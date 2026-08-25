@@ -515,7 +515,12 @@ export default function PlayerDetail({
             pushing the photo off the sheet. */}
         <div className="min-w-0">
           <h3 className="text-[22px] font-bold leading-tight">{player.full_name}</h3>
-          <p className="mt-1 text-sm font-semibold text-white/[.85]">{position}</p>
+          {/* ⚠️ STAFF ONLY, since 25 Aug 2026: position is decorated onto the
+              row from a staff-only table, so for a parent it is always absent
+              — and printing "Not set" for them would suggest an omission they
+              are not allowed to see corrected. canEdit is the staff signal
+              this sheet already carries; staff still get "Not set". */}
+          {canEdit && <p className="mt-1 text-sm font-semibold text-white/[.85]">{position}</p>}
           <p className="text-sm font-semibold text-white/[.85]">{teamName}</p>
           {/* Captaincy used to live in a "Role" key/value row below, because
               the prototype's "©" suffix is announced as "copyright" and means

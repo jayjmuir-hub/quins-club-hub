@@ -15,9 +15,19 @@ import userEvent from '@testing-library/user-event'
 const useMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
 const insertPlayersMock = vi.fn()
+const savePlayerPositionsMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
+}))
+
+// The importer writes positions to staff-only player_positions AFTER the
+// insert (25 Aug 2026) — the players payload carries no position key.
+vi.mock('../src/data/playerTiers.js', () => ({
+  listPlayerGrades: vi.fn(async () => new Map()),
+  listPlayerUnits: vi.fn(async () => new Map()),
+  listPlayerPositions: vi.fn(async () => new Map()),
+  savePlayerPositions: (...a) => savePlayerPositionsMock(...a),
 }))
 
 vi.mock('../src/data/players.js', () => ({
@@ -51,6 +61,7 @@ beforeEach(() => {
   useMembershipsMock.mockReturnValue({ memberships: ADMIN, teams: TEAMS })
   listPlayersMock.mockResolvedValue([])
   insertPlayersMock.mockResolvedValue([{ id: 'new-1' }])
+  savePlayerPositionsMock.mockResolvedValue([])
 })
 
 async function openImport(user) {
@@ -189,8 +200,11 @@ describe('Import — writing', () => {
       // and must arrive as null — NOT '' and NOT missing. The database's
       // players_gender_check refuses the empty string, and a bulk insert is a
       // single statement, so one '' would abort all 300 rows.
-      { club_id: 'club-1', team_id: 'team-u10', full_name: 'Tom Fletcher', position: 'Flanker', gender: null },
+      // No position key: staff-only since 25 Aug 2026, written to
+      // player_positions in the second phase asserted below.
+      { club_id: 'club-1', team_id: 'team-u10', full_name: 'Tom Fletcher', gender: null },
     ]))
+    await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('new-1', ['Flanker']))
   })
 
   it('never sends jersey_num — the club does not use squad numbers', async () => {

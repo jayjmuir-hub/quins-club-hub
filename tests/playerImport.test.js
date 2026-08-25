@@ -297,9 +297,13 @@ describe('parsePlayerPaste — players already on the roster', () => {
 describe('toInsertRows', () => {
   it('emits only valid rows, shaped for the players table', () => {
     const r = parse('Tom Fletcher\tProp\tU10\nBad\tProp')
+    // ⚠️ NO position key since 25 Aug 2026: positions are staff-only and go to
+    // player_positions in a second write after the insert — the parsed row
+    // still carries it for that write (asserted below).
     expect(toInsertRows(r, { clubId: 'club-1' })).toEqual([
-      { club_id: 'club-1', gender: null, team_id: 'team-u10', full_name: 'Tom Fletcher', position: 'Prop' },
+      { club_id: 'club-1', gender: null, team_id: 'team-u10', full_name: 'Tom Fletcher' },
     ])
+    expect(r.rows.find((row) => row.ok).position).toBe('Prop')
   })
 
   it('never emits jersey_num — the club does not use squad numbers', () => {

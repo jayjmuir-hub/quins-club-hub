@@ -3,7 +3,7 @@ import Badge from './Badge.jsx'
 import Card from './Card.jsx'
 import PlayerAvatar from './PlayerAvatar.jsx'
 import Button from './Button.jsx'
-import { POSITIONS } from '../lib/positions.js'
+import { POSITIONS_BY_UNIT } from '../lib/positions.js'
 import { GENDERS } from '../lib/gender.js'
 import { upsertPlayer } from '../data/players.js'
 
@@ -100,9 +100,15 @@ export default function RosterTable({
   hiddenColumns = null,
   // player id -> 'A' | 'B' | 'C'. Only ever passed for a coach.
   tierByPlayer = null,
-  // player id -> ['Prop', 'Hooker']. The FULL set; players.position is the
-  // primary and is what the inline editor below still writes.
+  // player id -> ['Prop', 'Hooker']. The FULL set, first is the PRIMARY.
+  // Staff-only since 25 Aug 2026: passing null (what Roster does for a
+  // parent) also removes the Position column entirely.
   positionsByPlayer = null,
+  // async (playerId, positions) => void. The inline editor's write path —
+  // player_positions replaced players.position, and the caller owns the
+  // optimistic map update. Editing without it is a silent no-op, so pass it
+  // whenever rows are editable and positionsByPlayer is set.
+  onSavePositions = null,
 }) {
   const [sort, setSort] = useState({ key: 'full_name', dir: 'asc' })
   // Per-row, keyed by player id: the field currently in flight, and the last
@@ -145,13 +151,26 @@ export default function RosterTable({
     setErrors((e) => ({ ...e, [player.id]: null }))
     setSaving((s) => ({ ...s, [player.id]: field }))
     // Optimistic: the cell shows the new value immediately, and is put back
-    // if the write is refused.
-    onPatch(player.id, { [field]: value })
+    // if the write is refused. Position's optimism lives in the CALLER's
+    // positionsByPlayer map instead (25 Aug 2026): the row's position is
+    // decorated from that map, so an onPatch here would be overwritten on
+    // the very next render.
+    if (field !== 'position') onPatch(player.id, { [field]: value })
 
     try {
-      await upsertPlayer({ id: player.id, [field]: value })
+      if (field === 'position') {
+        // The picked position becomes the primary; the player's other
+        // positions keep their order behind it. players.position is nulled
+        // and staff-only — player_positions is the only store now.
+        const others = (positionsByPlayer?.get(player.id) ?? []).filter(
+          (name) => name !== previous && name !== value,
+        )
+        await onSavePositions?.(player.id, value ? [value, ...others] : others)
+      } else {
+        await upsertPlayer({ id: player.id, [field]: value })
+      }
     } catch (err) {
-      onPatch(player.id, { [field]: previous })
+      if (field !== 'position') onPatch(player.id, { [field]: previous })
       setErrors((e) => ({
         ...e,
         [player.id]: err?.message || "We couldn't save that change.",
@@ -166,8 +185,13 @@ export default function RosterTable({
   // repeated "U16B Contact" four times. Both are the same fault — a column whose
   // value never varies carries no information — so the caller passes which ones
   // are constant rather than this file special-casing two of them by name.
-  const columns = SORTABLE.filter((column) => !hiddenColumns?.has(column.key))
-  const show = (key) => !hiddenColumns?.has(key)
+  // ⚠️ THE POSITION COLUMN EXISTS ONLY WHEN THE CALLER PASSED THE POSITIONS
+  // MAP — which Roster does for staff and never for a parent (staff-only
+  // since 25 Aug 2026). A parent's rows carry no position at all, and a
+  // column of "Not set" would state a gap they are not allowed to see filled.
+  const show = (key) =>
+    !hiddenColumns?.has(key) && (key !== 'position' || positionsByPlayer != null)
+  const columns = SORTABLE.filter((column) => show(column.key))
   // Every column a heading row has to stretch across: the visible ones, the
   // optional Tier column, and the Open column.
   const span = columns.length + (tierByPlayer ? 1 : 0) + 1
@@ -325,6 +349,7 @@ export default function RosterTable({
                     )}
                   </td>
 
+                  {show('position') && (
                   <td className={BODY_CELL}>
                     {editable ? (
                       <select
@@ -335,9 +360,21 @@ export default function RosterTable({
                         onChange={(event) => save(player, 'position', event.target.value || null)}
                       >
                         <option value="">Not set</option>
-                        {POSITIONS.map((p) => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
+                        {/* Grouped the way the form now asks the question:
+                            forward or back first, the position under it. */}
+                        <optgroup label="Forwards">
+                          {POSITIONS_BY_UNIT.forward.filter((p) => p !== 'Utility').map((p) => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Backs">
+                          {POSITIONS_BY_UNIT.back.filter((p) => p !== 'Utility').map((p) => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </optgroup>
+                        {/* Utility sits under both units, so it groups under
+                            neither here. */}
+                        <option value="Utility">Utility</option>
                       </select>
                     ) : (
                       <span className="px-2 text-ink-muted">{player.position || 'Not set'}</span>
@@ -362,6 +399,7 @@ export default function RosterTable({
                       </span>
                     )}
                   </td>
+                  )}
 
                   {show('gender') && (
                   <td className={BODY_CELL}>

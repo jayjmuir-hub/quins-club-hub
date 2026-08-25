@@ -53,6 +53,19 @@ vi.mock('../src/data/players.js', () => ({
   setOwnPlayerGender: (...a) => setOwnPlayerGenderMock(...a),
 }))
 
+// Positions are staff-only since 25 Aug 2026: the roster decorates its rows
+// from player_positions for staff. Every fixture in this file is a Flanker,
+// so the map hands Flanker back for whatever ids the screen asks about.
+vi.mock('../src/data/playerTiers.js', () => ({
+  TIERS: ['A', 'B', 'C'],
+  listPlayerGrades: vi.fn(async () => new Map()),
+  listPlayerUnits: vi.fn(async () => new Map()),
+  savePlayerPositions: vi.fn(async () => []),
+  setPlayerGrade: vi.fn(async () => null),
+  setPlayerUnit: vi.fn(async () => null),
+  listPlayerPositions: vi.fn(async (ids) => new Map((ids ?? []).map((id) => [id, ['Flanker']]))),
+}))
+
 vi.mock('../src/data/parents.js', () => ({
   listParents: (...a) => listParentsMock(...a),
   listParentsForPlayers: async () => ({}),
@@ -161,8 +174,13 @@ beforeEach(() => {
 describe('Gender on the roster list', () => {
   it('appends a recorded gender to the player row', async () => {
     await renderRoster(ADMIN, [A_GIRL])
-    const row = await screen.findByRole('button', { name: /Amy Rose/i })
-    expect(within(row).getByText(/Flanker · U14 · Female/)).toBeInTheDocument()
+    // Re-queried inside waitFor: the position arrives from the staff-only
+    // table after first paint and its arrival re-buckets the groups, so a row
+    // captured earlier can be a detached node.
+    await waitFor(() => {
+      const row = screen.getByRole('button', { name: /Amy Rose/i })
+      expect(within(row).getByText(/Flanker · U14 · Female/)).toBeInTheDocument()
+    })
   })
 
   // ⚠️ The injected fault for the test above. If genderLabel ever returned a
@@ -170,9 +188,11 @@ describe('Gender on the roster list', () => {
   // roster rows would carry a nag about missing data.
   it('shows nothing at all when the gender is not recorded', async () => {
     await renderRoster(ADMIN, [UNKNOWN])
-    const row = await screen.findByRole('button', { name: /Chris Dale/i })
-    expect(within(row).getByText('Flanker · U14')).toBeInTheDocument()
-    expect(within(row).queryByText(/Not set|Not recorded|·\s*$/)).toBeNull()
+    await waitFor(() => {
+      const row = screen.getByRole('button', { name: /Chris Dale/i })
+      expect(within(row).getByText('Flanker · U14')).toBeInTheDocument()
+      expect(within(row).queryByText(/Not set|Not recorded|·\s*$/)).toBeNull()
+    })
   })
 })
 

@@ -1,19 +1,18 @@
 import { supabase } from '../lib/supabase.js'
 
-// Player grading (A/B/C) and the positions a player can cover.
+// Player grading (A/B/C), the positions a player can cover, and forward-or-back.
 // Phase 2 of claude/plans/2026-08-14-tiers-and-game-time.md.
 //
-// ⚠️ TWO TABLES WITH DELIBERATELY DIFFERENT VISIBILITY, AND THEY MUST NOT BE
-// TIDIED INTO ONE SHAPE:
-//   player_grades    coach-only on BOTH read and write. A judgement about a
-//                    child's ability, in an app their parents use.
-//   player_positions squad-readable, coach-writable — the same class of
-//                    information as players.position, which the roster already
-//                    shows everybody.
+// ⚠️ ALL THREE TABLES ARE STAFF-ONLY, since 25 Aug 2026. player_positions was
+// squad-readable ("the same information the roster shows everybody") until Jay
+// reversed that ruling: "positions should only be viewable and editable by
+// staff". player_units carries what players.unit used to — the columns on
+// players could not be staff-only because RLS grants rows, not columns. See
+// db/migrations/20260825_positions_staff_only.sql.
 //
-// ⚠️ A GRADE READ RETURNING NOTHING IS NORMAL, NOT A FAILURE. For a parent the
-// policy returns zero rows by design, and for most players nobody has graded
-// them. Callers must render "not graded" rather than an error.
+// ⚠️ A READ RETURNING NOTHING IS NORMAL, NOT A FAILURE — for a parent every
+// policy here returns zero rows by design. Callers must render "not set" /
+// "not graded" rather than an error.
 
 export const TIERS = ['A', 'B', 'C']
 
@@ -102,9 +101,9 @@ export async function listPlayerPositions(playerIds) {
  * rows are moves and which are additions without ever colliding with one it is
  * about to remove. A player has at most a handful, edited by one coach at a time.
  *
- * ⚠️ THE CALLER MUST ALSO KEEP players.position IN STEP — it stays the PRIMARY
- * and six other screens read it. PlayerForm does that in the same submit; see the
- * migration's header for the full list of readers and why they were not rewritten.
+ * ⚠️ THE FIRST POSITION IS THE PRIMARY. players.position is nulled (and later
+ * dropped) by the 25 Aug staff-only migration; staff screens decorate their
+ * player rows from this table's map instead.
  */
 export async function savePlayerPositions(playerId, positions) {
   const { error: clearError } = await supabase
@@ -132,4 +131,46 @@ export async function savePlayerPositions(playerId, positions) {
     throw new Error("We couldn't save those positions. Check them and try again.")
   }
   return data
+}
+
+/** Forward-or-back for these players, keyed by player id: 'forward' | 'back'. */
+export async function listPlayerUnits(playerIds) {
+  const ids = [...new Set((playerIds ?? []).filter(Boolean))]
+  if (ids.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('player_units')
+    .select('player_id, unit')
+    .in('player_id', ids)
+
+  if (error) throw error
+  return new Map((data ?? []).map((row) => [row.player_id, row.unit]))
+}
+
+/**
+ * Sets or clears one player's forward-or-back.
+ *
+ * ⚠️ A FALSY UNIT DELETES THE ROW rather than storing a null — "not set" is the
+ * absence of a row, the same rule setPlayerGrade carries, and the table's CHECK
+ * allows only 'forward' | 'back' anyway.
+ */
+export async function setPlayerUnit(playerId, unit) {
+  if (!unit) {
+    const { error } = await supabase.from('player_units').delete().eq('player_id', playerId)
+    if (error) throw error
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('player_units')
+    .upsert({ player_id: playerId, unit }, { onConflict: 'player_id' })
+    .select('player_id, unit')
+
+  if (error) throw error
+  // Same zero-row check as setPlayerGrade: RLS refuses by matching nothing,
+  // which PostgREST reports as success.
+  if (!data || data.length === 0) {
+    throw new Error("We couldn't save that. Ask a club admin if that looks wrong.")
+  }
+  return data[0]
 }

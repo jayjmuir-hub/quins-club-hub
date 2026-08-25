@@ -34,6 +34,7 @@ vi.mock('../src/data/lineups.js', () => ({
 }))
 vi.mock('../src/data/playerTiers.js', () => ({
   listPlayerGrades: (...a) => listPlayerGradesMock(...a),
+  listPlayerPositions: vi.fn(async () => new Map()),
 }))
 vi.mock('../src/lib/shareImage.js', () => ({ shareElementAsImage: vi.fn() }))
 

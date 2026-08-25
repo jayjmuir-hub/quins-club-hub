@@ -20,6 +20,7 @@ const useMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
 const listPlayerGradesMock = vi.fn()
 const listPlayerPositionsMock = vi.fn()
+const listPlayerUnitsMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -43,6 +44,7 @@ vi.mock('../src/data/playerTiers.js', async (importOriginal) => ({
   ...(await importOriginal()),
   listPlayerGrades: (...a) => listPlayerGradesMock(...a),
   listPlayerPositions: (...a) => listPlayerPositionsMock(...a),
+  listPlayerUnits: (...a) => listPlayerUnitsMock(...a),
 }))
 
 import Roster from '../src/screens/Roster.jsx'
@@ -82,8 +84,19 @@ beforeEach(() => {
     ['p2', { player_id: 'p2', tier: 'A', note: null }],
     ['p3', { player_id: 'p3', tier: 'B', note: null }],
   ]))
+  // Since 25 Aug 2026 the screen reads position and unit from these
+  // staff-only maps and DECORATES its rows — the inline position/unit on the
+  // SQUAD fixtures above are ignored for a staff viewer, so the maps must
+  // mirror them or the grouping tests test nothing.
+  listPlayerUnitsMock.mockResolvedValue(new Map([
+    ['p1', 'forward'],
+    ['p2', 'back'],
+    ['p3', 'forward'],
+  ]))
   listPlayerPositionsMock.mockResolvedValue(new Map([
     ['p1', ['Prop', 'Hooker']],
+    ['p2', ['Wing']],
+    ['p3', ['Lock']],
   ]))
 })
 

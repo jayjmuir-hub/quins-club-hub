@@ -280,8 +280,11 @@ export default function YourPlayers({ memberships = [], teams = [], reload }) {
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-bold text-ink">{player.full_name}</p>
+                {/* Just the squad: position went staff-only on 25 Aug 2026
+                    (players.position is nulled), and this card is the
+                    parent's view. */}
                 <p className="text-[12.5px] font-semibold text-ink-muted">
-                  {[team?.name, player.position].filter(Boolean).join(' · ') || 'No age group'}
+                  {team?.name || 'No age group'}
                 </p>
               </div>
               {/* ⚠️ PER CHILD, NOT PER ACCOUNT. This is where a parent looks to

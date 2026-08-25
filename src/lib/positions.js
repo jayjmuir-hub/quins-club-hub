@@ -22,6 +22,18 @@ export const POSITIONS = [
   'Utility',
 ]
 
+// Which of the offerable positions each UNIT choice unlocks (Jay, 25 Aug 2026:
+// "forward or back selectable, then a sub selection for the rugby positions
+// under those two main categories"). Still the OFFERABLE list, not the
+// grouping rule — src/lib/rosterUnit.js buckets values that are not offerable
+// and stays separate for the reason at the top of this file. 'Utility' sits
+// under both: a utility forward and a utility back are both real answers, and
+// leaving it out of either list would make it unpickable for that unit.
+export const POSITIONS_BY_UNIT = {
+  forward: ['Prop', 'Hooker', 'Lock', 'Flanker', 'Number 8', 'Utility'],
+  back: ['Scrum-half', 'Fly-half', 'Centre', 'Wing', 'Fullback', 'Utility'],
+}
+
 // Case- and whitespace-insensitive lookup, returning the canonical spelling.
 // Pasted data will carry "flanker", "FLY-HALF", "number 8" and similar; the
 // database should still receive the enum's exact casing.

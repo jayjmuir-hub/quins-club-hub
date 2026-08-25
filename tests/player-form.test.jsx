@@ -44,8 +44,10 @@ vi.mock('../src/data/playerTiers.js', () => ({
   TIERS: ['A', 'B', 'C'],
   listPlayerGrades: async () => new Map(),
   listPlayerPositions: async () => new Map(),
+  listPlayerUnits: async () => new Map(),
   savePlayerPositions: async () => [],
   setPlayerGrade: async () => null,
+  setPlayerUnit: async () => null,
 }))
 
 // The photo bucket is private, so the form signs URLs and uploads through
@@ -351,26 +353,25 @@ describe('PlayerForm — shape and scoping', () => {
     expect(screen.queryByText(/jersey number|squad number|shirt number/i)).not.toBeInTheDocument()
   })
 
-  it('offers the club position list plus an unset option, since position is optional', () => {
+  it('offers the positions as a sub-selection under forward or back', async () => {
+    // Jay, 25 Aug 2026: "forward or back selectable, then a sub selection for
+    // the rugby positions under those two main categories". The standalone
+    // single-select Position field went with players.position (staff-only).
+    const user = userEvent.setup()
     renderForm()
-    const select = screen.getByLabelText('Position')
-    const options = within(select).getAllByRole('option').map((o) => o.textContent)
-    expect(options[0]).toMatch(/not set/i)
-    expect(options).toEqual(
-      expect.arrayContaining([
-        'Prop',
-        'Hooker',
-        'Lock',
-        'Flanker',
-        'Number 8',
-        'Scrum-half',
-        'Fly-half',
-        'Centre',
-        'Wing',
-        'Fullback',
-        'Utility',
-      ]),
-    )
+    expect(screen.queryByLabelText('Position')).not.toBeInTheDocument()
+    expect(screen.getByText(/choose forward or back/i)).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText(/forward or back/i), 'forward')
+    expect(screen.getByRole('checkbox', { name: 'Prop' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Number 8' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Utility' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Wing' })).not.toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText(/forward or back/i), 'back')
+    expect(screen.getByRole('checkbox', { name: 'Scrum-half' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Fullback' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Prop' })).not.toBeInTheDocument()
   })
 })
 
@@ -488,7 +489,6 @@ describe('PlayerForm — saving a new player', () => {
     const { onSaved, onClose } = renderForm({ memberships: COACH_TWO })
 
     await typePlayerName(user, '  Tom  ', '  Fletcher  ')
-    await user.selectOptions(screen.getByLabelText('Position'), 'Flanker')
     await user.selectOptions(screen.getByLabelText('Age group'), 't-u14')
     await user.click(screen.getByRole('radio', { name: 'Captain' }))
     await user.click(screen.getByRole('button', { name: /add player/i }))
@@ -504,18 +504,16 @@ describe('PlayerForm — saving a new player', () => {
       first_name: 'Tom',
       last_name: 'Fletcher',
       full_name: 'Tom Fletcher',
-      position: 'Flanker',
       is_captain: true,
       // Nobody touched the gender buttons in this test, so the payload must
       // carry an explicit null. toEqual is exact, which is what makes this
       // assertion worth having: it catches the field being dropped from the
       // payload AND it catching a default value being invented.
       gender: null,
-      // ⚠️ ADDED 14 Aug 2026 with players.unit, and this exact-match assertion
-      // is what caught it — which is the assertion doing its job rather than
-      // being in the way. Untouched here, so it must be an explicit null: a
-      // coach who has not decided forward-or-back has not said "forward".
-      unit: null,
+      // ⚠️ NO position AND NO unit keys, since 25 Aug 2026: both are
+      // staff-only and live in player_positions / player_units — the
+      // squad-readable players row must not carry either, and toEqual being
+      // exact is what enforces their ABSENCE here.
     })
     // No id on an insert, and never a jersey number.
     expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('id')
@@ -524,7 +522,7 @@ describe('PlayerForm — saving a new player', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('writes a null position rather than an empty string when none is chosen', async () => {
+  it('sends no position field at all — it is staff-only and lives elsewhere', async () => {
     const user = userEvent.setup()
     renderForm()
 
@@ -532,7 +530,7 @@ describe('PlayerForm — saving a new player', () => {
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
-    expect(upsertPlayerMock.mock.calls[0][0].position).toBeNull()
+    expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('position')
   })
 
   it('skips the contact write entirely when both contact fields are left blank', async () => {
@@ -615,7 +613,6 @@ describe('PlayerForm — editing an existing player', () => {
 
     expect(firstNameBox()).toHaveValue('Dhruv')
     expect(lastNameBox()).toHaveValue('Ramachandran')
-    expect(screen.getByLabelText('Position')).toHaveValue('Flanker')
     expect(screen.getByLabelText('Age group')).toHaveValue('t-u14')
     expect(screen.getByRole('radio', { name: 'Captain' })).toBeChecked()
 

@@ -645,6 +645,15 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.player_positions TO authenticated
 REVOKE ALL ON public.player_grades    FROM anon;
 REVOKE ALL ON public.player_positions FROM anon;
 
+-- ⚠️ THE VISIBILITY NOTE ABOVE IS OVERTAKEN, 25 Aug 2026: Jay made positions
+-- staff-only, so `player position manage` now IS the player_grades shape and
+-- the deliberate difference the note describes no longer exists — see
+-- db/migrations/20260825_positions_staff_only.sql, which also adds
+-- player_units (same shape, same grants). The note is left in place because
+-- this file records what each capture found, and it was true when captured.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.player_units TO authenticated;
+REVOKE ALL ON public.player_units FROM anon;
+
 -- ---------------------------------------------------------------------
 -- membership_audit  (17 Aug 2026) — the one table in this file that a client
 -- may READ and may not WRITE, and the only one where that asymmetry is the

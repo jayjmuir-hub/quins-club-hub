@@ -10,9 +10,9 @@ import {
 } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
-import { POSITIONS } from '../lib/positions.js'
+import { POSITIONS, POSITIONS_BY_UNIT } from '../lib/positions.js'
 import { isMinisTeam } from '../lib/minis.js'
-import { listPlayerGrades, listPlayerPositions, savePlayerPositions, setPlayerGrade, TIERS } from '../data/playerTiers.js'
+import { listPlayerGrades, listPlayerPositions, listPlayerUnits, savePlayerPositions, setPlayerGrade, setPlayerUnit, TIERS } from '../data/playerTiers.js'
 import { listParents, saveParents } from '../data/parents.js'
 import { deletePlayerPhoto, forgetPhotoUrl, uploadPlayerPhoto } from '../data/photos.js'
 import useOwnContactGate from '../lib/useOwnContactGate.js'
@@ -125,11 +125,11 @@ function initialValues(player, editableTeams) {
     // box here means an empty column, which is the truth.
     firstName: player?.first_name ?? '',
     lastName: player?.last_name ?? '',
-    position: player?.position ?? '',
-    unit: player?.unit ?? '',
-    // ⚠️ BOTH LOAD ASYNCHRONOUSLY and so start empty rather than from `player`.
-    // player_positions and player_grades are separate tables — the roster row
-    // this form is opened from carries neither. See the effect below.
+    // ⚠️ ALL THREE LOAD ASYNCHRONOUSLY and so start empty rather than from
+    // `player`. player_positions, player_units and player_grades are separate
+    // STAFF-ONLY tables (25 Aug 2026) — the roster row this form is opened
+    // from carries none of them. See the effect below.
+    unit: '',
     positions: [],
     tier: '',
     // An existing player's own squad wins, even if the editable list hasn't
@@ -259,6 +259,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
 
     Promise.allSettled([
       listPlayerPositions([player.id]),
+      listPlayerUnits([player.id]),
       listPlayerGrades([player.id]),
       // ⚠️ THE BIRTHDAY, ADDED 17 Aug 2026, AND IT BELONGS IN THIS allSettled
       // RATHER THAN ITS OWN EFFECT for the reason the comment above gives about
@@ -268,7 +269,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       // an empty box, which is the same thing they saw before this existed.
       getPlayerDob(player.id),
     ]).then(
-      ([positionsResult, gradesResult, dobResult]) => {
+      ([positionsResult, unitsResult, gradesResult, dobResult]) => {
         if (!mounted) return
         if (dobResult.status === 'fulfilled') setDobOnFile(dobResult.value ?? '')
         setValues((current) => ({
@@ -278,6 +279,10 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             positionsResult.status === 'fulfilled'
               ? positionsResult.value.get(player.id) ?? []
               : current.positions,
+          unit:
+            unitsResult.status === 'fulfilled'
+              ? unitsResult.value.get(player.id) ?? ''
+              : current.unit,
           tier:
             gradesResult.status === 'fulfilled'
               ? gradesResult.value.get(player.id)?.tier ?? ''
@@ -522,18 +527,11 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
       first_name: firstName,
       last_name: lastName || null,
       full_name: [firstName, lastName].filter(Boolean).join(' '),
-      // ⚠️ STILL THE PRIMARY, AND KEPT IN STEP WITH THE FIRST SELECTED POSITION.
-      // Six things read players.position (the roster meta line and its inline
-      // editor, YourPlayers, PlayerDetail, the importer, the forwards/backs
-      // fallback) and none of them were rewritten — see the player_positions
-      // migration. When the coach has picked positions, the first one wins; the
-      // single-select below is kept for the players who only ever have one.
-      // Parenthesised because `??` and `||` cannot be mixed bare — and the
-      // grouping matters: a ticked position wins, otherwise the single-select
-      // falls back to null when it is ''.
-      position: values.positions[0] ?? (values.position || null),
-      // '' means nobody has decided, which is a real answer and stays NULL.
-      unit: values.unit || null,
+      // ⚠️ NO position AND NO unit, since 25 Aug 2026. Both are staff-only now
+      // and live in player_positions / player_units, written below — the
+      // squad-readable players row must not carry either. The columns still
+      // exist until the post-deploy DROP migration; this form just stops
+      // feeding them.
       is_captain: values.isCaptain,
       // `?? null` rather than `|| null` so the value is written through
       // exactly as held. Both happen to behave the same for the two strings
@@ -683,6 +681,14 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         } catch (err) {
           onSaved?.(saved)
           setErrorStage('positions')
+          setError(err)
+          return
+        }
+        try {
+          await setPlayerUnit(saved.id, values.unit || null)
+        } catch (err) {
+          onSaved?.(saved)
+          setErrorStage('unit')
           setError(err)
           return
         }
@@ -856,7 +862,20 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           <select
             id="player-unit"
             value={values.unit}
-            onChange={setFromInput('unit')}
+            onChange={(domEvent) => {
+              const unit = domEvent.target.value
+              // Switching category drops positions the new one doesn't offer:
+              // "back" plus a ticked Prop is exactly the data error the unit
+              // ruling says a human must fix, so the form doesn't create it.
+              // Utility is in both lists and survives the switch.
+              setValues((current) => ({
+                ...current,
+                unit,
+                positions: unit
+                  ? current.positions.filter((p) => POSITIONS_BY_UNIT[unit].includes(p))
+                  : current.positions,
+              }))
+            }}
             className={inputClasses(false)}
           >
             <option value="">Not set</option>
@@ -875,11 +894,21 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             because a checkbox list has no memory of which was pressed first and
             pretending otherwise would make the primary depend on invisible
             state. */}
-        {!minisPlayer && (
+        {/* ⚠️ NESTED UNDER THE UNIT (Jay, 25 Aug 2026: "forward or back
+            selectable, then a sub selection for the rugby positions under
+            those two main categories"). No unit chosen means no checkboxes —
+            the coarse answer comes first, and offering all eleven positions
+            before it is what this replaced. */}
+        {!minisPlayer && !values.unit && (
+        <p className="text-[12.5px] leading-relaxed text-ink-muted">
+          Choose forward or back to pick the positions they can play.
+        </p>
+        )}
+        {!minisPlayer && values.unit && (
         <fieldset className={FIELD}>
           <legend className={LABEL}>Positions they can play</legend>
           <div className="flex flex-wrap gap-2">
-            {POSITIONS.map((position) => {
+            {POSITIONS_BY_UNIT[values.unit].map((position) => {
               const on = values.positions.includes(position)
               return (
                 <label key={position}>
@@ -954,29 +983,10 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         </div>
         )}
 
-        {!minisPlayer && (
-        <div className={FIELD}>
-          <label className={LABEL} htmlFor="player-position">
-            Position
-          </label>
-          {/* Optional: players.position is nullable and most of the club's
-              records don't carry one yet, so "Not set" is a real answer
-              rather than a placeholder to be got rid of. */}
-          <select
-            id="player-position"
-            value={values.position}
-            onChange={setFromInput('position')}
-            className={inputClasses(false)}
-          >
-            <option value="">Not set</option>
-            {POSITIONS.map((position) => (
-              <option key={position} value={position}>
-                {position}
-              </option>
-            ))}
-          </select>
-        </div>
-        )}
+        {/* The standalone single-select "Position" field lived here until
+            25 Aug 2026. The primary is the first ticked position above; a
+            second control writing the same fact was already redundant, and
+            it wrote players.position, which is nulled and staff-only now. */}
 
         <div className={FIELD}>
           <label className={LABEL} htmlFor="player-team">
@@ -1153,6 +1163,9 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
                 The player was saved, but their positions were not — they may now have
                 none. Check them and save again.
               </span>
+            )}
+            {errorStage === 'unit' && (
+              <span className="block">The player was saved, but forward-or-back was not.</span>
             )}
             {errorStage === 'grade' && (
               <span className="block">The player was saved, but their tier was not.</span>

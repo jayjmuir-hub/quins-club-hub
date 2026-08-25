@@ -320,6 +320,21 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
 
 ## One migration each
 
+- **Positions staff-only, the two follow-ups (25 Aug 2026).**
+  `db/migrations/20260825_positions_staff_only.sql` moves position/unit into
+  staff-only tables and NULLS `players.position` / `players.unit`. Left open
+  deliberately:
+  1. **A later migration DROPS the two nulled columns** — deploy first, drop
+     second (the destructive-schema rule); until then the columns exist,
+     empty, and nothing reads or writes them.
+  2. **Re-capture `db/schema/`** after the migration applies — tables.sql
+     still carries the pre-25-Aug "NOT sensitive, parents already read it"
+     prose on both columns, and policies.sql predates player_grades entirely.
+  Also: the screenshot harness has NO playerTiers stub (it never did), so its
+  roster shots now render "Position not set" where the stub players carried
+  inline positions — cosmetic, but a stub returning the maps is the fix when
+  the shots are next regenerated.
+
 - **`anon` holds full table privileges on `public`.** ⚠️ **Re-measured 14 Aug 2026:
   it is 23 of the 24 tables, not the "seven" this line used to claim** — seven was a
   sample read as a total. The exception is `photo_backup_runs`, created 13 Aug with

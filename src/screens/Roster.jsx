@@ -11,7 +11,7 @@ import TeamFilter, { ALL_TEAMS_ID } from '../components/TeamFilter.jsx'
 import { positionGroup, POSITION_GROUP_ORDER } from '../lib/rosterUnit.js'
 import { buildRosterGroups, constantColumns, GROUP_BY } from '../lib/rosterGrouping.js'
 import { isMinisTeam } from '../lib/minis.js'
-import { listPlayerGrades, listPlayerPositions } from '../data/playerTiers.js'
+import { listPlayerGrades, listPlayerPositions, listPlayerUnits, savePlayerPositions } from '../data/playerTiers.js'
 import PlayerDetail from './PlayerDetail.jsx'
 import PlayerForm from './PlayerForm.jsx'
 import MyPlayerForm from './MyPlayerForm.jsx'
@@ -112,7 +112,7 @@ function ChevronRightIcon(props) {
   )
 }
 
-function PlayerRow({ player, teamName, photoUrl, age = null, onSelect }) {
+function PlayerRow({ player, teamName, photoUrl, age = null, showPosition = false, onSelect }) {
   return (
     <button
       type="button"
@@ -155,8 +155,13 @@ function PlayerRow({ player, teamName, photoUrl, age = null, onSelect }) {
             thirds of a squad is noise while a blank is worse. It also appears
             only for staff: the screen does not read a birthday at all for a
             parent, so this is never half-filled. */}
+        {/* ⚠️ THE POSITION APPEARS ONLY FOR STAFF (Jay, 25 Aug 2026) — it is
+            decorated onto the row from a staff-only table, so for a parent it
+            is always absent, and printing "Position not set" for them would
+            state a gap they are not allowed to see filled. Staff still get
+            "Position not set", which for them is an honest to-do. */}
         <span className="mt-0.5 block text-[12.5px] text-ink-faint">
-          {player.position || 'Position not set'} · {teamName}
+          {showPosition ? `${player.position || 'Position not set'} · ` : ''}{teamName}
           {genderLabel(player.gender) ? ` · ${genderLabel(player.gender)}` : ''}
           {Number.isFinite(age) ? ` · ${age}` : ''}
         </span>
@@ -167,7 +172,7 @@ function PlayerRow({ player, teamName, photoUrl, age = null, onSelect }) {
   )
 }
 
-function RosterGroup({ label, players, teamsById, photoUrls, ageByPlayer, onSelect }) {
+function RosterGroup({ label, players, teamsById, photoUrls, ageByPlayer, showPosition = false, onSelect }) {
   return (
     <div className="mb-4 last:mb-0">
       <h3 className={`mb-2 flex items-center gap-2 text-[12.5px] font-extrabold uppercase tracking-[.5px] ${MUTED_ON_PAPER}`}>
@@ -187,6 +192,7 @@ function RosterGroup({ label, players, teamsById, photoUrls, ageByPlayer, onSele
             teamName={teamsById.get(player.team_id)?.name ?? 'No age group'}
             photoUrl={player.photo_path ? photoUrls?.[player.photo_path] : undefined}
             age={ageByPlayer?.get(player.id) ?? null}
+            showPosition={showPosition}
             onSelect={onSelect}
           />
         ))}
@@ -224,6 +230,7 @@ export default function Roster() {
   // a policy that already says no.
   const [tierByPlayer, setTierByPlayer] = useState(new Map())
   const [positionsByPlayer, setPositionsByPlayer] = useState(new Map())
+  const [unitsByPlayer, setUnitsByPlayer] = useState(new Map())
   const [selectedPlayerId, setSelectedPlayerId] = useState(null)
   // null when the add/edit sheet is closed; { player } when open (player is
   // null for "add"). An object rather than a boolean so opening the form for
@@ -385,17 +392,19 @@ export default function Roster() {
     if (!canEditAnything || playerIdKey === '') {
       setTierByPlayer(new Map())
       setPositionsByPlayer(new Map())
+      setUnitsByPlayer(new Map())
       return undefined
     }
     let mounted = true
     const ids = playerIdKey.split(',')
-    Promise.all([listPlayerGrades(ids), listPlayerPositions(ids)])
-      .then(([grades, positions]) => {
+    Promise.all([listPlayerGrades(ids), listPlayerPositions(ids), listPlayerUnits(ids)])
+      .then(([grades, positions, units]) => {
         if (!mounted) return
         // listPlayerGrades hands back the whole row; the table only wants the
         // letter.
         setTierByPlayer(new Map([...grades].map(([id, row]) => [id, row.tier])))
         setPositionsByPlayer(positions)
+        setUnitsByPlayer(units)
       })
       .catch(() => {
         // A failure here must not take the roster down with it: the names, the
@@ -404,12 +413,17 @@ export default function Roster() {
         if (mounted) {
           setTierByPlayer(new Map())
           setPositionsByPlayer(new Map())
+          setUnitsByPlayer(new Map())
         }
       })
     return () => {
       mounted = false
     }
-  }, [canEditAnything, playerIdKey])
+    // ⚠️ reloadToken IS IN THE KEY since 25 Aug 2026: a PlayerForm save calls
+    // refresh(), and with players.position gone these maps are the ONLY source
+    // of what the form just changed — same ids, so playerIdKey alone would
+    // leave the table showing the old positions until a remount.
+  }, [canEditAnything, playerIdKey, reloadToken])
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
   const normalisedQuery = query.trim().toLowerCase()
@@ -436,7 +450,22 @@ export default function Roster() {
   // about; the pill selects within it. Applying gender after the pill counts
   // were computed would make the counts describe a set the list no longer
   // shows.
-  const matchingSearch = players.filter(
+  // ⚠️ THE DECORATION, and it is what keeps this change small. position and
+  // unit moved off the players row into staff-only tables (25 Aug 2026 —
+  // parents must not see them, and RLS grants rows, not columns). Stamping
+  // them back onto the row HERE, for staff only, means every downstream
+  // reader — search, grouping, sorting, the table cell, the detail sheet —
+  // keeps reading player.position/player.unit exactly as before. For a
+  // parent both stay absent, which is the point.
+  const scopedPlayers = canEditAnything
+    ? players.map((player) => ({
+        ...player,
+        position: positionsByPlayer.get(player.id)?.[0] ?? null,
+        unit: unitsByPlayer.get(player.id) ?? null,
+      }))
+    : players
+
+  const matchingSearch = scopedPlayers.filter(
     (player) =>
       matchesQuery(player, teamsById.get(player.team_id)?.name ?? '', normalisedQuery) &&
       // ⚠️ 'unrecorded' IS NOT ON THE RADIO ROW. It is reachable only by
@@ -517,8 +546,12 @@ export default function Roster() {
   // because nobody has told the app whether a seven-year-old is a prop. The
   // age-group branch gives one heading carrying the squad's name instead, which
   // says something true.
+  // ⚠️ AND NEVER FOR A PARENT, since positions went staff-only (25 Aug 2026):
+  // their rows carry no unit and no position, so this branch would file every
+  // child under one heading reading "Other" — the same degenerate heading the
+  // minis exception below already guards against, for the same reason.
   const groupByPosition =
-    !minisOnly && (activeFilter !== ALL_TEAMS_ID || scopedTeams.length === 1)
+    canEditAnything && !minisOnly && (activeFilter !== ALL_TEAMS_ID || scopedTeams.length === 1)
 
   // Not memoised: `visible` is rebuilt on every render anyway (it depends on
   // the search box), so a useMemo here would never hit its cache and would
@@ -590,6 +623,29 @@ export default function Roster() {
   // would reorder the table under the user's cursor mid-edit.
   const patchPlayer = (id, patch) => {
     setPlayers((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)))
+  }
+
+  // The table's position write (25 Aug 2026: player_positions replaced
+  // players.position). The map is what decorates player.position, so THIS is
+  // where the optimism lives — updated before the request, put back if the
+  // write is refused, and the throw lets the table put its refusal message in
+  // the row that caused it.
+  const savePositionsFor = async (playerId, positions) => {
+    const previous = positionsByPlayer.get(playerId)
+    const stamp = (list) =>
+      setPositionsByPlayer((current) => {
+        const next = new Map(current)
+        if (list?.length) next.set(playerId, list)
+        else next.delete(playerId)
+        return next
+      })
+    stamp(positions)
+    try {
+      await savePlayerPositions(playerId, positions)
+    } catch (err) {
+      stamp(previous)
+      throw err
+    }
   }
 
   const persistFilter = (next) => {
@@ -876,7 +932,11 @@ export default function Roster() {
           // these squads have no grades and no positions to show, and a coach
           // who moves a child up to U11 gets both columns back with the pill.
           tierByPlayer={canEditAnything && !minisOnly ? tierByPlayer : null}
+          // ⚠️ SINCE 25 Aug 2026 THIS ALSO CONTROLS THE POSITION COLUMN'S
+          // EXISTENCE — positions are staff-only, and a parent's table must
+          // not carry the column at all.
           positionsByPlayer={canEditAnything && !minisOnly ? positionsByPlayer : null}
+          onSavePositions={savePositionsFor}
         />
       )}
 
@@ -891,6 +951,7 @@ export default function Roster() {
             teamsById={teamsById}
             photoUrls={photoUrls}
             ageByPlayer={ageByPlayer}
+            showPosition={canEditAnything && !minisOnly}
             onSelect={setSelectedPlayerId}
           />
         ))}

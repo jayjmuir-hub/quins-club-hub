@@ -41,7 +41,7 @@ vi.mock('../src/lib/shareImage.js', () => ({ shareElementAsImage: vi.fn() }))
 // that read's failure by design — so without this mock the suite still PASSED
 // while making a real Supabase request per test and paying for the timeout. Grades
 // themselves are tested in tests/lineup-eligibility.test.jsx.
-vi.mock('../src/data/playerTiers.js', () => ({ listPlayerGrades: vi.fn(async () => new Map()) }))
+vi.mock('../src/data/playerTiers.js', () => ({ listPlayerGrades: vi.fn(async () => new Map()), listPlayerPositions: vi.fn(async () => new Map()) }))
 
 import Lineup from '../src/screens/Lineup.jsx'
 

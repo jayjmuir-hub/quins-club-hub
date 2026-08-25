@@ -50,6 +50,8 @@ vi.mock('../src/data/playerTiers.js', async (importOriginal) => ({
   listPlayerPositions: (...a) => listPlayerPositionsMock(...a),
   savePlayerPositions: vi.fn(async () => []),
   setPlayerGrade: vi.fn(async () => null),
+  listPlayerUnits: vi.fn(async () => new Map()),
+  setPlayerUnit: vi.fn(async () => null),
 }))
 
 import Roster from '../src/screens/Roster.jsx'
@@ -177,13 +179,21 @@ describe('PlayerForm — a minis player', () => {
     expect(screen.getByLabelText(/age group/i)).toBeInTheDocument()
   })
 
-  it('⚠️ HAS all four at U14 — the control', () => {
-    open([U14B])
+  it('⚠️ HAS the selection fields at U14 — the control', async () => {
+    const user = open([U14B])
 
     expect(screen.getByLabelText(/^tier$/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/forward or back/i)).toBeInTheDocument()
-    expect(screen.getByText(/positions they can play/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/^position$/i)).toBeInTheDocument()
+    // Positions nest under the unit since 25 Aug 2026: the prompt shows until
+    // forward-or-back is chosen, then the sub-selection appears. The old
+    // standalone single-select Position field is gone with players.position.
+    expect(screen.getByText(/choose forward or back/i)).toBeInTheDocument()
+    // By role: the prompt sentence above also contains the words "positions
+    // they can play", so a text query would match it and prove nothing.
+    expect(screen.queryByRole('group', { name: /positions they can play/i })).not.toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText(/forward or back/i), 'forward')
+    expect(screen.getByRole('group', { name: /positions they can play/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^position$/i)).not.toBeInTheDocument()
   })
 
   it('⚠️ MOVES WITH THE AGE GROUP DROPDOWN, in the same sitting', async () => {

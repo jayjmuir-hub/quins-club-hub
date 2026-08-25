@@ -212,7 +212,10 @@ describe('More — your players', () => {
 
     const card = await screen.findByTestId('your-player')
     expect(within(card).getByText('Tom Muir')).toBeInTheDocument()
-    expect(within(card).getByText(/U10 · Flanker/)).toBeInTheDocument()
+    // Squad only — the position went staff-only on 25 Aug 2026 and this card
+    // is the parent's own view.
+    expect(within(card).getByText('U10')).toBeInTheDocument()
+    expect(within(card).queryByText(/Flanker/)).toBeNull()
   })
 
   /* ══════════════════════════════════════════════════════════════════════

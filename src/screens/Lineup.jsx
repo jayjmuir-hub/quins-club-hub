@@ -8,7 +8,7 @@ import { getEvent } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
 import { listAvailability } from '../data/availability.js'
 import { createLineup, listLineups, saveLineupPlayers, updateLineup } from '../data/lineups.js'
-import { listPlayerGrades } from '../data/playerTiers.js'
+import { listPlayerGrades, listPlayerPositions } from '../data/playerTiers.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam } from '../lib/scope.js'
 import { TIER_OK, tierEligibility } from '../lib/tierEligibility.js'
@@ -180,7 +180,16 @@ export default function Lineup() {
           listAvailability(eventId),
         ])
         if (!mounted) return
-        setPlayers(playerRows)
+        // Positions moved off the players row into staff-only player_positions
+        // (25 Aug 2026). This screen is staff-run, so decorate each row with
+        // the primary the way Roster does — saveLineupPlayers snapshots
+        // player.position into the sheet. Swallowed like grades below: a
+        // lineup without positions is still a lineup.
+        const positionRows = await listPlayerPositions(playerRows.map((p) => p.id)).catch(
+          () => new Map(),
+        )
+        if (!mounted) return
+        setPlayers(playerRows.map((p) => ({ ...p, position: positionRows.get(p.id)?.[0] ?? null })))
         setStatuses(statusMap(availabilityRows))
 
         // ⚠️ ITS FAILURE IS SWALLOWED, UNLIKE EVERYTHING ELSE ON THIS SCREEN, AND
