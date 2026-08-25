@@ -1,9 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Button from './Button.jsx'
-import ChatPhoto from './ChatPhoto.jsx'
+import ChatBubble from './ChatBubble.jsx'
 import EmojiPicker from './EmojiPicker.jsx'
-import ReactionBar from './ReactionBar.jsx'
 import Spinner from './Spinner.jsx'
 import { uploadChatPhoto } from '../data/chatMedia.js'
 import { listMyNicknames } from '../data/nicknames.js'
@@ -27,7 +26,6 @@ import {
 import { useAuth } from '../lib/auth.jsx'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { stampLabel } from '../lib/notices.js'
 import { RowAvatar, previewLine, scopeChatRows } from '../screens/ChatList.jsx'
 
 // The floating chat dock — claude/plans/2026-08-24-floating-chat-dock.md.
@@ -354,6 +352,20 @@ export default function FloatingChatDock({ badge = false }) {
                 {thread?.length === 0 && <p className="px-1 py-4 text-[13px] text-ink-muted">Nothing here yet.</p>}
                 {thread?.map((m, index) => {
                   const mine = m.author_id === selfId
+                  const authorName = nicknames.get(m.author_id) ?? m.author?.full_name ?? 'Someone'
+                  const tallies = reactions.get(m.id) ?? []
+                  // 1:1 chrome already names them. Groups, staff and squad
+                  // channels still need the name on THEIRS — same rule as
+                  // DirectMessages Thread / MessageRow.
+                  const named = active.kind !== 'dm'
+                  const quote = m.quoted?.id && !m.deleted_at ? (
+                    <p
+                      className={`mb-0.5 truncate rounded-[6px] border-l-2 px-1.5 py-0.5 text-[11px] ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-brand bg-surface-mute text-ink-muted'}`}
+                      data-testid="quote-block"
+                    >
+                      {m.quoted.deleted_at ? 'Message deleted' : (m.quoted.body?.trim() ? m.quoted.body : '📷 Photo')}
+                    </p>
+                  ) : null
                   return (
                     <Fragment key={m.id}>
                       {daysDiffer(thread[index - 1]?.created_at, m.created_at) && (
@@ -363,48 +375,29 @@ export default function FloatingChatDock({ badge = false }) {
                           </span>
                         </div>
                       )}
-                    <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dock-bubble">
-                      <div className={`max-w-[85%] rounded-[13px] px-2.5 py-1.5 ${mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'}`}>
-                        {!mine && (
-                          <p className="text-[11px] font-extrabold text-brand-ink">{nicknames.get(m.author_id) ?? m.author?.full_name ?? 'Someone'}</p>
-                        )}
-                        {m.forwarded && !m.deleted_at && (
-                          <p className={`text-[10.5px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`} data-testid="forwarded-tag">Forwarded</p>
-                        )}
-                        {/* `?.id`, not truthiness — see the DM thread's note:
-                            an empty-array embed once chipped every bubble. */}
-                        {m.quoted?.id && !m.deleted_at && (
-                          <p className={`mb-0.5 truncate rounded-[6px] border-l-2 px-1.5 py-0.5 text-[11px] ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-brand bg-surface-mute text-ink-muted'}`} data-testid="quote-block">
-                            {m.quoted.deleted_at ? 'Message deleted' : (m.quoted.body?.trim() ? m.quoted.body : '📷 Photo')}
-                          </p>
-                        )}
-                        {m.deleted_at ? (
-                          <p className="text-[12.5px] italic opacity-70">Message removed</p>
-                        ) : (
-                          <>
-                            {m.attachment_path && <ChatPhoto path={m.attachment_path} compact />}
-                            {m.body?.trim() ? (
-                              <p className="whitespace-pre-wrap break-words text-[13.5px] leading-[1.4]">
-                                {m.body}
-                                <span className={`float-right ml-2 mt-1 text-[9.5px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-                                  {stampLabel(m.created_at)}
-                                </span>
-                              </p>
-                            ) : (
-                              <p className={`text-right text-[9.5px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>{stampLabel(m.created_at)}</p>
-                            )}
-                          </>
-                        )}
-                        {!m.deleted_at && m.replies?.length ? (
-                          <p className={`mt-0.5 text-[10px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-                            {m.replies.length} repl{m.replies.length === 1 ? 'y' : 'ies'} in full view
-                          </p>
-                        ) : null}
-                        {!m.deleted_at && (
-                          <ReactionBar messageId={m.id} reactions={reactions.get(m.id) ?? []} selfId={selfId} onToggle={react} />
-                        )}
-                      </div>
-                    </div>
+                      <ChatBubble
+                        mine={mine}
+                        messageId={m.id}
+                        testId="dock-bubble"
+                        showAuthor={named && !mine}
+                        authorLabel={authorName}
+                        forwarded={Boolean(m.forwarded)}
+                        quote={quote}
+                        deleted={Boolean(m.deleted_at)}
+                        createdAt={m.created_at}
+                        body={m.body}
+                        photoPath={m.attachment_path}
+                        extra={
+                          !m.deleted_at && m.replies?.length ? (
+                            <p className={`mt-0.5 text-[10px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+                              {m.replies.length} repl{m.replies.length === 1 ? 'y' : 'ies'} in full view
+                            </p>
+                          ) : null
+                        }
+                        reactions={tallies}
+                        selfId={selfId}
+                        onReact={react}
+                      />
                     </Fragment>
                   )
                 })}

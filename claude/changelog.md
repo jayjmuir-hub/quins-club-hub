@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 💬 **Channel threads use the same bubbles as a DM.** Staff / squad / club
+- 💬 **The floating dock speaks the same bubble language as a DM, from one
+  shell, and Home squad contacts are role-ordered without wrapping on a
+  phone.** Jay, 25 Aug: a 1:1 in the dock still printed the other person's
+  name in brand-red on every incoming paper bubble; own bubbles were the
+  old green rectangle; stamp/emoji did not match the round 3/4 thread.
+  `src/components/ChatBubble.jsx` is now the one shell — DirectMessages
+  Thread, `MessageRow` (channel + nested replies), and `FloatingChatDock`
+  all render it — so a fourth surface cannot miss the pass the way
+  `Chat.jsx` missed the DM language and the dock missed #410. 1:1: no
+  author name on incoming (the header already names them), no "You" on
+  own. Groups / staff / squad: name on theirs only. Own: quins-green
+  `bg-accent-deep`, stamp inside, chevron, reaction trigger beside,
+  tallies as a corner pill. StarredMessages and ChatList stay list rows,
+  not bubbles. Same day: Home Squad contacts reverse the old "no role
+  order" ruling — Head Coach, Team Manager(s), Assistant Coaches, Medics,
+  name order within a role; a "Head Coach" title or the `is_head_coach`
+  flag still beats a plain coach (`src/lib/squadStaff.js`, used by
+  `listMySquadStaff`, `listSquadStaff`, and `SquadStaffCard`). The
+  editorial Card row keeps 44px actions but they no longer `flex-wrap`
+  onto a ragged second line at phone width. Frontend only. The NEXT pull
+  request cites this entry's squash SHA.
+- `7ea4c79` — 💬 **Channel threads use the same bubbles as a DM.** Staff / squad / club
   at `/chat/:teamId` still rendered the old `MessageRow` layout Jay
   screenshotted on U11 Mixed · staff: rectangular green/white bubbles, a
   "You" label, avatars, role pills as chrome, and red Reply/Pin/Delete/Report
@@ -19,8 +40,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   menu, reaction trigger beside, tallies as a corner pill). `MessageRow`
   now speaks that language; channel-only bits (staff pill on *their* name,
   nested replies, fixture cards, read-stats, Pin for staff, Report) live in
-  the chevron or inside the bubble. Frontend only. The NEXT pull request
-  cites this entry's squash SHA.
+  the chevron or inside the bubble. Frontend only.
 - `ed950de` — 🏉 **Squad Hub’s picker is yours first, in the same Card language as Chat.**
   Bare `/squad` stops being a “Which squad?” dump of full-width name rows.
   Squads this person actually belongs to lead; an admin then sees the rest of

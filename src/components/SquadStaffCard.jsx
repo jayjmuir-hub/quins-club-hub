@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Card from './Card.jsx'
+import { compareSquadStaff } from '../lib/squadStaff.js'
 import { labelForRole } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 import { whatsappUrl } from '../lib/phone.js'
@@ -31,34 +32,21 @@ import { focusToObjectPosition } from '../lib/photoFocus.js'
 // used to be a glossy mosaic of poster tiles (photo or role-gradient filling
 // the tile, white type over a dark scrim). That language never reached Chat
 // or Notices, so "Squad contacts" read as a leftover from the 15 Aug tiles.
-// The people, the buttons, the collapse, and who goes first are unchanged.
-// The TILE is gone.
+// The people, the buttons, the collapse stay. Order within a squad is
+// Head Coach, Team Manager(s), Assistant Coaches, Medics — Jay, 25 Aug
+// 2026, reversing the old "name only because role order was not agreed"
+// ruling. Same role: name order. The TILE is gone.
 //
+// ⚠️ THE PHONE ROW MUST NOT WRAP. After #407 the editorial Card had face +
+// name + four 44px actions with `flex-wrap`, which dumped the buttons onto
+// the next line at ~320–390px (Jay, phone PWA: "completely messed up").
+// Name truncates; the action cluster stays on the same line. Do not bring
+// the glossy mosaic back to "solve" this.
+
 // ⚠️ ONLY TWO OF THE CLUB'S FIFTEEN STAFF HAVE A PHOTO (measured 15 Aug 2026).
 // The monogram is still the ordinary case. It is now the same circular mark
 // Chat and Notices already use — initials on a role-keyed gradient — not a
 // watermark bled across a poster.
-
-/**
- * Who goes first in the list.
- *
- * ⚠️ IT IS DECIDED BY TITLE, NEVER BY ROLE, AND THAT IS A RULING THIS FILE IS
- * OBEYING RATHER THAN INVENTING. `src/data/staff.js` sorts staff by NAME in two
- * places and says why both times: role order "would put every coach above every
- * manager, which reads as a hierarchy the club has not agreed to". Putting a
- * coach first because they are a coach would reintroduce exactly that
- * hierarchy.
- *
- * A TITLE is different: it is a string an admin typed on /admin/staff, so
- * leading with it states only what the club has already chosen to state.
- *
- * ⚠️ CONSEQUENCE: most squads have nobody titled "Head …", so the list stays
- * in the data module's name order. That is correct, not a bug — the way to
- * lead the list is to set a title, which is a thing the club decides.
- */
-export function leadIndex(staff) {
-  return staff.findIndex((member) => /\bhead\b/i.test(member?.title ?? ''))
-}
 
 // The monogram's gradient, keyed to role. The role is written in words on the
 // same row, so the colour repeats it rather than carrying it — the same rule
@@ -120,10 +108,13 @@ function ChatIcon(props) {
  *
  * ⚠️ 44px SQUARE, AND THAT IS THE FLOOR RATHER THAN A PREFERENCE. Button.jsx
  * carries the same number and the same reason: this app is used one-handed, at
- * the side of a pitch in Abu Dhabi, often with wet hands. The retired poster
- * tiles had to fake this with a 36px draw and a 44px hit area, because three
- * red squares ate a 175px photo. A Chat-shaped row has the width; the control
- * can BE its tap target.
+ * the side of a pitch in Abu Dhabi, often with wet hands.
+ *
+ * ⚠️ THEY MUST FIT ON THE NAME'S ROW AT PHONE WIDTH. Four of these plus a
+ * 44px face is tight at 320–390px; the name truncates and this cluster does
+ * not wrap. Wrapping (`flex-wrap` on the row) was the 25 Aug 2026 phone-PWA
+ * bug after #407. Do not "fix" it by shrinking below 44px or by bringing
+ * the mosaic tiles back.
  *
  * ⚠️ THE ICON IS aria-hidden AND THE LINK CARRIES THE WORDS. An icon-only
  * control with no accessible name is a button that announces itself as "link",
@@ -208,14 +199,14 @@ function StaffRow({ member, onChat = null, selfId = null }) {
   const hasActions = Boolean(member.phone || member.email || canChat)
 
   return (
-    <li data-testid="squad-staff-person" className="flex flex-wrap items-center gap-3 border-b border-line px-3.5 py-3 last:border-b-0">
+    <li data-testid="squad-staff-person" className="flex flex-nowrap items-center gap-2 border-b border-line px-3 py-3 last:border-b-0">
       <StaffAvatar
         name={member.name}
         role={member.role}
         url={member.photoUrl}
         focus={member.focus}
       />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <p className="truncate text-[15px] font-extrabold text-ink">{member.name}</p>
         {/* ⚠️ THE TITLE REPLACES THE ROLE LABEL RATHER THAN JOINING IT. "Head
             Coach" beside a "Coach" chip is the same word twice. When there is
@@ -235,7 +226,7 @@ function StaffRow({ member, onChat = null, selfId = null }) {
           choice, not a privacy one — Jay, 13 Aug 2026: "the staff automatically
           opts in when accepting the position". */}
       {hasActions && (
-        <div className="flex shrink-0 gap-1">
+        <div className="flex shrink-0 flex-nowrap gap-1" data-testid="squad-staff-actions">
           {member.phone && (
             <ContactButton href={`tel:${member.phone}`} label={`Call ${member.name}`} tone="solid">
               <PhoneIcon className="h-[15px] w-[15px]" aria-hidden="true" />
@@ -311,12 +302,9 @@ function FaceStack({ staff }) {
  */
 export function SquadStaffCard({ squadName, staff = [], defaultOpen = true, onChat = null, selfId = null }) {
   const [open, setOpen] = useState(defaultOpen)
-  const lead = leadIndex(staff)
-  // The lead first, then everyone else in the order the data module chose —
-  // which is by NAME. Moving one person to the front is the only reordering
-  // this component does, and it is the one the club stated by giving them a
-  // title.
-  const ordered = lead > 0 ? [staff[lead], ...staff.filter((_, i) => i !== lead)] : staff
+  // Sort here as well as in the data module: tests (and any future caller)
+  // can hand an unsorted array and the card still draws the agreed order.
+  const ordered = [...staff].sort(compareSquadStaff)
 
   const collapsible = staff.length > 0
   const panelId = `squad-staff-${squadName.replace(/\W+/g, '-').toLowerCase()}`

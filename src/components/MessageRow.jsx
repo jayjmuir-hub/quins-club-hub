@@ -1,70 +1,24 @@
 import { useEffect, useState } from 'react'
 import Button from './Button.jsx'
-import ChatPhoto from './ChatPhoto.jsx'
+import ChatBubble from './ChatBubble.jsx'
 import FixtureCard from './FixtureCard.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
-import MessageMenu from './MessageMenu.jsx'
-import { stampLabel } from '../lib/notices.js'
-import ReactionBar, { ReactionTrigger } from './ReactionBar.jsx'
 import { labelForRole } from '../lib/scope.js'
 
-// One post in a channel, as a BUBBLE, with its replies. Same visual
-// language as the DM/group Thread in src/screens/DirectMessages.jsx
-// (round 3/4): quins-green own bubbles, paper theirs, stamp INSIDE,
-// MessageMenu chevron, reaction trigger BESIDE the bubble, tallies as a
-// pill overlapping the corner. No "You" label, no avatars, no permanent
-// Reply/Pin/Delete/Report row under every bubble — Jay, 25 Aug 2026,
-// production screenshot of U11 Mixed · staff. DirectMessages was already
-// there (bc971f8 / #389); this file was the miss.
+// One post in a channel, as a BUBBLE, with its replies. The bubble itself
+// is ChatBubble — the same shell the DM thread and the floating dock use —
+// so this file cannot miss a language pass the way it missed #389 and the
+// dock missed #410. Channel-only extras (staff pill, nested replies,
+// fixture cards, read-stats, Pin, Report) are slots into that shell.
 //
 // ⚠️ A PURE-PROPS COMPONENT, like NoticeRow and for the same reason: a row
 // that needs a database session to be looked at is a row that gets reviewed
 // by reading its JSX. This one renders in the harness.
-//
-// Channel-only capabilities stay: a staff role pill on THEIR name (the
-// pill says the role in words — claude/specs/accessibility.md), nested
-// replies, fixture cards, read-stats, announce-only's reply path, Pin for
-// staff, Report. They live in the chevron / inside the bubble, not as a
-// text-action row.
 
 const STAFF_ROLES = new Set(['admin', 'coach', 'manager', 'medic'])
 
 export function isStaffRole(role) {
   return STAFF_ROLES.has(role)
-}
-
-function Body({ message, mine, stamp, padded }) {
-  if (message.deleted_at) {
-    return (
-      <p className={`text-[13.5px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-        Message removed
-        {stamp}
-      </p>
-    )
-  }
-  // Round 2: a forward wears its tag, a photo renders above whatever text
-  // rode with it, and a photo-only message renders no empty paragraph.
-  return (
-    <>
-      {message.forwarded && (
-        <p className={`text-[11px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`} data-testid="forwarded-tag">
-          Forwarded
-        </p>
-      )}
-      {message.attachment_path && <ChatPhoto path={message.attachment_path} />}
-      {message.body?.trim() ? (
-        <p className={`whitespace-pre-wrap break-words text-[14.5px] leading-[1.4] ${padded ? 'pr-5' : ''}`}>
-          {message.body}
-          {message.edited_at && (
-            <span className={`ml-1.5 text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>(edited)</span>
-          )}
-          {stamp}
-        </p>
-      ) : stamp ? (
-        <p className="text-right leading-none">{stamp}</p>
-      ) : null}
-    </>
-  )
 }
 
 function RolePill({ role, title }) {
@@ -82,23 +36,24 @@ function Reply({ reply, selfId, canModerate, onRemove }) {
     !reply.deleted_at && (mine || canModerate)
       ? [{ label: 'Delete', onClick: () => onRemove(reply.id), danger: true }]
       : []
-  const stamp = (
-    <span className={`float-right ml-2 mt-1.5 text-[10px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-      {stampLabel(reply.created_at)}
-    </span>
-  )
   return (
-    <div className={`flex items-center gap-1.5 py-0.5 ${mine ? 'justify-end' : 'justify-start'}`} data-testid="message-reply">
-      <div className={`relative max-w-[80%] rounded-[14px] px-2.5 py-1.5 ${mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'}`}>
-        <MessageMenu items={menuItems} mine={mine} />
-        {!mine && (
-          <p className={`text-[11px] font-extrabold text-brand-ink ${menuItems.length ? 'pr-10' : ''}`}>
-            {reply.author?.full_name ?? 'Someone'}
-            {staff && <RolePill role={reply.author_role} title={reply.author_title} />}
-          </p>
-        )}
-        <Body message={reply} mine={mine} stamp={stamp} padded={menuItems.length > 0} />
-      </div>
+    <div className="py-0.5">
+      <ChatBubble
+        mine={mine}
+        messageId={reply.id}
+        testId="message-reply"
+        menuItems={menuItems}
+        showAuthor={!mine}
+        authorLabel={reply.author?.full_name ?? 'Someone'}
+        authorExtra={staff ? <RolePill role={reply.author_role} title={reply.author_title} /> : null}
+        forwarded={Boolean(reply.forwarded)}
+        deleted={Boolean(reply.deleted_at)}
+        createdAt={reply.created_at}
+        body={reply.body}
+        photoPath={reply.attachment_path}
+        edited={Boolean(reply.edited_at)}
+        selfId={selfId}
+      />
     </div>
   )
 }
@@ -176,95 +131,62 @@ export default function MessageRow({
         ...(!mine && onReport ? [{ label: 'Report', onClick: () => setReporting((v) => !v), danger: true }] : []),
       ]
 
-  // The stamp rides INSIDE the bubble, WhatsApp style (round 3: "the time
-  // stamp is not totally below the message"). Same markup as the DM Thread.
-  const stamp = (
-    <span className={`float-right ml-2 mt-1.5 text-[10px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-      {stampLabel(message.created_at)}
-    </span>
-  )
-
   return (
     <article
       data-testid="message-row"
       data-staff={staff ? 'true' : 'false'}
       data-mine={mine ? 'true' : 'false'}
     >
-      {/* items-center, not items-end (Jay, 25 Aug 2026: "put the reaction
-          button centered on every message") — same as the DM Thread. */}
-      <div
-        className={`flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}
-        data-testid="message-bubble"
-      >
-        {mine && onReact && !message.deleted_at && (
-          <ReactionTrigger messageId={message.id} reactions={tallies} selfId={selfId} onToggle={onReact} align="right" />
-        )}
-        <div
-          className={`relative max-w-[80%] rounded-[14px] px-2.5 py-1.5 ${tallies.length ? 'mb-3' : ''} ${
-            mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'
-          }`}
-        >
-          <MessageMenu items={menuItems} mine={mine} />
-          {message.pinned && !message.deleted_at && (
-            <span
-              aria-label="Pinned"
-              className={`absolute right-7 top-1.5 text-[10px] ${mine ? 'text-white/70' : 'text-ink-faint'}`}
-              data-testid="pin-mark"
-            >
-              📌
-            </span>
-          )}
-          {!mine && (
-            <p className={`text-[11px] font-extrabold text-brand-ink ${menuItems.length ? 'pr-10' : ''}`}>
-              {unread && <span className="sr-only">New. </span>}
-              {message.author?.full_name ?? 'Someone'}
-              {staff && <RolePill role={message.author_role} title={message.author_title} />}
-            </p>
-          )}
-
-          {message.event && (
+      <ChatBubble
+        mine={mine}
+        messageId={message.id}
+        testId="message-bubble"
+        menuItems={menuItems}
+        pinned={Boolean(message.pinned)}
+        showAuthor={!mine}
+        authorLabel={
+          <>
+            {unread && <span className="sr-only">New. </span>}
+            {message.author?.full_name ?? 'Someone'}
+          </>
+        }
+        authorExtra={staff ? <RolePill role={message.author_role} title={message.author_title} /> : null}
+        forwarded={Boolean(message.forwarded)}
+        deleted={Boolean(message.deleted_at)}
+        createdAt={message.created_at}
+        body={message.body}
+        photoPath={message.attachment_path}
+        edited={Boolean(message.edited_at)}
+        lead={
+          message.event ? (
             <div className="mb-2 mt-1">
               <FixtureCard event={message.event} tally={tally} />
             </div>
-          )}
-
-          <Body message={message} mine={mine} stamp={stamp} padded={menuItems.length > 0} />
-
-          {readStat && (
-            <span data-testid="read-stat" className={`text-[10px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-              Read by {readStat.reads} of {readStat.audience}
-            </span>
-          )}
-          {replies.length > 0 && !message.deleted_at && (
-            <button
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              className={`mt-0.5 block text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}
-              aria-expanded={open}
-            >
-              {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
-            </button>
-          )}
-          {/* Round 4: the tallies are a pill OVERLAPPING the bubble's bottom
-              corner, where WhatsApp puts them — left of theirs, right of
-              yours. The mb-3 on the bubble is the room it hangs into. */}
-          {!message.deleted_at && tallies.length > 0 && (
-            <div className={`absolute -bottom-3 ${mine ? 'right-2' : 'left-2'}`} data-testid="reaction-pill">
-              <ReactionBar
-                messageId={message.id}
-                reactions={tallies}
-                selfId={selfId}
-                onToggle={onReact}
-                disabled={!onReact}
-                showAdd={false}
-              />
-            </div>
-          )}
-        </div>
-        {!mine && onReact && !message.deleted_at && (
-          <ReactionTrigger messageId={message.id} reactions={tallies} selfId={selfId} onToggle={onReact} align="left" />
-        )}
-      </div>
+          ) : null
+        }
+        extra={
+          <>
+            {readStat && (
+              <span data-testid="read-stat" className={`text-[10px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+                Read by {readStat.reads} of {readStat.audience}
+              </span>
+            )}
+            {replies.length > 0 && !message.deleted_at && (
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className={`mt-0.5 block text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}
+                aria-expanded={open}
+              >
+                {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+              </button>
+            )}
+          </>
+        }
+        reactions={tallies}
+        selfId={selfId}
+        onReact={onReact}
+      />
 
       {reporting && (
         <form

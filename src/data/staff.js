@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { SQUAD_STAFF_ROLES } from '../lib/scope.js'
+import { compareSquadStaff } from '../lib/squadStaff.js'
 import { unwrapCapped, withCap } from './limits.js'
 import { signStaffPhotoUrls } from './photos.js'
 
@@ -82,9 +83,12 @@ export async function listSquadStaff() {
   return teams.map((team) => ({
     id: team.id,
     name: team.name,
-    // ⚠️ SORTED BY NAME, NOT BY ROLE. Role order would put every coach above
-    // every manager, which reads as a hierarchy the club has not agreed to.
-    staff: (byTeam.get(team.id) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+    // Jay, 25 Aug 2026: reverse the old "name only" ruling. Home (and this
+    // admin directory, which shares compareSquadStaff) lists Head Coach, then
+    // Team Manager(s), then Assistant Coaches, then Medics. Same role: name
+    // order. The comparator lives in src/lib/squadStaff.js so a mocked data
+    // module cannot drop it.
+    staff: (byTeam.get(team.id) ?? []).sort(compareSquadStaff),
   }))
 }
 
@@ -243,10 +247,7 @@ export async function listMySquadStaff() {
   }
 
   for (const list of byTeam.values()) {
-    // Same rule as the admin directory: by NAME, never by role. Role order
-    // would print every coach above every manager, which reads as a hierarchy
-    // the club has not agreed to.
-    list.sort((a, b) => a.name.localeCompare(b.name))
+    list.sort(compareSquadStaff)
   }
 
   return byTeam
