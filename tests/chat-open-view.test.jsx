@@ -317,16 +317,42 @@ describe('the page keeps growing after the messages render — and the reader st
     scrollTo.mockRestore()
   })
 
-  it('does NOT yank a reader who has scrolled up into history', async () => {
+  it('does NOT yank a reader who deliberately scrolled UP into history', async () => {
     const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
     renderChat()
     await waitFor(() => expect(scrollTo).toHaveBeenCalled())
-    // Far from the bottom: a tall document, scrolled to the top.
+    // A tall document; the reader scrolls DOWNWARD state to y=2000, then UP
+    // to y=1000 — the upward move is the intent that unsticks.
     Object.defineProperty(document.documentElement, 'scrollHeight', { value: 5000, configurable: true })
+    Object.defineProperty(window, 'scrollY', { value: 2000, configurable: true })
+    window.dispatchEvent(new Event('scroll'))
+    Object.defineProperty(window, 'scrollY', { value: 1000, configurable: true })
     window.dispatchEvent(new Event('scroll'))
     scrollTo.mockClear()
     observers.filter((o) => o.el === document.body).forEach((o) => o.cb())
     expect(scrollTo).not.toHaveBeenCalled()
+    delete document.documentElement.scrollHeight
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
+    scrollTo.mockRestore()
+  })
+
+  it('a growth-induced scroll event does NOT unstick the pin — the phone bug', async () => {
+    // 25 Aug 2026, the mechanism that survived two deploys: Android's scroll
+    // anchoring fires adjustment scroll events when photos load above the
+    // viewport while the page has also grown below. The old gate read
+    // "far from bottom" off that event and permanently disarmed the re-pin.
+    // Intent semantics: scrollY did not DECREASE, so the reader stays stuck.
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    renderChat()
+    await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+    // The page grows under the reader: suddenly far from the end, scrollY
+    // unchanged (or clamped upward by anchoring — either way, not a user
+    // scroll upward).
+    Object.defineProperty(document.documentElement, 'scrollHeight', { value: 5000, configurable: true })
+    window.dispatchEvent(new Event('scroll'))
+    scrollTo.mockClear()
+    observers.filter((o) => o.el === document.body).forEach((o) => o.cb())
+    expect(scrollTo).toHaveBeenCalledWith(0, document.documentElement.scrollHeight)
     delete document.documentElement.scrollHeight
     scrollTo.mockRestore()
   })

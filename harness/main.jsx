@@ -41,6 +41,7 @@ import PhotoPositioner, {
 import NoticeRowScenario from './notice-row.jsx'
 import MessageRowScenario from './message-row.jsx'
 import ChatList from '../src/screens/ChatList.jsx'
+import DirectMessages from '../src/screens/DirectMessages.jsx'
 import { PLAYERS } from './stubs/players.js'
 import { AuthProvider } from './stubs/auth.jsx'
 import { MembershipProvider } from './stubs/memberships.jsx'
@@ -1110,6 +1111,25 @@ const scenarios = {
   'notice-row': () => <NoticeRowScenario />,
   // The squad chat's rows (23 Aug 2026) — same reasoning as notice-row.
   'message-row': () => <MessageRowScenario />,
+  // 25 Aug 2026 — the DM thread with LATE photos, at its real route so
+  // useParams resolves. The instrument for "still not snapping to the last
+  // message": signed URLs land ~900ms after the data (stubs/chatMedia.js),
+  // so the page grows exactly the way Jay's kit-photo thread does.
+  // Starts on the LIST with the thread routed, so the harness can walk the
+  // exact path Jay does: tap the row, arrive in the thread by navigation.
+  // ?at=thread starts directly in the thread instead.
+  'dm-thread': () => (
+    <Shell
+      route={new URLSearchParams(window.location.search).get('at') === 'thread' ? '/chat/dm/hz-conv-1' : '/chat'}
+      authValue={baseAuth(COACH_EMAIL)}
+      membershipValue={{ memberships: COACH_MEMBERSHIPS, teams: TEAMS, loading: false, error: null, reload: noop }}
+    >
+      <RRoutes>
+        <RRoute path="/chat" element={<ChatList />} />
+        <RRoute path="/chat/dm/:conversationId" element={<DirectMessages />} />
+      </RRoutes>
+    </Shell>
+  ),
   // 24 Aug 2026 — the WhatsApp-shaped list. Rows come from harness/stubs/messages.js.
   'chat-list': () => (
     <Shell
