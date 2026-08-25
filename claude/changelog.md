@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — **The flip is DONE and VERIFIED LIVE.** Jay switched "Confirm
+- (unmerged) — 🏉 **Positions are STAFF-ONLY, picked as forward-or-back then
+  a sub-selection** — Jay, both halves: "forward or back selectable, then a
+  sub selection for the rugby positions under those two main categories" and
+  "positions should only be viewable and editable by staff". The second half
+  REVERSES the 14 Aug squad-readable ruling on player_positions, and since
+  RLS grants rows, not columns, it forces the data OFF the squad-readable
+  players row: `player_positions` tightens to the player_grades shape, new
+  `player_units` carries forward/back, and `players.position`/`players.unit`
+  are backfilled from, then nulled (DROP follows a later post-deploy
+  migration) — `db/migrations/20260825_positions_staff_only.sql`, NOT YET
+  APPLIED; it must run before this deploys. Staff screens DECORATE their
+  rows from the staff-only maps so grouping/search/sort/table cells read
+  `player.position` unchanged; parents lose the position column, the
+  roster-row and detail-hero position lines, and the forwards/backs
+  grouping. PlayerForm nests position checkboxes under the unit and drops
+  the standalone single-select; the roster's inline editor writes
+  player_positions primary-first via optgroups. The NEXT pull request cites
+  this entry's squash SHA.
+- `776eebb` — **The flip is DONE and VERIFIED LIVE.** Jay switched "Confirm
   email" OFF; a throwaway signup came back with a session, the welcome sent
   (`POST | 200` on notify-welcome two seconds later), and the door question
   is answered: GoTrue autoconfirm is INSERT-then-Confirm()-UPDATE, so **door

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
 import { insertPlayers } from '../data/players.js'
+import { savePlayerPositions } from '../data/playerTiers.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { parsePlayerPaste, toInsertRows } from '../lib/playerImport.js'
@@ -73,7 +74,28 @@ export default function PlayerImport({ onClose, onImported, existingPlayers = []
 
     try {
       const rows = toInsertRows(parsed, { clubId })
-      await insertPlayers(rows)
+      const inserted = await insertPlayers(rows)
+      // Positions are staff-only (25 Aug 2026) and live in player_positions,
+      // which keys on ids that exist only after the insert — hence a second
+      // phase. RETURNING preserves input order, and both lists come from the
+      // same parsed.rows filter, so pairing by index is sound.
+      const okRows = parsed.rows.filter((row) => row.ok)
+      try {
+        await Promise.all(
+          inserted.map((player, index) =>
+            okRows[index]?.position
+              ? savePlayerPositions(player.id, [okRows[index].position])
+              : null,
+          ).filter(Boolean),
+        )
+      } catch {
+        // The players ARE in: reporting this as a failed import would invite
+        // a retry that duplicates the whole squad. The positions can be
+        // re-entered from the roster; the import must report what happened.
+        setFailure('The players were added, but some positions were not saved. Set them from the roster.')
+        onImported?.(rows.length)
+        return
+      }
       onImported?.(rows.length)
       onClose()
     } catch (err) {

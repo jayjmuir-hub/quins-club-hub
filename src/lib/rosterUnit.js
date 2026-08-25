@@ -16,8 +16,14 @@ export const FORWARDS = ['Prop', 'Hooker', 'Lock', 'Flanker', 'Number 8']
 export const BACKS = ['Scrum-half', 'Fly-half', 'Centre', 'Wing', 'Fullback']
 export const POSITION_GROUP_ORDER = ['Forwards', 'Backs', 'Other']
 
+// ⚠️ `player.unit` and `player.position` ARE DECORATED FIELDS SINCE 25 Aug
+// 2026, not columns: both went staff-only (player_units / player_positions),
+// and Roster stamps them onto the row for staff before grouping. For a parent
+// they are absent and everything lands in 'Other' — which is why Roster no
+// longer offers a parent the position grouping at all.
+//
 // ⚠️ TAKES THE PLAYER, NOT THE POSITION, SINCE 14 Aug 2026, and the change is
-// the whole point of players.unit. It used to receive a position string and so
+// the whole point of the unit field. It used to receive a position string and so
 // could only bucket a player once somebody had named a specific position —
 // which meant a nine-year-old who is plainly a forward sat in "Other" until
 // prop-or-lock was decided.

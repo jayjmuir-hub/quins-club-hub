@@ -21,6 +21,18 @@ import userEvent from '@testing-library/user-event'
 const useMembershipsMock = vi.fn()
 const listPlayersMock = vi.fn()
 const upsertPlayerMock = vi.fn()
+const savePlayerPositionsMock = vi.fn()
+const listPlayerPositionsMock = vi.fn()
+
+// Positions live in staff-only player_positions since 25 Aug 2026; the screen
+// decorates its rows from this map for staff, and the inline editor writes
+// through savePlayerPositions rather than the players row.
+vi.mock('../src/data/playerTiers.js', () => ({
+  listPlayerGrades: vi.fn(async () => new Map()),
+  listPlayerUnits: vi.fn(async () => new Map()),
+  listPlayerPositions: (...a) => listPlayerPositionsMock(...a),
+  savePlayerPositions: (...a) => savePlayerPositionsMock(...a),
+}))
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -77,6 +89,13 @@ beforeEach(() => {
   useMembershipsMock.mockReturnValue({ memberships: ADMIN, teams: TEAMS })
   listPlayersMock.mockResolvedValue([TOM, AMY, ZAC])
   upsertPlayerMock.mockImplementation(async (p) => ({ ...p }))
+  savePlayerPositionsMock.mockResolvedValue([])
+  // Mirrors the inline fixture positions on TOM and AMY above — the fixture
+  // fields themselves are ignored for a staff viewer.
+  listPlayerPositionsMock.mockResolvedValue(new Map([
+    ['p1', ['Flanker']],
+    ['p2', ['Wing']],
+  ]))
 })
 
 const rows = () => screen.getAllByTestId('roster-table-row')
@@ -149,6 +168,12 @@ describe('RosterTable — sorting', () => {
       { ...ZAC, position: 'Lock' },
       { id: 'p4', team_id: 'team-u10', full_name: 'Alfie Denning', position: 'Prop', is_captain: false },
     ])
+    // The decoration reads THIS, not the inline fixture fields above.
+    listPlayerPositionsMock.mockResolvedValue(new Map([
+      ['p1', ['Flanker']],
+      ['p3', ['Lock']],
+      ['p4', ['Prop']],
+    ]))
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
@@ -183,7 +208,10 @@ describe('RosterTable — inline editing', () => {
     await screen.findByTestId('roster-table')
 
     await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
-    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalledWith({ id: 'p3', position: 'Prop' }))
+    // Through player_positions since 25 Aug 2026 — the players row carries no
+    // position any more, so upsertPlayer must not be touched.
+    await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p3', ['Prop']))
+    expect(upsertPlayerMock).not.toHaveBeenCalled()
   })
 
   it('does not write when the value is unchanged', async () => {
@@ -192,16 +220,17 @@ describe('RosterTable — inline editing', () => {
     await screen.findByTestId('roster-table')
 
     await user.selectOptions(screen.getByLabelText('Position for Tom Fletcher'), 'Flanker')
+    expect(savePlayerPositionsMock).not.toHaveBeenCalled()
     expect(upsertPlayerMock).not.toHaveBeenCalled()
   })
 
-  it('writes null rather than an empty string when a position is cleared', async () => {
+  it('clearing the primary clears the set — an empty list, never an empty string', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
     await user.selectOptions(screen.getByLabelText('Position for Tom Fletcher'), '')
-    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalledWith({ id: 'p1', position: null }))
+    await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p1', []))
   })
 
   it('moves a player to another age group', async () => {
@@ -231,7 +260,7 @@ describe('RosterTable — inline editing', () => {
   it('updates the cell optimistically, before the write resolves', async () => {
     const user = userEvent.setup()
     let release
-    upsertPlayerMock.mockImplementation(() => new Promise((r) => { release = r }))
+    savePlayerPositionsMock.mockImplementation(() => new Promise((r) => { release = r }))
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
@@ -239,14 +268,14 @@ describe('RosterTable — inline editing', () => {
 
     // Still in flight, but the cell already shows the new value.
     expect(screen.getByLabelText('Position for Zac Bell')).toHaveValue('Prop')
-    release({ id: 'p3', position: 'Prop' })
+    release([])
   })
 })
 
 describe('RosterTable — refusals', () => {
   it('puts the old value back and names the failure in the row when the write is refused', async () => {
     const user = userEvent.setup()
-    upsertPlayerMock.mockRejectedValue(
+    savePlayerPositionsMock.mockRejectedValue(
       new Error("We couldn't save that player. You may not have permission to change this squad."),
     )
 
@@ -262,7 +291,7 @@ describe('RosterTable — refusals', () => {
 
   it('reports the refusal in the row that caused it, not globally', async () => {
     const user = userEvent.setup()
-    upsertPlayerMock.mockRejectedValue(new Error('Refused'))
+    savePlayerPositionsMock.mockRejectedValue(new Error('Refused'))
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
@@ -275,30 +304,34 @@ describe('RosterTable — refusals', () => {
 
   it('clears a previous error when the next edit on that row succeeds', async () => {
     const user = userEvent.setup()
-    upsertPlayerMock.mockRejectedValueOnce(new Error('Refused'))
+    savePlayerPositionsMock.mockRejectedValueOnce(new Error('Refused'))
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
     await screen.findByRole('alert')
 
-    upsertPlayerMock.mockResolvedValue({ id: 'p3', position: 'Lock' })
+    savePlayerPositionsMock.mockResolvedValue([])
     await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Lock')
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
 })
 
 describe('RosterTable — permissions', () => {
-  it('renders cells as plain text, not controls, for a squad the user cannot edit', async () => {
-    useMembershipsMock.mockReturnValue({ memberships: COACH_U10, teams: TEAMS })
-    // A coach of U10 only sees U10 through visibleTeams, so put a second U10
-    // player in and assert the control exists there — then prove the
-    // read-only path with a membership that resolves to no editable team.
-    listPlayersMock.mockResolvedValue([TOM, ZAC])
+  it('renders position controls for a coach of a non-minis squad', async () => {
+    // ⚠️ U12, NOT U10, since 25 Aug 2026: a minis-only roster now hides the
+    // Position column entirely (tag rugby has no positions — the same 15 Aug
+    // rule that already hid Tier), so the control has to be asserted on a
+    // squad that can have one.
+    useMembershipsMock.mockReturnValue({
+      memberships: [{ id: 'm2', role: 'coach', team_id: 'team-u12' }],
+      teams: TEAMS,
+    })
+    listPlayersMock.mockResolvedValue([AMY])
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
-    expect(screen.getByLabelText('Position for Tom Fletcher')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('Position for Amy Rose')).toBeInTheDocument())
   })
 
   it('never renders a control the database would refuse', async () => {

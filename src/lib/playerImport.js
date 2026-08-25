@@ -332,7 +332,9 @@ export function toInsertRows(parsed, { clubId }) {
       club_id: clubId,
       team_id: row.team_id,
       full_name: row.full_name,
-      position: row.position,
+      // ⚠️ NO position: staff-only since 25 Aug 2026, so it goes to
+      // player_positions AFTER the insert — see PlayerImport.handleImport.
+      // The parsed row still carries row.position for that second write.
       // null when the column was blank or absent, which the CHECK constraint
       // allows. Never '' — players_gender_check refuses the empty string, and
       // a whole 300-row insert is one statement, so a single '' would abort

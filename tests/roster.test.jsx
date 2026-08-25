@@ -52,6 +52,26 @@ vi.mock('../src/data/players.js', () => ({
   listPlayerPrivate: (...args) => listPlayerPrivateMock(...args),
 }))
 
+// Positions and forward-or-back live in STAFF-ONLY tables since 25 Aug 2026
+// (player_positions / player_units); the screen decorates its rows from these
+// maps for staff and leaves a parent's rows bare. This mirrors the fixture
+// positions below, so the grouping and search tests keep meaning what they
+// meant — but through the staff-only path the screen actually takes now.
+vi.mock('../src/data/playerTiers.js', () => ({
+  listPlayerGrades: vi.fn(async () => new Map()),
+  listPlayerUnits: vi.fn(async () => new Map()),
+  savePlayerPositions: vi.fn(async () => []),
+  listPlayerPositions: vi.fn(async () => new Map([
+    ['p-flanker', ['Flanker']],
+    ['p-fly-half', ['Fly-half']],
+    ['p-prop', ['Prop']],
+    ['p-utility', ['Utility']],
+    ['p-hooker', ['Hooker']],
+    ['p-lock', ['Lock']],
+    ['p-fullback', ['Fullback']],
+  ])),
+}))
+
 // Import after vi.mock so this binds to the mocked modules.
 import Roster from '../src/screens/Roster.jsx'
 
@@ -880,12 +900,18 @@ describe('Roster — ages', () => {
     useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
     setup()
 
-    const row = (await screen.findAllByTestId('player-row')).find((node) =>
-      within(node).queryByText('Tom Fletcher'),
-    )
     // The meta line reads "position · squad · gender · age". Asserting on the
     // row's text rather than a testid keeps this about what a coach can READ.
-    await waitFor(() => expect(row.textContent).toMatch(/Flanker · U12 · \d+/))
+    // ⚠️ RE-QUERIED INSIDE waitFor since 25 Aug 2026: positions arrive from a
+    // staff-only table AFTER first paint, and their arrival re-buckets the
+    // groups — a node captured before that is detached, and would hold the
+    // "Position not set" it was born with forever.
+    await waitFor(() => {
+      const row = screen
+        .getAllByTestId('player-row')
+        .find((node) => within(node).queryByText('Tom Fletcher'))
+      expect(row.textContent).toMatch(/Flanker · U12 · \d+/)
+    })
   })
 
   it('shows no age for a player with no birthday on file', async () => {

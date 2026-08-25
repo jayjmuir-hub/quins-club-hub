@@ -22,6 +22,8 @@ const savePlayerPositionsMock = vi.fn()
 const setPlayerGradeMock = vi.fn()
 const listPlayerPositionsMock = vi.fn()
 const listPlayerGradesMock = vi.fn()
+const listPlayerUnitsMock = vi.fn()
+const setPlayerUnitMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/data/players.js', () => ({
@@ -46,6 +48,8 @@ vi.mock('../src/data/playerTiers.js', () => ({
   listPlayerPositions: (...a) => listPlayerPositionsMock(...a),
   savePlayerPositions: (...a) => savePlayerPositionsMock(...a),
   setPlayerGrade: (...a) => setPlayerGradeMock(...a),
+  listPlayerUnits: (...a) => listPlayerUnitsMock(...a),
+  setPlayerUnit: (...a) => setPlayerUnitMock(...a),
 }))
 
 import PlayerForm from '../src/screens/PlayerForm.jsx'
@@ -85,21 +89,26 @@ beforeEach(() => {
   setPlayerGradeMock.mockResolvedValue(null)
   listPlayerPositionsMock.mockResolvedValue(new Map())
   listPlayerGradesMock.mockResolvedValue(new Map())
+  listPlayerUnitsMock.mockResolvedValue(new Map())
+  setPlayerUnitMock.mockResolvedValue(null)
 })
 
 describe('multiple positions', () => {
-  it('saves every ticked position, and makes the first one the PRIMARY', async () => {
-    // ⚠️ players.position IS NOT REPLACED. Six things read it — the roster meta
-    // line and its inline editor, YourPlayers, PlayerDetail, the importer, and
-    // the forwards/backs fallback — so the form keeps it in step with the first
-    // position rather than rewriting all six readers.
+  it('saves every ticked position under the chosen unit, first one the PRIMARY', async () => {
+    // ⚠️ players.position IS DEAD since 25 Aug 2026 — positions are staff-only
+    // and player_positions is the only store, its first row the primary. The
+    // checkboxes appear only after forward-or-back is chosen (Jay: "forward or
+    // back selectable, then a sub selection ... under those two main
+    // categories").
     const user = renderForm()
     await user.type(screen.getByLabelText('First name', { selector: '#player-first-name' }), 'Idris')
     await user.type(screen.getByLabelText('Family name', { selector: '#player-last-name' }), 'Vanterpool')
-    // ⚠️ BY ROLE, NOT BY TEXT. Each position appears TWICE in this form — once
-    // as a checkbox chip and once as an <option> in the single-select below it,
-    // which is deliberate (the select still serves players with one position).
-    // getByText finds both and throws.
+    // No unit chosen yet: no checkboxes, just the prompt.
+    expect(screen.queryByRole('checkbox', { name: 'Hooker' })).not.toBeInTheDocument()
+    expect(screen.getByText(/choose forward or back/i)).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText(/forward or back/i), 'forward')
+    // Only the forward sub-selection is offered.
+    expect(screen.queryByRole('checkbox', { name: 'Wing' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('checkbox', { name: 'Hooker' }))
     await user.click(screen.getByRole('checkbox', { name: 'Flanker' }))
     await user.click(screen.getByRole('button', { name: /add player/i }))
@@ -109,19 +118,28 @@ describe('multiple positions', () => {
     // checkbox group has no memory of press order, so deriving the primary from
     // it would make it depend on invisible state.
     expect(savePlayerPositionsMock).toHaveBeenCalledWith('p-new', ['Hooker', 'Flanker'])
-    expect(upsertPlayerMock.mock.calls[0][0].position).toBe('Hooker')
+    expect(setPlayerUnitMock).toHaveBeenCalledWith('p-new', 'forward')
+    // The squad-readable players row must carry neither fact.
+    expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('position')
+    expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('unit')
   })
 
-  it('leaves the primary alone when nothing is ticked', async () => {
+  it('switching unit drops the positions the new one does not offer', async () => {
     const user = renderForm()
+    await user.selectOptions(screen.getByLabelText(/forward or back/i), 'forward')
+    await user.click(screen.getByRole('checkbox', { name: 'Prop' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Utility' }))
+    await user.selectOptions(screen.getByLabelText(/forward or back/i), 'back')
+    // Prop is gone — a "back" who plays Prop is the data error the unit ruling
+    // says a human must fix, so the form refuses to create it. Utility sits
+    // under both units and survives the switch.
+    expect(screen.queryByRole('checkbox', { name: 'Prop' })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Utility' })).toBeChecked()
+
     await user.type(screen.getByLabelText('First name', { selector: '#player-first-name' }), 'Idris')
     await user.type(screen.getByLabelText('Family name', { selector: '#player-last-name' }), 'Vanterpool')
-    await user.selectOptions(screen.getByLabelText('Position'), 'Wing')
     await user.click(screen.getByRole('button', { name: /add player/i }))
-
-    await waitFor(() => expect(upsertPlayerMock).toHaveBeenCalled())
-    // The single-select still works for the players who only ever have one.
-    expect(upsertPlayerMock.mock.calls[0][0].position).toBe('Wing')
+    await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p-new', ['Utility']))
   })
 })
 
