@@ -38,11 +38,15 @@ describe('the message menu near the viewport bottom', () => {
   })
 })
 
-describe('the thread header clears the glass masthead on phones', () => {
-  it('carries the phone offset and desktop:top-0', () => {
+describe('the thread header pins at the very top (chrome-free conversations, 25 Aug 2026)', () => {
+  // The masthead island is hidden inside a conversation, so the 64px
+  // clearance went with it: top-0, with the safe-area folded into the
+  // padding so the bar's background covers the notch.
+  it('sits at top-0 with safe-area padding', () => {
     render(<MemoryRouter><ChatHeader avatar={null} title="Zz Probe" subtitle="x" /></MemoryRouter>)
     const header = screen.getByTestId('chat-header')
-    expect(header.className).toContain('top-[calc(env(safe-area-inset-top)+64px)]')
-    expect(header.className).toContain('desktop:top-0')
+    expect(header.className).toMatch(/(^|\s)top-0(\s|$)/)
+    expect(header.className).toContain('pt-[calc(env(safe-area-inset-top)+8px)]')
+    expect(header.className).not.toContain('64px')
   })
 })

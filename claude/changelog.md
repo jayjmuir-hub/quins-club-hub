@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 📌 **The reader stays pinned to the newest message as the page
+- (unmerged) — 💬 **Chrome-free conversations** — Jay: "lets try the no
+  bottom menu inside a conversation". WhatsApp-style: inside a thread the
+  phone shows NO tab bar and NO masthead island — the chat header pins at
+  top-0 (safe-area in its padding, covering the notch) and the composer
+  sits on the bottom edge, its 74px tab-bar lift gone with the bar. The
+  way back is the header's ← and the system back gesture. The chat LIST
+  and /chat/starred keep the chrome; desktop is untouched (sidebar +
+  top-right island). ⚠️ **View-as keeps ALL chrome even in a thread** —
+  the banner is the way out of a preview and must never disappear (same
+  contract as the masthead auto-hide's disabled flag); the header sliding
+  under the banner there is the accepted cost. `conversationScreen` in
+  AppShell decides by route. This retires #389's accepted 64px gap. The
+  NEXT pull request cites this entry's squash SHA.
+- `c69da5f` — 📌 **The reader stays pinned to the newest message as the page
   grows** — Jay's phone, same morning: "still when i open a chat i have to
   scroll down", composer floating mid-content in the screenshot. The #394
   scroll fired once, when the DATA arrived — but chat photos render as
@@ -20,8 +33,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the end on every growth while the reader is near the bottom, and leaves
   them alone once they have scrolled up into history. This also sits the
   composer back down against the tab bar — its floating-high look was the
-  sticky bar shown mid-scroll, not its resting place. The NEXT pull
-  request cites this entry's squash SHA.
+  sticky bar shown mid-scroll, not its resting place. (#395) Its own
+  branch could not cite this squash SHA, so this entry does.
 - `422b594` — 📱 **Opening a chat lands you on the newest message, above the
   chrome, with "New" marked** — Jay: "chat is not working correctly with the
   bottom and top menu bars", "the latest message is ... sometimes below the

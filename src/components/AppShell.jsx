@@ -218,6 +218,22 @@ export default function AppShell({ children }) {
   const [helpOpen, setHelpOpen] = useState(false)
 
   const isMoreRoute = location.pathname === '/more'
+  // WhatsApp-style chrome-free conversations (Jay, 25 Aug 2026: "lets try
+  // the no bottom menu inside a conversation"). Inside a THREAD the phone
+  // shows no tab bar and no masthead island — the chat header's ← and the
+  // system back gesture are the way out — so the composer can sit on the
+  // bottom edge instead of floating 74px above it. The chat LIST and
+  // /chat/starred keep the chrome; desktop is untouched (its chrome is the
+  // sidebar and a top-right island that never crosses a thread). View-as
+  // keeps everything: the banner is the way OUT of the preview, and an
+  // admin forgetting they are previewing is the failure it exists to
+  // prevent — same contract as the auto-hide's disabled flag above.
+  const conversationScreen =
+    !viewAs &&
+    (/^\/chat\/dm\/./.test(location.pathname) ||
+      /^\/squad\/[^/]+\/chat$/.test(location.pathname) ||
+      (/^\/chat\/[^/]+$/.test(location.pathname) &&
+        !['dm', 'starred'].includes(location.pathname.split('/')[2])))
   const ready = !loading && !error && memberships.length > 0
   // ⚠️ DO NOT gate this on `viewAs` to win masthead space. Tried, reverted
   // (7 Aug 2026). tests/view-as.test.jsx reads this pill to prove the
@@ -397,6 +413,11 @@ export default function AppShell({ children }) {
         data-hidden={mastheadHidden ? 'true' : undefined}
         className={[
           'pointer-events-none sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:flex desktop:flex-col desktop:items-end desktop:px-4',
+          // Chrome-free conversations: the island leaves the phone entirely
+          // (desktop:flex restores it where it lives top-right and never
+          // crosses a thread). The view-as case never reaches here —
+          // conversationScreen is false while previewing.
+          conversationScreen ? 'hidden desktop:flex' : '',
           'transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none',
           mastheadHidden
             ? '-translate-y-[calc(100%+24px)] opacity-0 desktop:translate-y-0 desktop:opacity-100'
@@ -639,10 +660,13 @@ export default function AppShell({ children }) {
         </header>
       </div>
 
+      {/* Chrome-free conversations: the 108px band exists to clear the tab
+          bar, and with the bar gone it would be a dead strip pinned under
+          the composer at full scroll. */}
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full max-w-[1120px] flex-1 px-4 pb-[calc(108px+env(safe-area-inset-bottom))] pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 desktop:pb-16 wide:max-w-none focus:outline-none"
+        className={`mx-auto w-full max-w-[1120px] flex-1 px-4 ${conversationScreen ? 'pb-2' : 'pb-[calc(108px+env(safe-area-inset-bottom))]'} pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 desktop:pb-16 wide:max-w-none focus:outline-none`}
       >
         {/* ⚠️ ABOVE THE loading/error/ready SPLIT, DELIBERATELY. Installing is
             not gated on having a membership: a parent who has just signed up
@@ -755,7 +779,10 @@ export default function AppShell({ children }) {
 
           Anything `fixed` must live OUTSIDE `.glass-chrome`. The help button
           and the sheets already do; the account menu is portalled to <body>. */}
-      <Nav showSquadHub={showSquadHub} badges={dockBadges} />
+      {/* Chrome-free conversations: no tab bar inside a thread. Nav is the
+          phone dock only (desktop:hidden throughout), so skipping it costs
+          desktop nothing — the Sidebar above is desktop's navigation. */}
+      {!conversationScreen && <Nav showSquadHub={showSquadHub} badges={dockBadges} />}
 
       {/* The floating chat dock — desktop only, never on /chat. Lives here
           (not per screen) so an open panel and its half-written draft

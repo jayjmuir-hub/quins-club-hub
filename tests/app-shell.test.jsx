@@ -839,3 +839,45 @@ describe('AppShell — the masthead hides on scroll like the dock', () => {
     expect(wrapper.className).toMatch(/desktop:opacity-100/)
   })
 })
+
+describe('chrome-free conversations (Jay, 25 Aug 2026)', () => {
+  // Inside a thread the phone shows NO tab bar and NO masthead island —
+  // WhatsApp-style. The chat header's ← and the system back gesture are the
+  // way out. The chat LIST keeps the chrome, and view-as keeps everything:
+  // the banner is the way out of the preview and must never disappear.
+  // The tab bar is the only role=navigation named "Primary" (the sidebar's
+  // "Primary" sits on an <aside>, role complementary), so presence is a
+  // COUNT: one normally, zero inside a conversation.
+  it('hides the tab bar and masthead island inside a DM thread', () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    renderShell('/chat/dm/c1')
+    expect(screen.queryAllByRole('navigation', { name: 'Primary' })).toHaveLength(0)
+    expect(hasClassToken(screen.getByTestId('masthead-wrapper'), 'hidden')).toBe(true)
+    // The 108px tab-bar clearance would be a dead band under the composer.
+    expect(document.getElementById('main-content').className).not.toContain('108px')
+  })
+
+  it('squad and club streams count as conversations', () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    renderShell('/chat/club')
+    expect(screen.queryAllByRole('navigation', { name: 'Primary' })).toHaveLength(0)
+  })
+
+  it('the chat list and starred keep the chrome', () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    const { unmount } = renderShell('/chat')
+    expect(screen.getAllByRole('navigation', { name: 'Primary' })).toHaveLength(1)
+    expect(hasClassToken(screen.getByTestId('masthead-wrapper'), 'hidden')).toBe(false)
+    expect(document.getElementById('main-content').className).toContain('108px')
+    unmount()
+    renderShell('/chat/starred')
+    expect(screen.getAllByRole('navigation', { name: 'Primary' })).toHaveLength(1)
+  })
+
+  it('view-as keeps the chrome even inside a conversation', () => {
+    useMembershipsMock.mockReturnValue(loaded({ viewAs: { role: 'parent', team_id: null } }))
+    renderShell('/chat/dm/c1')
+    expect(screen.getAllByRole('navigation', { name: 'Primary' })).toHaveLength(1)
+    expect(hasClassToken(screen.getByTestId('masthead-wrapper'), 'hidden')).toBe(false)
+  })
+})

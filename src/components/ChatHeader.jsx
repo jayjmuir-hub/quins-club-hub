@@ -29,16 +29,16 @@ export default function ChatHeader({ avatar, title, subtitle, actions = [] }) {
   }, [open])
 
   return (
-    // ⚠️ THE PHONE OFFSET CLEARS THE GLASS MASTHEAD. top-0 pinned this bar
-    // under the floating island (z-40 beats z-10) and the privacy notice
-    // under IT — Jay's phone screenshot, 24 Aug 2026 ("chat isn't playing
-    // nice"). 64px ≈ the island's wrapper (safe-area + 8px top, ~48px
-    // island, 8px bottom). When the masthead auto-hides mid-scroll the bar
-    // sits 64px down with daylight above it — the accepted cost; the
-    // alternative (chrome-free thread screens, WhatsApp-style) is Jay's
-    // call, not a hotfix. Desktop keeps top-0: the island lives top-RIGHT
-    // there and never crosses this bar.
-    <div className="sticky top-[calc(env(safe-area-inset-top)+64px)] z-10 -mx-1 mb-3 flex items-center gap-2.5 border-b border-line bg-surface px-1 py-2 desktop:top-0" data-testid="chat-header">
+    // Chrome-free conversations (Jay, 25 Aug 2026): the masthead island is
+    // hidden inside a thread (AppShell's conversationScreen), so this bar
+    // pins at the very top — the 64px clearance it carried while the island
+    // floated above it (#389) went with the island. The safe-area folds into
+    // the padding so the bar's own background covers the notch. This header
+    // only renders on conversation screens (Chat.jsx and the DM thread), so
+    // there is no masthead case left to clear — except view-as, where the
+    // chrome stays and this bar slides under the banner: accepted, an admin
+    // previewing a thread is rare and the banner must win.
+    <div className="sticky top-0 z-10 -mx-1 mb-3 flex items-center gap-2.5 border-b border-line bg-surface px-1 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:pt-2" data-testid="chat-header">
       <Link
         to="/chat"
         aria-label="Back to chats"
