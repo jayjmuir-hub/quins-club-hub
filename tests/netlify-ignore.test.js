@@ -45,6 +45,11 @@ describe('which paths can reach the built site', () => {
     'CLAUDE.md',
     'RESTORE.md',
     'README.md',
+    'AGENTS.md',
+    '.cursor/environment.json',
+    '.cursor/install.sh',
+    '.cursor/rules/graft.mdc',
+    '.cursor/mcp.json',
   ])('%s cannot', (path) => {
     expect(isDeployIrrelevant(path)).toBe(true)
   })

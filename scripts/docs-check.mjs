@@ -67,8 +67,8 @@ function fencedLines(text) {
 
 // Only treat a backticked string as a path if it starts with a real repo
 // directory, so `useState` or `auth.uid()` is never mistaken for a file.
-const PATH_PREFIXES = ['claude/', 'db/', 'src/', 'scripts/', 'harness/', 'supabase/', 'tests/', '.superpowers/']
-const ROOT_DOCS = ['CLAUDE.md', 'RESTORE.md', 'README.md']
+const PATH_PREFIXES = ['claude/', 'db/', 'src/', 'scripts/', 'harness/', 'supabase/', 'tests/', '.superpowers/', '.cursor/']
+const ROOT_DOCS = ['CLAUDE.md', 'RESTORE.md', 'README.md', 'AGENTS.md']
 
 /**
  * Archives of a COMPLETED build. Their references were true when written and
