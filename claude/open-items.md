@@ -330,10 +330,15 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
   2. **Re-capture `db/schema/`** after the migration applies — tables.sql
      still carries the pre-25-Aug "NOT sensitive, parents already read it"
      prose on both columns, and policies.sql predates player_grades entirely.
-  Also: the screenshot harness has NO playerTiers stub (it never did), so its
+  Also: ~~the screenshot harness has NO playerTiers stub (it never did), so its
   roster shots now render "Position not set" where the stub players carried
   inline positions — cosmetic, but a stub returning the maps is the fix when
-  the shots are next regenerated.
+  the shots are next regenerated~~ — **DONE the same day**:
+  `harness/stubs/playerTiers.js` landed with the three-view roster builder
+  (PR #420), aliased in `harness/vite.config.js` and held to export parity by
+  `tests/harness-stubs.test.js`. It returns empty maps on purpose — grades and
+  positions are decoration on the screens under shoot, and their rendering has
+  its own tests.
 
 - **`anon` holds full table privileges on `public`.** ⚠️ **Re-measured 14 Aug 2026:
   it is 23 of the 24 tables, not the "seven" this line used to claim** — seven was a
