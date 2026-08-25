@@ -98,6 +98,13 @@ export default defineConfig({
       // src/screens/, one level below src/, so the specifier text matches the
       // same rule shape as every alias above.
       { find: /^\.\.\/data\/pitches\.js$/, replacement: path.resolve(__dirname, 'stubs/pitches.js') },
+      // Player grades (25 Aug 2026): Lineup.jsx reads them for the tier
+      // warnings, and src/data/playerTiers.js imports supabase at module
+      // scope — the stubs/staff.js failure mode, not a broken read.
+      {
+        find: /^\.\.\/data\/playerTiers\.js$/,
+        replacement: path.resolve(__dirname, 'stubs/playerTiers.js'),
+      },
       {
         find: /^\.\.\/data\/pitchRequests\.js$/,
         replacement: path.resolve(__dirname, 'stubs/pitchRequests.js'),

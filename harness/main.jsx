@@ -33,6 +33,7 @@ import More from '../src/screens/More.jsx'
 import Accounts from '../src/screens/Accounts.jsx'
 import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 import MatchSheet from '../src/screens/MatchSheet.jsx'
+import Lineup from '../src/screens/Lineup.jsx'
 import Allocation from '../src/screens/Allocation.jsx'
 import PhotoPositioner, {
   PhotoDropZone,
@@ -1047,6 +1048,36 @@ const scenarios = {
       </Routes>
     </Shell>
   ),
+
+  // ⚠️ THE THREE-VIEW ROSTER BUILDER (25 Aug 2026) — the reason this scenario
+  // exists is DRAG: jsdom has no layout, so the pointer-drag reorder can only
+  // be proven in a real browser (tests/lineup-views.test.jsx's header). The
+  // stub lineup is 15-a-side with six starters, so slots 7–15 render empty —
+  // both halves of the slots and pitch views in one screenshot.
+  // ?view=slots|pitch pre-selects a view through the same localStorage key the
+  // screen itself uses, so the shot lands directly on the view under test.
+  'lineup': () => {
+    const view = new URLSearchParams(window.location.search).get('view')
+    if (view) window.localStorage.setItem('lineup-view', view)
+    else window.localStorage.removeItem('lineup-view')
+    return (
+      <Shell
+        route="/lineup/e2"
+        authValue={{ ...baseAuth(COACH_EMAIL), user: { id: 'pr-jay', email: COACH_EMAIL } }}
+        membershipValue={{
+          memberships: COACH_MEMBERSHIPS,
+          teams: TEAMS,
+          loading: false,
+          error: null,
+          reload: noop,
+        }}
+      >
+        <Routes>
+          <Route path="/lineup/:eventId" element={<Lineup />} />
+        </Routes>
+      </Shell>
+    )
+  },
 
   // ⚠️ THE PITCH CALENDAR — Day, Week and Month (12 Aug 2026). The month grid
   // is the widest NON-SHEET thing in the app after the match sheet, and it is
