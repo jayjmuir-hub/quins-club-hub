@@ -1,3 +1,10 @@
+// ⚠️ SUPERSEDED 25 Aug 2026 — the live icon set is built by
+// harness/make-icons-pin.py from harness/pin-photo.jpg (the enamel-pin
+// rendition Jay chose, on the accent-green gradient). This script is KEPT:
+// it documents the previous design's decisions and can rebuild the flat
+// "CLUB HUB" crest set if the pin look is ever retired. Do not run it
+// expecting to reproduce what is in public/icons/ today.
+//
 // Builds the installed-app icon set from src/assets/crest.png.
 //
 // Run by hand, from the repo root:
