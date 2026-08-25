@@ -48,6 +48,7 @@ import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { postedLabel, stampLabel } from '../lib/notices.js'
 import { isAdmin } from '../lib/scope.js'
+import useStayPinnedToBottom from '../lib/useStayPinnedToBottom.js'
 import { RowAvatar, scopeChatRows } from './ChatList.jsx'
 
 // Direct messages — squad chat phase 3. claude/plans/2026-08-23-squad-chat.md.
@@ -220,36 +221,8 @@ function Thread({ conversationId }) {
   }, [messages, selfId])
 
   // Stay pinned to the newest message unless the reader scrolled up into
-  // history — same treatment as Chat.jsx, same 24 Aug feedback.
-  const nearBottomRef = useRef(true)
-  useEffect(() => {
-    function onScroll() {
-      const doc = document.documentElement
-      nearBottomRef.current = window.innerHeight + window.scrollY >= doc.scrollHeight - 160
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    // Same growth-pinning as Chat.jsx: photos and reactions land after the
-    // messages do, and every arrival re-pins while the reader is near the
-    // bottom.
-    let observer
-    if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(() => {
-        if (nearBottomRef.current) window.scrollTo(0, document.documentElement.scrollHeight)
-      })
-      observer.observe(document.body)
-    }
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      observer?.disconnect()
-    }
-  }, [])
-  useEffect(() => {
-    // The TRUE document end — scrollIntoView({block:'end'}) parked the
-    // newest message under the sticky composer and the tab bar. Same fix
-    // and reasoning as Chat.jsx.
-    if (messages?.length && nearBottomRef.current) window.scrollTo(0, document.documentElement.scrollHeight)
-  }, [messages])
+  // history — the whole story lives in src/lib/useStayPinnedToBottom.js.
+  useStayPinnedToBottom(messages)
 
   const isGroup = conversation?.kind === 'group'
   const myMemberRow = isGroup ? members?.find((p) => p.profile_id === selfId) : null
@@ -785,7 +758,10 @@ function Thread({ conversationId }) {
                   <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
                 </div>
               )}
-            <div className={`flex items-end gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'} id={`msg-${m.id}`}>
+            {/* items-center, not items-end (Jay, 25 Aug 2026: "put the
+                reaction button centered on every message") — the smiley
+                trigger sits at the bubble's vertical middle. */}
+            <div className={`flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'} id={`msg-${m.id}`}>
               {/* Round 3: the add-reaction trigger sits BESIDE the bubble —
                   left of yours, right of theirs — so it reads as acting on
                   the bubble it hugs. */}
