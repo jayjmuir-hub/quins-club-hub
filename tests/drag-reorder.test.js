@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { targetIndex } from '../src/lib/useDragReorder.js'
-import { ROSTER_FORMATS, rosterFormat, slotLabel } from '../src/lib/rosterFormats.js'
+import { ROSTER_FORMATS, nearestSlot, rosterFormat, slotLabel } from '../src/lib/rosterFormats.js'
 
 // The drag maths, tested where jsdom can actually see it. The pointer wiring
 // in useDragReorder is deliberately thin (measure, call targetIndex, commit
@@ -30,6 +30,45 @@ describe('targetIndex', () => {
 
   it('handles an empty list — a one-row drag has nowhere to go', () => {
     expect(targetIndex([], 123)).toBe(0)
+  })
+})
+
+describe('nearestSlot — the drag-onto-pitch drop decision', () => {
+  const pitch = [
+    { x: 20, y: 20 },
+    { x: 50, y: 20 },
+    { x: 50, y: 60 },
+  ]
+
+  it('lands on the closest circle within reach', () => {
+    expect(nearestSlot(pitch, 48, 22, 7)).toBe(1)
+  })
+
+  it('returns null on open grass — a sloppy release moves nobody', () => {
+    expect(nearestSlot(pitch, 80, 90, 7)).toBeNull()
+  })
+
+  it('honours the reach exactly at the boundary', () => {
+    expect(nearestSlot(pitch, 27, 20, 7)).toBe(0)
+    expect(nearestSlot(pitch, 27.01, 20, 7)).toBeNull()
+  })
+
+  it('no preset has two circles inside one drop reach of each other', () => {
+    // The guarantee the DROP_REACH constant in PitchDiagram leans on: within 7
+    // units of any circle's centre there is never a SECOND circle, so a drop
+    // can never be ambiguous. Checked against every format so a future preset
+    // edit cannot quietly break the gesture.
+    for (const format of Object.values(ROSTER_FORMATS)) {
+      for (let a = 0; a < format.pitch.length; a += 1) {
+        for (let b = a + 1; b < format.pitch.length; b += 1) {
+          const distance = Math.hypot(
+            format.pitch[a].x - format.pitch[b].x,
+            format.pitch[a].y - format.pitch[b].y,
+          )
+          expect(distance).toBeGreaterThan(7)
+        }
+      }
+    }
   })
 })
 

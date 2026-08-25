@@ -51,6 +51,56 @@ const shots = [
   },
   { file: 'pitch', url: '/?scenario=lineup&view=pitch', steps: async () => {} },
   {
+    file: 'pitch-after-drag',
+    url: '/?scenario=lineup&view=pitch',
+    // Phase 2: drag a filled circle onto an empty one with a real pointer and
+    // assert the MOVE committed — shirt 1 empties, shirt 9 gains the player.
+    steps: async (page, record) => {
+      const source = page.locator('[aria-label^="Shirt 1:"]')
+      const before = await source.getAttribute('aria-label')
+      const target = page.locator('[aria-label="Shirt 9: empty"]')
+      const from = await source.boundingBox()
+      const to = await target.boundingBox()
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(from.x + from.width / 2 + 8, from.y + from.height / 2 + 8, { steps: 4 })
+      await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 })
+      await page.mouse.up()
+      await page.waitForTimeout(200)
+      const afterOne = await page.locator('[aria-label^="Shirt 1:"]').getAttribute('aria-label')
+      const afterNine = await page.locator('[aria-label^="Shirt 9:"]').getAttribute('aria-label')
+      record('pitchDrag', { before, afterOne, afterNine })
+      if (afterOne !== 'Shirt 1: empty') throw new Error('pitch drag did not empty the source circle')
+      if (afterNine === 'Shirt 9: empty') throw new Error('pitch drag did not fill the target circle')
+    },
+  },
+  {
+    file: 'sheet-pitch-style',
+    url: '/?scenario=lineup&view=pitch',
+    // Desktop only: the step drags the 720px facsimile into the page flow to
+    // photograph it, which OVERFLOWS a 375px viewport by construction — the
+    // element is off-screen in real life and its PNG is identical either way.
+    desktopOnly: true,
+    // The pitch-STYLE share sheet: flip the toggle, drag the off-screen
+    // facsimile into view, and photograph the element itself — this is the
+    // actual PNG parents would receive.
+    steps: async (page, record) => {
+      await page.getByRole('button', { name: 'Pitch', pressed: false }).click()
+      await page.evaluate(() => {
+        const wrapper = document.querySelector('.force-light').parentElement
+        wrapper.className = ''
+        wrapper.style.position = 'static'
+      })
+      await page.waitForTimeout(200)
+      const facsimile = page.locator('.force-light')
+      const box = await facsimile.boundingBox()
+      record('sheet', { width: Math.round(box.width) })
+      await facsimile.screenshot({
+        path: `${outDir}/sheet-pitch-style-card.png`,
+      })
+    },
+  },
+  {
     file: 'pitch-swap',
     url: '/?scenario=lineup&view=pitch',
     // Tap two filled circles and assert the shirts swapped in the aria labels.
@@ -80,6 +130,7 @@ const browser = await chromium.launch()
 
 for (const shot of shots) {
   for (const vp of viewports) {
+    if (shot.desktopOnly && vp.name !== 'desktop') continue
     const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } })
     const consoleErrors = []
     const pageErrors = []
@@ -129,7 +180,15 @@ for (const r of results) {
   if (r.consoleErrors.length) problems.push(`console errors: ${r.consoleErrors.join(' | ')}`)
   if (r.pageErrors.length) problems.push(`page errors: ${r.pageErrors.join(' | ')}`)
   if (r.failure) problems.push(r.failure)
-  const extra = r.drag ? ` drag→index ${r.drag.landedAt}` : r.swap ? ' swap ok' : ''
+  const extra = r.drag
+    ? ` drag→index ${r.drag.landedAt}`
+    : r.swap
+      ? ' swap ok'
+      : r.pitchDrag
+        ? ` pitch-drag: 1→9 (${r.pitchDrag.afterNine})`
+        : r.sheet
+          ? ` sheet ${r.sheet.width}px`
+          : ''
   console.log(`${problems.length ? '✗' : '✓'} ${r.shot}${extra}${problems.length ? ' — ' + problems.join('; ') : ''}`)
   if (problems.length) bad += 1
 }

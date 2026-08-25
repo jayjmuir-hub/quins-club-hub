@@ -1,6 +1,9 @@
 # 2026-08-25 — Roster builder: three views over one lineup
 
-**Status: phase 1 SHIPPED (this branch); phase 2 (pitch share style + drag-onto-pitch) not started.**
+**Status: SHIPPED — phase 1 in PR #420, phase 2 (pitch sheet style +
+drag-onto-pitch, `src/components/PitchDiagram.jsx`) the same day.** The only
+idea still parked is per-club editing of the format presets, which nobody has
+asked for.
 
 Jay, 25 Aug 2026: a drag-and-drop match roster builder, format-aware
 (players per side varies by age group), and the simple tap path must stay
