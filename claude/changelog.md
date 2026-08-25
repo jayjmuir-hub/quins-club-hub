@@ -10,7 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🖼️ **Harlequin wallpaper JPEG lands** — decoded from
+- (unmerged) — 🖼️ **Doodle wallpaper JPEG lands** — decoded from
+  `cursor/chat-wallpapers` `doodle.jpg.b64` (20412 chars) into
+  `public/chat-backgrounds/doodle.jpg`, magic `ffd8`, 15309 bytes. All
+  five papers are now on the branch. Cites `44014d5`.
+- `44014d5` — 🖼️ **Harlequin wallpaper JPEG lands** — decoded from
   `cursor/chat-wallpapers` `harlequin.jpg.b64` (23412 chars) into
   `public/chat-backgrounds/harlequin.jpg`, magic `ffd8`, 17559 bytes.
   Doodle `.b64` still 404; bytes not invented. Cites `fe00815`.
