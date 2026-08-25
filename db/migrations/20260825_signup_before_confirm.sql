@@ -2,8 +2,8 @@
 --
 -- WHY. People confirmed the email, closed the tab, and landed on Waiting for
 -- access as Unnamed / "hasn't said what they need". Measured on the Accounts
--- screen the same day: anne.granelli@gmail.com (confirmed, no name, no role)
--- and willowh10@hotmail.com (unconfirmed, same blanks).
+-- screen the same day: a confirmed login with no name and no role, and a
+-- four-day-old login that had never opened the mail.
 --
 -- Confirmation is ON, so signUp() returns no session. They cannot run RollCall
 -- between signup and confirm. The answers therefore have to be collected

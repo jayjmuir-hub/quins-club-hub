@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AccessBuilder from '../components/AccessBuilder.jsx'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
@@ -790,6 +790,8 @@ export default function Accounts() {
   // whether the insert is in flight, and the last refusal. WHAT is being
   // granted lives inside AccessBuilder — the screen only learns it on submit.
   const [grantState, setGrantState] = useState({})
+  // Unfinished logins hide Give access until an admin says they know them.
+  const [grantAnyway, setGrantAnyway] = useState({})
   // Which existing people have their "Add access" builder open.
   const [adding, setAdding] = useState({})
 
@@ -1724,8 +1726,8 @@ export default function Accounts() {
           </h3>
           <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
             Anyone can create a login with their email address, but they see nothing at all in
-            the app until an admin gives them access. People who asked for access are listed
-            first, with whatever they said about themselves. Anyone you don&apos;t recognise can
+            the app until an admin gives them access. People who finished saying who they are sit at the top.
+            People who only created a login sit below — dismiss those if you do not recognise them. Anyone you don&apos;t recognise can
             be dismissed — that only clears them off this list, it doesn&apos;t delete their
             login, and you can undo it below.
           </p>
@@ -1750,10 +1752,17 @@ export default function Accounts() {
           ) : (
             <>
               <div className="mt-2.5 flex flex-col gap-3">
-                {waiting.map((profile) => {
+                {waiting.map((profile, index) => {
                   const state = grantState[profile.id] ?? {}
                   const triage = triageState[profile.id] ?? {}
                   const request = requestByProfile.get(profile.id)
+                  const asked = Boolean(request)
+                  const prevAsked =
+                    index > 0 && Boolean(requestByProfile.get(waiting[index - 1].id))
+                  const showAskedHeading = asked && index === 0
+                  const showUnfinishedHeading = !asked && (index === 0 || prevAsked)
+                  const allowGrant =
+                    asked || Boolean(grantAnyway[profile.id]) || requestsLoaded === false
                   // ⚠️ THE EMAIL IS THE FALLBACK HERE TOO — 13 Aug 2026, and
                   // this site was MISSED by the first pass at it. The pending
                   // queue above was fixed and this was not, which is the more
@@ -1784,8 +1793,30 @@ export default function Accounts() {
                     .join(' · ')
 
                   return (
+                    <Fragment key={profile.id}>
+                      {showAskedHeading && (
+                        <h4
+                          data-testid="waiting-asked-heading"
+                          className="mt-1 text-[13px] font-extrabold uppercase tracking-[0.06em] text-ink"
+                        >
+                          Ready to approve
+                        </h4>
+                      )}
+                      {showUnfinishedHeading && (
+                        <h4
+                          data-testid="waiting-unfinished-heading"
+                          className="mt-1 text-[13px] font-extrabold uppercase tracking-[0.06em] text-ink"
+                        >
+                          Didn't finish setup
+                        </h4>
+                      )}
+                      {showUnfinishedHeading && (
+                        <p className={`-mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
+                          They confirmed an email, or only created a login. Do not pick a role
+                          for them unless you know who they are.
+                        </p>
+                      )}
                     <Card
-                      key={profile.id}
                       data-testid="waiting-person"
                       className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[14px] py-3"
                     >
@@ -1921,18 +1952,31 @@ export default function Accounts() {
                           not an edge one — so this is the same component the
                           existing-person blocks use, with no existing rows to
                           guard against. */}
-                      <AccessBuilder
-                        label={label}
-                        teams={sortedTeams}
-                        players={players}
-                        playersLoading={playersLoading}
-                        playersError={playersError}
-                        onNeedPlayers={loadPlayers}
-                        saving={Boolean(state.saving)}
-                        error={state.error}
-                        submitLabel="Give access"
-                        onSubmit={(rows) => grant(profile, rows)}
-                      />
+                      {allowGrant ? (
+                        <AccessBuilder
+                          label={label}
+                          teams={sortedTeams}
+                          players={players}
+                          playersLoading={playersLoading}
+                          playersError={playersError}
+                          onNeedPlayers={loadPlayers}
+                          saving={Boolean(state.saving)}
+                          error={state.error}
+                          submitLabel="Give access"
+                          onSubmit={(rows) => grant(profile, rows)}
+                        />
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          data-testid="give-access-anyway"
+                          onClick={() =>
+                            setGrantAnyway((current) => ({ ...current, [profile.id]: true }))
+                          }
+                        >
+                          I know them — give access
+                        </Button>
+                      )}
 
                       <div className="flex flex-col items-end gap-1">
                         {triage.error && (
@@ -1953,6 +1997,7 @@ export default function Accounts() {
                         </Button>
                       </div>
                     </Card>
+                    </Fragment>
                   )
                 })}
               </div>
