@@ -2,15 +2,13 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
+import ChatBubble from '../components/ChatBubble.jsx'
 import ChatHeader from '../components/ChatHeader.jsx'
-import ChatPhoto from '../components/ChatPhoto.jsx'
 import EmojiPicker from '../components/EmojiPicker.jsx'
 import { Empty } from '../components/Empty.jsx'
 import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
-import MessageMenu from '../components/MessageMenu.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
-import ReactionBar, { ReactionTrigger } from '../components/ReactionBar.jsx'
 import { removeChatPhoto, uploadChatPhoto } from '../data/chatMedia.js'
 import { listMyNicknames, setNickname } from '../data/nicknames.js'
 import {
@@ -47,7 +45,7 @@ import { backgroundStyle, getChatBackground, setChatBackground } from '../lib/ch
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { postedLabel, stampLabel } from '../lib/notices.js'
+import { postedLabel } from '../lib/notices.js'
 import { isAdmin } from '../lib/scope.js'
 import useStayPinnedToBottom from '../lib/useStayPinnedToBottom.js'
 import { RowAvatar, scopeChatRows } from './ChatList.jsx'
@@ -703,7 +701,7 @@ function Thread({ conversationId }) {
           const authorName = mine ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')
           const tallies = reactions.get(m.id) ?? []
           // Round 4: the chevron menu carries every action; the screen
-          // decides the list, MessageMenu only draws it.
+          // decides the list, ChatBubble only draws it.
           const menuItems = !participant || m.deleted_at || selecting
             ? []
             : [
@@ -717,13 +715,35 @@ function Thread({ conversationId }) {
                   ? [{ label: 'Delete', onClick: () => onRemove(m.id), danger: true }]
                   : [{ label: 'Report', onClick: () => setReporting(m.id), danger: true }]),
               ]
-          // The stamp rides INSIDE the bubble, WhatsApp style (round 3:
-          // "the time stamp is not totally below the message").
-          const stamp = (
-            <span className={`float-right ml-2 mt-1.5 text-[10px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-              {stampLabel(m.created_at)}
-            </span>
-          )
+          // The quote block. A HARD-deleted original nulls quoted_id
+          // (FK set null) and the block simply goes; a soft-deleted
+          // one keeps the pointer and says so without re-showing a
+          // word of the deleted content.
+          // ⚠️ `?.id`, NOT truthiness. A reverse-direction embed once
+          // made `quoted` an EMPTY ARRAY on every message — truthy —
+          // and every bubble grew a phantom chip (24 Aug 2026, live).
+          // An object with an id is the only shape worth drawing.
+          const quote = m.quoted?.id && !m.deleted_at
+            ? (m.quoted.deleted_at ? (
+                <p className={`mb-1 mt-0.5 rounded-[8px] border-l-2 px-2 py-1 text-[12px] italic ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-line bg-surface-mute text-ink-faint'}`} data-testid="quote-block">
+                  Message deleted
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="quote-block"
+                  onClick={() => document.getElementById(`msg-${m.quoted.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })}
+                  className={`mb-1 mt-0.5 block w-full rounded-[8px] border-l-2 px-2 py-1 text-left ${mine ? 'border-white/40 bg-white/10' : 'border-brand bg-surface-mute'}`}
+                >
+                  <span className={`block text-[11px] font-extrabold ${mine ? 'text-white/80' : 'text-brand-ink'}`}>
+                    {m.quoted.author_id === selfId ? 'You' : nameFor(m.quoted.author_id, m.quoted.author?.full_name ?? 'Member')}
+                  </span>
+                  <span className={`block truncate text-[12px] ${mine ? 'text-white/70' : 'text-ink-muted'}`}>
+                    {m.quoted.body?.trim() ? m.quoted.body : '📷 Photo'}
+                  </span>
+                </button>
+              ))
+            : null
           return (
             <Fragment key={m.id}>
               {daysDiffer(messages[index - 1]?.created_at, m.created_at) && (
@@ -740,98 +760,28 @@ function Thread({ conversationId }) {
                   <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
                 </div>
               )}
-            {/* items-center, not items-end (Jay, 25 Aug 2026: "put the
-                reaction button centered on every message") — the smiley
-                trigger sits at the bubble's vertical middle. */}
-            <div className={`flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`} data-testid="dm-bubble" data-mine={mine ? 'true' : 'false'} id={`msg-${m.id}`}>
-              {/* Round 3: the add-reaction trigger sits BESIDE the bubble —
-                  left of yours, right of theirs — so it reads as acting on
-                  the bubble it hugs. */}
-              {mine && participant && !m.deleted_at && !selecting && (
-                <ReactionTrigger messageId={m.id} reactions={reactions.get(m.id) ?? []} selfId={selfId} onToggle={react} align="right" />
-              )}
-              <div
-                className={`relative max-w-[80%] rounded-[14px] px-2.5 py-1.5 ${tallies.length ? 'mb-3' : ''} ${mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'} ${selecting && selected.has(m.id) ? 'ring-2 ring-brand' : ''}`}
-                onClick={selecting && !m.deleted_at ? () => toggleSelected(m.id) : undefined}
-                data-selected={selecting && selected.has(m.id) ? 'true' : undefined}
-              >
-                <MessageMenu items={menuItems} mine={mine} />
-                {m.pinned && !m.deleted_at && (
-                  <span aria-label="Pinned" className={`absolute right-7 top-1.5 text-[10px] ${mine ? 'text-white/70' : 'text-ink-faint'}`} data-testid="pin-mark">📌</span>
-                )}
-                {isGroup && !mine && (
-                  <p className="pr-10 text-[11px] font-extrabold text-brand-ink">{authorName}</p>
-                )}
-                {m.forwarded && !m.deleted_at && (
-                  <p className={`text-[11px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`} data-testid="forwarded-tag">
-                    Forwarded
-                  </p>
-                )}
-                {/* The quote block. A HARD-deleted original nulls quoted_id
-                    (FK set null) and the block simply goes; a soft-deleted
-                    one keeps the pointer and says so without re-showing a
-                    word of the deleted content.
-                    ⚠️ `?.id`, NOT truthiness. A reverse-direction embed once
-                    made `quoted` an EMPTY ARRAY on every message — truthy —
-                    and every bubble grew a phantom chip (24 Aug 2026, live).
-                    An object with an id is the only shape worth drawing. */}
-                {m.quoted?.id && !m.deleted_at && (
-                  m.quoted.deleted_at ? (
-                    <p className={`mb-1 mt-0.5 rounded-[8px] border-l-2 px-2 py-1 text-[12px] italic ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-line bg-surface-mute text-ink-faint'}`} data-testid="quote-block">
-                      Message deleted
-                    </p>
-                  ) : (
-                    <button
-                      type="button"
-                      data-testid="quote-block"
-                      onClick={() => document.getElementById(`msg-${m.quoted.id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })}
-                      className={`mb-1 mt-0.5 block w-full rounded-[8px] border-l-2 px-2 py-1 text-left ${mine ? 'border-white/40 bg-white/10' : 'border-brand bg-surface-mute'}`}
-                    >
-                      <span className={`block text-[11px] font-extrabold ${mine ? 'text-white/80' : 'text-brand-ink'}`}>
-                        {m.quoted.author_id === selfId ? 'You' : nameFor(m.quoted.author_id, m.quoted.author?.full_name ?? 'Member')}
-                      </span>
-                      <span className={`block truncate text-[12px] ${mine ? 'text-white/70' : 'text-ink-muted'}`}>
-                        {m.quoted.body?.trim() ? m.quoted.body : '📷 Photo'}
-                      </span>
-                    </button>
-                  )
-                )}
-                {m.deleted_at ? (
-                  <p className="text-[13px] italic opacity-70">Message removed{stamp}</p>
-                ) : (
-                  <>
-                    {m.attachment_path && <ChatPhoto path={m.attachment_path} />}
-                    {m.body?.trim() ? (
-                      <p className={`whitespace-pre-wrap break-words text-[14.5px] leading-[1.4] ${menuItems.length ? 'pr-5' : ''}`}>
-                        {m.body}
-                        {stamp}
-                      </p>
-                    ) : (
-                      <p className="text-right leading-none">{stamp}</p>
-                    )}
-                  </>
-                )}
-                {/* Round 4: the tallies are a pill OVERLAPPING the bubble's
-                    bottom corner, where WhatsApp puts them — left of
-                    theirs, right of yours. The mb-3 on the bubble is the
-                    room it hangs into. */}
-                {!m.deleted_at && tallies.length > 0 && (
-                  <div className={`absolute -bottom-3 ${mine ? 'right-2' : 'left-2'}`} data-testid="reaction-pill">
-                    <ReactionBar
-                      messageId={m.id}
-                      reactions={tallies}
-                      selfId={selfId}
-                      onToggle={react}
-                      disabled={!participant}
-                      showAdd={false}
-                    />
-                  </div>
-                )}
-              </div>
-              {!mine && participant && !m.deleted_at && !selecting && (
-                <ReactionTrigger messageId={m.id} reactions={reactions.get(m.id) ?? []} selfId={selfId} onToggle={react} align="left" />
-              )}
-            </div>
+              <ChatBubble
+                mine={mine}
+                messageId={m.id}
+                testId="dm-bubble"
+                id={`msg-${m.id}`}
+                selected={selecting && selected.has(m.id)}
+                onSelect={selecting && !m.deleted_at ? () => toggleSelected(m.id) : undefined}
+                menuItems={menuItems}
+                pinned={Boolean(m.pinned)}
+                showAuthor={isGroup && !mine}
+                authorLabel={authorName}
+                forwarded={Boolean(m.forwarded)}
+                quote={quote}
+                deleted={Boolean(m.deleted_at)}
+                createdAt={m.created_at}
+                body={m.body}
+                photoPath={m.attachment_path}
+                reactions={tallies}
+                selfId={selfId}
+                onReact={participant ? react : null}
+                hideTrigger={selecting}
+              />
             </Fragment>
           )
         })}

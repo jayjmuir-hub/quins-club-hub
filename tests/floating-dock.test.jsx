@@ -55,9 +55,17 @@ const ROWS = [
   { kind: 'squad', team_id: 't1', conversation_id: null, label: 'ZZ Probe U13', detail: 'Squad · open chat', last_at: '2026-08-24T08:00:00Z', last_body: 'Kick-off moved', last_author_id: 'coach-1', last_author_name: 'Zz Coach Probe', unread: 1 },
   { kind: 'squad', team_id: 't2', conversation_id: null, label: 'ZZ Probe U18', detail: 'Squad · open chat', last_at: '2026-08-24T07:30:00Z', last_body: null, last_author_id: null, last_author_name: null, unread: 0 },
   { kind: 'dm', team_id: null, conversation_id: 'c1', label: 'Zz Manager Probe', detail: 'Team Manager', last_at: '2026-08-24T07:00:00Z', last_body: 'Two seats held', last_author_id: ME, last_author_name: 'Me', unread: 0 },
+  { kind: 'group', team_id: null, conversation_id: 'g1', label: 'Zz Car Pool', detail: 'Group · 3 people', last_at: '2026-08-24T06:00:00Z', last_body: 'Seats sorted', last_author_id: 'other-2', last_author_name: 'Zz Parent Probe', unread: 0 },
 ]
 const DM_THREAD = [
   { id: 'x1', conversation_id: 'c1', channel: 'dm', author_id: 'other-1', body: 'Zz two seats held', created_at: '2026-08-24T07:00:00Z', deleted_at: null, author: { full_name: 'Zz Manager Probe' } },
+  { id: 'x2', conversation_id: 'c1', channel: 'dm', author_id: ME, body: 'Zz on my way yesterday', created_at: '2026-08-24T07:05:00Z', deleted_at: null, author: { full_name: 'Me Probe' } },
+]
+const GROUP_THREAD = [
+  { id: 'g-x1', conversation_id: 'g1', channel: 'dm', author_id: 'other-2', body: 'Zz seats sorted', created_at: '2026-08-24T06:00:00Z', deleted_at: null, author: { full_name: 'Zz Parent Probe' } },
+]
+const SQUAD_THREAD = [
+  { id: 's1', team_id: 't1', channel: 'squad', author_id: 'coach-1', body: 'Kick-off moved', created_at: '2026-08-24T08:00:00Z', deleted_at: null, author: { full_name: 'Zz Coach Probe' }, author_role: 'coach' },
 ]
 
 function renderAt(path) {
@@ -82,7 +90,8 @@ beforeEach(() => {
     ],
   })
   m.listChats.mockResolvedValue(ROWS)
-  m.listDirectMessages.mockResolvedValue(DM_THREAD)
+  m.listDirectMessages.mockImplementation(async (id) => (id === 'g1' ? GROUP_THREAD : DM_THREAD))
+  m.listMessages.mockResolvedValue(SQUAD_THREAD)
   m.sendDirectMessage.mockResolvedValue()
   m.markMessagesRead.mockResolvedValue()
   m.subscribeMessages.mockReturnValue(() => {})
@@ -107,9 +116,10 @@ describe('the floating chat dock', () => {
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     const dockRows = await screen.findAllByTestId('dock-row')
-    const labels = dockRows.map((r) => within(r).getByText(/ZZ Probe U13|ZZ Probe U18|Zz Manager Probe/).textContent)
+    const labels = dockRows.map((r) => within(r).getByText(/ZZ Probe U13|ZZ Probe U18|Zz Manager Probe|Zz Car Pool/).textContent)
     expect(labels).toContain('ZZ Probe U13')
     expect(labels).toContain('Zz Manager Probe')
+    expect(labels).toContain('Zz Car Pool')
     expect(labels).not.toContain('ZZ Probe U18')
   })
 
@@ -118,12 +128,54 @@ describe('the floating chat dock', () => {
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[1])
-    expect(await screen.findByTestId('dock-bubble')).toHaveTextContent('Zz two seats held')
+    const bubbles = await screen.findAllByTestId('dock-bubble')
+    expect(bubbles[0]).toHaveTextContent('Zz two seats held')
     // First name only in the greeting (Jay, 25 Aug 2026) — the full name is
     // already the header's job. Squads keep their whole label.
     expect(screen.getByPlaceholderText('Message Zz')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Message'), 'Zz on my way')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz on my way', { attachmentPath: null }))
+  })
+
+  it('a 1:1 does not print their name on every incoming bubble, and own is green with no You', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[1])
+    const bubbles = await screen.findAllByTestId('dock-bubble')
+    expect(bubbles).toHaveLength(2)
+    // Incoming: the header already says Zz Manager Probe — the bubble must not.
+    expect(within(bubbles[0]).queryByText('Zz Manager Probe')).not.toBeInTheDocument()
+    expect(bubbles[0]).toHaveTextContent('Zz two seats held')
+    expect(bubbles[0].querySelector('[class*="bg-accent-deep"]')).toBeNull()
+    // Own: quins-green, stamp inside, no You.
+    expect(bubbles[1]).toHaveAttribute('data-mine', 'true')
+    expect(bubbles[1].querySelector('[class*="bg-accent-deep"]')).not.toBeNull()
+    expect(within(bubbles[1]).queryByText('You')).not.toBeInTheDocument()
+    expect(within(bubbles[1]).getByText('Zz on my way yesterday').textContent).toMatch(/Zz on my way yesterday/)
+    // Reaction trigger sits BESIDE, not an action row inside the bubble.
+    expect(within(bubbles[0]).getByTestId('reaction-trigger')).toBe(bubbles[0].lastElementChild)
+    expect(within(bubbles[1]).getByTestId('reaction-trigger')).toBe(bubbles[1].firstElementChild)
+  })
+
+  it('a group still names theirs, never You on own', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[2])
+    const bubble = await screen.findByTestId('dock-bubble')
+    expect(within(bubble).getByText('Zz Parent Probe')).toBeInTheDocument()
+    expect(within(bubble).queryByText('You')).not.toBeInTheDocument()
+  })
+
+  it('a squad channel names theirs — same as MessageRow, not a third style', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[0])
+    const bubble = await screen.findByTestId('dock-bubble')
+    expect(within(bubble).getByText('Zz Coach Probe')).toBeInTheDocument()
+    expect(bubble.querySelector('[class*="rounded-[14px]"]')).not.toBeNull()
   })
 })

@@ -55,7 +55,8 @@ vi.mock('../src/data/staff.js', () => ({
   listMySquadStaff: (...args) => listMySquadStaffMock(...args),
 }))
 
-import SquadStaffCard, { leadIndex } from '../src/components/SquadStaffCard.jsx'
+import SquadStaffCard from '../src/components/SquadStaffCard.jsx'
+import { compareSquadStaff } from '../src/lib/squadStaff.js'
 import Dashboard from '../src/screens/Dashboard.jsx'
 import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
@@ -287,6 +288,16 @@ const MANAGER_PRIYA = {
   photoPath: null,
   photoUrl: null,
 }
+const MANAGER_AMAL = {
+  membershipId: 'ms-5',
+  role: 'manager',
+  title: 'Team Manager',
+  name: 'Amal Voss',
+  email: 'amal@example.com',
+  phone: '+971501112233',
+  photoPath: null,
+  photoUrl: null,
+}
 const COACH_DAN = {
   membershipId: 'ms-4',
   role: 'coach',
@@ -302,32 +313,35 @@ function person(n) {
   return { ...COACH_DAN, membershipId: `gen-${n}`, name: `Person ${n}`, title: 'Assistant Coach' }
 }
 
-describe('leadIndex — who goes first', () => {
-  // ⚠️ THE RULE IS TITLE, NEVER ROLE, AND src/data/staff.js IS WHY. It sorts by
-  // name in two places and says both times that role order "reads as a
-  // hierarchy the club has not agreed to". Putting a coach first because they
-  // are a coach would restate that hierarchy, so the lead is whoever the club
-  // chose to CALL a head — a string an admin typed, not something this code
-  // inferred.
-  it('features whoever is titled a head, wherever they sit in the list', () => {
-    expect(leadIndex([MEDIC_SAM, COACH_ROSA, MANAGER_PRIYA])).toBe(1)
+describe('compareSquadStaff — role order (Jay, 25 Aug 2026)', () => {
+  // Reverse of the old "name only" ruling. Head Coach, Team Manager(s),
+  // Assistant Coaches, Medics; same role keeps name order. A title like
+  // "Head Coach" (or the is_head_coach flag) still beats a plain coach.
+  function names(list) {
+    return [...list].sort(compareSquadStaff).map((m) => m.name)
+  }
+
+  it('orders Head Coach, managers, assistants, medics', () => {
+    expect(names([MEDIC_SAM, COACH_DAN, MANAGER_PRIYA, COACH_ROSA, MANAGER_AMAL])).toEqual([
+      'Rosa Ferreira',
+      'Amal Voss',
+      'Priyanka Ramachandran',
+      'Dan Whitfield',
+      'Sam Okonkwo',
+    ])
   })
 
-  it('does not care about case', () => {
-    expect(leadIndex([{ ...COACH_ROSA, title: 'head coach' }])).toBe(0)
+  it('does not care about Head Coach case', () => {
+    expect(names([{ ...COACH_ROSA, title: 'head coach' }, COACH_DAN])[0]).toBe('Rosa Ferreira')
   })
 
-  // ⚠️ WORD BOUNDARY, NOT `includes`. "Overhead", "Forehead" and — the one that
-  // matters here — a title like "Overheads and Kit" would all match a substring
-  // test and quietly promote the wrong person to the top of the list.
   it('does not match head inside another word', () => {
-    expect(leadIndex([{ ...COACH_ROSA, title: 'Overheads and Kit' }])).toBe(-1)
+    expect(names([{ ...COACH_ROSA, title: 'Overheads and Kit' }, MANAGER_PRIYA])[0]).toBe('Priyanka Ramachandran')
   })
 
-  it('features nobody when no title says so, which is most squads', () => {
-    expect(leadIndex([MEDIC_SAM, MANAGER_PRIYA])).toBe(-1)
-    expect(leadIndex([{ ...COACH_ROSA, title: null }])).toBe(-1)
-    expect(leadIndex([])).toBe(-1)
+  it('the is_head_coach flag beats a plain coach even with no title', () => {
+    const flagged = { ...COACH_DAN, isHeadCoach: true, title: null, name: 'Zz Flagged Probe' }
+    expect(names([COACH_DAN, flagged])[0]).toBe('Zz Flagged Probe')
   })
 })
 
@@ -375,22 +389,47 @@ describe('SquadStaffCard — the contact buttons', () => {
       expect(link.className.split(/\s+/)).toContain('w-11')
     }
   })
-})
 
-describe('SquadStaffCard — editorial rows, not glossy tiles', () => {
-  it('puts the titled head first and everyone else in name order', () => {
+  // ⚠️ jsdom COMPUTES NO CSS, so wrap vs nowrap cannot be measured in pixels
+  // here. The class tokens are the bug: `flex-wrap` on the person row is what
+  // dumped four 44px actions onto a ragged second line at ~320–390px (Jay,
+  // 25 Aug 2026, phone PWA). Pin both the row and the action cluster.
+  it('does not wrap the action cluster under the name', () => {
     render(
       <SquadStaffCard
         squadName="U13 Mixed Contact"
-        staff={[MEDIC_SAM, COACH_ROSA, MANAGER_PRIYA]}
+        staff={[{ ...COACH_ROSA, profileId: 'p-rosa' }]}
+        onChat={() => {}}
+        selfId="me-1"
+      />,
+    )
+
+    const row = screen.getByTestId('squad-staff-person')
+    expect(row.className.split(/\s+/)).toContain('flex-nowrap')
+    expect(row.className.split(/\s+/)).not.toContain('flex-wrap')
+    const actions = screen.getByTestId('squad-staff-actions')
+    expect(actions.className.split(/\s+/)).toContain('flex-nowrap')
+    expect(actions.className.split(/\s+/)).toContain('shrink-0')
+    expect(screen.getAllByRole('link').length + screen.getAllByRole('button', { name: /Chat with/ }).length).toBe(4)
+  })
+})
+
+describe('SquadStaffCard — editorial rows, not glossy tiles', () => {
+  it('draws Head Coach, managers, assistants, medics — not name order', () => {
+    render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[MEDIC_SAM, COACH_DAN, MANAGER_PRIYA, COACH_ROSA, MANAGER_AMAL]}
       />,
     )
 
     const rows = screen.getAllByTestId('squad-staff-person')
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining('Rosa Ferreira'),
-      expect.stringContaining('Sam Okonkwo'),
+      expect.stringContaining('Amal Voss'),
       expect.stringContaining('Priyanka Ramachandran'),
+      expect.stringContaining('Dan Whitfield'),
+      expect.stringContaining('Sam Okonkwo'),
     ])
   })
 
@@ -414,14 +453,15 @@ describe('SquadStaffCard — editorial rows, not glossy tiles', () => {
     expect(six[0]).toHaveTextContent('Rosa Ferreira')
   })
 
-  it('keeps name-order when nobody is titled a head', () => {
+  it('keeps managers in name order when nobody is titled a head', () => {
     render(
-      <SquadStaffCard squadName="U13 Mixed Contact" staff={[MEDIC_SAM, MANAGER_PRIYA]} />,
+      <SquadStaffCard squadName="U13 Mixed Contact" staff={[MEDIC_SAM, MANAGER_PRIYA, MANAGER_AMAL]} />,
     )
 
     const rows = screen.getAllByTestId('squad-staff-person')
-    expect(rows[0]).toHaveTextContent('Sam Okonkwo')
+    expect(rows[0]).toHaveTextContent('Amal Voss')
     expect(rows[1]).toHaveTextContent('Priyanka Ramachandran')
+    expect(rows[2]).toHaveTextContent('Sam Okonkwo')
   })
 
   it('sits the people on the shared Card, ink on paper, no poster scrim', () => {
