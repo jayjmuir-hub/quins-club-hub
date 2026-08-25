@@ -445,7 +445,7 @@ export default function FloatingChatDock({ badge = false }) {
                     onKeyDown={composerKeyDown}
                     rows={1}
                     maxLength={2000}
-                    placeholder={`Message ${active.label}`}
+                    placeholder={`Message ${active.kind === 'dm' ? active.label.split(' ')[0] : active.label}`}
                     className="min-h-[38px] flex-1 resize-none rounded-[12px] border border-line bg-surface px-3 py-2 text-[13.5px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
                   />
                   <EmojiPicker onPick={(emoji) => setDraft(insertAtCursor(draftRef.current, emoji))} />
