@@ -723,8 +723,9 @@ export default function Roster() {
                   // the age-group one. The commit that made this change and
                   // its pull request both call it "the squad filters" and "the
                   // closest analogue to adhjrt.com's age-group buttons" — it
-                  // is neither. AGE GROUP on this screen is a `<select>`, not
-                  // a pill row, so no age-group control was touched. Verified
+                  // is neither. AGE GROUP on this screen is a pill dropdown
+                  // (was a `<select>` until the Schedule filter-bar pass),
+                  // still not this row, so no age-group control was touched.
                   // live after deploying: the three `.rounded-tab` elements on
                   // /roster read All, Male and Female. Recorded here because a
                   // merged commit message cannot be edited and the code is the

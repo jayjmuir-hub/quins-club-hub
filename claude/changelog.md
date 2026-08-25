@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
+- 🗓️ **Schedule stops being an unpaginated wall** — fixtures group by club-calendar
+  month with sticky month and column headers below the filter bar; Upcoming /
+  Results / Calendar, age group and type filters share one bar; the native
+  age-group `<select>` is a pill dropdown (still one line at any squad count,
+  not a wrapping pill row). Later months reveal in document order via
+  "Show more months", never numbered pages. Frontend only.
 - `070852f` — 🧾 **Waiting for access splits into “ready to approve” and
   “didn’t finish setup”** — Jay’s queue was filling with logins that never
   finished RollCall (no name, no role, Give access anyway). People who

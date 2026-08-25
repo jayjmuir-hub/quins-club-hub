@@ -61,3 +61,14 @@ export function initialVisibleMonthCount(groups, { minMonths = 3, softRows = 40 
   }
   return groups.length
 }
+
+/**
+ * Label for the progressive-reveal control. Names the next month so a coach
+ * is not hunting through numbered pages for next month's games.
+ */
+export function showMoreMonthsLabel(remaining) {
+  if (!remaining?.length) return null
+  const next = remaining[0].label
+  if (remaining.length === 1) return `Show ${next}`
+  return `Show more months (${next} onwards)`
+}

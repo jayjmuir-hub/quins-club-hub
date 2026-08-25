@@ -518,14 +518,14 @@ guardian details must name both.
 
 ### UI state, forms and design
 
-**A selected team pill must be reconciled against live scope.** Both Schedule and Roster
+**A selected team filter must be reconciled against live scope.** Both Schedule and Roster
 derive `activeFilter = teamIds.includes(teamFilter) ? teamFilter : ALL_TEAMS_ID`. Without it,
 a membership reload that drops the selected team leaves the list filtered to nothing — and
-below two teams both screens hide the pill row entirely, so there is no "All" pill to click
+below two teams both screens hide the age-group control entirely, so there is no "All" option to click
 as a manual recovery.
 
-**Pill counts come from the search-only set, never the team-filtered set.** Otherwise every
-unselected pill reads "· 0" the moment any pill is clicked.
+**Age-group counts come from the search-only set, never the team-filtered set.** Otherwise every
+unselected option reads "· 0" the moment any squad is chosen.
 
 **Distinguish first load from refresh.** `setLoading(true)` on every refetch flashes a
 spinner over already-rendered content — Schedule uses a derived `isFirstLoad`, EventDetail a

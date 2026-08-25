@@ -169,6 +169,15 @@ function setup() {
   return { user, ...utils }
 }
 
+async function chooseAgeGroup(user, optionName) {
+  await user.click(screen.getByRole('combobox', { name: /age group/i }))
+  await user.click(screen.getByRole('option', { name: new RegExp(`^${optionName}(?:$| · )`) }))
+}
+
+async function openAgeGroup(user) {
+  await user.click(screen.getByRole('combobox', { name: /age group/i }))
+}
+
 describe('Roster — loading, empty and error states', () => {
   it('shows a loading state while the players query is in flight', () => {
     listPlayersMock.mockReturnValue(new Promise(() => {}))
@@ -268,7 +277,7 @@ describe('Roster — grouping', () => {
     await screen.findByText('Tom Fletcher')
     expect(groupLabels()).toEqual(['U12', 'Senior Men 1st XV'])
 
-    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u12')
+    await chooseAgeGroup(user, 'U12')
 
     expect(groupLabels()).toEqual(['Forwards', 'Backs', 'Other'])
     expect(screen.queryByText('Craig Muir')).not.toBeInTheDocument()
@@ -323,14 +332,16 @@ describe('Roster — team filter pill counts', () => {
     const { user } = setup()
 
     await screen.findByText('Tom Fletcher')
+    await openAgeGroup(user)
     expect(screen.getByRole('option', { name: 'All age groups · 7' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'U12 · 6' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u12')
+    await user.click(screen.getByRole('option', { name: 'U12 · 6' }))
 
     // Selecting U12 must not zero out the squads it hides, nor shrink "All"
     // to the size of the current selection.
+    await openAgeGroup(user)
     expect(screen.getByRole('option', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'All age groups · 7' })).toBeInTheDocument()
   })
@@ -341,6 +352,7 @@ describe('Roster — team filter pill counts', () => {
     await screen.findByText('Tom Fletcher')
     await user.type(screen.getByRole('searchbox'), 'craig')
 
+    await openAgeGroup(user)
     expect(screen.getByRole('option', { name: 'All age groups · 1' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'U12 · 0' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Senior Men 1st XV · 1' })).toBeInTheDocument()
@@ -357,7 +369,7 @@ describe('Roster — a team filter that outlives its team', () => {
     const { user, rerender } = setup()
 
     await screen.findByText('Tom Fletcher')
-    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u12')
+    await chooseAgeGroup(user, 'U12')
     expect(screen.queryByText('Craig Muir')).not.toBeInTheDocument()
 
     useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))

@@ -179,26 +179,33 @@ describe('TeamFilter', () => {
     { id: 'u12', name: 'U12' },
   ]
 
-  // ⚠️ REPOINTED, NOT REWRITTEN. This block asserted a pill row - aria-pressed
-  // on buttons, one click per squad. The control became a <select> on 10 Aug
-  // 2026 because the row reached four wrapped lines at 18 squads (see the
-  // header of src/components/TeamFilter.jsx). Every assertion below is the
-  // same question asked of the new control: what is selected, what does
-  // choosing do, and do the counts still reach the labels.
+  // ⚠️ REPOINTED, NOT REWRITTEN. This block asserted a pill row, then a
+  // native <select> (10 Aug 2026, four wrapped lines at 18 squads). The
+  // control is now a pill-styled combobox that opens a list — one line at
+  // any club size, same language as the other Schedule pills. Every
+  // assertion below is the same question asked of the new control: what is
+  // selected, what does choosing do, and do the counts still reach the labels.
 
-  it('shows the selected squad as the select value', () => {
+  const combo = () => screen.getByRole('combobox', { name: /age group/i })
+
+  async function openList(user) {
+    await user.click(combo())
+  }
+
+  it('shows the selected squad on the trigger, not as a native select value', () => {
     render(<TeamFilter teams={teams} selected="u10" onChange={() => {}} />)
-    expect(screen.getByRole('combobox', { name: /age group/i })).toHaveValue('u10')
+    expect(combo().tagName).not.toBe('SELECT')
+    expect(combo()).toHaveTextContent('U10')
   })
 
   it('shows the sentinel as the value when nothing is filtered', () => {
     render(<TeamFilter teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} />)
-    expect(screen.getByRole('combobox', { name: /age group/i })).toHaveValue(ALL_TEAMS_ID)
+    expect(combo()).toHaveTextContent('All age groups')
   })
 
   // ⚠️ A REAL LABEL, NOT aria-label. A pill reading "U10" said what it did; a
-  // select shows only its current value, so without the word beside it a squad
-  // name sitting on a schedule is ambiguous - filter, or heading?
+  // closed dropdown shows only its current value, so without the word beside
+  // it a squad name sitting on a schedule is ambiguous - filter, or heading?
   it('is labelled, so the value is not mistaken for a heading', () => {
     render(<TeamFilter teams={teams} selected="u10" onChange={() => {}} />)
     expect(screen.getByLabelText('Age group')).toBeInTheDocument()
@@ -209,7 +216,8 @@ describe('TeamFilter', () => {
     const onChange = vi.fn()
     render(<TeamFilter teams={teams} selected="u10" onChange={onChange} />)
 
-    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'u12')
+    await openList(user)
+    await user.click(screen.getByRole('option', { name: 'U12' }))
 
     expect(onChange).toHaveBeenCalledWith('u12')
   })
@@ -219,17 +227,16 @@ describe('TeamFilter', () => {
     const onChange = vi.fn()
     render(<TeamFilter teams={teams} selected="u10" onChange={onChange} />)
 
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: /age group/i }),
-      ALL_TEAMS_ID,
-    )
+    await openList(user)
+    await user.click(screen.getByRole('option', { name: 'All age groups' }))
 
     expect(onChange).toHaveBeenCalledWith(ALL_TEAMS_ID)
   })
 
   // The counts are why the Roster row was tolerable at 18 squads - "which
   // squads actually have anybody", answered at a glance. They had to survive.
-  it('suffixes each option with its count when a counts map is given', () => {
+  it('suffixes each option with its count when a counts map is given', async () => {
+    const user = userEvent.setup()
     const counts = new Map([
       [ALL_TEAMS_ID, 12],
       ['u10', 9],
@@ -237,12 +244,14 @@ describe('TeamFilter', () => {
     ])
     render(<TeamFilter teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} counts={counts} />)
 
+    await openList(user)
     expect(screen.getByRole('option', { name: 'All age groups · 12' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'U10 · 9' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'U12 · 3' })).toBeInTheDocument()
   })
 
-  it('shows a zero count rather than treating it as absent', () => {
+  it('shows a zero count rather than treating it as absent', async () => {
+    const user = userEvent.setup()
     render(
       <TeamFilter
         teams={teams}
@@ -252,17 +261,31 @@ describe('TeamFilter', () => {
       />,
     )
 
+    await openList(user)
     expect(screen.getByRole('option', { name: 'U10 · 0' })).toBeInTheDocument()
     // No entry in the map at all means a bare label - not "· 0".
     expect(screen.getByRole('option', { name: 'U12' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'All age groups' })).toBeInTheDocument()
   })
 
-  it('leaves every label bare when no counts are given', () => {
+  it('leaves every label bare when no counts are given', async () => {
+    const user = userEvent.setup()
     render(<TeamFilter teams={teams} selected={ALL_TEAMS_ID} onChange={() => {}} />)
 
+    await openList(user)
     expect(screen.getByRole('option', { name: 'U10' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'All age groups' })).toBeInTheDocument()
+  })
+
+  it('closes on Escape and returns focus to the trigger', async () => {
+    const user = userEvent.setup()
+    render(<TeamFilter teams={teams} selected="u10" onChange={() => {}} />)
+
+    await openList(user)
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(combo()).toHaveFocus()
   })
 
   it('renders no broken control for an empty teams array', () => {

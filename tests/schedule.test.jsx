@@ -213,6 +213,11 @@ function withRouter(ui) {
   )
 }
 
+async function chooseAgeGroup(user, optionName) {
+  await user.click(screen.getByRole('combobox', { name: /age group/i }))
+  await user.click(screen.getByRole('option', { name: new RegExp(`^${optionName}(?:$| · )`) }))
+}
+
 describe('Schedule — loading, empty and error states', () => {
   it('shows a loading state while the events query is in flight', () => {
     listEventsMock.mockReturnValue(new Promise(() => {}))
@@ -341,7 +346,7 @@ describe('Schedule — team filter', () => {
     await screen.findByText('Quins vs Dubai Exiles')
     expect(screen.getByText('Senior squad training')).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
+    await chooseAgeGroup(user, 'U10')
 
     expect(screen.getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
     expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
@@ -366,7 +371,7 @@ describe('Schedule — team filter', () => {
     const { user, rerender } = setup()
 
     await screen.findByText('Quins vs Dubai Exiles')
-    await user.selectOptions(screen.getByRole('combobox', { name: /age group/i }), 'team-u10')
+    await chooseAgeGroup(user, 'U10')
     expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
 
     useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))
@@ -1281,5 +1286,63 @@ describe('Schedule — the section heading', () => {
     expect(heading).toBeInTheDocument()
     expect(screen.getByText('Schedule')).toBeInTheDocument() // the kicker
     expect(screen.queryByText(/schedule\s*&\s*fixtures/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('Schedule — one filter bar', () => {
+  it('keeps view, age group and type filters in a single bar, with no native select', async () => {
+    setup()
+    await screen.findByText('Quins vs Dubai Exiles')
+
+    const bar = screen.getByTestId('schedule-filter-bar')
+    expect(within(bar).getByRole('button', { name: 'Upcoming' })).toBeInTheDocument()
+    expect(within(bar).getByRole('combobox', { name: /age group/i })).toBeInTheDocument()
+    expect(within(bar).getByRole('button', { name: 'Training' })).toBeInTheDocument()
+    expect(bar.querySelector('select')).toBeNull()
+    expect(screen.getByRole('combobox', { name: /age group/i }).tagName).toBe('BUTTON')
+  })
+
+  it('is sticky so month headers cannot cover the filters', async () => {
+    setup()
+    await screen.findByText('Quins vs Dubai Exiles')
+    expect(hasClassToken(screen.getByTestId('schedule-filter-bar'), 'sticky')).toBe(true)
+  })
+})
+
+describe('Schedule — month groups', () => {
+  it('groups the stacked list by club-calendar month', async () => {
+    listEventsMock.mockResolvedValue([
+      { ...UPCOMING_MATCH, id: 'e-mar', starts_at: '2030-03-10T11:00:00Z', opponent: 'Sandstorm RFC' },
+      { ...UPCOMING_TRAINING, id: 'e-apr', starts_at: '2030-04-10T11:00:00Z', title: 'April skills' },
+    ])
+    setup()
+
+    await screen.findByText(/Sandstorm RFC/)
+    const months = screen.getAllByTestId('schedule-month').map((node) => node.textContent)
+    expect(months[0]).toMatch(/March 2030/)
+    expect(months[1]).toMatch(/April 2030/)
+    expect(hasClassToken(screen.getAllByTestId('schedule-month')[0], 'sticky')).toBe(true)
+  })
+
+  it('reveals later months in document order, not behind a page number', async () => {
+    const rows = []
+    for (let month = 0; month < 8; month += 1) {
+      for (let n = 0; n < 8; n += 1) {
+        rows.push({
+          ...UPCOMING_TRAINING,
+          id: `e-${month}-${n}`,
+          starts_at: `2031-${String(month + 1).padStart(2, '0')}-10T11:00:00Z`,
+          title: `Session ${month}-${n}`,
+        })
+      }
+    }
+    listEventsMock.mockResolvedValue(rows)
+    const { user } = setup()
+
+    await screen.findByText('Session 0-0')
+    expect(screen.queryByText('Session 7-0')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /show more months/i }))
+    expect(screen.getByText('Session 7-0')).toBeInTheDocument()
   })
 })

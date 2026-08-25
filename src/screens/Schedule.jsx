@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '../components/Button.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import Card from '../components/Card.jsx'
@@ -20,6 +20,11 @@ import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import { defaultEventWindow, isMonthOutsideWindow, windowCovering } from '../lib/eventWindow.js'
 import ScheduleTable from '../components/ScheduleTable.jsx'
 import { useMediaQuery, WIDE_QUERY } from '../lib/useMediaQuery.js'
+import {
+  groupEventsByMonth,
+  initialVisibleMonthCount,
+  showMoreMonthsLabel,
+} from '../lib/scheduleMonthGroups.js'
 
 // Same reasoning as Roster's: the filter has to outlive a reload, or a coach
 // who runs one age group re-filters on every visit. Separate key from the
@@ -88,8 +93,9 @@ export function filterByType(events, typeFilter) {
 
 // Schedule (design-system.md §5.2 calls it "Schedule & fixtures"; renamed on
 // screen 9 Aug 2026 — the head said the same thing twice): scope note, section
-// head, Upcoming/Results/Calendar sub-tabs, a team filter, an event-type
-// filter on Upcoming, then the list or the month grid. Reads events once for the whole visible scope and filters in
+// head, then ONE filter bar holding Upcoming/Results/Calendar, the age-group
+// dropdown, and the event-type pills. The list is grouped by club-calendar
+// month. Reads events once for the whole visible scope and filters in
 // memory — the scope is at most 15 teams' worth of fixtures, so refetching
 // on every pill tap would add latency and flicker for nothing.
 //
@@ -163,7 +169,12 @@ function currentClubMonth() {
   return { year, month }
 }
 
-function FixtureList({ events, teamsById, onSelect, emptyMessage }) {
+function FixtureList({ events, teamsById, onSelect, emptyMessage, revealKey }) {
+  const [revealed, setRevealed] = useState(false)
+  useEffect(() => {
+    setRevealed(false)
+  }, [revealKey])
+
   if (events.length === 0) {
     return (
       <Card>
@@ -172,17 +183,51 @@ function FixtureList({ events, teamsById, onSelect, emptyMessage }) {
     )
   }
 
+  const groups = groupEventsByMonth(events)
+  const visibleCount = revealed ? groups.length : initialVisibleMonthCount(groups)
+  const visible = groups.slice(0, visibleCount)
+  const remaining = groups.slice(visibleCount)
+  const moreLabel = showMoreMonthsLabel(remaining)
+
+  // Events without a parseable start are skipped by the grouper (same as the
+  // calendar). If that emptied the list, keep the original rows so nothing
+  // silently vanishes.
+  const sections = visible.length > 0 ? visible : [{ key: 'undated', label: null, events }]
+
   return (
-    <Card className="overflow-hidden">
-      {events.map((event) => (
-        <FixtureRow
-          key={event.id}
-          event={event}
-          teamName={teamsById.get(event.team_id)?.name}
-          onSelect={onSelect}
-        />
+    <>
+      {sections.map((group) => (
+        <div key={group.key} className="mb-4 last:mb-0">
+          {group.label && (
+            <h3
+              data-testid="schedule-month"
+              className="sticky z-10 mb-2 flex items-center gap-2 bg-surface py-1.5 text-[12.5px] font-extrabold uppercase tracking-[.5px] text-ink"
+              style={{ top: 'var(--schedule-filter-h, 0px)' }}
+            >
+              <span>{group.label}</span>
+              <span className="rounded-[20px] bg-surface-sunk px-2 py-0.5 text-[11px] font-extrabold text-ink-muted">
+                {group.events.length}
+              </span>
+            </h3>
+          )}
+          <Card className="overflow-hidden">
+            {group.events.map((event) => (
+              <FixtureRow
+                key={event.id}
+                event={event}
+                teamName={teamsById.get(event.team_id)?.name}
+                onSelect={onSelect}
+              />
+            ))}
+          </Card>
+        </div>
       ))}
-    </Card>
+      {moreLabel && (
+        <Button variant="secondary" full onClick={() => setRevealed(true)}>
+          {moreLabel}
+        </Button>
+      )}
+    </>
   )
 }
 
@@ -413,6 +458,8 @@ export default function Schedule() {
   // landscape tablet or a small laptop — the stacked FixtureRow list is still
   // the better shape; seven columns there would be cramped rather than dense.
   const isWide = useMediaQuery(WIDE_QUERY)
+  const filterBarRef = useRef(null)
+  const [filterH, setFilterH] = useState(0)
 
   const [tab, setTab] = useState('upcoming')
   const [teamFilter, setTeamFilter] = useState(readStoredFilter)
@@ -625,8 +672,21 @@ export default function Schedule() {
     }
   }
 
+  const revealKey = `${tab}:${activeFilter}:${typeFilter}`
+
+  useEffect(() => {
+    const el = filterBarRef.current
+    if (!el) return undefined
+    const measure = () => setFilterH(Math.ceil(el.getBoundingClientRect().height))
+    measure()
+    if (typeof ResizeObserver !== 'function') return undefined
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [tab, scopedTeams.length, typeFilter])
+
   return (
-    <section>
+    <section style={{ ['--schedule-filter-h']: `${filterH}px` }}>
       {/* design-system.md §5.2: the section head carries an "Add" button on
           the right for admin/coach. It is absent, not disabled, for everyone
           else — and it only exists at all now that Task 14's form does. */}
@@ -669,41 +729,51 @@ export default function Schedule() {
         </div>
       </div>
 
-      <div className="mb-3 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {TABS.map(({ id, label }) => (
-          <PillButton key={id} active={tab === id} onClick={() => setTab(id)}>
-            {label}
-          </PillButton>
-        ))}
+      <div
+        ref={filterBarRef}
+        data-testid="schedule-filter-bar"
+        className="sticky top-0 z-20 mb-4 rounded-card border border-line bg-surface-card px-3 py-2.5 shadow-card"
+      >
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div
+            role="group"
+            aria-label="Schedule view"
+            className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {TABS.map(({ id, label }) => (
+              <PillButton key={id} active={tab === id} onClick={() => setTab(id)}>
+                {label}
+              </PillButton>
+            ))}
+          </div>
+
+          {/* The calendar always shows the user's whole visible scope, so the
+              team filter is hidden there (design-system.md §5.2). Below two
+              teams there is nothing to filter between, and TeamFilter already
+              renders nothing for an empty list. */}
+          {tab !== 'calendar' && scopedTeams.length > 1 && (
+            <TeamFilter teams={scopedTeams} selected={activeFilter} onChange={persistFilter} />
+          )}
+
+          {/* Event-type filter: Upcoming only, and for EVERYONE — a parent
+              asking "when is the next training?" is the main case, not an
+              organiser one. Same PillButton as the view tabs, labelled so the
+              two groups can't be confused with each other by a screen reader. */}
+          {tab === 'upcoming' && (
+            <div
+              role="group"
+              aria-label="Filter by event type"
+              className="flex gap-2 overflow-x-auto desktop:flex-wrap desktop:overflow-x-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {TYPE_FILTERS.map(({ id, label }) => (
+                <PillButton key={id} active={typeFilter === id} onClick={() => persistTypeFilter(id)}>
+                  {label}
+                </PillButton>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* The calendar always shows the user's whole visible scope, so the
-          team filter is hidden there (design-system.md §5.2). Below two
-          teams there is nothing to filter between, and TeamFilter already
-          renders nothing for an empty list. */}
-      {tab !== 'calendar' && scopedTeams.length > 1 && (
-        <div className="mb-4">
-          <TeamFilter teams={scopedTeams} selected={activeFilter} onChange={persistFilter} />
-        </div>
-      )}
-
-      {/* Event-type filter: Upcoming only, and for EVERYONE — a parent asking
-          "when is the next training?" is the main case, not an organiser one.
-          Same PillButton as the sub-tabs above, labelled so the two rows can't
-          be confused with each other by a screen reader. */}
-      {tab === 'upcoming' && (
-        <div
-          role="group"
-          aria-label="Filter by event type"
-          className="mb-4 flex gap-2 overflow-x-auto desktop:flex-wrap desktop:overflow-x-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {TYPE_FILTERS.map(({ id, label }) => (
-            <PillButton key={id} active={typeFilter === id} onClick={() => persistTypeFilter(id)}>
-              {label}
-            </PillButton>
-          ))}
-        </div>
-      )}
 
       {isFirstLoad && (
         <Card className="flex justify-center py-10">
@@ -734,6 +804,7 @@ export default function Schedule() {
             teamsById={teamsById}
             onSelect={setSelectedEventId}
             emptyMessage={upcomingEmpty}
+            revealKey={revealKey}
           />
         ) : (
           <FixtureList
@@ -741,6 +812,7 @@ export default function Schedule() {
             teamsById={teamsById}
             onSelect={setSelectedEventId}
             emptyMessage={upcomingEmpty}
+            revealKey={revealKey}
           />
         )
       )}
@@ -752,6 +824,7 @@ export default function Schedule() {
             teamsById={teamsById}
             onSelect={setSelectedEventId}
             emptyMessage="No results yet. Scores show here once someone adds them."
+            revealKey={revealKey}
           />
         ) : (
           <FixtureList
@@ -759,6 +832,7 @@ export default function Schedule() {
             teamsById={teamsById}
             onSelect={setSelectedEventId}
             emptyMessage="No results yet. Scores show here once someone adds them."
+            revealKey={revealKey}
           />
         )
       )}
