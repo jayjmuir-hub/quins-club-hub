@@ -135,6 +135,12 @@ const REFUSED_CONTACT =
  * There is deliberately no jersey_num here: the club does not use squad
  * numbers (see src/lib/playerFormat.js). The column stays in the schema and
  * nothing writes it.
+ *
+ * PLAYER_INSERT_NO_PARENT_ROW — this insert, and insertPlayers below, create
+ * a child without a parent membership. Needs Attention counts
+ * public.player_parents, so a coach saving with an empty parents editor, or
+ * a paste of names, still tags the child. That is the truth. A parent-role
+ * membership is what writes the row: private.memberships_write_parent_row.
  */
 export async function upsertPlayer(player) {
   const { id, ...fields } = player ?? {}

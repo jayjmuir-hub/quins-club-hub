@@ -174,10 +174,12 @@ describe('toSaveRows', () => {
 })
 
 // ══ BOTH NAMES, ONCE, FOR BOTH SCREENS ══════════════════════════════════
-// PlayerForm and MyPlayerForm are the only two writers of public.player_parents
-// — no RPC and no importer touches it — so this function is the whole rule.
-// Written twice, it would be a rule free to disagree with itself, and the copy
-// nobody tested would be the one that let a one-word name through.
+// PlayerForm and MyPlayerForm are the only two places a human TYPES a
+// player_parents row. A parent-role membership also writes one, from the
+// adult's profile (`private.memberships_write_parent_row`) — that path never
+// reaches this function. Written twice on the forms, the rule would be free
+// to disagree with itself, and the copy nobody tested would be the one that
+// let a one-word name through.
 describe('parentNameProblem', () => {
   const NAMED = { first_name: 'Hannah', last_name: 'Okafor' }
 

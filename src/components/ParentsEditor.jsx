@@ -122,7 +122,7 @@ export default function ParentsEditor({ parents, onChange, disabled = false }) {
               gating. It BLOCKS rather than warns, unlike the "no parent on
               file" note above: there is nothing to grandfather here, since
               every existing parent row has both names and these two forms are
-              the only writers of the table. */}
+              still the only places a human types one. */}
           <div className="mb-3.5">
             <label className={LABEL} htmlFor={`parent-first-name-${index}`}>
               First name

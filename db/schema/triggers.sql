@@ -337,3 +337,26 @@ CREATE TRIGGER messages_push AFTER INSERT ON public.messages FOR EACH ROW EXECUT
 CREATE TRIGGER message_reports_provenance BEFORE INSERT ON public.message_reports FOR EACH ROW EXECUTE FUNCTION private.set_report_provenance();
 CREATE TRIGGER message_reports_touch BEFORE UPDATE ON public.message_reports FOR EACH ROW EXECUTE FUNCTION private.touch_report();
 CREATE TRIGGER player_private_staff_dm_opt_in BEFORE UPDATE ON public.player_private FOR EACH ROW EXECUTE FUNCTION private.guard_staff_dm_opt_in();
+
+
+-- ---------------------------------------------------------------------
+-- public.memberships → memberships_write_parent_row    ADDED 2026-08-25
+-- Migration: db/migrations/20260825_player_parents_from_parent_membership.sql
+--
+-- When a parent-role membership lands with a player_id, copy the adult's
+-- profile (name, email, phone, profile_id) onto public.player_parents if
+-- that child has no row for this adult yet. Needs Attention counts that
+-- table, not Club Hub accounts; register_my_player / apply_signup_intent
+-- used to leave it empty. Coaches saving a child with no parent membership
+-- are not covered — the badge is then telling the truth.
+--
+-- WHEN (role = 'parent' AND player_id IS NOT NULL): self-register is
+-- role='player' and must not write a parent row of the child themselves.
+-- The function swallows unexpected errors so a registration cannot fail
+-- for a contact copy; blank names are skipped, not raised.
+-- ---------------------------------------------------------------------
+CREATE TRIGGER memberships_write_parent_row
+  AFTER INSERT ON public.memberships
+  FOR EACH ROW
+  WHEN ((new.role = 'parent'::text) AND (new.player_id IS NOT NULL))
+  EXECUTE FUNCTION private.memberships_write_parent_row();

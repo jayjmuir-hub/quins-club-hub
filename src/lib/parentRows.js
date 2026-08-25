@@ -123,10 +123,12 @@ export function toSaveRows(rows) {
  * That one warns because ~159 existing players have no parent row at all and a
  * hard requirement would make every one of them unsaveable. This one blocks
  * because there is nothing to grandfather: every parent row in the live
- * database has both names (measured 16 Aug 2026), and the only two writers of
- * public.player_parents are the two forms this rule governs — no RPC and no
- * importer touches the table. So requiring it here closes the door rather than
- * locking somebody out from behind it.
+ * database has both names (measured 16 Aug 2026). The two forms this rule
+ * governs are still the only places a human TYPES a parent row. RPCs copy
+ * the adult's profile when they insert a parent membership
+ * (`private.memberships_write_parent_row`); the importer does not. So
+ * requiring both names here closes the door on a half-typed row rather than
+ * locking a coach out of a child with none.
  *
  * A row nobody has typed anything into is ignored: adding a parent and changing
  * your mind is not an error, and saveParents drops those rows anyway.
