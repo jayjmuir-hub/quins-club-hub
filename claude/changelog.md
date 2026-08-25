@@ -10,6 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
+- 📣 **The `test` job pings the Grok Bot webhook when it finishes** — Cursor
+  GitHub `ci-passed` events are dropped on cloud-agent PRs, so GitHub Actions
+  itself is the source of truth. After `npm test`, a `continue-on-error` curl
+  POSTs job status (success and failure, `always()`) to
+  `GROK_BOT_CI_WEBHOOK_URL` with `GROK_BOT_CI_WEBHOOK_KEY`. Skips when the
+  secret is empty so clones without secrets stay green. Never logs the key.
+  The NEXT pull request cites this entry's squash SHA.
+- `7d827f9` — 🃏 **Member-app cards speak one language, and loading placeholders match them.**
+  Home's Squad contacts retire the glossy poster tiles (photo/gradient fill,
+  white type over a scrim) for the same editorial Card as Chat: circular
+  face, ink on paper, 44px contact actions in a list. Notices and Squad Hub
+  drop the first-load spinner for skeletons in the shape of those cards —
+  NoticeRow, calendar/doors/tracking, and the contacts rows on Home's own
+  skeleton. Frontend only.
 - `86e5e72` — 🔌 **Cursor (cloud and local) uses graft, and Cloud Agent Builds build the
   structural index first.** `.cursor/rules/graft.mdc` is always-apply;
   `AGENTS.md` tells Cloud agents to install/build if `graft/` is missing and
@@ -19,13 +33,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   no API key). `graft/` stays gitignored. `scripts/netlify-ignore.mjs` skips
   `.cursor/` so this does not deploy. Its own branch cannot cite this
   squash SHA, so this entry does.
-- 🃏 **Member-app cards speak one language, and loading placeholders match them.**
-  Home's Squad contacts retire the glossy poster tiles (photo/gradient fill,
-  white type over a scrim) for the same editorial Card as Chat: circular
-  face, ink on paper, 44px contact actions in a list. Notices and Squad Hub
-  drop the first-load spinner for skeletons in the shape of those cards —
-  NoticeRow, calendar/doors/tracking, and the contacts rows on Home's own
-  skeleton. Frontend only.
 - `da5c52c` — 🪪 **Admin’s waiting count leads to Accounts** — the sidebar badge is
   `countAdminWaiting` (pending memberships plus people waiting for access),
   but `/admin` was a chooser that never mentioned that number. The landing

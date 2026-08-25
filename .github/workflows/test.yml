@@ -72,6 +72,24 @@ jobs:
 
       - run: npm test
 
+      # Cursor GitHub `ci-passed` events are dropped on cloud-agent PRs, so
+      # GitHub Actions itself is the source of truth. Ping the Grok Bot
+      # webhook on success AND failure (`always()`). `continue-on-error` so a
+      # dead webhook never reds the required `test` check. Skip when the URL
+      # secret is empty so clones without secrets stay green. Never echo the
+      # key — it lives in env, not in the shell script.
+      - name: Notify Chief of Staff
+        if: ${{ always() && secrets.GROK_BOT_CI_WEBHOOK_URL != '' }}
+        continue-on-error: true
+        env:
+          GROK_BOT_CI_WEBHOOK_URL: ${{ secrets.GROK_BOT_CI_WEBHOOK_URL }}
+          GROK_BOT_CI_WEBHOOK_KEY: ${{ secrets.GROK_BOT_CI_WEBHOOK_KEY }}
+        run: |
+          curl -fsS -X POST "$GROK_BOT_CI_WEBHOOK_URL" \
+            -H "Authorization: Bearer $GROK_BOT_CI_WEBHOOK_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"source\":\"github-actions\",\"job\":\"test\",\"conclusion\":\"${{ job.status }}\",\"sha\":\"${{ github.sha }}\",\"ref\":\"${{ github.ref }}\",\"pr\":\"${{ github.event.pull_request.number }}\",\"html_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+
       # ── Dependency advisories ────────────────────────────────────────────
       #
       # ⚠️ THIS IS A STEP OF THE `test` JOB ON PURPOSE, NOT ITS OWN WORKFLOW.
