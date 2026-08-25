@@ -589,7 +589,7 @@ function Thread({ conversationId }) {
         </form>
       )}
 
-      {pickingBackground && <ChatBackgroundPicker current={background} onPick={pickBackground} />}
+      <ChatBackgroundPicker open={pickingBackground} onClose={() => setPickingBackground(false)} current={background} onPick={pickBackground} />
 
       {addingPeople && (
         <NewGroupPicker

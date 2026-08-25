@@ -10,8 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🖼️ **Chat wallpapers grow into a gallery, and DMs lead the
-  list** — Jay: "we need better chat backgrounds", ruled down to "too few
+- (unmerged) — 🎨 **The patterns actually paint, and the picker opens as a
+  sheet** — Jay, minutes after the gallery deployed: "most of the
+  backgrounds don't have anything in them" and "when i click chat
+  backgrounds nothing happens at all". Two root causes. (1) Every SVG
+  preset carried `%23` (an already-encoded `#`) inside a source that then
+  went through `encodeURIComponent` — double-encoded to `%2523`, so after
+  the browser's single decode the colour was the literal string
+  "%23808080": invalid, and nothing painted. **Inherited from round 3 —
+  the original doodle never drew either**, which is a fair share of why
+  chat always looked plain. Colours are now written as `#` and encoded
+  once; a test decodes every data URI and demands real hex colours (red
+  against the fault, and proven by canvas pixel-count in the harness: 720
+  inked pixels where there were 0). (2) The picker card rendered near the
+  TOP of the conversation while useStayPinnedToBottom held the reader at
+  the BOTTOM — it opened offscreen and the pin kept it there. It is now a
+  Sheet (portaled since #400), so scroll position cannot matter; measured
+  at rest fully on-screen in the harness. ⚠️ A hidden browser tab freezes
+  CSS animations at frame 0 — the sheet measured as "offscreen" until
+  `getAnimations().finish()`; noted so the next headless measurement of a
+  Sheet doesn't read the artifact as the bug. The NEXT pull request cites
+  this entry's squash SHA.
+- `817dfae` — 🖼️ **Chat wallpapers grow into a gallery, and DMs lead the
+  list** (#401) — Jay: "we need better chat backgrounds", ruled down to "too few
   choices" (claude/plans/2026-08-25-chat-wallpapers-and-dm-order.md), and
   "DMs should always be at the top of the chat screen". Four round-3
   presets become 17 in four groups (Colours / Gradients / Patterns /
@@ -24,8 +45,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   menu now exists holding exactly that one entry. The chat list reorders
   to Direct messages → Your squads → Archived, chips and sidebar
   matching. Verified in the harness dm-thread scenario: four groups, 17
-  swatches, a pick applies and persists. The NEXT pull request cites this
-  entry's squash SHA.
+  swatches, a pick applies and persists. Its own branch could not cite
+  this squash SHA, so this entry does.
 - `6b300d3` — 🎛️ **Three masthead fixes from Jay's phone, one morning** (#400) —
   (1) The install sheet opened MANGLED inside the masthead pill, on phone
   and desktop: the auto-hide wrapper's `transform` had made the glass

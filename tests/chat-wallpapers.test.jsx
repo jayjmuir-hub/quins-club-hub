@@ -39,6 +39,23 @@ describe('the preset table', () => {
     expect(BACKGROUND_GROUPS).toHaveLength(4)
   })
 
+  it('every SVG preset decodes to REAL colours — the invisible-pattern bug', () => {
+    // Jay, 25 Aug 2026: "most of the backgrounds don't have anything in
+    // them". The sources carried %23 (an already-encoded #) and then went
+    // through encodeURIComponent, double-encoding to %2523 — after the
+    // browser's single decode the colour was the literal string
+    // "%23808080", invalid, and nothing painted. Inherited from round 3:
+    // the original doodle never drew either. A colour must decode to #.
+    for (const preset of BACKGROUND_PRESETS) {
+      const image = preset.style?.backgroundImage ?? ''
+      const match = image.match(/^url\("data:image\/svg\+xml,(.*)"\)$/)
+      if (!match) continue
+      const decoded = decodeURIComponent(match[1])
+      expect(decoded, `${preset.key} decodes cleanly`).not.toContain('%23')
+      expect(decoded, `${preset.key} paints with a real colour`).toMatch(/(stroke|fill)='#[0-9a-fA-F]{6}'/)
+    }
+  })
+
   it('round-3 stored choices still resolve — green and warm survive', () => {
     // A saved wallpaper must not reset because a label improved.
     expect(backgroundStyle('green')).toBeTruthy()
@@ -48,15 +65,25 @@ describe('the preset table', () => {
 })
 
 describe('the shared picker', () => {
-  it('renders the four group labels and reports the pick', async () => {
+  it('opens as a SHEET with the four group labels and reports the pick', async () => {
+    // A sheet, not an in-flow card: the card opened at the TOP of the
+    // conversation while the stay-pinned hook held the reader at the
+    // BOTTOM — "nothing happens at all". The portal makes scroll position
+    // irrelevant.
     const user = userEvent.setup()
     const onPick = vi.fn()
-    render(<ChatBackgroundPicker current="plain" onPick={onPick} />)
+    render(<ChatBackgroundPicker open onClose={() => {}} current="plain" onPick={onPick} />)
+    expect(screen.getByRole('dialog', { name: 'Chat background' })).toBeInTheDocument()
     for (const { label } of BACKGROUND_GROUPS) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
     await user.click(screen.getByRole('button', { name: 'Hoops' }))
     expect(onPick).toHaveBeenCalledWith('hoops')
+  })
+
+  it('renders nothing while closed', () => {
+    render(<ChatBackgroundPicker open={false} onClose={() => {}} current="plain" onPick={() => {}} />)
+    expect(screen.queryByTestId('background-picker')).toBeNull()
   })
 })
 

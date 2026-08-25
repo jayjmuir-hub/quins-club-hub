@@ -420,7 +420,7 @@ export default function Chat() {
         </Card>
       )}
 
-      {pickingBackground && <ChatBackgroundPicker current={background} onPick={pickBackground} />}
+      <ChatBackgroundPicker open={pickingBackground} onClose={() => setPickingBackground(false)} current={background} onPick={pickBackground} />
 
       {/* Announce-only lives in the header's ⋯ menu since 24 Aug 2026; this
           line keeps the state visible to staff (data-testid kept for the tests). */}
