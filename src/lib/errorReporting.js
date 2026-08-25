@@ -63,6 +63,21 @@ export function errorReportingEnabled() {
   return Boolean(reporterOverride) || Boolean(DSN)
 }
 
+// Outlook Safe Links / CefSharp (and similar embedded Chromium scanners) walk
+// the live page and reject a promise with this shape. It is not Club Hub.
+// JAVASCRIPT-REACT-3 (25 Aug 2026) was that payload: no stack, 0 users, culprit
+// the origin. Id / MethodName / ParamCount vary, so the digits and the method
+// word are not pinned.
+const BROWSER_SCANNER_NOISE =
+  /Object Not Found Matching Id:\d+, MethodName:\w+, ParamCount:\d+/
+
+function looksLikeBrowserScannerNoise(value) {
+  if (typeof value?.message === 'string' && BROWSER_SCANNER_NOISE.test(value.message)) {
+    return true
+  }
+  return BROWSER_SCANNER_NOISE.test(String(value ?? ''))
+}
+
 async function loadSentry() {
   if (!loading) {
     loading = import('@sentry/react')
@@ -75,6 +90,16 @@ async function loadSentry() {
           // an app whose subject matter is CHILDREN. Neither is switched on by
           // accident here.
           integrations: [],
+          // ⚠️ `integrations: []` DOES NOT DISABLE SENTRY'S OWN GLOBAL HANDLERS.
+          // JAVASCRIPT-REACT-3 arrived with mechanism
+          // `auto.browser.global_handlers.onunhandledrejection` — Sentry's
+          // handler, not ours. `ignoreErrors` is what actually stops that path
+          // paging Jay. The scanner regex is the same one `reportError` uses;
+          // the Non-Error prefix is Sentry wrapping a string rejection.
+          ignoreErrors: [
+            BROWSER_SCANNER_NOISE,
+            'Non-Error promise rejection captured',
+          ],
           // Errors carry no user identity. `sendDefaultPii` defaults to false;
           // it is written out because a future reader will wonder whether it was
           // considered.
@@ -98,6 +123,10 @@ async function loadSentry() {
  * nothing is awaited by the caller.
  */
 export function reportError(error, context) {
+  // Whole surface, not only the unhandledrejection listener: a scanner Error,
+  // a wrapped `new Error(String(reason))`, or the raw string all match.
+  if (looksLikeBrowserScannerNoise(error)) return
+
   if (reporterOverride) {
     try {
       reporterOverride(error, context)
@@ -140,6 +169,7 @@ export function installGlobalErrorReporting(target = globalThis) {
 
   target.addEventListener('unhandledrejection', (event) => {
     const reason = event?.reason
+    if (looksLikeBrowserScannerNoise(reason)) return
     reportError(reason instanceof Error ? reason : new Error(String(reason)), {
       kind: 'unhandledrejection',
     })
