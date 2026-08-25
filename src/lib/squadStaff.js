@@ -1,3 +1,5 @@
+import { SQUAD_STAFF_ROLES } from './scope.js'
+
 /**
  * Order within a squad: Head Coach, Team Manager(s), Assistant Coaches, Medics.
  *
@@ -10,6 +12,10 @@
  * Lives in `lib/` (not `data/staff.js`) so a test that mocks the data module
  * still gets the real comparator — Home's Dashboard tests mock listMySquadStaff
  * and would otherwise sort as no-ops.
+ *
+ * ⚠️ ROLE NAMES COME FROM SQUAD_STAFF_ROLES, NEVER FROM A LITERAL. tests/
+ * staff-roles.test.jsx refuses `=== 'coach'` anywhere in src/ but scope.js —
+ * this file is the agreed sort, not a second vocabulary.
  */
 
 export function compareSquadStaff(a, b) {
@@ -20,10 +26,12 @@ export function compareSquadStaff(a, b) {
 
 function squadStaffRank(member) {
   const title = member?.title ?? ''
-  const headedCoach = member?.role === 'coach' && (member?.isHeadCoach === true || /\bhead\b/i.test(title))
+  const role = member?.role
+  const [coach, manager, medic] = SQUAD_STAFF_ROLES
+  const headedCoach = role === coach && (member?.isHeadCoach === true || /\bhead\b/i.test(title))
   if (headedCoach) return 0
-  if (member?.role === 'manager') return 1
-  if (member?.role === 'coach') return 2
-  if (member?.role === 'medic') return 3
+  if (role === manager) return 1
+  if (role === coach) return 2
+  if (role === medic) return 3
   return 4
 }
