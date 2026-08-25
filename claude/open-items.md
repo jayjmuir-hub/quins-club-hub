@@ -324,16 +324,34 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
   `db/migrations/20260825_positions_staff_only.sql` moves position/unit into
   staff-only tables and NULLS `players.position` / `players.unit`. Left open
   deliberately:
-  1. **A later migration DROPS the two nulled columns** — deploy first, drop
-     second (the destructive-schema rule); until then the columns exist,
-     empty, and nothing reads or writes them.
-  2. **Re-capture `db/schema/`** after the migration applies — tables.sql
-     still carries the pre-25-Aug "NOT sensitive, parents already read it"
-     prose on both columns, and policies.sql predates player_grades entirely.
+  1. ✅ ~~**A later migration DROPS the two nulled columns**~~ — **DONE, same
+     day, after the deploy**: `20260825_drop_players_position_unit.sql`.
+     Evidence, in order: live bundle grepped for the new code first; both
+     columns measured all-NULL (nothing had re-written them); every deployed
+     players read is `select('*')` so nothing names the columns; a
+     rolled-back dry-run dropped them with no dependents; then the real drop,
+     and `information_schema.columns` no longer lists either.
+  2. ✅ ~~**Re-capture `db/schema/`** after the migration applies~~ — **the
+     pieces this change touched are captured, 25 Aug**: players' column list
+     and prose, player_positions + player_units DDL in tables.sql (verified
+     against information_schema and pg_indexes), and the three `manage`
+     policies in policies.sql (verified against pg_policies). ⚠️ **The wider
+     drift is NOT fixed and is the item below.**
   Also: the screenshot harness has NO playerTiers stub (it never did), so its
   roster shots now render "Position not set" where the stub players carried
   inline positions — cosmetic, but a stub returning the maps is the fix when
   the shots are next regenerated.
+
+- **`db/schema/tables.sql` is FIFTEEN TABLES behind the live database —
+  measured 25 Aug 2026.** `information_schema.tables` lists 57 base tables in
+  `public`; the capture holds 42. Missing: availability_nudges, chat_prefs,
+  conversation_members, feedback (policies captured, table DDL not),
+  membership_audit, membership_vouches, message_reactions, message_stars,
+  nicknames, notification_opt_outs, player_grades, push_subscriptions,
+  signup_nudges, and until 25 Aug player_positions/player_units (those two
+  now captured). This is the exact drift the directory's README warns about,
+  at a size where the diff stops being reviewable. A full re-capture is its
+  own session's work — not absorbed into the positions change on purpose.
 
 - **`anon` holds full table privileges on `public`.** ⚠️ **Re-measured 14 Aug 2026:
   it is 23 of the 24 tables, not the "seven" this line used to claim** — seven was a

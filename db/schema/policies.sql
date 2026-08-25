@@ -1250,6 +1250,45 @@ CREATE POLICY "player private edit" ON public.player_private
 
 
 -- ---------------------------------------------------------------------
+-- player_grades / player_positions / player_units  (1 policy each,
+-- captured 25 Aug 2026 from pg_policies)
+--
+-- ⚠️ THE FIRST TWO WERE MISSING FROM THIS FILE FOR ELEVEN DAYS — both shipped
+-- 14 Aug and were never captured, the same gap the feedback block below
+-- records for 18-19 Aug. Found while capturing player_units, added today.
+--
+-- All three are the SAME SHAPE on purpose, since 25 Aug 2026: can_edit_team on
+-- both arms, no wider read, so a parent cannot read their own child's grade,
+-- positions OR unit. player_positions was born squad-readable ("read is wider
+-- than write") and Jay reversed that ruling on 25 Aug — positions_staff_only
+-- replaced its read/write pair with the single manage policy below and moved
+-- the players.position / players.unit columns into these tables outright.
+-- Fault-injected the same day, with real users: an actual parent read their 2
+-- squad players and ZERO rows from all three tables; an admin read 68/2/17.
+
+CREATE POLICY "player grade manage" ON public.player_grades
+  FOR ALL
+  USING (private.can_edit_team(( SELECT p.team_id FROM players p
+    WHERE (p.id = player_grades.player_id))))
+  WITH CHECK (private.can_edit_team(( SELECT p.team_id FROM players p
+    WHERE (p.id = player_grades.player_id))));
+
+CREATE POLICY "player position manage" ON public.player_positions
+  FOR ALL
+  USING (private.can_edit_team(( SELECT p.team_id FROM players p
+    WHERE (p.id = player_positions.player_id))))
+  WITH CHECK (private.can_edit_team(( SELECT p.team_id FROM players p
+    WHERE (p.id = player_positions.player_id))));
+
+CREATE POLICY "player unit manage" ON public.player_units
+  FOR ALL
+  USING (private.can_edit_team(( SELECT p.team_id FROM players p
+    WHERE (p.id = player_units.player_id))))
+  WITH CHECK (private.can_edit_team(( SELECT p.team_id FROM players p
+    WHERE (p.id = player_units.player_id))));
+
+
+-- ---------------------------------------------------------------------
 -- public.feedback  (4 policies, captured 19 Aug 2026)
 --
 -- ⚠️ THIS TABLE WAS ADDED ON 18 Aug AND WAS MISSING FROM THIS FILE ENTIRELY

@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🏉 **Positions are STAFF-ONLY, picked as forward-or-back then
+- (unmerged) — 🧹 **The nulled `players.position` / `players.unit` columns are
+  DROPPED, and the schema captures caught up on the pieces this change
+  touched.** `20260825_drop_players_position_unit.sql`, applied to production
+  after the #419 deploy was verified live from the served bundle — evidence
+  chain in the migration header (all-NULL measured, `select('*')`-only
+  readers, rolled-back dry-run first). tables.sql now carries
+  player_positions + player_units and the players column list as they
+  actually are; policies.sql gains the three `manage` policies (grades /
+  positions / units — the first two were ELEVEN DAYS uncaptured). Found and
+  recorded while there: the capture is FIFTEEN tables behind live — measured,
+  57 vs 42 — now its own open-items entry. The NEXT pull request cites this
+  entry's squash SHA.
+- `1d3bafe` — 🏉 **Positions are STAFF-ONLY, picked as forward-or-back then
   a sub-selection** — Jay, both halves: "forward or back selectable, then a
   sub selection for the rugby positions under those two main categories" and
   "positions should only be viewable and editable by staff". The second half

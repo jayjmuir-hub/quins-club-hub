@@ -294,7 +294,11 @@ CREATE TABLE public.players (
   first_name  text,
   last_name   text,
   jersey_num  integer,
-  position    text,
+  -- ⚠️ `position` and `unit` WERE DROPPED 25 Aug 2026 (positions_staff_only +
+  -- drop_players_position_unit). Jay made positions staff-only, and RLS grants
+  -- rows, not columns, so they could not stay on this squad-readable row. The
+  -- data moved to player_positions (first row = primary) and the new
+  -- player_units table below, both coach-only in the player_grades shape.
   is_captain  boolean              DEFAULT false,
   created_at  timestamptz          DEFAULT now(),
   -- Object key inside the PRIVATE `player-photos` storage bucket, e.g.
@@ -306,16 +310,6 @@ CREATE TABLE public.players (
   -- Added 2026-08-07 (player_gender). Nullable on purpose: "not recorded" is a
   -- real state and is not the same as either value.
   gender      text,
-  -- Added 2026-08-14 (players_unit). forward | back | NULL.
-  -- ⚠️ AUTHORITATIVE OVER `position` WHERE THEY DISAGREE (Jay's explicit choice).
-  -- Roster.positionGroup reads this first and falls back to the position only
-  -- when it is NULL. A `back` whose position says Flanker is a data error for a
-  -- human, not something the app reconciles. Deriving it from position was
-  -- rejected: that cannot express "forward, position not decided", which is the
-  -- whole reason the column exists.
-  -- ⚠️ NOT sensitive — same class as `position`, which parents already read.
-  -- The A/B/C ability tier is NOT this and must not live here.
-  unit        text,
   CONSTRAINT players_pkey         PRIMARY KEY (id),
   CONSTRAINT players_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
   CONSTRAINT players_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
@@ -1721,6 +1715,46 @@ ALTER TABLE public.lineup_players ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX lineups_event_idx         ON public.lineups        USING btree (event_id);
 CREATE INDEX lineup_players_lineup_idx ON public.lineup_players USING btree (lineup_id, sort_order);
+
+
+-- ---------------------------------------------------------------------
+-- public.player_positions / public.player_units    CAPTURED 2026-08-25
+--
+-- ⚠️ CAPTURED ELEVEN DAYS LATE. player_positions shipped 14 Aug
+-- (player_positions migration) and was never captured here — found while
+-- capturing player_units, which shipped today. Both verified against
+-- information_schema on 25 Aug 2026, AFTER positions_staff_only and
+-- drop_players_position_unit ran.
+--
+-- STAFF-ONLY, both of them, since 25 Aug 2026 — Jay: "positions should only
+-- be viewable and editable by staff", REVERSING the 14 Aug squad-readable
+-- ruling the player_positions migration header records. players.position and
+-- players.unit were backfilled into these and DROPPED. First position row
+-- (sort_order 0) is the PRIMARY. No CHECK on position's value: the offerable
+-- list lives in src/lib/positions.js and a constraint here would be a second
+-- copy that drifts.
+
+CREATE TABLE public.player_positions (
+  id         uuid     NOT NULL DEFAULT gen_random_uuid(),
+  player_id  uuid     NOT NULL,
+  position   text     NOT NULL,
+  sort_order smallint NOT NULL DEFAULT 0,
+  CONSTRAINT player_positions_pkey PRIMARY KEY (id),
+  CONSTRAINT player_positions_player_id_fkey FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+  CONSTRAINT player_positions_player_position_key UNIQUE (player_id, position)
+);
+ALTER TABLE public.player_positions ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE public.player_units (
+  player_id uuid NOT NULL,
+  unit      text NOT NULL,
+  CONSTRAINT player_units_pkey PRIMARY KEY (player_id),
+  CONSTRAINT player_units_player_id_fkey FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+  CONSTRAINT player_units_unit_check CHECK ((unit = ANY (ARRAY['forward'::text, 'back'::text])))
+);
+ALTER TABLE public.player_units ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX player_positions_player_idx ON public.player_positions USING btree (player_id, sort_order);
 
 
 -- ---------------------------------------------------------------------
