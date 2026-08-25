@@ -158,7 +158,7 @@ describe('the gate', () => {
     expect(await screen.findByRole('heading', { name: /U12 Mixed/i })).toBeInTheDocument()
   })
 
-  it('offers a multi-squad manager the picker', async () => {
+  it('offers a multi-squad manager the picker as Your squads rows', async () => {
     useMembershipsMock.mockReturnValue(
       membershipsFor([
         { role: 'manager', team_id: 't-u12', status: 'active' },
@@ -166,11 +166,78 @@ describe('the gate', () => {
       ]),
     )
     renderAt('/squad')
-    expect(await screen.findByText(/which squad/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /^your squads$/i })).toBeInTheDocument()
+    expect(screen.queryByText(/which squad/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('section-club-squads')).not.toBeInTheDocument()
     // In CLUB order (sort_order), not the shuffled fixture order — Jay's
     // 21 Aug report: the picker listed squads as the database inserted them.
-    const links = screen.getAllByRole('link', { name: /U1[24]/ })
-    expect(links.map((link) => link.textContent)).toEqual(['U12 Mixed', 'U14B'])
+    const yours = screen.getByTestId('section-your-squads')
+    const links = within(yours).getAllByTestId('squad-hub-row')
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/squad/t-u12', '/squad/t-u14'])
+    expect(links[0]).toHaveTextContent('U12 Mixed')
+    expect(links[0]).toHaveTextContent('Team Manager')
+  })
+
+  it('turns a parent-only account away from the picker, not a list they cannot open', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipsFor([{ role: 'parent', team_id: 't-u12', status: 'active', player_id: 'p1' }]),
+    )
+    renderAt('/squad')
+    expect(await screen.findByText(/for squad staff/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('squad-hub-row')).not.toBeInTheDocument()
+  })
+})
+
+describe('the picker — yours first', () => {
+  it('leads an admin parent with their squad, then the rest of the club', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipsFor([
+        { role: 'admin', team_id: null, status: 'active' },
+        { role: 'parent', team_id: 't-u8', status: 'active', player_id: 'p-child' },
+      ]),
+    )
+    renderAt('/squad')
+    const yours = await screen.findByTestId('section-your-squads')
+    const rest = screen.getByTestId('section-club-squads')
+    expect(within(yours).getAllByTestId('squad-hub-row').map((link) => link.getAttribute('href'))).toEqual([
+      '/squad/t-u8',
+    ])
+    expect(within(rest).getAllByTestId('squad-hub-row').map((link) => link.getAttribute('href'))).toEqual([
+      '/squad/t-u12',
+      '/squad/t-u14',
+    ])
+    expect(within(rest).getByRole('heading', { name: /the rest of the club/i })).toBeInTheDocument()
+    // Against the injected fault "flat list in club order": U8 would still
+    // appear, just not first among the links. The section split is the proof.
+    expect(yours.compareDocumentPosition(rest) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('does not invent an empty Your squads card for a club-only admin', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipsFor([{ role: 'admin', team_id: null, status: 'active' }]),
+    )
+    renderAt('/squad')
+    expect(await screen.findByTestId('section-club-squads')).toBeInTheDocument()
+    expect(screen.queryByTestId('section-your-squads')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^the club$/i })).toBeInTheDocument()
+    expect(screen.getAllByTestId('squad-hub-row')).toHaveLength(3)
+  })
+})
+
+describe('the picker — loading', () => {
+  it('holds editorial row shapes while memberships load, and announces it', () => {
+    useMembershipsMock.mockReturnValue({ memberships: [], teams: [], loading: true })
+    renderAt('/squad')
+
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('Loading your squads…')
+    const skeleton = screen.getByTestId('squad-hub-picker-skeleton')
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true')
+    expect(skeleton.querySelector('.rounded-full')).toBeTruthy()
+    expect(skeleton.querySelector('.rounded-card')).toBeTruthy()
+    expect(document.querySelector('.animate-spin')).toBeNull()
+    expect(screen.queryByTestId('squad-hub-skeleton')).not.toBeInTheDocument()
   })
 })
 

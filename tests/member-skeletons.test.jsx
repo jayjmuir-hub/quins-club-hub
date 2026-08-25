@@ -8,6 +8,7 @@ import { render, screen } from '@testing-library/react'
 import {
   DashboardSkeleton,
   NoticesSkeleton,
+  SquadHubPickerSkeleton,
   SquadHubSkeleton,
 } from '../src/components/Skeleton.jsx'
 
@@ -26,6 +27,19 @@ describe('NoticesSkeleton', () => {
     expect(tokens(cards[0])).toContain('bg-surface-card')
     expect(cards[0].querySelector('.rounded-full')).toBeTruthy()
     expect(cards[0].querySelector('.bg-surface-sunk')).toBeTruthy()
+  })
+})
+
+describe('SquadHubPickerSkeleton', () => {
+  it('is a card of circular-face rows, not the hub dashboard skeleton', () => {
+    render(<SquadHubPickerSkeleton />)
+    const root = screen.getByTestId('squad-hub-picker-skeleton')
+    expect(root).toHaveAttribute('aria-hidden', 'true')
+    const faces = [...root.querySelectorAll('.rounded-full')]
+    expect(faces.length).toBe(4)
+    const card = faces[0].closest('.rounded-card')
+    expect(tokens(card)).toContain('border-line')
+    expect(tokens(card)).toContain('bg-surface-card')
   })
 })
 

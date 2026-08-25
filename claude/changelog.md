@@ -10,15 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 📣 **The `test` job pings the Grok Bot webhook when it finishes** — Cursor
+- 🏉 **Squad Hub’s picker is yours first, in the same Card language as Chat.**
+  Bare `/squad` stops being a “Which squad?” dump of full-width name rows.
+  Squads this person actually belongs to lead; an admin then sees the rest of
+  the club. Each row is an editorial Card line: circular U-band mark, ink on
+  paper, role or format on the muted line. One-squad coaches still land
+  straight in. Parent-only accounts still meet the staff empty state. Frontend
+  only. The NEXT pull request cites this entry's squash SHA.
+- `e503f30` — 📣 **The `test` job pings the Grok Bot webhook when it finishes** — Cursor
   GitHub `ci-passed` events are dropped on cloud-agent PRs, so GitHub Actions
   itself is the source of truth. After `npm test`, a `continue-on-error` curl
   POSTs job status (success and failure, `always()`) to
   `GROK_BOT_CI_WEBHOOK_URL` with `GROK_BOT_CI_WEBHOOK_KEY`. GitHub rejects
   `secrets` in `if:` (Tests #989 never parsed the file), so the empty-URL
   skip is in the shell — clones without secrets stay green. Echoes
-  `webhook HTTP <code>` only; never the URL or key. The NEXT pull request
-  cites this entry's squash SHA.
+  `webhook HTTP <code>` only; never the URL or key. Its own branch could not
+  cite this squash SHA, so this entry does.
 - `7d827f9` — 🃏 **Member-app cards speak one language, and loading placeholders match them.**
   Home's Squad contacts retire the glossy poster tiles (photo/gradient fill,
   white type over a scrim) for the same editorial Card as Chat: circular
