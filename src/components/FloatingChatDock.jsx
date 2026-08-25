@@ -349,7 +349,7 @@ export default function FloatingChatDock({ badge = false }) {
 
           {active && (
             <>
-              <div ref={listRef} data-testid="dock-thread" className="flex flex-1 flex-col gap-1 overflow-y-auto bg-surface px-3 py-2" style={backgroundStyle(getChatBackground()) ?? undefined}>
+              <div ref={listRef} data-testid="dock-thread" className="flex flex-1 flex-col gap-1 overflow-y-auto bg-surface px-3 py-2" style={backgroundStyle(getChatBackground()) ?? undefined} data-background={getChatBackground()}>
                 {thread === null && <div className="py-8"><Spinner /></div>}
                 {thread?.length === 0 && <p className="px-1 py-4 text-[13px] text-ink-muted">Nothing here yet.</p>}
                 {thread?.map((m, index) => {

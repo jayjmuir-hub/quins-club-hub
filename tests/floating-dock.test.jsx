@@ -80,6 +80,7 @@ function renderAt(path) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  window.localStorage.clear()
   useAuthMock.mockReturnValue({ user: { id: ME } })
   // A parent on t1 only: t2's channel must never appear in the dock.
   useMembershipsMock.mockReturnValue({
@@ -198,5 +199,16 @@ describe('the floating chat dock', () => {
     const bubble = await screen.findByTestId('dock-bubble')
     expect(within(bubble).getByText('Zz Coach Probe')).toBeInTheDocument()
     expect(bubble.querySelector('[class*="rounded-[14px]"]')).not.toBeNull()
+  })
+
+  it('empty storage paints crest on the thread — default on every chat', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[0])
+    const panel = await screen.findByTestId('dock-thread')
+    expect(panel.getAttribute('data-background')).toBe('crest')
+    expect(panel.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+    expect(panel.style.backgroundImage).not.toContain('data:image/svg+xml')
   })
 })

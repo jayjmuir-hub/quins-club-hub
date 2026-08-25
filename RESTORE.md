@@ -79,6 +79,17 @@ clicking it opens the detail sheet. The **"Open"** button in the last column sti
 but is no longer the only way in. **Four** columns edit in place — position, age group,
 captain and **gender** (added 7 Aug), not the three this said.
 
+**Chat wallpapers are five photo papers, device-level.** Keys in picker
+order: `harlequin`, `dusk`, `crest`, `doodle`, `kit`. Default — and the
+fallback for empty storage, unknown keys, and every retired key (`plain`,
+`green`, `warm`, `hoops`, and the rest of the old gallery) — is `crest`.
+There is no `plain`. Stored under `chat-background`. Each paper is a
+covered JPEG at `/chat-backgrounds/{key}.jpg` washed with
+`rgb(var(--surface-rgb) / veil)`, painted on the DM/group thread, the
+squad/club/staff stream, and the floating dock. Picker is
+`src/components/ChatBackgroundPicker.jsx`; the table is
+`src/lib/chatBackgrounds.js`.
+
 ⚠️ **`FixtureRow` MUST STAY A DIRECT CHILD OF ITS LIST, AND WRAPPING IT IS A SILENT BUG.**
 The row carries `last:border-b-0` — CSS `:last-child` — so wrapping each row in its own
 `<div>` (to hold an animation, a link, anything) makes EVERY row its wrapper's last child

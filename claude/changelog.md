@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🧹 **The nulled `players.position` / `players.unit` columns are
+- (unmerged) — 🖼️ **Doodle wallpaper JPEG lands** — decoded from
+  `cursor/chat-wallpapers` `doodle.jpg.b64` (20412 chars) into
+  `public/chat-backgrounds/doodle.jpg`, magic `ffd8`, 15309 bytes. All
+  five papers are now on the branch. Cites `44014d5`.
+- `44014d5` — 🖼️ **Harlequin wallpaper JPEG lands** — decoded from
+  `cursor/chat-wallpapers` `harlequin.jpg.b64` (23412 chars) into
+  `public/chat-backgrounds/harlequin.jpg`, magic `ffd8`, 17559 bytes.
+  Doodle `.b64` still 404; bytes not invented. Cites `fe00815`.
+- `fe00815` — 🖼️ **Dusk wallpaper JPEG lands** — decoded from
+  `cursor/chat-wallpapers` `dusk.jpg.b64` (33456 chars) into
+  `public/chat-backgrounds/dusk.jpg`, magic `ffd8`. Harlequin and doodle
+  `.b64` URLs still 404; bytes not invented. Cites `6aca995`.
+- `6aca995` — 🖼️ **Chat wallpapers are five photo papers; crest letterhead
+  is the default on every chat.** Jay, 25 Aug 2026: land exactly five —
+  harlequin, dusk, crest, doodle, kit — painted as covered JPEGs washed
+  toward `--surface-rgb`. Empty storage, unknown keys, and the old gallery
+  (`plain`, `green`, `warm`, `hoops`, maroon, sky, rose, slate, club, dawn,
+  pitch, pitchlines, balls, shield) fall back to `crest`. There is no
+  `plain`. Device-level, still `chat-background`. Plan:
+  `claude/plans/2026-08-25-chat-wallpaper-papers.md`. Cites `861c731`.
+- `861c731` — 🧹 **The nulled `players.position` / `players.unit` columns are
   DROPPED, and the schema captures caught up on the pieces this change
   touched.** `20260825_drop_players_position_unit.sql`, applied to production
   after the #419 deploy was verified live from the served bundle — evidence
@@ -20,8 +40,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   actually are; policies.sql gains the three `manage` policies (grades /
   positions / units — the first two were ELEVEN DAYS uncaptured). Found and
   recorded while there: the capture is FIFTEEN tables behind live — measured,
-  57 vs 42 — now its own open-items entry. The NEXT pull request cites this
-  entry's squash SHA.
+  57 vs 42 — now its own open-items entry.
 - `60735db` — **The roster builder grew three views over one lineup** —
   Jay: drag-and-drop, format-aware, and keep the simple path. Quick (the
   14 Aug tap flow, untouched — its tests pass byte-identical), Slots

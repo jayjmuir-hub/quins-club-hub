@@ -1,88 +1,84 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
-// The wallpaper gallery and the DM-first list
-// (claude/plans/2026-08-25-chat-wallpapers-and-dm-order.md). The preset
-// table's shape, the shared picker, the squad chat finally painting the
-// wallpaper it always claimed to honour, and DMs leading the chat list.
+// Five photo papers, crest letterhead default
+// (claude/plans/2026-08-25-chat-wallpaper-papers.md). Retired stored keys
+// fall back to crest; the picker is just the five tiles.
 
 import {
-  BACKGROUND_GROUPS,
   BACKGROUND_PRESETS,
   backgroundStyle,
+  getChatBackground,
 } from '../src/lib/chatBackgrounds.js'
 import ChatBackgroundPicker from '../src/components/ChatBackgroundPicker.jsx'
 
+const FIVE_KEYS = ['harlequin', 'dusk', 'crest', 'doodle', 'kit']
+const FIVE_LABELS = [
+  'Harlequin (kit diamonds + crest bat)',
+  'Dusk (Zayed dusk photo)',
+  'Crest (DEFAULT; cream paper, faded shield)',
+  'Club doodle (lighter than the others)',
+  'Kit (green/red hoop fabric)',
+]
+const RETIRED = ['plain', 'green', 'warm', 'hoops']
+
 describe('the preset table', () => {
-  it('has unique keys, and every preset carries a group the picker knows', () => {
-    const keys = BACKGROUND_PRESETS.map((p) => p.key)
-    expect(new Set(keys).size).toBe(keys.length)
-    const known = new Set(BACKGROUND_GROUPS.map((g) => g.group))
+  it('is exactly the five keys, in picker order', () => {
+    expect(BACKGROUND_PRESETS.map((p) => p.key)).toEqual(FIVE_KEYS)
+    expect(new Set(BACKGROUND_PRESETS.map((p) => p.key)).size).toBe(5)
+  })
+
+  it('every paper is a covered photo washed toward --surface-rgb', () => {
     for (const preset of BACKGROUND_PRESETS) {
-      expect(known.has(preset.group), `${preset.key} group`).toBe(true)
+      expect(preset.style.backgroundImage, preset.key).toContain(`url(/chat-backgrounds/${preset.key}.jpg)`)
+      expect(preset.style.backgroundImage, preset.key).toContain('rgb(var(--surface-rgb) /')
+      expect(preset.style.backgroundImage, preset.key).not.toContain('data:image/svg+xml')
+      expect(preset.style.backgroundSize).toBe('cover')
+      expect(preset.style.backgroundPosition).toBe('center')
     }
   })
 
-  it('every preset except plain paints something', () => {
-    for (const preset of BACKGROUND_PRESETS) {
-      if (preset.key === 'plain') expect(preset.style).toBeNull()
-      else expect(preset.style?.backgroundImage, preset.key).toBeTruthy()
+  it('empty, unknown, and retired keys fall back to crest', () => {
+    window.localStorage.removeItem('chat-background')
+    expect(getChatBackground()).toBe('crest')
+    expect(backgroundStyle(undefined).backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+
+    window.localStorage.setItem('chat-background', 'not-a-paper')
+    expect(getChatBackground()).toBe('crest')
+    expect(backgroundStyle('not-a-paper').backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+
+    for (const key of RETIRED) {
+      window.localStorage.setItem('chat-background', key)
+      expect(getChatBackground(), key).toBe('crest')
+      expect(backgroundStyle(key).backgroundImage, key).toContain('/chat-backgrounds/crest.jpg')
     }
-  })
-
-  it('is a real gallery, in four groups', () => {
-    // "Too few choices" was the complaint — this pins the floor, not the
-    // exact count, so adding a preset never fails it.
-    expect(BACKGROUND_PRESETS.length).toBeGreaterThanOrEqual(16)
-    expect(BACKGROUND_GROUPS).toHaveLength(4)
-  })
-
-  it('every SVG preset decodes to REAL colours — the invisible-pattern bug', () => {
-    // Jay, 25 Aug 2026: "most of the backgrounds don't have anything in
-    // them". The sources carried %23 (an already-encoded #) and then went
-    // through encodeURIComponent, double-encoding to %2523 — after the
-    // browser's single decode the colour was the literal string
-    // "%23808080", invalid, and nothing painted. Inherited from round 3:
-    // the original doodle never drew either. A colour must decode to #.
-    for (const preset of BACKGROUND_PRESETS) {
-      const image = preset.style?.backgroundImage ?? ''
-      const match = image.match(/^url\("data:image\/svg\+xml,(.*)"\)$/)
-      if (!match) continue
-      const decoded = decodeURIComponent(match[1])
-      expect(decoded, `${preset.key} decodes cleanly`).not.toContain('%23')
-      expect(decoded, `${preset.key} paints with a real colour`).toMatch(/(stroke|fill)='#[0-9a-fA-F]{6}'/)
-    }
-  })
-
-  it('round-3 stored choices still resolve — green and warm survive', () => {
-    // A saved wallpaper must not reset because a label improved.
-    expect(backgroundStyle('green')).toBeTruthy()
-    expect(backgroundStyle('warm')).toBeTruthy()
-    expect(backgroundStyle('doodle')).toBeTruthy()
   })
 })
 
 describe('the shared picker', () => {
-  it('opens as a SHEET with the four group labels and reports the pick', async () => {
-    // A sheet, not an in-flow card: the card opened at the TOP of the
-    // conversation while the stay-pinned hook held the reader at the
-    // BOTTOM — "nothing happens at all". The portal makes scroll position
-    // irrelevant.
+  it('opens as a SHEET with only the five labels and reports Crest / Club doodle', async () => {
     const user = userEvent.setup()
     const onPick = vi.fn()
-    render(<ChatBackgroundPicker open onClose={() => {}} current="plain" onPick={onPick} />)
+    render(<ChatBackgroundPicker open onClose={() => {}} current="crest" onPick={onPick} />)
     expect(screen.getByRole('dialog', { name: 'Chat background' })).toBeInTheDocument()
-    for (const { label } of BACKGROUND_GROUPS) {
-      expect(screen.getByText(label)).toBeInTheDocument()
-    }
-    await user.click(screen.getByRole('button', { name: 'Hoops' }))
-    expect(onPick).toHaveBeenCalledWith('hoops')
+    const picker = screen.getByTestId('background-picker')
+    const buttons = within(picker).getAllByRole('button')
+    expect(buttons.map((b) => b.textContent)).toEqual(FIVE_LABELS)
+    expect(within(picker).queryByRole('button', { name: 'Hoops' })).toBeNull()
+    expect(screen.queryByText('Colours')).toBeNull()
+    expect(screen.queryByText('Gradients')).toBeNull()
+    expect(screen.queryByText('Patterns')).toBeNull()
+
+    await user.click(within(picker).getByRole('button', { name: /^Crest\b/ }))
+    expect(onPick).toHaveBeenCalledWith('crest')
+    await user.click(within(picker).getByRole('button', { name: /Club doodle/ }))
+    expect(onPick).toHaveBeenCalledWith('doodle')
   })
 
   it('renders nothing while closed', () => {
-    render(<ChatBackgroundPicker open={false} onClose={() => {}} current="plain" onPick={() => {}} />)
+    render(<ChatBackgroundPicker open={false} onClose={() => {}} current="crest" onPick={() => {}} />)
     expect(screen.queryByTestId('background-picker')).toBeNull()
   })
 })
@@ -164,6 +160,7 @@ function renderChat() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  window.localStorage.clear()
   useAuthMock.mockReturnValue({ user: { id: 'me-1' } })
   useMembershipsMock.mockReturnValue({
     memberships: PARENT,
@@ -186,12 +183,12 @@ beforeEach(() => {
 })
 
 describe('the squad chat wears the wallpaper', () => {
-  it('paints the stored choice — the "for every chat" promise, finally kept', async () => {
-    window.localStorage.setItem('chat-background', 'hoops')
+  it('empty storage paints crest — the default on every chat', async () => {
     renderChat()
     await waitFor(() => expect(screen.getByTestId('composer-locked')).toBeInTheDocument())
     const painted = document.querySelector('[data-background]')
-    expect(painted?.getAttribute('data-background')).toBe('hoops')
+    expect(painted?.getAttribute('data-background')).toBe('crest')
+    expect(painted?.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
     expect(painted?.style.backgroundImage).toContain('url(')
   })
 
