@@ -4,10 +4,11 @@
 // RPC, so it cannot be harnessed whole — but the thing Jay looks at is the
 // row, and src/components/MessageRow.jsx is pure props for exactly this.
 //
-// ⚠️ THE FOUR ROWS ARE THE FOUR STATES THAT LOOK DIFFERENT: a staff post
-// with replies (red rule, role pill, read stat), a family's post in an open
-// channel (plain), a removed message, and a pinned staff post. Everything
-// invented — CLAUDE.md rule 9.
+// ⚠️ THE ROWS ARE THE STATES THAT LOOK DIFFERENT: a fixture thread (open),
+// a staff post with replies (role pill on their name), a family's post, a
+// removed message, and a pinned staff post. Same bubble language as a DM —
+// chevron menu, stamp inside, no avatars. Everything invented — CLAUDE.md
+// rule 9.
 import { MemoryRouter } from 'react-router-dom'
 import MessageRow from '../src/components/MessageRow.jsx'
 
@@ -133,6 +134,7 @@ export default function MessageRowScenario() {
           onReply={noop}
           onRemove={noop}
           onPin={noop}
+          onReact={noop}
         />
       ))}
     </div>

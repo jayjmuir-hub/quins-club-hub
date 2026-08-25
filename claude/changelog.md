@@ -10,13 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 🏉 **Squad Hub’s picker is yours first, in the same Card language as Chat.**
+- 💬 **Channel threads use the same bubbles as a DM.** Staff / squad / club
+  at `/chat/:teamId` still rendered the old `MessageRow` layout Jay
+  screenshotted on U11 Mixed · staff: rectangular green/white bubbles, a
+  "You" label, avatars, role pills as chrome, and red Reply/Pin/Delete/Report
+  links under every row. DMs already had the round 3/4 language
+  (`DirectMessages` Thread — quins-green own bubbles, stamp inside, chevron
+  menu, reaction trigger beside, tallies as a corner pill). `MessageRow`
+  now speaks that language; channel-only bits (staff pill on *their* name,
+  nested replies, fixture cards, read-stats, Pin for staff, Report) live in
+  the chevron or inside the bubble. Frontend only. The NEXT pull request
+  cites this entry's squash SHA.
+- `ed950de` — 🏉 **Squad Hub’s picker is yours first, in the same Card language as Chat.**
   Bare `/squad` stops being a “Which squad?” dump of full-width name rows.
   Squads this person actually belongs to lead; an admin then sees the rest of
   the club. Each row is an editorial Card line: circular U-band mark, ink on
   paper, role or format on the muted line. One-squad coaches still land
   straight in. Parent-only accounts still meet the staff empty state. Frontend
-  only. The NEXT pull request cites this entry's squash SHA.
+  only.
 - `e503f30` — 📣 **The `test` job pings the Grok Bot webhook when it finishes** — Cursor
   GitHub `ci-passed` events are dropped on cloud-agent PRs, so GitHub Actions
   itself is the source of truth. After `npm test`, a `continue-on-error` curl
