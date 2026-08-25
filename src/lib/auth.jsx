@@ -122,7 +122,7 @@ export function AuthProvider({ children }) {
   // disable email SIGN-IN (only sign-up), and an email identity can always use
   // either route. Hiding the button is a UI decision, not a security boundary.
 
-  async function signUpWithPassword(email, password) {
+  async function signUpWithPassword(email, password, intent = null) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -131,6 +131,18 @@ export function AuthProvider({ children }) {
       options: {
         emailRedirectTo:
           window.location.origin + window.location.pathname + window.location.search,
+        // ⚠️ THE ROLL-CALL TRAVELS HERE, not in localStorage. They confirm
+        // on a different device (Gmail in-app browser). handle_new_user
+        // copies signup_intent onto public.profiles so the waiting list
+        // has a name and a role before they ever open the mail.
+        data: intent
+          ? {
+              full_name: `${intent.first_name} ${intent.last_name}`.trim(),
+              first_name: intent.first_name,
+              last_name: intent.last_name,
+              signup_intent: intent,
+            }
+          : {},
       },
     })
     if (error) throw error

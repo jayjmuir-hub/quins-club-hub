@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 import Button from '../components/Button.jsx'
+import SignupWizard from '../components/SignupWizard.jsx'
 import { takeSessionExpired } from '../lib/sessionExpired.js'
-import { checkPassword } from '../lib/password.js'
 import crest from '../assets/crest.png'
 
 // Login screen: the first thing an uninvited or signed-out visitor sees.
@@ -184,41 +184,6 @@ const FIELD =
   'w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand'
 const LABEL = 'mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink-faint'
 
-// The live checklist. Rendered as a list rather than a single "password must
-// contain…" sentence so a person can see WHICH part they are missing — the
-// thing GoTrue's own message conspicuously fails to tell them.
-//
-// aria-live="polite" so a screen reader announces items turning green as they
-// type, rather than the sighted user getting feedback nobody else does.
-function PasswordChecklist({ password }) {
-  const { rules } = checkPassword(password)
-  return (
-    <ul className="mt-2 space-y-1" aria-live="polite">
-      {rules.map((rule) => (
-        <li
-          key={rule.id}
-          // Unmet rules are the darker of the two: they are the ones the
-          // person still has to act on. Both clear AA on the card
-          // (ink-muted 6.06:1, ink-faint 5.52:1) — checked, not assumed.
-          className={
-            'flex items-center gap-2 text-xs ' +
-            (rule.met ? 'text-ink-faint' : 'text-ink-muted')
-          }
-        >
-          {/* The tick/dot is decorative — the met/not-met state is carried in
-              the visually-hidden text below, because colour and glyph alone
-              are not accessible. */}
-          <span aria-hidden="true" className={rule.met ? 'text-brand-ink' : 'text-line'}>
-            {rule.met ? '✓' : '•'}
-          </span>
-          <span>{rule.label}</span>
-          <span className="sr-only">{rule.met ? ' — done' : ' — still needed'}</span>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 // `embedded` — render as a plain card inside somebody else's page, instead of
 // as the whole screen. Used by /delete-account, which is public and therefore
 // has to offer sign-in itself. Without it the full-screen dark panel lands in
@@ -266,13 +231,6 @@ export default function Login({ authError = null, embedded = false }) {
     (staleAuthError ? `That sign-in link didn't work: ${staleAuthError}` : null) ??
     (sessionExpired ? SESSION_EXPIRED_MESSAGE : null)
 
-  const passwordOk = checkPassword(password).valid
-  // Submit stays disabled until the client rules pass, so in the normal case
-  // the parent never meets GoTrue's 422 at all. Sign-IN does not gate on this:
-  // someone whose existing password predates a rule change must still be able
-  // to get in, and refusing to submit would lock them out with no explanation.
-  const canSubmit = signingUp ? passwordOk : true
-
   function clearBanners() {
     setStaleAuthError(null)
     setSessionExpired(false)
@@ -300,12 +258,12 @@ export default function Login({ authError = null, embedded = false }) {
     }
 
     // ⚠️ A PRESENCE check, not a rules check — the two are different and the
-    // distinction is the point. `canSubmit` deliberately does NOT gate sign-in
-    // on the password rules (see above: an existing password that predates a
-    // rule change must still work). But submitting an EMPTY password sends a
-    // real request that returns invalid_credentials, which this screen
-    // translates into "if you've just registered, check your inbox…" —
-    // confidently wrong advice for someone who simply left the box blank.
+    // distinction is the point. Sign-in must not gate on the password rules
+    // (an existing password that predates a rule change must still work). But
+    // submitting an EMPTY password sends a real request that returns
+    // invalid_credentials, which this screen translates into "if you've just
+    // registered, check your inbox…" — confidently wrong advice for someone
+    // who simply left the box blank.
     if (!forgotting && password.length === 0) {
       setError('Enter your password.')
       return
@@ -316,19 +274,6 @@ export default function Login({ authError = null, embedded = false }) {
       if (forgotting) {
         await sendPasswordReset(trimmed)
         setStatus('reset-sent')
-        return
-      }
-
-      if (signingUp) {
-        const { alreadyRegistered } = await signUpWithPassword(trimmed, password)
-        // ⚠️ We do NOT branch the copy on `alreadyRegistered`. Saying "you
-        // already have an account" confirms to anyone who asks that a given
-        // address is a club member. The flag exists so this decision is
-        // visible and deliberate rather than accidental — the "already have an
-        // account?" link on the confirmation panel is the way out for the
-        // person who genuinely forgot.
-        void alreadyRegistered
-        setStatus('confirm-sent')
         return
       }
 
@@ -343,10 +288,30 @@ export default function Login({ authError = null, embedded = false }) {
           err,
           forgotting
             ? 'Something went wrong sending the reset email. Try again.'
-            : signingUp
-              ? 'Something went wrong creating your account. Try again.'
-              : 'Something went wrong signing in. Try again.',
+            : 'Something went wrong signing in. Try again.',
         ),
+      )
+      setStatus('idle')
+    }
+  }
+
+  async function handleSignupAccount({ email: trimmed, password: chosen, intent }) {
+    clearBanners()
+    setEmail(trimmed)
+    setStatus('busy')
+    try {
+      const { alreadyRegistered } = await signUpWithPassword(trimmed, chosen, intent)
+      // ⚠️ We do NOT branch the copy on `alreadyRegistered`. Saying "you
+      // already have an account" confirms to anyone who asks that a given
+      // address is a club member. The flag exists so this decision is
+      // visible and deliberate rather than accidental — the "already have an
+      // account?" link on the confirmation panel is the way out for the
+      // person who genuinely forgot.
+      void alreadyRegistered
+      setStatus('confirm-sent')
+    } catch (err) {
+      setError(
+        friendlyAuthError(err, 'Something went wrong creating your account. Try again.'),
       )
       setStatus('idle')
     }
@@ -434,7 +399,9 @@ export default function Login({ authError = null, embedded = false }) {
         <h2 className="text-center text-base font-bold text-ink">Check your email</h2>
         <p className="mt-2 text-center text-sm text-ink-faint">
           If <strong className="text-ink">{email.trim()}</strong> is new, we’ve sent a
-          confirmation link — open it to activate your account.
+          link to prove that address. Open it so the club can take what you just told us
+          — confirming the email is not the last step, but we already have your name
+          and why you're here.
         </p>
         <p className="mt-2 text-center text-sm text-ink-faint">
           <strong className="text-ink">
@@ -543,6 +510,28 @@ export default function Login({ authError = null, embedded = false }) {
             </div>
           )}
 
+          {signingUp ? (
+            <>
+              <SignupWizard
+                busy={busy}
+                error={displayedError}
+                onError={(message) => {
+                  clearBanners()
+                  setError(message)
+                }}
+                onSubmitAccount={handleSignupAccount}
+              />
+              <p className="mt-4 text-center text-sm text-ink-faint">
+                Can&rsquo;t get in?{' '}
+                <a
+                  href="mailto:help@adhquins-clubhub.com?subject=Can%27t%20sign%20in"
+                  className="font-semibold text-brand-ink underline"
+                >
+                  Email us
+                </a>
+              </p>
+            </>
+          ) : (
           <form className="mt-4" onSubmit={handleSubmit} noValidate>
             {displayedError && (
               <p
@@ -597,34 +586,29 @@ export default function Login({ authError = null, embedded = false }) {
                   // to generate one; current-password on sign-in tells it to
                   // fill. Getting these the wrong way round is why managers
                   // sometimes overwrite a saved entry.
-                  autoComplete={signingUp ? 'new-password' : 'current-password'}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className={FIELD}
                 />
-                {signingUp && <PasswordChecklist password={password} />}
               </div>
             )}
 
-            <Button type="submit" disabled={busy || !canSubmit} full className="mt-4">
+            <Button type="submit" disabled={busy} full className="mt-4">
               {busy
                 ? 'Please wait…'
                 : forgotting
                   ? 'Email me a reset link'
-                  : signingUp
-                    ? 'Create account'
-                    : 'Sign in'}
+                  : 'Sign in'}
             </Button>
 
-            {!signingUp && (
-              <button
-                type="button"
-                onClick={() => switchMode(forgotting ? 'signin' : 'forgot')}
-                className="mt-3 w-full text-center text-sm font-semibold text-ink-faint underline"
-              >
-                {forgotting ? 'Back to sign in' : 'Forgot password?'}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => switchMode(forgotting ? 'signin' : 'forgot')}
+              className="mt-3 w-full text-center text-sm font-semibold text-ink-faint underline"
+            >
+              {forgotting ? 'Back to sign in' : 'Forgot password?'}
+            </button>
 
             {/* ⚠️ THE ONE HOLE THE `?` BUTTON CANNOT COVER, AND IT IS THE
                 LIKELIEST PROBLEM ANYBODY WILL EVER HAVE.
@@ -678,6 +662,7 @@ export default function Login({ authError = null, embedded = false }) {
               </>
             )}
           </form>
+          )}
         </>
       )}
     </div>

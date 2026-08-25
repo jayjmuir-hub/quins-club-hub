@@ -18,7 +18,10 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 const verifyOtpMock = vi.fn()
 
 vi.mock('../src/lib/supabase', () => ({
-  supabase: { auth: { verifyOtp: (...a) => verifyOtpMock(...a) } },
+  supabase: {
+    auth: { verifyOtp: (...a) => verifyOtpMock(...a) },
+    rpc: () => Promise.resolve({ data: null, error: null }),
+  },
 }))
 
 import AuthConfirm, { safeNext } from '../src/screens/AuthConfirm.jsx'

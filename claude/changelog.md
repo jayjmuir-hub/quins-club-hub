@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🎨 **The patterns actually paint, and the picker opens as a
+- `070852f` — 🧾 **Waiting for access splits into “ready to approve” and
+  “didn’t finish setup”** — Jay’s queue was filling with logins that never
+  finished RollCall (no name, no role, Give access anyway). People who
+  actually asked stay at the top with the builder; unfinished logins sit
+  below, Dismiss first, Give access behind “I know them”. Same
+  `waiting-for-access` section, locked 2.0 tokens. Pairs with the
+  wizard-before-confirm change.
+- `0440c4f` — 📝 **Collect who you are before the confirmation email** (#403)
+  — confirming the address was reading as finished. Wizard (name, ticks,
+  squads, children) now runs before `signUp()`; answers ride in
+  `signup_intent`; children are created only after `email_confirmed_at`.
+  ⚠️ Apply `db/migrations/20260825_signup_before_confirm.sql` before this
+  frontend ships.
+- `16c419f` — 🎨 **The patterns actually paint, and the picker opens as a
   sheet** — Jay, minutes after the gallery deployed: "most of the
   backgrounds don't have anything in them" and "when i click chat
   backgrounds nothing happens at all". Two root causes. (1) Every SVG

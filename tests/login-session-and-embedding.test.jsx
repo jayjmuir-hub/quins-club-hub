@@ -26,6 +26,20 @@ vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => useAuthMock(),
 }))
 
+vi.mock('../src/data/signupSquads.js', () => ({
+  listSignupSquads: vi.fn(async () => []),
+}))
+
+vi.mock('../src/data/members.js', () => ({
+  getMyProfile: vi.fn(async () => null),
+  updateProfileNames: vi.fn(),
+  registerMyPlayer: vi.fn(),
+}))
+
+vi.mock('../src/data/players.js', () => ({
+  setPlayerDob: vi.fn(),
+}))
+
 import Login, { friendlyAuthError } from '../src/screens/Login.jsx'
 import { SESSION_EXPIRED_KEY, markSessionExpired } from '../src/lib/sessionExpired.js'
 

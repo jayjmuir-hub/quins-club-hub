@@ -129,7 +129,7 @@ export default function AuthConfirm() {
 
     supabase.auth
       .verifyOtp({ token_hash: tokenHash, type })
-      .then(({ error: verifyError }) => {
+      .then(async ({ error: verifyError }) => {
         if (verifyError) {
           // Supabase's own wording here is developer-facing ("Token has
           // expired or is invalid"), and this screen is read by a parent on a
@@ -138,6 +138,16 @@ export default function AuthConfirm() {
             'That link has expired or has already been used. Ask for a new one and try again.',
           )
           return
+        }
+
+        // ⚠️ THE TRIGGER ON email_confirmed_at IS WHAT CREATES THE CHILD.
+        // This RPC is the retry if that trigger swallowed an error. It is a
+        // no-op when there is no signup_intent or it was already applied, so
+        // a failure here must not strand them on this screen.
+        try {
+          await supabase.rpc('complete_signup_intent')
+        } catch {
+          // Trigger already applied, or the function is not deployed yet.
         }
 
         // ⚠️ RECOVERY GOES TO /reset-password, ALWAYS, whatever `next` says.

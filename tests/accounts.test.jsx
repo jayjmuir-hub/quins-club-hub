@@ -386,15 +386,27 @@ function roleSelect(label) {
 // Access-builder helpers. Several builders can be on screen at once (one per
 // waiting person, one per person whose "Add access" is open), so everything is
 // scoped to the builder whose role select carries this person's label.
+async function ensureBuilder(user, label) {
+  if (screen.queryByLabelText(`Role for ${label}`)) return
+  const card = screen.getAllByTestId('waiting-person').find(
+    (node) => within(node).queryByText(label) || within(node).queryByText(new RegExp(label, 'i')),
+  )
+  if (!card) return
+  const anyway = within(card).queryByTestId('give-access-anyway')
+  if (anyway) await user.click(anyway)
+}
+
 function builderFor(label) {
   return screen.getByLabelText(`Role for ${label}`).closest('[data-testid="access-builder"]')
 }
 
-function chooseRole(user, label, role) {
+async function chooseRole(user, label, role) {
+  await ensureBuilder(user, label)
   return user.selectOptions(screen.getByLabelText(`Role for ${label}`), role)
 }
 
-function tickAgeGroup(user, label, teamName) {
+async function tickAgeGroup(user, label, teamName) {
+  await ensureBuilder(user, label)
   return user.click(
     within(within(builderFor(label)).getByTestId('age-group-picker')).getByRole('checkbox', {
       name: teamName,
@@ -402,14 +414,13 @@ function tickAgeGroup(user, label, teamName) {
   )
 }
 
-// The player rows are labelled "<name> <age group>" — the age group is shown
-// because it is what the access row's team_id is derived from.
 function pickPlayer(user, label, playerName, type = 'checkbox') {
   const picker = within(builderFor(label)).getByTestId('player-picker')
   return user.click(within(picker).getByRole(type, { name: new RegExp(playerName) }))
 }
 
-function submitAccess(user, submitLabel, label) {
+async function submitAccess(user, submitLabel, label) {
+  await ensureBuilder(user, label)
   return user.click(within(builderFor(label)).getByRole('button', { name: `${submitLabel} for ${label}` }))
 }
 
@@ -2484,6 +2495,12 @@ describe('Accounts — the "hasn\'t said what they need" badge', () => {
     const badges = within(waiting()).getAllByTestId('no-request-badge')
     expect(badges).toHaveLength(2)
     expect(badges[0]).toHaveTextContent(/hasn.t said what they need/i)
+    expect(within(waiting()).getByTestId('waiting-unfinished-heading')).toHaveTextContent(
+      /didn.t finish setup/i,
+    )
+    expect(within(waiting()).queryByTestId('waiting-asked-heading')).toBeNull()
+    expect(within(waiting()).queryByTestId('access-builder')).toBeNull()
+    expect(within(waiting()).getAllByTestId('give-access-anyway')).toHaveLength(2)
   })
 
   it('does NOT mark somebody who did ask — they get the Asked badge instead', async () => {
@@ -2504,6 +2521,8 @@ describe('Accounts — the "hasn\'t said what they need" badge', () => {
     // One asked, one did not: exactly one badge of each.
     expect(within(waiting()).getAllByTestId('no-request-badge')).toHaveLength(1)
     expect(within(waiting()).getAllByTestId('asked-badge')).toHaveLength(1)
+    expect(within(waiting()).getByTestId('waiting-asked-heading')).toBeInTheDocument()
+    expect(within(waiting()).getByTestId('waiting-unfinished-heading')).toBeInTheDocument()
   })
 
   it('⚠️ says NOTHING when the requests read FAILED, rather than blaming everyone', async () => {

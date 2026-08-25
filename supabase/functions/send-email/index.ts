@@ -333,12 +333,12 @@ function render(email: string, data: EmailData): { subject: string; html: string
     // phrasing credential-phishing uses.
     case 'signup':
       return {
-        subject: 'Confirm your email address',
+        subject: 'Confirm this address so the club gets your request',
         ...layout(
-          'Confirm your email address',
-          `Confirm ${email} to finish setting up your Quins Club Hub account. You'll sign in with the password you just chose.`,
+          'One tap to send your request to the club',
+          `Confirm ${email} so Abu Dhabi Harlequins can take the details you just entered. This proves the email — it is not the last thing you will see. After you tap the button you can sign in with the password you chose.`,
           verifyUrl,
-          'Confirm my email',
+          'Continue setup',
         ),
       }
 
