@@ -10,7 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — **The welcome harness counts only welcome queue rows.** Its
+- (unmerged) — **The flip is DONE and VERIFIED LIVE.** Jay switched "Confirm
+  email" OFF; a throwaway signup came back with a session, the welcome sent
+  (`POST | 200` on notify-welcome two seconds later), and the door question
+  is answered: GoTrue autoconfirm is INSERT-then-Confirm()-UPDATE, so **door
+  two is the live path** and a single-door INSERT trigger would have sent
+  nothing, silently. Details appended to
+  `claude/decisions/2026-08-25-remove-email-confirmation.md`.
+- `80c887e` — **The welcome harness counts only welcome queue rows.** Its
   first production run failed honestly: assertion 1 measured a pg_net delta
   of FOUR because the fixture's pending membership and access_request fire
   the other notify triggers too. Every count now filters on the

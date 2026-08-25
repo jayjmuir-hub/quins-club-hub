@@ -65,3 +65,27 @@ acts on, and it still is.
 3. Merge/deploy the app code — also state-agnostic.
 4. **Jay flips "Confirm email" OFF in the dashboard.** Nothing before this
    step changes behaviour.
+
+## ✅ VERIFIED LIVE, 25 Aug 2026, minutes after the flip
+
+A throwaway signup straight at GoTrue (a plus-alias of Jay's own inbox, so
+the mail had somewhere real to land):
+
+- **A session came back in the signup response.** The gate is off.
+- **DOOR TWO FIRED, and it is the only door that ever will.** Measured on the
+  probe row: `email_confirmed_at` lands **46ms after** `created_at` —
+  GoTrue under autoconfirm INSERTs the user unconfirmed and runs Confirm()
+  as an UPDATE inside the same transaction (`welcomed_at` carries that
+  transaction's start timestamp, a hair before either GoTrue clock stamp).
+  So `on_auth_user_created_welcome` (the INSERT door) can never see a
+  confirmed row from GoTrue, and **a single-door INSERT trigger would have
+  sent nothing, ever, with no error anywhere** — which is exactly why the
+  migration refused to bet on GoTrue internals. Keep both doors: the INSERT
+  door still covers any path that creates rows already confirmed (imports,
+  admin tooling), and `welcomed_at` keeps the two honest.
+- **The welcome sent:** `function_edge_logs` shows
+  `POST | 200 | /functions/v1/notify-welcome` two seconds after the signup —
+  a 200 is past the profile read AND past Resend accepting the mail.
+- The harness's own first production run failed honestly on an unfiltered
+  pg_net count (the fixture's pending rows fire the other notify triggers);
+  fixed and merged the same hour. `db/tests/welcome-on-signup.sql`.
