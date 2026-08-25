@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- interactive-widget=resizes-content: since Chrome 108 the Android
+         keyboard only pans the VISUAL viewport by default — the layout never
+         re-flows, so a bottom-anchored chat composer stays laid out UNDER the
+         keyboard however the page scrolls. This opts the whole app back into
+         the keyboard shrinking the layout viewport, which .min-h-app (dvh,
+         src/index.css) then follows. iOS ignores the token and keeps its own
+         pan-into-view behaviour; that is fine and there is no iOS knob. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <!-- Matches the masthead, and vite.config.js's manifest theme_color. -->
     <meta name="theme-color" content="#0a0a0a" />
     <!-- Theme before first paint (2.0 retheme). This is src/lib/theme.js's

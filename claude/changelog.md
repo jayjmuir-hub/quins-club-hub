@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — ✅ **`a5c5efd`'s player_parents migration is APPLIED and
+- (unmerged) — ⌨️ **The keyboard fix, second half — the first was necessary
+  and not sufficient.** Jay: "composer is still acting up", after the
+  slack-eater. Two missing layers: Android Chrome's keyboard only PANS the
+  visual viewport unless `index.html` opts into
+  `interactive-widget=resizes-content`, and `min-h-screen` is 100vh, which
+  never shrinks for a keyboard even then. New `.min-h-app` (dvh over a vh
+  fallback, order load-bearing, `src/index.css`) replaces `min-h-screen` on
+  the shell and every full-height screen. Proven in a real engine by
+  `harness/shoot-chat-layout.mjs` simulating exactly what resizes-content
+  does — layout viewport shrunk to keyboard height, composer at 414px of a
+  430px viewport; guarded at the file level by
+  `tests/viewport-keyboard.test.js` because jsdom has no keyboard.
+- `545778e` — ✅ **`a5c5efd`'s player_parents migration is APPLIED and
   PROVEN** — the unapplied migration the re-capture found, run with Jay's
   yes. Trigger + helper measured live; backfill wrote 21 rows
   (player_parents 62 → 83, zero children left with a parent membership and
@@ -19,8 +31,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   with a positive control — the db:check harness needs SUPABASE_DB_URL,
   which this machine does not hold, so the injection was done through the
   same rolled-back mechanism it uses). triggers.sql's ⛔ NOT LIVE marker is
-  replaced by the applied record. The NEXT pull request cites this entry's
-  squash SHA.
+  replaced by the applied record.
 
 - `82dfeb9` — 💬 **The keyboard stops marooning the composer, and every
   chat name is a door.** Jay's screenshots: a DM with a handful of messages

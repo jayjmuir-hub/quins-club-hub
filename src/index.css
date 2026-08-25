@@ -257,6 +257,24 @@
 
 @layer components {
   /* ---------------------------------------------------------------------
+     THE APP'S HEIGHT — dvh with a vh fallback, in THIS order, on purpose.
+
+     min-h-screen is 100vh, and vh NEVER shrinks for the phone keyboard —
+     even with interactive-widget=resizes-content (index.html), vh tracks
+     the LARGE viewport. So the shell stayed keyboard-height too tall and
+     the bottom-anchored chat composer was laid out under the keyboard:
+     Jay's "composer is still acting up", 25 Aug 2026, AFTER the
+     slack-eater fix. dvh follows the dynamic viewport (keyboard and URL
+     bar both); the vh line above it is what a pre-2022 browser falls back
+     to. A single class rather than two Tailwind utilities because the
+     cascade order between .min-h-screen and an arbitrary-value utility is
+     Tailwind's to choose, and this fallback only works in one order. */
+  .min-h-app {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* ---------------------------------------------------------------------
      THE SWEEP. Jay's pick, 10 Aug 2026, from a motion study of three.
 
      A band of light crosses the fill once per hover — the sheen off a wet

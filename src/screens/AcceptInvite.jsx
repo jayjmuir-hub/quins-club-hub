@@ -83,7 +83,7 @@ export default function AcceptInvite() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface px-4 text-ink">
+    <div className="flex min-h-app items-center justify-center bg-surface px-4 text-ink">
       <div className="w-full max-w-[420px] rounded-2xl border border-line bg-surface-card p-6 text-center shadow-card">
         {/* Standalone branding header for this screen only — this route is
             a brand-new invitee's first-ever view of the app (see the top of

@@ -46,7 +46,37 @@ const measured = await page.evaluate(() => {
 
 await page.screenshot({ path: path.join(outDir, 'dm-thread-mobile.png'), fullPage: false })
 
+// ── The keyboard, simulated the way resizes-content delivers it ───────────
+// interactive-widget=resizes-content (index.html) makes the Android keyboard
+// SHRINK the layout viewport; Playwright cannot open a soft keyboard, but
+// setViewportSize IS a layout-viewport shrink — the identical mechanism. So:
+// focus the composer, shrink to a keyboard-open height, and the composer
+// must still be inside the (new) viewport, sitting at its bottom edge.
+await page.locator('main textarea').click()
+await page.setViewportSize({ width: 375, height: 430 })
+await page.waitForTimeout(400)
+
+const keyboard = await page.evaluate(() => {
+  const textarea = document.querySelector('main textarea')
+  const rect = textarea?.getBoundingClientRect()
+  return {
+    composerBottom: rect ? Math.round(rect.bottom) : null,
+    viewport: window.innerHeight,
+    visible: rect ? rect.top >= 0 && rect.bottom <= window.innerHeight : false,
+    shellHeight: Math.round(
+      document.querySelector('.min-h-app')?.getBoundingClientRect().height ?? 0,
+    ),
+    docHeight: document.documentElement.scrollHeight,
+  }
+})
+
+await page.screenshot({ path: path.join(outDir, 'dm-thread-keyboard.png'), fullPage: false })
+
 const problems = []
+if (!keyboard.visible)
+  problems.push(
+    `composer not visible with the keyboard open — bottom ${keyboard.composerBottom}px vs viewport ${keyboard.viewport}px`,
+  )
 if (measured.slackBelowComposer == null) problems.push('composer form not found')
 else if (measured.slackBelowComposer > SLACK_ALLOWANCE_PX)
   problems.push(`slack below composer is ${measured.slackBelowComposer}px — the keyboard will maroon it again`)
@@ -54,7 +84,7 @@ if (measured.overflow > 1) problems.push(`overflows by ${measured.overflow}px`)
 if (pageErrors.length) problems.push(`page errors: ${pageErrors.join(' | ')}`)
 
 console.log(
-  `${problems.length ? '✗' : '✓'} dm-thread slack=${measured.slackBelowComposer}px${problems.length ? ' — ' + problems.join('; ') : ''}`,
+  `${problems.length ? '✗' : '✓'} dm-thread slack=${measured.slackBelowComposer}px keyboard: composer ${keyboard.composerBottom}/${keyboard.viewport}px${problems.length ? ' — ' + problems.join('; ') : ''}`,
 )
 
 await page.close()

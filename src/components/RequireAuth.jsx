@@ -88,7 +88,7 @@ export default function RequireAuth({ children }) {
         // Dark chrome for the same reason as Login.jsx: the old full-screen
         // red->green gradient reached pure #3bd070, only 2.01:1 behind this
         // white text.
-        className="flex min-h-screen items-center justify-center bg-chrome-grad text-white"
+        className="flex min-h-app items-center justify-center bg-chrome-grad text-white"
       >
         <p className="text-sm font-semibold uppercase tracking-widest opacity-80">Loading…</p>
       </div>
