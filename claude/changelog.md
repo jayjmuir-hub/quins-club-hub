@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 🪪 **Admin’s waiting count leads to Accounts** — the sidebar badge is
+- `35a179e` — 🪪 **Admin’s waiting count leads to Accounts** — the sidebar badge is
   `countAdminWaiting` (pending memberships plus people waiting for access),
   but `/admin` was a chooser that never mentioned that number. The landing
   now shows the same count on a card that opens Accounts, and on the Club

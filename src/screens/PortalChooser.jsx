@@ -47,6 +47,7 @@ export default function PortalChooser() {
   // nothing, matching Sidebar — a "0" card would be a destination to an empty
   // queue. The card is the destination that badge was missing: /admin is a
   // chooser, and without this the number on Admin had nowhere to go.
+  // Destination is portalHome(club) (Accounts), not a second queue.
   const [waiting, setWaiting] = useState(0)
   useEffect(() => {
     let mounted = true
