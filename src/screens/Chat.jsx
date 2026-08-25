@@ -37,6 +37,7 @@ import {
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
+import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { eventTitle } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import useStayPinnedToBottom from '../lib/useStayPinnedToBottom.js'
@@ -462,10 +463,19 @@ export default function Chat() {
         />
       )}
       {/* Same paint site as the DM thread: the stream wrapper, wearing the
-          device wallpaper; data-background is what the tests read. */}
-      <div className="-mx-1 rounded-[12px] px-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
-      {messages?.map((m) => (
+          device wallpaper; data-background is what the tests read. Day
+          dividers and gap-1 match DirectMessages Thread so a staff chat
+          does not look like a third style. */}
+      <div className="-mx-1 flex flex-col gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
+      {messages?.map((m, index) => (
         <Fragment key={m.id}>
+        {daysDiffer(messages[index - 1]?.created_at, m.created_at) && (
+          <div className="my-1.5 flex justify-center" data-testid="day-divider" role="separator">
+            <span className="rounded-pill bg-surface-mute px-2.5 py-0.5 text-[11px] font-bold text-ink-muted shadow-card">
+              {dayLabel(m.created_at)}
+            </span>
+          </div>
+        )}
         {newFromRef.current === m.id && (
           <div className="my-1.5 flex items-center gap-2" data-testid="new-divider" role="separator" aria-label="New messages">
             <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />

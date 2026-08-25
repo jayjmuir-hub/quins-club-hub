@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 // Opening a chat, 25 Aug 2026 (Jay): "the latest message is not always
@@ -365,6 +365,40 @@ describe('the composer greets by first name', () => {
     renderThread()
     const composer = await screen.findByTestId('dm-composer')
     expect(composer.querySelector('textarea')?.placeholder).toBe('Message Zz')
+  })
+})
+
+describe('the channel thread uses the same bubble language as a DM (25 Aug 2026)', () => {
+  // The DM thread got chrome-free bubbles in bc971f8 / #389; Chat.jsx was
+  // missed. Classes ARE the assertion — jsdom cannot screenshot.
+  it('a squad post has no You label, no under-bubble action links, and a chevron menu', async () => {
+    renderChat()
+    const row = await screen.findByTestId('message-row')
+    expect(within(row).queryByText('You')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Report' })).toBeNull()
+    expect(within(row).getByRole('button', { name: 'Message options' })).toBeInTheDocument()
+    expect(within(row).getByTestId('message-bubble')).toBeInTheDocument()
+  })
+
+  it("the viewer's own staff post is quins green, with the stamp inside", async () => {
+    useAuthMock.mockReturnValue({ user: { id: 'coach-1' } })
+    useMembershipsMock.mockReturnValue({
+      memberships: [{ id: 'm1', role: 'coach', team_id: 'team-a', club_id: CLUB_ID, status: 'active' }],
+      realMemberships: [{ id: 'm1', role: 'coach', team_id: 'team-a', club_id: CLUB_ID, status: 'active' }],
+      teams: [TEAM_A],
+      loading: false,
+      error: null,
+      viewAs: null,
+    })
+    m.listMessages.mockResolvedValue([post({ author_id: 'coach-1' })])
+    renderChat()
+    const row = await screen.findByTestId('message-row')
+    expect(row).toHaveAttribute('data-mine', 'true')
+    expect(row.querySelector('[class*="bg-accent-deep"]')).not.toBeNull()
+    expect(within(row).queryByText('You')).not.toBeInTheDocument()
   })
 })
 

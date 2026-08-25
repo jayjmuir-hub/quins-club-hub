@@ -3,25 +3,29 @@ import Button from './Button.jsx'
 import ChatPhoto from './ChatPhoto.jsx'
 import FixtureCard from './FixtureCard.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
-import { postedLabel, stampLabel } from '../lib/notices.js'
-import ReactionBar from './ReactionBar.jsx'
-import { initials } from '../lib/playerFormat.js'
+import MessageMenu from './MessageMenu.jsx'
+import { stampLabel } from '../lib/notices.js'
+import ReactionBar, { ReactionTrigger } from './ReactionBar.jsx'
 import { labelForRole } from '../lib/scope.js'
 
-// One post in a channel, as a BUBBLE, with its replies — 24 Aug 2026, the
-// WhatsApp reshape. Mine on the right, everyone else's on the left with
-// their name. Same props, same test ids as the card it replaced.
+// One post in a channel, as a BUBBLE, with its replies. Same visual
+// language as the DM/group Thread in src/screens/DirectMessages.jsx
+// (round 3/4): quins-green own bubbles, paper theirs, stamp INSIDE,
+// MessageMenu chevron, reaction trigger BESIDE the bubble, tallies as a
+// pill overlapping the corner. No "You" label, no avatars, no permanent
+// Reply/Pin/Delete/Report row under every bubble — Jay, 25 Aug 2026,
+// production screenshot of U11 Mixed · staff. DirectMessages was already
+// there (bc971f8 / #389); this file was the miss.
 //
 // ⚠️ A PURE-PROPS COMPONENT, like NoticeRow and for the same reason: a row
 // that needs a database session to be looked at is a row that gets reviewed
 // by reading its JSX. This one renders in the harness.
 //
-// ⚠️ STAFF POSTS STILL LOOK DIFFERENT, AND THAT IS THE WHOLE SIGNAL/NOISE
-// DESIGN. A brand-red rule down the left of a coach's or manager's bubble and
-// a role pill by their name; a plain bubble for a family's. Colour is not the
-// only channel — the pill says the role in words (claude/specs/accessibility.md).
-//
-// ⚠️ INITIALS, NEVER A PHOTO. No child's face is ever in a chat.
+// Channel-only capabilities stay: a staff role pill on THEIR name (the
+// pill says the role in words — claude/specs/accessibility.md), nested
+// replies, fixture cards, read-stats, announce-only's reply path, Pin for
+// staff, Report. They live in the chevron / inside the bubble, not as a
+// text-action row.
 
 const STAFF_ROLES = new Set(['admin', 'coach', 'manager', 'medic'])
 
@@ -29,22 +33,14 @@ export function isStaffRole(role) {
   return STAFF_ROLES.has(role)
 }
 
-function Avatar({ name, staff }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`grid h-7 w-7 shrink-0 place-items-center self-end rounded-full text-[10px] font-extrabold text-ink-invert ${
-        staff ? 'bg-monogram-coach' : 'bg-monogram-manager'
-      }`}
-    >
-      {initials(name ?? '?')}
-    </span>
-  )
-}
-
-function Body({ message, mine }) {
+function Body({ message, mine, stamp, padded }) {
   if (message.deleted_at) {
-    return <p className={`text-[13.5px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`}>Message removed</p>
+    return (
+      <p className={`text-[13.5px] italic ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+        Message removed
+        {stamp}
+      </p>
+    )
   }
   // Round 2: a forward wears its tag, a photo renders above whatever text
   // rode with it, and a photo-only message renders no empty paragraph.
@@ -57,10 +53,15 @@ function Body({ message, mine }) {
       )}
       {message.attachment_path && <ChatPhoto path={message.attachment_path} />}
       {message.body?.trim() ? (
-        <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.4]">
+        <p className={`whitespace-pre-wrap break-words text-[14.5px] leading-[1.4] ${padded ? 'pr-5' : ''}`}>
           {message.body}
-          {message.edited_at && <span className={`ml-1.5 text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>(edited)</span>}
+          {message.edited_at && (
+            <span className={`ml-1.5 text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>(edited)</span>
+          )}
+          {stamp}
         </p>
+      ) : stamp ? (
+        <p className="text-right leading-none">{stamp}</p>
       ) : null}
     </>
   )
@@ -68,7 +69,7 @@ function Body({ message, mine }) {
 
 function RolePill({ role, title }) {
   return (
-    <span className="rounded-[6px] bg-danger-bg px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.4px] text-danger-ink">
+    <span className="ml-1 rounded-[6px] bg-danger-bg px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.4px] text-danger-ink">
       {title || labelForRole(role) || role}
     </span>
   )
@@ -77,27 +78,26 @@ function RolePill({ role, title }) {
 function Reply({ reply, selfId, canModerate, onRemove }) {
   const staff = isStaffRole(reply.author_role)
   const mine = reply.author_id === selfId
+  const menuItems =
+    !reply.deleted_at && (mine || canModerate)
+      ? [{ label: 'Delete', onClick: () => onRemove(reply.id), danger: true }]
+      : []
+  const stamp = (
+    <span className={`float-right ml-2 mt-1.5 text-[10px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+      {stampLabel(reply.created_at)}
+    </span>
+  )
   return (
-    <div className="flex gap-2 py-1.5" data-testid="message-reply">
-      <Avatar name={reply.author?.full_name} staff={staff} />
-      <div className="min-w-0 flex-1 rounded-[12px] rounded-bl-[4px] bg-surface-card px-3 py-2 shadow-card">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-[12.5px] font-extrabold text-ink">{reply.author?.full_name ?? 'Someone'}</span>
-          {staff && <RolePill role={reply.author_role} title={reply.author_title} />}
-          <span className="text-[11px] font-semibold text-ink-faint">{postedLabel(reply.created_at)}</span>
-          {!reply.deleted_at && (mine || canModerate) && (
-            <button
-              type="button"
-              onClick={() => onRemove(reply.id)}
-              className="text-[11px] font-semibold text-ink-faint underline-offset-2 hover:text-danger-ink hover:underline"
-            >
-              Delete
-            </button>
-          )}
-        </div>
-        <div className="text-ink">
-          <Body message={reply} mine={false} />
-        </div>
+    <div className={`flex items-center gap-1.5 py-0.5 ${mine ? 'justify-end' : 'justify-start'}`} data-testid="message-reply">
+      <div className={`relative max-w-[80%] rounded-[14px] px-2.5 py-1.5 ${mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'}`}>
+        <MessageMenu items={menuItems} mine={mine} />
+        {!mine && (
+          <p className={`text-[11px] font-extrabold text-brand-ink ${menuItems.length ? 'pr-10' : ''}`}>
+            {reply.author?.full_name ?? 'Someone'}
+            {staff && <RolePill role={reply.author_role} title={reply.author_title} />}
+          </p>
+        )}
+        <Body message={reply} mine={mine} stamp={stamp} padded={menuItems.length > 0} />
       </div>
     </div>
   )
@@ -146,6 +146,7 @@ export default function MessageRow({
   const staff = isStaffRole(message.author_role)
   const mine = message.author_id === selfId
   const replies = message.replies ?? []
+  const tallies = reactions.get(message.id) ?? []
 
   async function submitReply(domEvent) {
     domEvent.preventDefault()
@@ -166,39 +167,59 @@ export default function MessageRow({
     }
   }
 
-  const meta = mine ? 'text-white/70' : 'text-ink-faint'
+  const menuItems = message.deleted_at
+    ? []
+    : [
+        ...(onReply ? [{ label: 'Reply', onClick: () => setOpen((v) => !v) }] : []),
+        ...(canModerate && onPin ? [{ label: message.pinned ? 'Unpin' : 'Pin', onClick: () => onPin(message.id, !message.pinned) }] : []),
+        ...((mine || canModerate) && onRemove ? [{ label: 'Delete', onClick: () => onRemove(message.id), danger: true }] : []),
+        ...(!mine && onReport ? [{ label: 'Report', onClick: () => setReporting((v) => !v), danger: true }] : []),
+      ]
+
+  // The stamp rides INSIDE the bubble, WhatsApp style (round 3: "the time
+  // stamp is not totally below the message"). Same markup as the DM Thread.
+  const stamp = (
+    <span className={`float-right ml-2 mt-1.5 text-[10px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+      {stampLabel(message.created_at)}
+    </span>
+  )
 
   return (
     <article
       data-testid="message-row"
       data-staff={staff ? 'true' : 'false'}
       data-mine={mine ? 'true' : 'false'}
-      className={`mb-2 flex flex-col ${mine ? 'items-end' : 'items-start'}`}
     >
-      <div className={`flex max-w-[88%] gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
-        {!mine && <Avatar name={message.author?.full_name} staff={staff} />}
+      {/* items-center, not items-end (Jay, 25 Aug 2026: "put the reaction
+          button centered on every message") — same as the DM Thread. */}
+      <div
+        className={`flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}
+        data-testid="message-bubble"
+      >
+        {mine && onReact && !message.deleted_at && (
+          <ReactionTrigger messageId={message.id} reactions={tallies} selfId={selfId} onToggle={onReact} align="right" />
+        )}
         <div
-          className={`min-w-0 rounded-[16px] px-3.5 py-2.5 ${
-            mine
-              ? // Round 3, Jay: "need a better color than black for ...
-                // messages sent by yourself" — quins green (accent.deep),
-                // measured in the contrast gate. Red stays the STAFF signal
-                // on the left rule; green is "mine".
-                'rounded-br-[4px] bg-accent-deep text-white'
-              : `rounded-bl-[4px] bg-surface-card text-ink shadow-card ${staff ? 'border-l-[3px] border-brand' : ''}`
+          className={`relative max-w-[80%] rounded-[14px] px-2.5 py-1.5 ${tallies.length ? 'mb-3' : ''} ${
+            mine ? 'bg-accent-deep text-white' : 'bg-surface-card text-ink shadow-card'
           }`}
         >
-          {/* 24 Aug feedback: your own messages say so. */}
-          {mine && <div className="mb-0.5 text-[12.5px] font-extrabold text-white/80">You</div>}
+          <MessageMenu items={menuItems} mine={mine} />
+          {message.pinned && !message.deleted_at && (
+            <span
+              aria-label="Pinned"
+              className={`absolute right-7 top-1.5 text-[10px] ${mine ? 'text-white/70' : 'text-ink-faint'}`}
+              data-testid="pin-mark"
+            >
+              📌
+            </span>
+          )}
           {!mine && (
-            <div className="mb-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-              {unread && <span className="inline-block h-2 w-2 rounded-full bg-brand" aria-hidden="true" />}
+            <p className={`text-[11px] font-extrabold text-brand-ink ${menuItems.length ? 'pr-10' : ''}`}>
               {unread && <span className="sr-only">New. </span>}
-              <span className={`text-[12.5px] font-extrabold ${staff ? 'text-brand-ink' : 'text-ink'}`}>
-                {message.author?.full_name ?? 'Someone'}
-              </span>
+              {message.author?.full_name ?? 'Someone'}
               {staff && <RolePill role={message.author_role} title={message.author_title} />}
-            </div>
+            </p>
           )}
 
           {message.event && (
@@ -207,47 +228,41 @@ export default function MessageRow({
             </div>
           )}
 
-          <Body message={message} mine={mine} />
+          <Body message={message} mine={mine} stamp={stamp} padded={menuItems.length > 0} />
 
-          <div className={`mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-semibold ${meta}`}>
-            <span>{stampLabel(message.created_at)}</span>
-            {message.pinned && <span className="uppercase tracking-[.4px]">Pinned</span>}
-            {/* ⚠️ THE ONE THING WHATSAPP CANNOT TELL A COACH. Staff only — the
-                stats function returns rows to nobody else. */}
-            {readStat && <span data-testid="read-stat">Read by {readStat.reads} of {readStat.audience}</span>}
-          </div>
-          {onReact && !message.deleted_at && (
-            <ReactionBar
-              messageId={message.id}
-              reactions={reactions.get(message.id) ?? []}
-              selfId={selfId}
-              onToggle={onReact}
-            />
+          {readStat && (
+            <span data-testid="read-stat" className={`text-[10px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+              Read by {readStat.reads} of {readStat.audience}
+            </span>
+          )}
+          {replies.length > 0 && !message.deleted_at && (
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className={`mt-0.5 block text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}
+              aria-expanded={open}
+            >
+              {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+            </button>
+          )}
+          {/* Round 4: the tallies are a pill OVERLAPPING the bubble's bottom
+              corner, where WhatsApp puts them — left of theirs, right of
+              yours. The mb-3 on the bubble is the room it hangs into. */}
+          {!message.deleted_at && tallies.length > 0 && (
+            <div className={`absolute -bottom-3 ${mine ? 'right-2' : 'left-2'}`} data-testid="reaction-pill">
+              <ReactionBar
+                messageId={message.id}
+                reactions={tallies}
+                selfId={selfId}
+                onToggle={onReact}
+                disabled={!onReact}
+                showAdd={false}
+              />
+            </div>
           )}
         </div>
-      </div>
-
-      {/* Actions sit under the bubble, outside it — a tap target row. */}
-      <div className={`mt-0.5 flex flex-wrap items-center gap-x-3 px-1 text-[12px] font-semibold text-ink-muted ${mine ? 'flex-row-reverse' : 'pl-10'}`}>
-        {!message.deleted_at && (
-          <button type="button" onClick={() => setOpen((v) => !v)} className="text-brand-ink underline-offset-2 hover:underline" aria-expanded={open}>
-            {replies.length === 0 ? 'Reply' : `${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
-          </button>
-        )}
-        {canModerate && !message.deleted_at && (
-          <button type="button" onClick={() => onPin(message.id, !message.pinned)} className="hover:text-ink">
-            {message.pinned ? 'Unpin' : 'Pin'}
-          </button>
-        )}
-        {!message.deleted_at && (mine || canModerate) && (
-          <button type="button" onClick={() => onRemove(message.id)} className="hover:text-danger-ink">
-            Delete
-          </button>
-        )}
-        {!message.deleted_at && !mine && onReport && (
-          <button type="button" onClick={() => setReporting((v) => !v)} className="hover:text-ink" aria-expanded={reporting}>
-            Report
-          </button>
+        {!mine && onReact && !message.deleted_at && (
+          <ReactionTrigger messageId={message.id} reactions={tallies} selfId={selfId} onToggle={onReact} align="left" />
         )}
       </div>
 
@@ -296,34 +311,36 @@ export default function MessageRow({
       )}
 
       {open && (
-        <div className={`mt-1 w-full max-w-[88%] border-l-2 border-line pl-3 ${mine ? '' : 'ml-9'}`}>
+        <div className={`mt-1 w-full max-w-[88%] border-l-2 border-line pl-3 ${mine ? 'ml-auto' : ''}`}>
           {replies.map((reply) => (
             <Reply key={reply.id} reply={reply} selfId={selfId} canModerate={canModerate} onRemove={onRemove} />
           ))}
-          <form onSubmit={submitReply} className="mt-1.5 flex items-end gap-2">
-            <MentionPicker
-              people={mentionables}
-              onPick={(p) => {
-                setDraft((d) => appendMention(d, p))
-                setMentions((m) => (m.some((x) => x.profile_id === p.profile_id) ? m : [...m, p]))
-              }}
-            />
-            <label className="sr-only" htmlFor={`reply-${message.id}`}>
-              Reply
-            </label>
-            <textarea
-              id={`reply-${message.id}`}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              rows={1}
-              maxLength={2000}
-              placeholder="Reply"
-              className="min-h-[40px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3 py-2 text-[14px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
-            />
-            <Button type="submit" size="sm" disabled={sending || !draft.trim()}>
-              Send
-            </Button>
-          </form>
+          {onReply && (
+            <form onSubmit={submitReply} className="mt-1.5 flex items-end gap-2">
+              <MentionPicker
+                people={mentionables}
+                onPick={(p) => {
+                  setDraft((d) => appendMention(d, p))
+                  setMentions((m) => (m.some((x) => x.profile_id === p.profile_id) ? m : [...m, p]))
+                }}
+              />
+              <label className="sr-only" htmlFor={`reply-${message.id}`}>
+                Reply
+              </label>
+              <textarea
+                id={`reply-${message.id}`}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={1}
+                maxLength={2000}
+                placeholder="Reply"
+                className="min-h-[40px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3 py-2 text-[14px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
+              />
+              <Button type="submit" size="sm" disabled={sending || !draft.trim()}>
+                Send
+              </Button>
+            </form>
+          )}
           {error && (
             <p role="alert" className="mt-1.5 text-[12.5px] font-semibold text-danger-ink">
               {error}
