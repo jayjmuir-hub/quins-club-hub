@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 🩹 **Outlook Safe Links / CefSharp scanner rejections never reach Sentry.**
+- (unmerged) — 🔎 **The giant avatar was an INLINE span, and one word fixes
+  it** — Jay: "I just looked at the app, and it does not look like it was
+  fixed", after two rounds of everyone (me included) believing the
+  afternoon's contact-card rework had cured it. Diagnosed on the LIVE site
+  through Jay's logged-in Chrome: FaceStack faces measured 600×600 with
+  `h-7 w-7` in their class list and `28px` in computed style — a bare
+  <span> is display:inline, and **height/width do not apply to inline
+  boxes**; the photo rendered at intrinsic size and overflow-hidden cannot
+  clip an inline box either. It hid from every earlier check because flex
+  items are blockified (StaffRow's row) and the monogram branch carries
+  `grid` — only FaceStack's span-in-span, and only for staff WITH photos,
+  stayed truly inline; the harness's collapsed squads had monograms only,
+  which is the exact gap the pending harness-stub task exists to close.
+  The fix is `block` on StaffAvatar's photo span; the test pins the class
+  (red before the fix). The NEXT pull request cites this entry's squash
+  SHA.
+- `edf7615` — 🩹 **Outlook Safe Links / CefSharp scanner rejections never reach Sentry.**
   Production issue JAVASCRIPT-REACT-3 was `Object Not Found Matching
   Id:…, MethodName:…, ParamCount:…` — no stack, 0 users, culprit the
   origin, mechanism Sentry's own `onunhandledrejection` even with

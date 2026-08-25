@@ -235,6 +235,25 @@ describe('SquadStaffCard', () => {
     expect(face).toHaveStyle({ objectPosition: '47% 28%' })
   })
 
+  it("a FaceStack face's photo span is a BLOCK — the giant-avatar bug", () => {
+    // 25 Aug 2026, Jay's phone: a full-size photo where a 28px face belongs.
+    // A bare <span> is display:inline and height/width DO NOT apply to
+    // inline boxes — the h-7/w-7 classes sat in the list while the photo
+    // rendered at intrinsic size. It hid everywhere else because flex items
+    // are blockified (StaffRow) and the monogram branch carries `grid`;
+    // only FaceStack's span-in-span left it truly inline, and only with a
+    // photo. jsdom computes no layout, so the class IS the assertion.
+    render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[COACH_ROSA, MEDIC_SAM]}
+        defaultOpen={false}
+      />,
+    )
+    const face = screen.getByTestId('squad-staff-toggle').querySelector('img')
+    expect(face.parentElement.className).toMatch(/(^|\s)block(\s|$)/)
+  })
+
   it('falls back to initials when there is no photo, and says nothing about it', () => {
     const { container } = render(
       <SquadStaffCard squadName="U13 Mixed Contact" staff={[MEDIC_SAM]} />,

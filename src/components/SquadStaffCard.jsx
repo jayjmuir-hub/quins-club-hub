@@ -167,9 +167,18 @@ function StaffAvatar({ name, role, url, focus, size = 'md' }) {
   const box = size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-11 w-11 text-[12px]'
   const tone = MONOGRAM_TONE[role] ?? MONOGRAM_TONE.manager
 
+  // ⚠️ `block` IS THE LOAD-BEARING WORD — 25 Aug 2026, the giant avatar on
+  // Jay's phone. A bare <span> is display:inline, and height/width DO NOT
+  // APPLY to inline boxes: the h-7/w-7 sat in the class list while the photo
+  // inside rendered at its intrinsic ~600px, and overflow-hidden could not
+  // clip an inline box either. It went unseen because flex items are
+  // blockified — inside StaffRow's flex row the sizes applied — and only
+  // FaceStack (span-in-span on collapsed squad headers) left it truly
+  // inline, and only for staff WITH a photo. The monogram branch below
+  // carries `grid` and was never affected.
   if (url && !failed) {
     return (
-      <span className={`relative shrink-0 overflow-hidden rounded-full ${size === 'sm' ? 'h-7 w-7' : 'h-11 w-11'}`}>
+      <span className={`relative block shrink-0 overflow-hidden rounded-full ${size === 'sm' ? 'h-7 w-7' : 'h-11 w-11'}`}>
         <img
           src={url}
           alt=""
