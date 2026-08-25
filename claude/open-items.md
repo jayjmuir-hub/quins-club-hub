@@ -337,10 +337,15 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
      against information_schema and pg_indexes), and the three `manage`
      policies in policies.sql (verified against pg_policies). ⚠️ **The wider
      drift is NOT fixed and is the item below.**
-  Also: the screenshot harness has NO playerTiers stub (it never did), so its
+  Also: ~~the screenshot harness has NO playerTiers stub (it never did), so its
   roster shots now render "Position not set" where the stub players carried
   inline positions — cosmetic, but a stub returning the maps is the fix when
-  the shots are next regenerated.
+  the shots are next regenerated~~ — **DONE the same day**:
+  `harness/stubs/playerTiers.js` landed with the three-view roster builder
+  (PR #420), aliased in `harness/vite.config.js` and held to export parity by
+  `tests/harness-stubs.test.js`. It returns empty maps on purpose — grades and
+  positions are decoration on the screens under shoot, and their rendering has
+  its own tests.
 
 - **`db/schema/tables.sql` is FIFTEEN TABLES behind the live database —
   measured 25 Aug 2026.** `information_schema.tables` lists 57 base tables in

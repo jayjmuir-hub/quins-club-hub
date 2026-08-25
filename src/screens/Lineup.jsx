@@ -12,6 +12,8 @@ import { listPlayerGrades, listPlayerPositions } from '../data/playerTiers.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam } from '../lib/scope.js'
 import { TIER_OK, tierEligibility } from '../lib/tierEligibility.js'
+import { rosterFormat, slotLabel } from '../lib/rosterFormats.js'
+import { useDragReorder } from '../lib/useDragReorder.js'
 import {
   eventDate,
   eventTimeLabel,
@@ -21,8 +23,10 @@ import {
 } from '../lib/eventFormat.js'
 import { shareElementAsImage } from '../lib/shareImage.js'
 
-// Picking a team, and sharing it — phase 1 of
-// claude/plans/2026-08-14-match-lineups.md.
+// Picking a team, and sharing it — three VIEWS over one lineup since 25 Aug
+// 2026 (claude/plans/2026-08-25-roster-builder-three-views.md): Quick is the
+// 14 Aug tap flow unchanged, Slots adds shirt numbers and drag-to-reorder,
+// Pitch lays the same roster out on a field. One state, one save, one share.
 //
 // ⚠️ COACH-ONLY, AND THAT IS A PRODUCT DECISION RATHER THAN A STUB (Jay, 14 Aug
 // 2026). Parents get the lineup as a WhatsApp image; the app shows it to nobody
@@ -30,11 +34,19 @@ import { shareElementAsImage } from '../lib/shareImage.js'
 // child. The database agrees — the `lineup manage` policy is
 // private.can_edit_team — so this screen's own gate only decides what to OFFER.
 //
-// ⚠️ NOT DRAG AND DROP, deliberately. HTML5 drag does not work on touch at all,
-// and this is used pitch-side on a phone; a pointer-events library is ~30KB on a
-// bundle that already warns at 890KB, and an accessible keyboard path has to
-// exist anyway — at which point drag is a SECOND implementation of one piece of
-// state. Tap-to-assign is two taps and free on accessibility.
+// ⚠️ DRAG IS BACK, AND THE 14 AUG "NOT DRAG AND DROP" RULING IS SUPERSEDED —
+// re-opened by Jay, answered objection by objection in
+// claude/decisions/2026-08-25-drag-reopened.md. The short version: pointer
+// events not HTML5 drag, ~120 in-repo lines not a 30KB library, and the tap
+// path remains everywhere as the accessible route — drag calls the same state
+// transitions taps do.
+//
+// ⚠️ THE SLOT MODEL IS SPARSE. `slotted` is an array of player ids and nulls
+// whose INDEX is the shirt number minus one — a coach filling the pitch picks
+// the full-back before the props, so slot 15 must be fillable while 1–14 are
+// empty. Quick view simply shows the non-null entries in order, which is why
+// every 14 Aug test passes untouched. sort_order on save is the slot index,
+// so the share image and MatchSheet inherit shirt order for free.
 
 const ROLE_STARTER = 'starter'
 const ROLE_REPLACEMENT = 'replacement'
@@ -58,13 +70,29 @@ const STATUS_CHIP = {
 
 // ⚠️ A GUIDE, NOT A GATE. See the migration's comment on players_per_side: the
 // count warns when it is over, and never refuses. Coaches over-pick then cut.
-const SIDE_SIZES = [7, 9, 10, 12, 13, 15]
+// 5 joined the set on 25 Aug with the format presets — minis tag.
+const SIDE_SIZES = [5, 7, 9, 10, 12, 13, 15]
+
+const VIEWS = [
+  { key: 'quick', label: 'Quick' },
+  { key: 'slots', label: 'Slots' },
+  { key: 'pitch', label: 'Pitch' },
+]
+
+const VIEW_STORAGE_KEY = 'lineup-view'
 
 /** availability rows -> { [playerId]: 'in'|'maybe'|'out' }. */
 function statusMap(rows) {
   const map = new Map()
   for (const row of rows ?? []) map.set(row.player_id, row.status)
   return map
+}
+
+/** "Mika Featherwell" -> "Mika F." — the pitch circles have no room for more. */
+function shortName(fullName) {
+  const parts = String(fullName ?? '').trim().split(/\s+/)
+  if (parts.length < 2) return parts[0] ?? ''
+  return `${parts[0]} ${parts[1][0]}.`
 }
 
 function StatusChip({ status }) {
@@ -154,12 +182,32 @@ export default function Lineup() {
   // failure — see listPlayerGrades.
   const [grades, setGrades] = useState(() => new Map())
   const [lineupId, setLineupId] = useState(null)
-  // [{ player_id, role, position, sort_order }]
-  const [picked, setPicked] = useState([])
+  // The sparse slot model — see the header. slotted[i] is shirt i+1 or null.
+  const [slotted, setSlotted] = useState([])
+  // Replacement player ids, in bench order.
+  const [reps, setReps] = useState([])
   const [perSide, setPerSide] = useState(null)
   const [squadSize, setSquadSize] = useState(null)
   const [notes, setNotes] = useState('')
   const [showOut, setShowOut] = useState(false)
+
+  // Which of the three views. Remembered per device — a coach who lives in
+  // Pitch should land back in Pitch — but Quick is the default and the
+  // fallback, because it is the view with no prerequisites.
+  const [view, setView] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem(VIEW_STORAGE_KEY)
+      return VIEWS.some((candidate) => candidate.key === stored) ? stored : 'quick'
+    } catch {
+      return 'quick'
+    }
+  })
+  // The slot a coach is filling (tap an empty slot or circle, then tap a
+  // player). Belongs to the slots and pitch views; quick never sets it.
+  const [pendingSlot, setPendingSlot] = useState(null)
+  // A filled pitch circle that has been tapped, awaiting a second tap (swap)
+  // or an action button (bench / remove).
+  const [selectedSlot, setSelectedSlot] = useState(null)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -207,24 +255,34 @@ export default function Lineup() {
         setGrades(gradeRows)
 
         // ⚠️ THE FIRST lineup, not "the" lineup — event_id is deliberately not
-        // unique (see the migration). Phase 1 edits one; a tournament day with
-        // several is what that decision leaves room for.
+        // unique (see the migration). This screen edits one; a tournament day
+        // with several is what that decision leaves room for.
         const existing = lineups[0]
         if (existing) {
           setLineupId(existing.id)
           setPerSide(existing.players_per_side ?? null)
           setSquadSize(existing.squad_size ?? null)
           setNotes(existing.notes ?? '')
-          setPicked(
-            [...(existing.lineup_players ?? [])]
-              .sort((a, b) => a.sort_order - b.sort_order)
-              .map((row) => ({
-                player_id: row.player_id,
-                role: row.role,
-                position: row.position,
-                sort_order: row.sort_order,
-              })),
-          )
+          // Starters land at their sort_order INDEX — pre-slot lineups were
+          // dense 0..n so they load exactly as they used to; slotted ones come
+          // back with their holes intact.
+          const nextSlots = []
+          const nextReps = []
+          for (const row of [...(existing.lineup_players ?? [])].sort(
+            (a, b) => a.sort_order - b.sort_order,
+          )) {
+            if (row.role === ROLE_REPLACEMENT) {
+              nextReps.push(row.player_id)
+            } else {
+              const at = Number.isInteger(row.sort_order) && row.sort_order >= 0
+                ? row.sort_order
+                : nextSlots.length
+              while (nextSlots.length < at) nextSlots.push(null)
+              nextSlots[at] = row.player_id
+            }
+          }
+          setSlotted(nextSlots)
+          setReps(nextReps)
         }
       })
       .catch((failure) => {
@@ -239,13 +297,32 @@ export default function Lineup() {
   }, [eventId])
 
   const playersById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+
+  const format = rosterFormat(perSide)
+  // How many slot rows the slots and pitch views draw: the format's size, or
+  // however far the sparse array already reaches — over-picking never hides
+  // anyone (guide, not gate).
+  const slotCount = Math.max(perSide ?? 0, slotted.length)
+
+  // Quick view's world: the non-null starters in slot order. Everything the
+  // 14 Aug screen derived from `picked` derives from these two.
+  const starters = useMemo(
+    () =>
+      slotted
+        .map((playerId, index) => (playerId ? { player_id: playerId, role: ROLE_STARTER, slot: index } : null))
+        .filter(Boolean),
+    [slotted],
+  )
+  const bench = useMemo(
+    () => reps.map((playerId) => ({ player_id: playerId, role: ROLE_REPLACEMENT })),
+    [reps],
+  )
+  const picked = useMemo(() => [...starters, ...bench], [starters, bench])
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.player_id)), [picked])
 
   const canEdit = canEditTeam(memberships, event?.team_id)
   const team = teams.find((t) => t.id === event?.team_id)
 
-  const starters = picked.filter((p) => p.role === ROLE_STARTER)
-  const bench = picked.filter((p) => p.role === ROLE_REPLACEMENT)
   const overPicked = perSide != null && starters.length > perSide
   const overSquad = squadSize != null && picked.length > squadSize
 
@@ -263,29 +340,91 @@ export default function Lineup() {
     return groups
   }, [players, pickedIds, statuses])
 
-  function add(playerId, role) {
+  function switchView(next) {
+    setView(next)
+    setPendingSlot(null)
+    setSelectedSlot(null)
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next)
+    } catch {
+      // Private browsing: the toggle still works, it just isn't remembered.
+    }
+  }
+
+  function firstFreeSlot(current) {
+    const horizon = Math.max(perSide ?? 0, current.length)
+    for (let i = 0; i < horizon; i += 1) {
+      if (!current[i]) return i
+    }
+    return horizon
+  }
+
+  function placeInSlot(current, index, playerId) {
+    const next = [...current]
+    while (next.length <= index) next.push(null)
+    next[index] = playerId
+    return next
+  }
+
+  function add(playerId, role, slotIndex = null) {
     setSaved(false)
-    setPicked((current) => [
-      ...current,
-      { player_id: playerId, role, position: null, sort_order: current.length },
-    ])
+    if (role === ROLE_REPLACEMENT) {
+      setReps((current) => [...current, playerId])
+    } else {
+      setSlotted((current) =>
+        placeInSlot(current, slotIndex ?? firstFreeSlot(current), playerId),
+      )
+    }
+    setPendingSlot(null)
   }
 
   function remove(playerId) {
     setSaved(false)
-    setPicked((current) => current.filter((p) => p.player_id !== playerId))
+    setSlotted((current) => current.map((id) => (id === playerId ? null : id)))
+    setReps((current) => current.filter((id) => id !== playerId))
+    setSelectedSlot(null)
   }
 
   function toggleRole(playerId) {
     setSaved(false)
-    setPicked((current) =>
-      current.map((p) =>
-        p.player_id === playerId
-          ? { ...p, role: p.role === ROLE_STARTER ? ROLE_REPLACEMENT : ROLE_STARTER }
-          : p,
-      ),
-    )
+    if (reps.includes(playerId)) {
+      setReps((current) => current.filter((id) => id !== playerId))
+      setSlotted((current) => placeInSlot(current, firstFreeSlot(current), playerId))
+    } else {
+      setSlotted((current) => current.map((id) => (id === playerId ? null : id)))
+      setReps((current) => [...current, playerId])
+    }
+    setSelectedSlot(null)
   }
+
+  // Drag lands here: splice the full slot array — empty slots move too, which
+  // is what "shove everyone down one" means on a team sheet.
+  function moveSlot(from, to) {
+    setSaved(false)
+    setSlotted((current) => {
+      const next = [...current]
+      while (next.length < slotCount) next.push(null)
+      const [row] = next.splice(from, 1)
+      next.splice(to, 0, row ?? null)
+      return next
+    })
+  }
+
+  function swapSlots(a, b) {
+    setSaved(false)
+    setSlotted((current) => {
+      const next = [...current]
+      while (next.length <= Math.max(a, b)) next.push(null)
+      ;[next[a], next[b]] = [next[b], next[a]]
+      return next
+    })
+    setSelectedSlot(null)
+  }
+
+  const { handleProps, rowRef, dragIndex, overIndex, dragOffset } = useDragReorder(
+    slotCount,
+    moveSlot,
+  )
 
   async function save() {
     setSaving(true)
@@ -308,10 +447,28 @@ export default function Lineup() {
       } else {
         await updateLineup(id, { playersPerSide: perSide, squadSize, notes: notes.trim() || null })
       }
-      await saveLineupPlayers(
-        id,
-        picked.map((p, index) => ({ ...p, sort_order: index })),
-      )
+      // sort_order IS the slot index for starters — holes and all — so the
+      // shirt a coach placed somebody at survives the round trip. Positions
+      // come from the format preset and are a guide (rosterFormats.js).
+      const rows = []
+      slotted.forEach((playerId, index) => {
+        if (!playerId) return
+        rows.push({
+          player_id: playerId,
+          role: ROLE_STARTER,
+          position: format?.positions?.[index] ?? null,
+          sort_order: index,
+        })
+      })
+      reps.forEach((playerId, index) => {
+        rows.push({
+          player_id: playerId,
+          role: ROLE_REPLACEMENT,
+          position: null,
+          sort_order: slotCount + index,
+        })
+      })
+      await saveLineupPlayers(id, rows)
       setSaved(true)
     } catch (failure) {
       setError(failure)
@@ -360,161 +517,14 @@ export default function Lineup() {
   }
 
   const date = eventDate(event)
+  const pendingPlayerLabel =
+    pendingSlot != null ? slotLabel(format, pendingSlot) : null
 
-  return (
-    <section>
-      {/* ⚠️ `flex-wrap` IS REQUIRED, and tests/page-header-wrap.test.js enforces
-          it across every screen: a page header without it pushes the whole
-          document wider than the viewport rather than wrapping. It caught this
-          screen on its first run. */}
-      <div className="mb-3.5 mt-1 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Team sheet</h2>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="text-[13px] font-bold text-brand-ink"
-        >
-          Back
-        </button>
-      </div>
-
-      {error && (
-        <p
-          role="alert"
-          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
-        >
-          {error.message || "That didn't save. Try again."}
-        </p>
-      )}
-
-      <Card className="mb-3 p-[14px]">
-        <p className="text-[15px] font-extrabold text-ink">{eventTitle(event)}</p>
-        <p className="mt-0.5 text-[12.5px] font-semibold text-ink-muted">
-          {team?.name} · {formatLongDate(date)} · {eventTimeLabel(event)}
-        </p>
-
-        <label className="mt-3 block">
-          <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
-            Players per side
-          </span>
-          <select
-            value={perSide ?? ''}
-            onChange={(domEvent) => {
-              setSaved(false)
-              setPerSide(domEvent.target.value === '' ? null : Number(domEvent.target.value))
-            }}
-            className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none focus:border-brand"
-          >
-            <option value="">Not set</option>
-            {SIDE_SIZES.map((size) => (
-              <option key={size} value={String(size)}>
-                {size}-a-side
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {/* ⚠️ TOTAL, NOT BENCH SIZE (Jay, 14 Aug 2026). Set independently of
-            players-per-side rather than derived from it: "22 for a 15s match"
-            and "10 for a 7s tournament" are both things a coach knows and the
-            app cannot work out.
-            ⚠️ A NUMBER INPUT, NOT A SELECT, unlike players-per-side directly
-            above. That set is small and closed — the formats a club plays. A
-            matchday squad total is not: it varies by competition, by tournament
-            rules and by who is fit. A select would need a dozen options and
-            still be wrong for somebody. */}
-        <label className="mt-3 block">
-          <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
-            Total in the squad
-          </span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min="1"
-            max="40"
-            value={squadSize ?? ''}
-            onChange={(domEvent) => {
-              setSaved(false)
-              const raw = domEvent.target.value
-              setSquadSize(raw === '' ? null : Number(raw))
-            }}
-            placeholder="e.g. 22"
-            className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none focus:border-brand"
-          />
-          <span className="mt-1.5 block text-[12.5px] leading-relaxed text-ink-muted">
-            Starters plus replacements. Used to count against — it never stops you
-            picking somebody.
-          </span>
-        </label>
-      </Card>
-
-      <div className="mb-2 flex items-baseline justify-between">
-        <h3 className="text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
-          Starting {perSide != null ? `— ${starters.length} of ${perSide}` : `— ${starters.length}`}
-        </h3>
-        {overPicked && (
-          <span className="text-[12px] font-bold text-warn-ink">
-            {starters.length - perSide} over
-          </span>
-        )}
-      </div>
-      <Card className="mb-3 px-[14px] py-1">
-        {starters.length === 0 ? (
-          <p className="py-3 text-[13px] text-ink-muted">Nobody picked yet.</p>
-        ) : (
-          <ul>
-            {starters.map((p) => (
-              <PickedRow
-                key={p.player_id}
-                player={{ ...playersById.get(p.player_id), role: p.role }}
-                status={statuses.get(p.player_id)}
-                fixtureTier={event?.tier}
-                grade={grades.get(p.player_id)?.tier}
-                onRemove={() => remove(p.player_id)}
-                onToggleRole={() => toggleRole(p.player_id)}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      <div className="mb-2 flex items-baseline justify-between">
-        <h3 className="text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
-          Replacements — {bench.length}
-        </h3>
-        {/* ⚠️ THE SQUAD TOTAL IS COUNTED HERE, against ALL picked players rather
-            than against the bench, because that is what the number means —
-            starters plus replacements. Shown beside Replacements because this is
-            where the total is finally reached. */}
-        {squadSize != null && (
-          <span
-            className={`text-[12px] font-bold ${overSquad ? 'text-warn-ink' : 'text-ink-muted'}`}
-          >
-            {picked.length} of {squadSize} in the squad
-            {overSquad ? ` — ${picked.length - squadSize} over` : ''}
-          </span>
-        )}
-      </div>
-      <Card className="mb-3 px-[14px] py-1">
-        {bench.length === 0 ? (
-          <p className="py-3 text-[13px] text-ink-muted">No replacements yet.</p>
-        ) : (
-          <ul>
-            {bench.map((p) => (
-              <PickedRow
-                key={p.player_id}
-                player={{ ...playersById.get(p.player_id), role: p.role }}
-                status={statuses.get(p.player_id)}
-                fixtureTier={event?.tier}
-                grade={grades.get(p.player_id)?.tier}
-                onRemove={() => remove(p.player_id)}
-                onToggleRole={() => toggleRole(p.player_id)}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
-
+  /* The pool card — shared by all three views. In quick view its buttons are
+     Start/Bench; while a slot is pending (slots and pitch views) the primary
+     button targets that exact slot instead. */
+  const poolCard = (
+    <>
       {/* ⚠️ "Still to pick", NOT "Squad" — Jay, 14 Aug 2026, having picked all
           four U16B players and asked what the empty section was for. "Squad"
           reads as THE SQUAD (the whole roster), so an empty one looks like the
@@ -572,13 +582,24 @@ export default function Lineup() {
                       <span className="min-w-0 flex-1 truncate text-[14.5px] text-ink">
                         {player.full_name}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => add(player.id, ROLE_STARTER)}
-                        className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
-                      >
-                        Start
-                      </button>
+                      {pendingSlot != null ? (
+                        <button
+                          type="button"
+                          onClick={() => add(player.id, ROLE_STARTER, pendingSlot)}
+                          aria-label={`Give shirt ${pendingSlot + 1} to ${player.full_name}`}
+                          className="shrink-0 rounded-[8px] border-[1.5px] border-brand px-2.5 py-1 text-[11.5px] font-bold text-brand-ink hover:bg-surface-mute"
+                        >
+                          Shirt {pendingSlot + 1}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => add(player.id, ROLE_STARTER)}
+                          className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
+                        >
+                          Start
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => add(player.id, ROLE_REPLACEMENT)}
@@ -605,6 +626,466 @@ export default function Lineup() {
           )
         })}
       </Card>
+    </>
+  )
+
+  const replacementsCard = (
+    <>
+      <div className="mb-2 flex items-baseline justify-between">
+        <h3 className="text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+          Replacements — {bench.length}
+        </h3>
+        {/* ⚠️ THE SQUAD TOTAL IS COUNTED HERE, against ALL picked players rather
+            than against the bench, because that is what the number means —
+            starters plus replacements. Shown beside Replacements because this is
+            where the total is finally reached. */}
+        {squadSize != null && (
+          <span
+            className={`text-[12px] font-bold ${overSquad ? 'text-warn-ink' : 'text-ink-muted'}`}
+          >
+            {picked.length} of {squadSize} in the squad
+            {overSquad ? ` — ${picked.length - squadSize} over` : ''}
+          </span>
+        )}
+      </div>
+      <Card className="mb-3 px-[14px] py-1">
+        {bench.length === 0 ? (
+          <p className="py-3 text-[13px] text-ink-muted">No replacements yet.</p>
+        ) : (
+          <ul>
+            {bench.map((p) => (
+              <PickedRow
+                key={p.player_id}
+                player={{ ...playersById.get(p.player_id), role: p.role }}
+                status={statuses.get(p.player_id)}
+                fixtureTier={event?.tier}
+                grade={grades.get(p.player_id)?.tier}
+                onRemove={() => remove(p.player_id)}
+                onToggleRole={() => toggleRole(p.player_id)}
+              />
+            ))}
+          </ul>
+        )}
+      </Card>
+    </>
+  )
+
+  return (
+    <section>
+      {/* ⚠️ `flex-wrap` IS REQUIRED, and tests/page-header-wrap.test.js enforces
+          it across every screen: a page header without it pushes the whole
+          document wider than the viewport rather than wrapping. It caught this
+          screen on its first run. */}
+      <div className="mb-3.5 mt-1 flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Team sheet</h2>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="text-[13px] font-bold text-brand-ink"
+        >
+          Back
+        </button>
+      </div>
+
+      {error && (
+        <p
+          role="alert"
+          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
+        >
+          {error.message || "That didn't save. Try again."}
+        </p>
+      )}
+
+      <Card className="mb-3 p-[14px]">
+        <p className="text-[15px] font-extrabold text-ink">{eventTitle(event)}</p>
+        <p className="mt-0.5 text-[12.5px] font-semibold text-ink-muted">
+          {team?.name} · {formatLongDate(date)} · {eventTimeLabel(event)}
+        </p>
+
+        <label className="mt-3 block">
+          <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+            Players per side
+          </span>
+          <select
+            value={perSide ?? ''}
+            onChange={(domEvent) => {
+              setSaved(false)
+              setPendingSlot(null)
+              setSelectedSlot(null)
+              setPerSide(domEvent.target.value === '' ? null : Number(domEvent.target.value))
+            }}
+            className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none focus:border-brand"
+          >
+            <option value="">Not set</option>
+            {SIDE_SIZES.map((size) => (
+              <option key={size} value={String(size)}>
+                {size}-a-side
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* ⚠️ TOTAL, NOT BENCH SIZE (Jay, 14 Aug 2026). Set independently of
+            players-per-side rather than derived from it: "22 for a 15s match"
+            and "10 for a 7s tournament" are both things a coach knows and the
+            app cannot work out.
+            ⚠️ A NUMBER INPUT, NOT A SELECT, unlike players-per-side directly
+            above. That set is small and closed — the formats a club plays. A
+            matchday squad total is not: it varies by competition, by tournament
+            rules and by who is fit. A select would need a dozen options and
+            still be wrong for somebody. */}
+        <label className="mt-3 block">
+          <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+            Total in the squad
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="1"
+            max="40"
+            value={squadSize ?? ''}
+            onChange={(domEvent) => {
+              setSaved(false)
+              const raw = domEvent.target.value
+              setSquadSize(raw === '' ? null : Number(raw))
+            }}
+            placeholder="e.g. 22"
+            className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none focus:border-brand"
+          />
+          <span className="mt-1.5 block text-[12.5px] leading-relaxed text-ink-muted">
+            Starters plus replacements. Used to count against — it never stops you
+            picking somebody.
+          </span>
+        </label>
+      </Card>
+
+      {/* The view toggle. Quick is the whole 14 Aug screen; Slots and Pitch are
+          other ways of touching the same roster. */}
+      <div role="tablist" aria-label="Roster view" className="mb-3 flex gap-1.5">
+        {VIEWS.map((candidate) => (
+          <button
+            key={candidate.key}
+            type="button"
+            role="tab"
+            aria-selected={view === candidate.key}
+            onClick={() => switchView(candidate.key)}
+            className={`rounded-[10px] px-3.5 py-1.5 text-[13px] font-bold ${
+              view === candidate.key
+                ? 'bg-brand text-white'
+                : 'border-[1.5px] border-line text-ink hover:bg-surface-mute'
+            }`}
+          >
+            {candidate.label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'quick' && (
+        <>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h3 className="text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+              Starting {perSide != null ? `— ${starters.length} of ${perSide}` : `— ${starters.length}`}
+            </h3>
+            {overPicked && (
+              <span className="text-[12px] font-bold text-warn-ink">
+                {starters.length - perSide} over
+              </span>
+            )}
+          </div>
+          <Card className="mb-3 px-[14px] py-1">
+            {starters.length === 0 ? (
+              <p className="py-3 text-[13px] text-ink-muted">Nobody picked yet.</p>
+            ) : (
+              <ul>
+                {starters.map((p) => (
+                  <PickedRow
+                    key={p.player_id}
+                    player={{ ...playersById.get(p.player_id), role: p.role }}
+                    status={statuses.get(p.player_id)}
+                    fixtureTier={event?.tier}
+                    grade={grades.get(p.player_id)?.tier}
+                    onRemove={() => remove(p.player_id)}
+                    onToggleRole={() => toggleRole(p.player_id)}
+                  />
+                ))}
+              </ul>
+            )}
+          </Card>
+        </>
+      )}
+
+      {view === 'slots' && (
+        <>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h3 className="text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+              Shirts {perSide != null ? `— ${starters.length} of ${perSide}` : `— ${starters.length}`}
+            </h3>
+            {overPicked && (
+              <span className="text-[12px] font-bold text-warn-ink">
+                {starters.length - perSide} over
+              </span>
+            )}
+          </div>
+          {slotCount === 0 ? (
+            <Card className="mb-3 p-4">
+              <p className="text-[13px] leading-relaxed text-ink-muted">
+                Choose players per side above and the shirts appear here, numbered and
+                ready to fill.
+              </p>
+            </Card>
+          ) : (
+            <Card className="mb-3 px-[10px] py-1.5">
+              <ul>
+                {Array.from({ length: slotCount }, (unused, index) => {
+                  const playerId = slotted[index] ?? null
+                  const player = playerId ? playersById.get(playerId) : null
+                  const { shirt, position } = slotLabel(format, index)
+                  const isDragging = dragIndex === index
+                  const isOver =
+                    dragIndex != null && overIndex === index && dragIndex !== index
+                  const extra = perSide != null && index >= perSide
+                  return (
+                    <li
+                      key={index}
+                      ref={rowRef(index)}
+                      className={`flex items-center gap-2 border-b border-line py-2 last:border-b-0 ${
+                        isOver ? 'border-t-2 border-t-brand' : ''
+                      }`}
+                      style={
+                        isDragging
+                          ? {
+                              transform: `translateY(${dragOffset}px)`,
+                              position: 'relative',
+                              zIndex: 5,
+                              opacity: 0.92,
+                            }
+                          : undefined
+                      }
+                    >
+                      {player ? (
+                        <span
+                          {...handleProps(index)}
+                          aria-label={`Drag to move ${player.full_name}`}
+                          className="shrink-0 cursor-grab select-none px-1 text-[16px] leading-none text-ink-faint"
+                        >
+                          ⠿
+                        </span>
+                      ) : (
+                        <span className="w-[22px] shrink-0" aria-hidden="true" />
+                      )}
+                      <span
+                        className={`flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[7px] text-[12px] font-bold ${
+                          player
+                            ? 'bg-brand text-white'
+                            : 'border-[1.5px] border-line text-ink-muted'
+                        }`}
+                      >
+                        {extra ? '+' : shirt}
+                      </span>
+                      {player ? (
+                        <>
+                          <span className="min-w-0 flex-1 truncate text-[14.5px] font-bold text-ink">
+                            {player.full_name}
+                          </span>
+                          <StatusChip status={statuses.get(playerId)} />
+                          <button
+                            type="button"
+                            onClick={() => toggleRole(playerId)}
+                            className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand-ink hover:bg-surface-mute"
+                          >
+                            → Bench
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => remove(playerId)}
+                            aria-label={`Remove ${player.full_name}`}
+                            className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted hover:bg-surface-mute"
+                          >
+                            Remove
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPendingSlot((current) => (current === index ? null : index))
+                          }
+                          className={`min-w-0 flex-1 truncate rounded-[8px] px-1 py-1 text-left text-[13.5px] font-semibold ${
+                            pendingSlot === index
+                              ? 'bg-brand/10 text-brand-ink'
+                              : 'text-ink-muted hover:bg-surface-mute'
+                          }`}
+                        >
+                          {pendingSlot === index
+                            ? 'Now tap a player below'
+                            : `Tap to fill${position ? ` · ${position}` : ''}`}
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </Card>
+          )}
+          <p className="mb-3 text-[12.5px] leading-relaxed text-ink-muted">
+            Drag ⠿ to move somebody to a different shirt. Tap an empty shirt, then a
+            player below, to fill it directly.
+          </p>
+        </>
+      )}
+
+      {view === 'pitch' && (
+        <>
+          {format == null ? (
+            <Card className="mb-3 p-4">
+              <p className="text-[13px] leading-relaxed text-ink-muted">
+                Choose players per side above and the pitch lays the shirts out for that
+                format.
+              </p>
+            </Card>
+          ) : (
+            <Card className="mb-3 overflow-hidden p-0">
+              {/* ⚠️ TAP-FIRST, AS THE PLAN PROMISED: tap a circle then a player,
+                  or tap two filled circles to swap them. Dragging a name onto a
+                  17px circle while the page wants to scroll is the one gesture
+                  the 14 Aug ruling was RIGHT about on phones; it can arrive
+                  later as polish without this view waiting for it. */}
+              <svg
+                viewBox="0 0 100 106"
+                role="group"
+                aria-label="Pitch — the starting team by position"
+                className="block w-full"
+              >
+                {/* The turf is PAINTED, not themed — a pitch is green in dark
+                    mode too, the same reasoning as the share facsimile's
+                    force-light. As an SVG fill rather than a Tailwind
+                    arbitrary value, where tests/theme.test.js rightly bans
+                    raw hex. */}
+                <rect x="0" y="0" width="100" height="106" fill="#2F7D3D" />
+                <rect x="3" y="3" width="94" height="100" fill="none" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="0.7" />
+                <line x1="3" y1="24" x2="97" y2="24" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="0.5" />
+                <line x1="3" y1="63" x2="97" y2="63" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="0.5" strokeDasharray="2 1.6" />
+                {format.pitch.map((point, index) => {
+                  const playerId = slotted[index] ?? null
+                  const player = playerId ? playersById.get(playerId) : null
+                  const isPending = pendingSlot === index
+                  const isSelected = selectedSlot === index
+                  return (
+                    <g
+                      key={index}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={
+                        player
+                          ? `Shirt ${index + 1}: ${player.full_name}`
+                          : `Shirt ${index + 1}: empty`
+                      }
+                      className="cursor-pointer"
+                      onClick={() => {
+                        if (!player) {
+                          setSelectedSlot(null)
+                          setPendingSlot(isPending ? null : index)
+                          return
+                        }
+                        setPendingSlot(null)
+                        if (selectedSlot == null) {
+                          setSelectedSlot(index)
+                        } else if (selectedSlot === index) {
+                          setSelectedSlot(null)
+                        } else {
+                          swapSlots(selectedSlot, index)
+                        }
+                      }}
+                      onKeyDown={(domEvent) => {
+                        if (domEvent.key === 'Enter' || domEvent.key === ' ') {
+                          domEvent.preventDefault()
+                          domEvent.currentTarget.dispatchEvent(
+                            new MouseEvent('click', { bubbles: true }),
+                          )
+                        }
+                      }}
+                    >
+                      <circle
+                        cx={point.x}
+                        cy={point.y}
+                        r="5.2"
+                        fill={player ? '#ffffff' : 'transparent'}
+                        stroke={isSelected || isPending ? '#FAC775' : '#ffffff'}
+                        strokeWidth={isSelected || isPending ? 1.4 : 0.8}
+                        strokeDasharray={player ? undefined : '1.6 1.4'}
+                      />
+                      <text
+                        x={point.x}
+                        y={point.y + 1.1}
+                        textAnchor="middle"
+                        fontSize="3.6"
+                        fontWeight="700"
+                        fill={player ? '#8E1526' : '#ffffff'}
+                      >
+                        {index + 1}
+                      </text>
+                      {player && (
+                        <text
+                          x={point.x}
+                          y={point.y + 8.6}
+                          textAnchor="middle"
+                          fontSize="2.9"
+                          fontWeight="600"
+                          fill="#ffffff"
+                        >
+                          {shortName(player.full_name)}
+                        </text>
+                      )}
+                    </g>
+                  )
+                })}
+              </svg>
+              <div className="px-[14px] py-2.5">
+                {selectedSlot != null && slotted[selectedSlot] ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-ink">
+                      {playersById.get(slotted[selectedSlot])?.full_name} — shirt{' '}
+                      {selectedSlot + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleRole(slotted[selectedSlot])}
+                      className="rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink"
+                    >
+                      → Bench
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => remove(slotted[selectedSlot])}
+                      className="rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink-muted"
+                    >
+                      Remove
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSlot(null)}
+                      className="rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[12.5px] leading-relaxed text-ink-muted">
+                    {pendingSlot != null
+                      ? `Shirt ${pendingSlot + 1}${
+                          pendingPlayerLabel?.position ? ` — ${pendingPlayerLabel.position}` : ''
+                        }: tap a player below.`
+                      : 'Tap an empty circle then a player below. Tap two filled circles to swap them.'}
+                  </p>
+                )}
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+
+      {replacementsCard}
+      {poolCard}
 
       <label className="mb-3 block">
         <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
@@ -648,6 +1129,8 @@ export default function Lineup() {
           ⚠️ FULL NAMES, which is Jay's explicit decision (14 Aug 2026) over a
           first-name-plus-initial option that was offered. Consistent with the
           RCM match sheet the club already shares as an image.
+          ⚠️ THE NUMBER IS THE SHIRT — the slot index plus one — so a roster
+          built by position shares with true numbers, holes skipped.
           ⚠️ RENDERED, NOT HIDDEN WITH display:none. html2canvas cannot photograph
           a display:none element — it has zero size. It is positioned off-screen
           instead, which is the same trick MatchSheet's facsimile relies on. */}
@@ -678,9 +1161,9 @@ export default function Lineup() {
                 Starting
               </p>
               <ol className="text-[16px] leading-[1.9] text-ink">
-                {starters.map((p, index) => (
+                {starters.map((p) => (
                   <li key={p.player_id}>
-                    <span className="inline-block w-6 font-bold text-ink-muted">{index + 1}</span>
+                    <span className="inline-block w-6 font-bold text-ink-muted">{p.slot + 1}</span>
                     {playersById.get(p.player_id)?.full_name}
                   </li>
                 ))}

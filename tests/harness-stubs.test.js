@@ -56,6 +56,10 @@ const ALIASES = [
   ['harness/stubs/matchSheets.js', 'src/data/matchSheets.js'],
   // The pitch allocation screen, 12 Aug 2026.
   ['harness/stubs/pitches.js', 'src/data/pitches.js'],
+  // The lineup scenario's grade read, added 25 Aug 2026 with the three-view
+  // roster builder. Its first shoot died on a missing TIERS export — the
+  // exact omission the export-parity check below exists to catch.
+  ['harness/stubs/playerTiers.js', 'src/data/playerTiers.js'],
   ['harness/stubs/pitchRequests.js', 'src/data/pitchRequests.js'],
   // The Squad contacts block on Home, 13 Aug 2026.
   //

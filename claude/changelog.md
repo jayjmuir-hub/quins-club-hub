@@ -22,6 +22,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   recorded while there: the capture is FIFTEEN tables behind live — measured,
   57 vs 42 — now its own open-items entry. The NEXT pull request cites this
   entry's squash SHA.
+- `60735db` — **The roster builder grew three views over one lineup** —
+  Jay: drag-and-drop, format-aware, and keep the simple path. Quick (the
+  14 Aug tap flow, untouched — its tests pass byte-identical), Slots
+  (shirt numbers + position names from `src/lib/rosterFormats.js` presets,
+  drag-to-reorder via a hand-rolled pointer hook, no dependency), Pitch
+  (per-format field layout, tap-to-fill, tap-two-to-swap). Sparse slot
+  model: `sort_order` IS the shirt, holes survive the round trip. Drag
+  proven in a real browser by `harness/shoot-lineup.mjs` — jsdom cannot
+  see it. Supersedes the 14 Aug no-drag ruling:
+  `claude/decisions/2026-08-25-drag-reopened.md`; plan:
+  `claude/plans/2026-08-25-roster-builder-three-views.md`.
 - `1d3bafe` — 🏉 **Positions are STAFF-ONLY, picked as forward-or-back then
   a sub-selection** — Jay, both halves: "forward or back selectable, then a
   sub selection for the rugby positions under those two main categories" and
@@ -38,8 +49,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   roster-row and detail-hero position lines, and the forwards/backs
   grouping. PlayerForm nests position checkboxes under the unit and drops
   the standalone single-select; the roster's inline editor writes
-  player_positions primary-first via optgroups. The NEXT pull request cites
-  this entry's squash SHA.
+  player_positions primary-first via optgroups.
 - `776eebb` — **The flip is DONE and VERIFIED LIVE.** Jay switched "Confirm
   email" OFF; a throwaway signup came back with a session, the welcome sent
   (`POST | 200` on notify-welcome two seconds later), and the door question
