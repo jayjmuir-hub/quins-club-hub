@@ -357,8 +357,13 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
   measured against pg_catalog; the full account is the 25 Aug entry in
   `db/schema/README.md`. Two findings became their own items below.
 
-- ⛔ **`20260825_player_parents_from_parent_membership.sql` (squash `a5c5efd`)
-  WAS NEVER APPLIED TO PRODUCTION — found 25 Aug 2026 by the re-capture.**
+- ✅ ~~**`20260825_player_parents_from_parent_membership.sql` (squash `a5c5efd`)
+  WAS NEVER APPLIED TO PRODUCTION — found 25 Aug 2026 by the re-capture.**~~
+  — **APPLIED later the same day, with Jay's yes.** Trigger + helper measured
+  live, backfill wrote 21 rows (player_parents 62 → 83, zero children left
+  with a parent membership and an empty list), trigger fault-injected in a
+  rolled-back transaction with a positive rollback control. The ⛔ marker in
+  triggers.sql is replaced by the applied record. Original finding:
   The commit shipped the migration AND wrote the capture as if applied, but
   neither the trigger nor `private.memberships_write_parent_row()` exists
   live and `schema_migrations` has no row for it. Consequence: parent
