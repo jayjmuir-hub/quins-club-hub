@@ -540,6 +540,11 @@ export default function PlayerRegistrationForm({
   onDone,
   submitLabel = 'Add my player',
   defaultSelfRegister = false,
+  // ⚠️ PRE-SIGNUP COLLECT. The wizard has no session, so it cannot call
+  // register_my_player (email is not confirmed yet either). When this is
+  // true the form validates and hands the rows back instead of writing.
+  collectOnly = false,
+  onCollect,
 }) {
   const [rows, setRows] = useState(() => [
     { ...blankRow(), selfRegister: Boolean(defaultSelfRegister) },
@@ -551,7 +556,7 @@ export default function PlayerRegistrationForm({
   // true when the row arrives; that is the right way round, because a field
   // that appears is better than one that vanishes under a thumb mid-typing.
   const { profile } = useMyProfile()
-  const needsName = Boolean(profile?.id) && !profile.name_confirmed_at
+  const needsName = !collectOnly && Boolean(profile?.id) && !profile.name_confirmed_at
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   // The children that were saved before something went wrong, by name. Held
@@ -701,6 +706,12 @@ export default function PlayerRegistrationForm({
     setError(null)
     setSaved([])
     setSubmitting(true)
+
+    if (collectOnly) {
+      onCollect?.(rows)
+      setSubmitting(false)
+      return
+    }
 
     // ⚠️ THE NAME GOES FIRST, AND THE ORDER IS THE ENTIRE FIX. Writing it after
     // the children would leave the same race in place — the membership, and so

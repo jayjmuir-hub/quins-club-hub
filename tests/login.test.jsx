@@ -44,6 +44,28 @@ vi.mock('../src/lib/auth.jsx', () => ({
   }),
 }))
 
+vi.mock('../src/data/signupSquads.js', () => ({
+  listSignupSquads: vi.fn(async () => [
+    {
+      id: 'team-u12',
+      name: 'U12A Contact',
+      sort_order: 1,
+      self_registration_allowed: false,
+      is_senior: false,
+    },
+  ]),
+}))
+
+vi.mock('../src/data/members.js', () => ({
+  getMyProfile: vi.fn(async () => null),
+  updateProfileNames: vi.fn(),
+  registerMyPlayer: vi.fn(),
+}))
+
+vi.mock('../src/data/players.js', () => ({
+  setPlayerDob: vi.fn(),
+}))
+
 // Import after vi.mock so this binds to the mocked module.
 import Login from '../src/screens/Login.jsx'
 
@@ -67,6 +89,18 @@ beforeEach(() => {
 /** The tab strip is role="tablist"; switching modes is a real user action. */
 async function switchToSignUp(user) {
   await user.click(screen.getByRole('tab', { name: /create account/i }))
+}
+
+/** Walk the pre-signup wizard as a volunteer so tests can reach email+password. */
+async function finishWizardAsHelper(user) {
+  await switchToSignUp(user)
+  await screen.findByLabelText(/your first name/i)
+  await user.type(screen.getByLabelText(/your first name/i), 'Anne')
+  await user.type(screen.getByLabelText(/your family name/i), 'Granelli')
+  await user.click(screen.getByRole('checkbox', { name: /i help the club another way/i }))
+  await user.click(await screen.findByRole('checkbox', { name: /u12a contact/i }))
+  await user.click(screen.getByRole('button', { name: /^continue$/i }))
+  await screen.findByLabelText(/email address/i)
 }
 
 describe('Login screen', () => {
@@ -225,36 +259,43 @@ describe('Login screen — signing in', () => {
 })
 
 describe('Login screen — creating an account', () => {
-  it('sends the typed email and password to signUpWithPassword', async () => {
+  it('does not offer email and password until the roll-call is done', async () => {
+    const user = userEvent.setup()
+    render(<Login />)
+    await switchToSignUp(user)
+    await screen.findByLabelText(/your first name/i)
+    expect(screen.queryByLabelText(/email address/i)).toBeNull()
+    expect(screen.queryByLabelText('Password')).toBeNull()
+  })
+
+  it('sends the typed email, password and intent to signUpWithPassword', async () => {
     const user = userEvent.setup()
     render(<Login />)
 
-    await switchToSignUp(user)
+    await finishWizardAsHelper(user)
     await user.type(screen.getByLabelText(/email address/i), 'newparent@example.com')
     await user.type(screen.getByLabelText('Password'), GOOD_PASSWORD)
-    await user.click(screen.getByRole('button', { name: /create account/i }))
+    await user.click(screen.getByRole('button', { name: /send my details/i }))
 
-    await waitFor(() =>
-      expect(signUpWithPassword).toHaveBeenCalledWith('newparent@example.com', GOOD_PASSWORD),
-    )
+    await waitFor(() => expect(signUpWithPassword).toHaveBeenCalledTimes(1))
+    const [email, password, intent] = signUpWithPassword.mock.calls[0]
+    expect(email).toBe('newparent@example.com')
+    expect(password).toBe(GOOD_PASSWORD)
+    expect(intent.claimed_role).toBe('volunteer')
+    expect(intent.first_name).toBe('Anne')
+    expect(intent.squad_ids).toEqual(['team-u12'])
   })
 
   it('keeps submit disabled until the password passes the rules', async () => {
-    // The client rules mirror the Supabase dashboard (src/lib/password.js).
-    // Gating the button here means the normal case never meets GoTrue's 422,
-    // whose message enumerates all four character classes every time and so
-    // cannot tell a parent what is actually missing.
     const user = userEvent.setup()
     render(<Login />)
 
-    await switchToSignUp(user)
+    await finishWizardAsHelper(user)
     await user.type(screen.getByLabelText(/email address/i), 'newparent@example.com')
 
-    const submit = screen.getByRole('button', { name: /create account/i })
+    const submit = screen.getByRole('button', { name: /send my details/i })
     expect(submit).toBeDisabled()
 
-    // 'Password1' is the near-miss: everything but a symbol. The server
-    // returned 422 weak_password for it on 8 Aug 2026.
     await user.type(screen.getByLabelText('Password'), 'Password1')
     expect(submit).toBeDisabled()
 
@@ -267,17 +308,12 @@ describe('Login screen — creating an account', () => {
     const user = userEvent.setup()
     render(<Login />)
 
-    await switchToSignUp(user)
+    await finishWizardAsHelper(user)
 
-    // Five, not "some": a partial list is how the checklist quietly drifts
-    // out of sync with the dashboard and a parent goes all-green into a 422.
     expect(screen.getAllByRole('listitem')).toHaveLength(5)
   })
 
   it('clears the password field when the tab changes', async () => {
-    // Deliberate, in switchMode(). Someone who typed a password into "sign
-    // in", failed, and switched to "create account" should be making a fresh
-    // decision — not silently registering with a guess at somebody's password.
     const user = userEvent.setup()
     render(<Login />)
 
@@ -285,60 +321,38 @@ describe('Login screen — creating an account', () => {
     expect(screen.getByLabelText('Password')).toHaveValue('a-guess-at-my-old-one')
 
     await switchToSignUp(user)
-    expect(screen.getByLabelText('Password')).toHaveValue('')
+    expect(screen.queryByLabelText('Password')).toBeNull()
   })
 
   it('shows a "Check your email" panel naming the address after a successful sign-up', async () => {
     const user = userEvent.setup()
     render(<Login />)
 
-    await switchToSignUp(user)
+    await finishWizardAsHelper(user)
     await user.type(screen.getByLabelText(/email address/i), 'newparent@example.com')
     await user.type(screen.getByLabelText('Password'), GOOD_PASSWORD)
-    await user.click(screen.getByRole('button', { name: /create account/i }))
+    await user.click(screen.getByRole('button', { name: /send my details/i }))
 
-    const panel = (await screen.findByRole('heading', { name: /check your email/i }))
-      .parentElement
+    const panel = (await screen.findByRole('heading', { name: /check your email/i })).parentElement
     expect(within(panel).getByText('newparent@example.com')).toBeInTheDocument()
-    expect(panel).toHaveTextContent(/open it to activate your account/i)
-
-    // ⚠️ MUST NOT ASSERT THAT AN EMAIL WAS SENT. Added 8 Aug 2026 after this
-    // panel opened with "We've sent a confirmation link to X" and the caveat
-    // came second. Jay read the first line, waited for an email that a repeat
-    // signup never produces, and reported a fault. The copy has to hold both
-    // outcomes because the app cannot tell which one happened.
+    expect(panel).toHaveTextContent(/prove that address/i)
+    expect(panel.textContent).not.toMatch(/activate your account/i)
     expect(panel.textContent).not.toMatch(/we[’']ve sent a confirmation link to/i)
     expect(panel).toHaveTextContent(/if .* is new/i)
-
-    // Both ways out, equally weighted — the app does not know which applies.
     expect(within(panel).getByRole('button', { name: /back to sign in/i })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: /reset my password/i })).toBeInTheDocument()
   })
 
   it('says exactly the same thing when the email is ALREADY registered', async () => {
-    // ⚠️ ANTI-ENUMERATION, AND THE MOST DELIBERATE DECISION ON THIS SCREEN.
-    // See claude/decisions/2026-08-08-parent-self-registration.md.
-    //
-    // GoTrue answers a signup for an existing address with 200 and an
-    // obfuscated user (empty `identities`), and sends nothing. auth.jsx turns
-    // that into `{ alreadyRegistered: true }` so the decision is VISIBLE
-    // rather than accidental — but the screen must not branch on it. Saying
-    // "that email is already taken" confirms to anyone who cares to ask that
-    // a named family are members of this club, and this app's whole roster is
-    // children.
-    //
-    // The route out for the person who genuinely forgot is the "already had
-    // an account?" line in the panel, which costs no information.
     const user = userEvent.setup()
 
     async function signUpAndReadPanel() {
       const view = render(<Login />)
-      await switchToSignUp(user)
+      await finishWizardAsHelper(user)
       await user.type(screen.getByLabelText(/email address/i), 'known@example.com')
       await user.type(screen.getByLabelText('Password'), GOOD_PASSWORD)
-      await user.click(screen.getByRole('button', { name: /create account/i }))
-      const panel = (await screen.findByRole('heading', { name: /check your email/i }))
-        .parentElement
+      await user.click(screen.getByRole('button', { name: /send my details/i }))
+      const panel = (await screen.findByRole('heading', { name: /check your email/i })).parentElement
       const text = panel.textContent
       view.unmount()
       return text
@@ -351,10 +365,7 @@ describe('Login screen — creating an account', () => {
     const existing = await signUpAndReadPanel()
 
     expect(existing).toBe(fresh)
-    // And spell out the two words that must never appear, so a future
-    // "helpful" copy edit fails here rather than in front of the club.
     expect(existing).not.toMatch(/already (taken|registered|exists|in use)/i)
-    // The honest, non-leaking way to help the person who forgot.
     expect(existing).toMatch(/nothing will arrive/i)
   })
 })
