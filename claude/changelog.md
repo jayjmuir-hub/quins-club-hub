@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🔎 **The giant avatar was an INLINE span, and one word fixes
+- (unmerged) — 💬 **The floating dock's panel now stays pinned to the newest
+  message.** Jay: chats opened from the bubble didn't show the latest
+  message — the `useStayPinnedToBottom` fix only reached the full chat
+  screens, because it pins the WINDOW and the dock scrolls its own div.
+  The dock's one-shot `scrollIntoView` fired when the data arrived and
+  landed short once signed photo URLs grew the list (same failure as
+  #395). The hook now takes an optional container ref — same intent-based
+  stick gate, same three re-pin triggers — and the dock passes its panel.
+  The NEXT pull request cites this entry's squash SHA.
+- `5319a73` — 🔎 **The giant avatar was an INLINE span, and one word fixes
   it** — Jay: "I just looked at the app, and it does not look like it was
   fixed", after two rounds of everyone (me included) believing the
   afternoon's contact-card rework had cured it. Diagnosed on the LIVE site

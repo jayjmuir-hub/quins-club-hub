@@ -169,6 +169,27 @@ describe('the floating chat dock', () => {
     expect(within(bubble).queryByText('You')).not.toBeInTheDocument()
   })
 
+  it('pins its own panel to the newest message — and KEEPS pinning as photos grow it', async () => {
+    // The dock scrolls a div, not the window, so the useStayPinnedToBottom
+    // fix for the full screens never reached it: a one-shot scrollIntoView
+    // fired at data time and landed short once signed photo URLs grew the
+    // list (Jay, 25 Aug 2026: opening from the bubble doesn't show the
+    // latest message). The ticker must re-pin AFTER the data has rendered.
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[1])
+    await screen.findAllByTestId('dock-bubble')
+    // jsdom has no layout: give the panel real-looking scroll metrics only
+    // NOW, after the initial pin already ran against zero heights.
+    const panel = screen.getByTestId('dock-thread')
+    let y = 0
+    Object.defineProperty(panel, 'scrollTop', { get: () => y, set: (v) => { y = v }, configurable: true })
+    Object.defineProperty(panel, 'scrollHeight', { get: () => 480, configurable: true })
+    Object.defineProperty(panel, 'clientHeight', { get: () => 200, configurable: true })
+    await waitFor(() => expect(y).toBe(480), { timeout: 2000 })
+  })
+
   it('a squad channel names theirs — same as MessageRow, not a third style', async () => {
     const user = userEvent.setup()
     renderAt('/roster')
