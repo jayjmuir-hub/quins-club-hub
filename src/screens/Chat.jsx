@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ChatHeader from '../components/ChatHeader.jsx'
@@ -27,6 +27,7 @@ import {
   markMessagesRead,
   messageReadStats,
   postMessage,
+  openConversation,
   removeMessage,
   replyToMessage,
   setAnnounceOnly,
@@ -85,6 +86,7 @@ export function tallyByEvent(rows) {
 export default function Chat() {
   const { teamId: param } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
   const selfId = user?.id ?? null
@@ -337,6 +339,29 @@ export default function Chat() {
       setError(err.message || 'Could not pin that.')
     }
   }
+
+  // The group-DM courtesies, on the squad channel too (25 Aug 2026). Whether
+  // a DM with this person is ALLOWED stays open_conversation's call — its
+  // refusal is the database's words, the same contract the DM thread's
+  // onReplyPrivately documents. DMs and channels share one messages table,
+  // so quoting a channel message into the DM is an ordinary quoted_id.
+  async function openDmWith(profileId) {
+    try {
+      const dm = await openConversation(profileId)
+      navigate(`/chat/dm/${dm}`)
+    } catch (err) {
+      setError(err.message || 'Could not open a chat with them.')
+    }
+  }
+  async function onReplyPrivately(m) {
+    try {
+      const dm = await openConversation(m.author_id)
+      navigate(`/chat/dm/${dm}`, { state: { replyPrivatelyTo: m } })
+    } catch (err) {
+      setError(err.message || 'Could not open a chat with them.')
+    }
+  }
+
   async function toggleAnnounceOnly() {
     try {
       await setAnnounceOnly(teamId, clubId, selfId, !announceOnly)
@@ -379,7 +404,7 @@ export default function Chat() {
   }
 
   return (
-    <section className="px-1">
+    <section className="flex flex-1 flex-col px-1">
       <ChatHeader
         avatar={
           <span
@@ -462,6 +487,11 @@ export default function Chat() {
           }
         />
       )}
+      {/* The slack-eater — same fix as the DM thread, same day: bottom-anchor
+          the stream and composer so the shell's min-h-screen surplus sits
+          ABOVE the messages, not below the composer where the phone keyboard
+          maroons it (AppShell's <main> comment has the mechanism). */}
+      <div className="flex-1" aria-hidden="true" />
       {/* Same paint site as the DM thread: the stream wrapper, wearing the
           device wallpaper; data-background is what the tests read. Day
           dividers and gap-1 match DirectMessages Thread so a staff chat
@@ -498,6 +528,8 @@ export default function Chat() {
           onRemove={onRemove}
           onPin={onPin}
           onReport={onReport}
+          onReplyPrivately={onReplyPrivately}
+          onAuthor={openDmWith}
         />
         </Fragment>
       ))}

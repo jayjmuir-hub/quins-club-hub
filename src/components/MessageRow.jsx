@@ -29,7 +29,7 @@ function RolePill({ role, title }) {
   )
 }
 
-function Reply({ reply, selfId, canModerate, onRemove }) {
+function Reply({ reply, selfId, canModerate, onRemove, onAuthor }) {
   const staff = isStaffRole(reply.author_role)
   const mine = reply.author_id === selfId
   const menuItems =
@@ -44,6 +44,7 @@ function Reply({ reply, selfId, canModerate, onRemove }) {
         testId="message-reply"
         menuItems={menuItems}
         showAuthor={!mine}
+        onAuthor={!mine && onAuthor ? () => onAuthor(reply.author_id) : null}
         authorLabel={reply.author?.full_name ?? 'Someone'}
         authorExtra={staff ? <RolePill role={reply.author_role} title={reply.author_title} /> : null}
         forwarded={Boolean(reply.forwarded)}
@@ -85,6 +86,11 @@ export default function MessageRow({
   onRemove,
   onPin,
   onReport,
+  // 25 Aug 2026: the squad channel grows the group-DM courtesies — a
+  // private reply from the chevron menu, and a tappable author name. Both
+  // optional; the screen supplies them only where a DM makes sense.
+  onReplyPrivately,
+  onAuthor,
 }) {
   const [open, setOpen] = useState(forceOpen)
   const [reporting, setReporting] = useState(false)
@@ -126,6 +132,9 @@ export default function MessageRow({
     ? []
     : [
         ...(onReply ? [{ label: 'Reply', onClick: () => setOpen((v) => !v) }] : []),
+        ...(!mine && onReplyPrivately
+          ? [{ label: 'Reply privately', onClick: () => onReplyPrivately(message) }]
+          : []),
         ...(canModerate && onPin ? [{ label: message.pinned ? 'Unpin' : 'Pin', onClick: () => onPin(message.id, !message.pinned) }] : []),
         ...((mine || canModerate) && onRemove ? [{ label: 'Delete', onClick: () => onRemove(message.id), danger: true }] : []),
         ...(!mine && onReport ? [{ label: 'Report', onClick: () => setReporting((v) => !v), danger: true }] : []),
@@ -144,6 +153,7 @@ export default function MessageRow({
         menuItems={menuItems}
         pinned={Boolean(message.pinned)}
         showAuthor={!mine}
+        onAuthor={!mine && onAuthor ? () => onAuthor(message.author_id) : null}
         authorLabel={
           <>
             {unread && <span className="sr-only">New. </span>}
@@ -235,7 +245,7 @@ export default function MessageRow({
       {open && (
         <div className={`mt-1 w-full max-w-[88%] border-l-2 border-line pl-3 ${mine ? 'ml-auto' : ''}`}>
           {replies.map((reply) => (
-            <Reply key={reply.id} reply={reply} selfId={selfId} canModerate={canModerate} onRemove={onRemove} />
+            <Reply key={reply.id} reply={reply} selfId={selfId} canModerate={canModerate} onRemove={onRemove} onAuthor={onAuthor} />
           ))}
           {onReply && (
             <form onSubmit={submitReply} className="mt-1.5 flex items-end gap-2">

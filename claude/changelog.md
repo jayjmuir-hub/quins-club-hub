@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🗄️ **`db/schema/` re-captured in FULL — twelve days of drift,
+- (unmerged) — 💬 **The keyboard stops marooning the composer, and every
+  chat name is a door.** Jay's screenshots: a DM with a handful of messages
+  left the shell's min-h-screen surplus BELOW the composer, so the phone
+  keyboard's pin-to-bottom scrolled it to mid-screen over a void.
+  Conversation screens are now a flex column with a slack-eater ABOVE the
+  stream — the composer IS the document bottom (measured: 16px, the pb-2,
+  by `harness/shoot-chat-layout.mjs`). And the squad channel gains the
+  group-DM courtesies: "Reply privately" on the chevron menu and tappable
+  author names (message and reply bubbles, groups included) that open the
+  1:1 — permission stays `open_conversation`'s call in the database.
+- `0465064` — 🗄️ **`db/schema/` re-captured in FULL — twelve days of drift,
   the largest reconciliation the directory has absorbed.** Measured against
   pg_catalog: 13 whole tables missing, 11 drifted (conversations' group-chat
   rewrite had falsified two captured constraints), 25 policies missing (one
@@ -22,9 +32,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   entry in `db/schema/README.md`. ⚠️ **And one drift ran the other way:
   `a5c5efd`'s player_parents migration WAS NEVER APPLIED — the capture
   described intent as fact.** Marked ⛔ NOT LIVE in triggers.sql; applying it
-  is an open item needing Jay. The NEXT pull request cites this entry's
-  squash SHA.
-
+  is an open item needing Jay.
 - `fdadfa3` — 🏉 **Phase 2 of the roster builder: the pitch is a SHEET
   STYLE, and circles drag.** The Pitch view's drawing moved into
   `src/components/PitchDiagram.jsx` and serves two customers: the
