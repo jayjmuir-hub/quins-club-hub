@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -113,6 +113,12 @@ export default function Chat() {
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
   const bottomRef = useRef(null)
+  // Where "New" starts and what was unread, captured ONCE per visit — the
+  // mark-read-on-arrival effect updates `reads` moments later, so a live
+  // value would wipe the highlight under the reader. Same stance as the DM
+  // thread's newFromRef (24 Aug feedback: "mark for new messages").
+  const newFromRef = useRef(undefined)
+  const openReadsRef = useRef(null)
   const draftRef = useRef(null)
   const fileRef = useRef(null)
   const threadParam = searchParams.get('thread')
@@ -133,6 +139,16 @@ export default function Chat() {
         listMyMessageReads(),
         getChannelSettings(teamId),
       ])
+      if (newFromRef.current === undefined) {
+        openReadsRef.current = mine
+        const first = rows.find(
+          (row) =>
+            !row.deleted_at &&
+            ((row.author_id !== selfId && !mine.has(row.id)) ||
+              (row.replies ?? []).some((r) => !r.deleted_at && r.author_id !== selfId && !mine.has(r.id))),
+        )
+        newFromRef.current = first?.id ?? null
+      }
       setMessages(rows)
       setReads(mine)
       setSettings(channel)
@@ -164,7 +180,7 @@ export default function Chat() {
     } catch (err) {
       setError(err.message || 'We could not load the chat just now.')
     }
-  }, [param, teamId, canModerate, staffChannel, unknownTeam])
+  }, [param, teamId, canModerate, staffChannel, unknownTeam, selfId])
 
   useEffect(() => {
     load()
@@ -225,8 +241,13 @@ export default function Chat() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
   useEffect(() => {
-    // Optional-called: jsdom (and some old WebViews) have no scrollIntoView.
-    if (messages?.length && nearBottomRef.current) bottomRef.current?.scrollIntoView?.({ block: 'end' })
+    // The TRUE document end, not scrollIntoView({block:'end'}): aligning the
+    // anchor with the viewport bottom parked the newest message under the
+    // sticky composer and the tab bar — the last ~130px of a phone viewport
+    // is chrome. At the full end the composer sits in flow above the page's
+    // bottom padding and the newest message clears it (Jay, 25 Aug 2026:
+    // "the latest message is ... sometimes below the input bar").
+    if (messages?.length && nearBottomRef.current) window.scrollTo(0, document.documentElement.scrollHeight)
   }, [messages])
 
   // ── Routing ─────────────────────────────────────────────────────────────
@@ -441,15 +462,22 @@ export default function Chat() {
         />
       )}
       {messages?.map((m) => (
+        <Fragment key={m.id}>
+        {newFromRef.current === m.id && (
+          <div className="my-1.5 flex items-center gap-2" data-testid="new-divider" role="separator" aria-label="New messages">
+            <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
+            <span className="font-condensed text-[11px] font-bold uppercase tracking-[.14em] text-brand-ink">New</span>
+            <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
+          </div>
+        )}
         <MessageRow
-          key={m.id}
           message={m}
           selfId={selfId}
           canModerate={canModerate}
           reactions={reactions}
           onReact={onReact}
           readStat={canModerate ? stats.get(m.id) : undefined}
-          unread={!reads.has(m.id)}
+          unread={!(openReadsRef.current ?? reads).has(m.id)}
           tally={m.event_id ? tallies.get(m.event_id) : undefined}
           mentionables={mentionables}
           forceOpen={threadParam === m.id}
@@ -458,11 +486,15 @@ export default function Chat() {
           onPin={onPin}
           onReport={onReport}
         />
+        </Fragment>
       ))}
       <div ref={bottomRef} />
 
       {/* ── Composer ────────────────────────────────────────────────── */}
-      <div className="sticky bottom-0 -mx-1 mt-3 border-t border-line bg-surface px-1 pb-2 pt-2">
+      {/* The phone offset clears the fixed glass tab bar (74px+safe-area —
+          the same lift the DM thread got in bc971f8; this screen was
+          missed). Desktop keeps bottom-0: no tab bar there. */}
+      <div className="sticky bottom-[calc(74px+env(safe-area-inset-bottom))] desktop:bottom-0 -mx-1 mt-3 border-t border-line bg-surface px-1 pb-2 pt-2">
         {/* Attach a fixture: starts that fixture's thread. Offered to
             everyone in the squad (not only staff) — the fixture's discussion
             belongs to the squad. Only fixtures without an open thread. */}

@@ -232,7 +232,10 @@ function Thread({ conversationId }) {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
   useEffect(() => {
-    if (messages?.length && nearBottomRef.current) bottomRef.current?.scrollIntoView?.({ block: 'end' })
+    // The TRUE document end — scrollIntoView({block:'end'}) parked the
+    // newest message under the sticky composer and the tab bar. Same fix
+    // and reasoning as Chat.jsx.
+    if (messages?.length && nearBottomRef.current) window.scrollTo(0, document.documentElement.scrollHeight)
   }, [messages])
 
   const isGroup = conversation?.kind === 'group'

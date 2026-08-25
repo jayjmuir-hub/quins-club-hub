@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 📌 **The app icon is the club pin** — Jay walked the icon through a night
+- (unmerged) — 📱 **Opening a chat lands you on the newest message, above the
+  chrome, with "New" marked** — Jay: "chat is not working correctly with the
+  bottom and top menu bars", "the latest message is ... sometimes below the
+  input bar", "new messages should be highlighted somehow when a chat is
+  opened". Three fixes: the squad/club composer lifts 74px+safe-area above
+  the phone tab bar (the same lift the DM thread got in #389 — Chat.jsx was
+  missed); both screens now open by scrolling the window to the TRUE
+  document end instead of `scrollIntoView({block:'end'})`, which aligned
+  the anchor with the viewport bottom — exactly where the sticky composer
+  and tab bar overlay it; and Chat.jsx grows the DM thread's "New" divider,
+  with unread dots captured at the moment of opening so the
+  mark-read-on-arrival effect no longer wipes them under the reader.
+  `tests/chat-open-view.test.jsx`; jsdom's missing `window.scrollTo`
+  stubbed in `src/test/setup.js`. The NEXT pull request cites this entry's
+  squash SHA.
+- `9f31939` — 📌 **The app icon is the club pin** (#393) — Jay walked the icon through a night
   of looks (green tiles, bigger crest, synthetic gold/silver/gunmetal pin
   rims) and landed on the real thing: an enamel-lapel-pin rendition of the
   full crest (`harness/pin-photo.jpg`, an AI-generated product shot) cut
@@ -20,8 +35,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   method, and the maskable safe-zone arithmetic are documented in its
   header); `harness/make-icons.mjs` is superseded-and-kept with a pointer.
   The full wording stays on the pin — badge-as-object, consciously
-  reversing the 14 Aug strip-the-wording brief. (No SHA — this branch's
-  entry; the next pull request cites the squash.)
+  reversing the 14 Aug strip-the-wording brief. Its own branch could not
+  cite this squash SHA, so this entry does.
 
 ## 24 Aug 2026
 
