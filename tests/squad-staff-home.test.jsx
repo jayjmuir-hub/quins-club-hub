@@ -55,7 +55,7 @@ vi.mock('../src/data/staff.js', () => ({
   listMySquadStaff: (...args) => listMySquadStaffMock(...args),
 }))
 
-import SquadStaffCard, { leadIndex, leadRowSpan, tileSpans } from '../src/components/SquadStaffCard.jsx'
+import SquadStaffCard, { leadIndex } from '../src/components/SquadStaffCard.jsx'
 import Dashboard from '../src/screens/Dashboard.jsx'
 import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
@@ -302,12 +302,13 @@ function person(n) {
   return { ...COACH_DAN, membershipId: `gen-${n}`, name: `Person ${n}`, title: 'Assistant Coach' }
 }
 
-describe('leadIndex — who gets the big tile', () => {
+describe('leadIndex — who goes first', () => {
   // ⚠️ THE RULE IS TITLE, NEVER ROLE, AND src/data/staff.js IS WHY. It sorts by
   // name in two places and says both times that role order "reads as a
-  // hierarchy the club has not agreed to". Featuring by role would restate that
-  // hierarchy at twice the size, so the lead is whoever the club chose to CALL
-  // a head — a string an admin typed, not something this code inferred.
+  // hierarchy the club has not agreed to". Putting a coach first because they
+  // are a coach would restate that hierarchy, so the lead is whoever the club
+  // chose to CALL a head — a string an admin typed, not something this code
+  // inferred.
   it('features whoever is titled a head, wherever they sit in the list', () => {
     expect(leadIndex([MEDIC_SAM, COACH_ROSA, MANAGER_PRIYA])).toBe(1)
   })
@@ -318,7 +319,7 @@ describe('leadIndex — who gets the big tile', () => {
 
   // ⚠️ WORD BOUNDARY, NOT `includes`. "Overhead", "Forehead" and — the one that
   // matters here — a title like "Overheads and Kit" would all match a substring
-  // test and quietly promote the wrong person to the biggest tile on the screen.
+  // test and quietly promote the wrong person to the top of the list.
   it('does not match head inside another word', () => {
     expect(leadIndex([{ ...COACH_ROSA, title: 'Overheads and Kit' }])).toBe(-1)
   })
@@ -327,82 +328,6 @@ describe('leadIndex — who gets the big tile', () => {
     expect(leadIndex([MEDIC_SAM, MANAGER_PRIYA])).toBe(-1)
     expect(leadIndex([{ ...COACH_ROSA, title: null }])).toBe(-1)
     expect(leadIndex([])).toBe(-1)
-  })
-})
-
-describe('tileSpans — the lead is two tiles tall and the rest flow around it', () => {
-  it('gives a lone person the full width rather than half a row', () => {
-    expect(tileSpans(1, true)).toEqual(['wide'])
-    expect(tileSpans(1, false)).toEqual(['wide'])
-  })
-
-  // ⚠️ TWO IS ENOUGH, AND THIS TEST ASSERTED THE OPPOSITE UNTIL 16 Aug 2026.
-  // It read "refuses the tall tile below three people", on the reasoning that
-  // the tall tile leaves a hole beside its lower half at two. The hole is real.
-  // It lost to consistency: Jay, comparing a two-person squad with a six-person
-  // one on the same screen — "the U13 head coach bubble is not the standard
-  // double size". A head coach is a head coach at either size of squad, and the
-  // same job rendered two ways one above the other reads as a bug.
-  it('⚠️ gives the lead the tall tile at two people, hole and all', () => {
-    expect(tileSpans(2, true)).toEqual(['lead', 'half'])
-  })
-
-  // Still no tall tile without somebody titled to earn it.
-  it('leaves a two-person squad with no head coach as an even pair', () => {
-    expect(tileSpans(2, false)).toEqual(['half', 'half'])
-  })
-
-  it('stacks two tiles beside the lead at three', () => {
-    expect(tileSpans(3, true)).toEqual(['lead', 'half', 'half'])
-  })
-
-  // ⚠️ THIS REVERSES AN EARLIER RULE ON PURPOSE — DO NOT "FIX" IT BACK. For a
-  // few hours the lead owned the WHOLE left column, so nothing wrapped beneath
-  // it. Seen against the real six-person squad with an actual photograph, that
-  // made the lead a 175x712 strip and a person in it a vertical sliver. Jay
-  // chose the wrapping as the lesser problem, having seen both.
-  it('lets the rest flow under the lead as well as beside it', () => {
-    expect(tileSpans(4, true)).toEqual(['lead', 'half', 'half', 'half'])
-    expect(tileSpans(6, true)).toEqual(['lead', 'half', 'half', 'half', 'half', 'half'])
-  })
-
-  // ⚠️ AN ODD LAST TILE KEEPS ITS WIDTH AND LEAVES A GAP — Jay, 15 Aug 2026,
-  // on the real six-person squad: "i don't like the bottom one going full
-  // length". A tile stretched to twice its neighbours' width reads as a
-  // different KIND of thing; a gap just reads as the end of the list.
-  it('never stretches the odd last tile', () => {
-    for (const n of [3, 4, 5, 6, 7]) {
-      expect(tileSpans(n, true).slice(1)).not.toContain('wide')
-      expect(tileSpans(n, false)).not.toContain('wide')
-    }
-  })
-
-  it('leaves a full last row alone at five', () => {
-    expect(tileSpans(5, true)).toEqual(['lead', 'half', 'half', 'half', 'half'])
-  })
-
-  it('pairs them off evenly when nobody leads', () => {
-    expect(tileSpans(4, false)).toEqual(['half', 'half', 'half', 'half'])
-    expect(tileSpans(3, false)).toEqual(['half', 'half', 'half'])
-  })
-
-  // ⚠️ THE INVARIANT CHANGED WITH THE RULE. It used to be "an even number of
-  // half tiles, so none is ever alone"; a lone tile is now allowed and simply
-  // leaves a gap. What still holds is that `wide` appears ONLY for a squad of
-  // one, where there is no set to be the odd one out of.
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])('uses wide only for a squad of one (%i)', (n) => {
-    for (const hasLead of [true, false]) {
-      const spans = tileSpans(n, hasLead)
-      expect(spans.includes('wide')).toBe(n === 1)
-    }
-  })
-})
-
-describe('leadRowSpan — two small tiles tall, and only ever two', () => {
-  // ⚠️ IT USED TO BE `count - 1`. A real photograph is what settled it: at six
-  // people that made the lead 1:4 and unusable for a face.
-  it.each([2, 3, 6, 20])('is 2 whatever the squad size (%i)', () => {
-    expect(leadRowSpan()).toBe(2)
   })
 })
 
@@ -439,22 +364,21 @@ describe('SquadStaffCard — the contact buttons', () => {
   })
 
   // ⚠️ jsdom COMPUTES NO CSS, so the 44px floor cannot be measured here — the
-  // class token is the only thing this environment can hold. The width was
-  // measured in Chromium instead: at 320px the three buttons needed 144px in a
-  // 140px tile and the last one was CLIPPED rather than overflowing, because
-  // the tile clips. See the breakpoint note in SquadStaffCard.jsx.
+  // class token is the only thing this environment can hold. The retired
+  // poster tiles faked it with `after:h-11` on a 36px draw; the row card has
+  // the width, so the control is actually 44.
   it('keeps every contact button at the 44px tap-target floor', () => {
     render(<SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />)
 
     for (const link of screen.getAllByRole('link')) {
-      expect(link.className).toContain('h-11')
-      expect(link.className).toContain('w-11')
+      expect(link.className.split(/\s+/)).toContain('h-11')
+      expect(link.className.split(/\s+/)).toContain('w-11')
     }
   })
 })
 
-describe('SquadStaffCard — the mosaic on screen', () => {
-  it('gives the titled head the lead tile and nobody else', () => {
+describe('SquadStaffCard — editorial rows, not glossy tiles', () => {
+  it('puts the titled head first and everyone else in name order', () => {
     render(
       <SquadStaffCard
         squadName="U13 Mixed Contact"
@@ -462,33 +386,21 @@ describe('SquadStaffCard — the mosaic on screen', () => {
       />,
     )
 
-    const tiles = screen.getAllByTestId('squad-staff-person')
-    expect(tiles.map((t) => t.dataset.span)).toEqual(['lead', 'half', 'half'])
-    // The lead is moved to the front; everyone else keeps the order the data
-    // module chose, which is by name.
-    expect(tiles[0]).toHaveTextContent('Rosa Ferreira')
-    expect(tiles.filter((t) => t.dataset.featured === 'true')).toHaveLength(1)
+    const rows = screen.getAllByTestId('squad-staff-person')
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Rosa Ferreira'),
+      expect.stringContaining('Sam Okonkwo'),
+      expect.stringContaining('Priyanka Ramachandran'),
+    ])
   })
 
-  // ⚠️ THE SHAPE JAY ACTUALLY REPORTED, AND THE ONLY TEST HERE THAT RENDERS IT.
-  // "the U13 head coach bubble is not the standard double size" was a two-person
-  // squad sitting above a six-person one on Home. `tileSpans(2, true)` is
-  // asserted above, but a span array is not a size: the size lives in
-  // SPAN_CLASS, and a lead that lost its class tokens would satisfy every
-  // existing assertion in this file. So this compares the two-person lead
-  // against the six-person one and demands they be the same tile.
-  it('draws the head coach the same size in a two-person squad as in a six', () => {
-    const leadTile = () =>
-      screen.getAllByTestId('squad-staff-person').find((t) => t.dataset.span === 'lead')
-
+  it('draws every person as the same row, two-person squad or six', () => {
     const { rerender } = render(
       <SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA, MANAGER_PRIYA]} />,
     )
-    const small = leadTile()
-    expect(small).toHaveTextContent('Rosa Ferreira')
-    expect(small.dataset.featured).toBe('true')
-    const smallClass = small.className
-    const smallRow = small.style.gridRow
+    const two = screen.getAllByTestId('squad-staff-person')
+    expect(two[0]).toHaveTextContent('Rosa Ferreira')
+    const twoClass = two[0].className
 
     rerender(
       <SquadStaffCard
@@ -496,50 +408,43 @@ describe('SquadStaffCard — the mosaic on screen', () => {
         staff={[COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA, person(5), person(6)]}
       />,
     )
-    const big = leadTile()
-
-    expect(smallClass).toBe(big.className)
-    expect(smallRow).toBe(big.style.gridRow)
+    const six = screen.getAllByTestId('squad-staff-person')
+    expect(six).toHaveLength(6)
+    expect(six[0].className).toBe(twoClass)
+    expect(six[0]).toHaveTextContent('Rosa Ferreira')
   })
 
-  it('lays a squad out evenly when nobody is titled a head', () => {
+  it('keeps name-order when nobody is titled a head', () => {
     render(
       <SquadStaffCard squadName="U13 Mixed Contact" staff={[MEDIC_SAM, MANAGER_PRIYA]} />,
     )
 
-    const tiles = screen.getAllByTestId('squad-staff-person')
-    expect(tiles.map((t) => t.dataset.span)).toEqual(['half', 'half'])
-    expect(tiles.some((t) => t.dataset.featured === 'true')).toBe(false)
+    const rows = screen.getAllByTestId('squad-staff-person')
+    expect(rows[0]).toHaveTextContent('Sam Okonkwo')
+    expect(rows[1]).toHaveTextContent('Priyanka Ramachandran')
   })
 
-  it('lays out the four- and six-person squads the club really has', () => {
-    const { rerender } = render(
-      <SquadStaffCard
-        squadName="U13 Mixed Contact"
-        staff={[COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA]}
-      />,
-    )
-    expect(screen.getAllByTestId('squad-staff-person').map((t) => t.dataset.span)).toEqual([
-      'lead',
-      'half',
-      'half',
-      'half',
-    ])
+  it('sits the people on the shared Card, ink on paper, no poster scrim', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />)
 
-    rerender(
-      <SquadStaffCard
-        squadName="U13 Mixed Contact"
-        staff={[COACH_ROSA, MEDIC_SAM, COACH_DAN, MANAGER_PRIYA, person(5), person(6)]}
-      />,
-    )
-    expect(screen.getAllByTestId('squad-staff-person').map((t) => t.dataset.span)).toEqual([
-      'lead',
-      'half',
-      'half',
-      'half',
-      'half',
-      'half',
-    ])
+    const row = screen.getByTestId('squad-staff-person')
+    expect(row.tagName).toBe('LI')
+    expect(row.className).not.toMatch(/overflow-hidden/)
+    expect(row.querySelector('[class*="linear-gradient"]')).toBeNull()
+
+    const card = row.closest('ul')
+    expect(card.className.split(/\s+/)).toContain('rounded-card')
+    expect(card.className.split(/\s+/)).toContain('border-line')
+    expect(card.className.split(/\s+/)).toContain('bg-surface-card')
+    expect(card.className.split(/\s+/)).toContain('shadow-card')
+  })
+
+  it('does not paint the name in white over a photo', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />)
+
+    const name = screen.getByText('Rosa Ferreira')
+    expect(name.className.split(/\s+/)).toContain('text-ink')
+    expect(name.className.split(/\s+/)).not.toContain('text-white')
   })
 
   // ⚠️ THE MONOGRAM IS THE ORDINARY CASE, NOT AN ERROR STATE. Thirteen of the
@@ -633,7 +538,8 @@ describe('SquadStaffCard — collapsing a squad', () => {
     fireEvent.click(toggle)
     const opened = document.getElementById(id)
     expect(opened).not.toHaveAttribute('hidden')
-    expect(opened.className.split(/\s+/)).toContain('grid')
+    expect(opened.className.split(/\s+/)).not.toContain('hidden')
+    expect(opened.className.split(/\s+/)).toContain('rounded-card')
   })
 
   // ⚠️ A disclosure that opens onto one sentence wastes a tap to say "still

@@ -58,8 +58,30 @@ export function Skeleton({ className = '' }) {
  * failure is silent — the page simply starts jumping again. The first version
  * of this file was written against the 13 Aug dashboard and was already wrong
  * by the 15th: it had no greeting and no fortnight strip, and its hero was 152.
- * If you add a block to Dashboard.jsx, add it here.
+ * If you add a block to Dashboard.jsx, add it here. Squad contacts landed on
+ * Home on 13 Aug and only joined this skeleton on 25 Aug, when the glossy
+ * tiles retired and the rows became a card the placeholder could copy.
  */
+function StaffContactRows({ count = 2 }) {
+  return (
+    <div className="overflow-hidden rounded-card border border-line bg-surface-card">
+      {Array.from({ length: count }, (_, row) => (
+        <div
+          key={row}
+          className="flex items-center gap-3 border-b border-line px-3.5 py-3 last:border-b-0"
+        >
+          <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-[15px] w-[140px]" />
+            <Skeleton className="mt-1.5 h-[11px] w-[72px]" />
+          </div>
+          <Skeleton className="h-11 w-11 shrink-0 rounded-[11px]" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function DashboardSkeleton() {
   return (
     <div data-testid="dashboard-skeleton" aria-hidden="true">
@@ -93,6 +115,95 @@ export function DashboardSkeleton() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Squad contacts — the same row card the loaded block draws. */}
+      <Skeleton className="ml-0.5 mt-[18px] h-4 w-[128px]" />
+      <div className="mt-2.5">
+        <StaffContactRows />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * /notices first-load shape: the NoticeRow card (stripe, circular face,
+ * title, two body lines) three times. A generic pulse block here is what
+ * made the board lurch when the rows landed — they are the same Card as Home.
+ */
+export function NoticesSkeleton() {
+  return (
+    <div data-testid="notices-skeleton" aria-hidden="true">
+      {[0, 1, 2].map((row) => (
+        <div
+          key={row}
+          className="mb-2.5 overflow-hidden rounded-card border border-line bg-surface-card"
+        >
+          <div className="flex min-h-[132px]">
+            <span className="w-1.5 shrink-0 bg-surface-sunk" />
+            <div className="min-w-0 flex-1 px-3.5 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1">
+                  <Skeleton className="h-[14px] w-[128px]" />
+                  <Skeleton className="mt-2 h-[12px] w-[72px] rounded-[6px]" />
+                </div>
+              </div>
+              <Skeleton className="mt-3 h-[16px] w-[70%] max-w-[280px]" />
+              <Skeleton className="mt-2 h-[12px] w-[90%]" />
+              <Skeleton className="mt-1.5 h-[12px] w-[55%]" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Squad Hub first-load shape: calendar card, door cards, tracking card —
+ * the same grid the loaded screen uses, so the page does not grow when
+ * the events land.
+ */
+export function SquadHubSkeleton() {
+  return (
+    <div data-testid="squad-hub-skeleton" aria-hidden="true">
+      <div className="desktop:grid desktop:grid-cols-[1.15fr_.85fr] desktop:gap-x-4">
+        <div className="mb-4 overflow-hidden rounded-card border border-line bg-surface-card p-4 desktop:col-start-1 desktop:row-start-1">
+          <Skeleton className="h-4 w-[140px]" />
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="mt-3 flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <Skeleton className="h-[14px] w-[55%]" />
+                <Skeleton className="mt-1.5 h-[12px] w-[40%]" />
+              </div>
+              <Skeleton className="h-[12px] w-[72px]" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 desktop:col-start-2 desktop:row-start-1 desktop:content-start">
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="rounded-card border border-line bg-surface-card p-4">
+              <Skeleton className="h-[15px] w-[88px]" />
+              <Skeleton className="mt-2 h-[12px] w-[80%]" />
+              <Skeleton className="mt-3 h-[12px] w-[120px]" />
+            </div>
+          ))}
+        </div>
+        <div className="mb-4 rounded-card border border-line bg-surface-card p-4 desktop:col-span-2 desktop:row-start-2">
+          <Skeleton className="h-4 w-[160px]" />
+          <Skeleton className="mt-3 h-[12px] w-[90%] max-w-[420px]" />
+          <Skeleton className="mt-4 h-9 w-full rounded-pill" />
+          {[0, 1, 2, 3].map((row) => (
+            <div
+              key={row}
+              className="mt-2 flex items-center justify-between gap-2 border-b border-line/50 py-2.5 last:border-b-0"
+            >
+              <Skeleton className="h-[14px] w-[38%]" />
+              <Skeleton className="h-[14px] w-[72px]" />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

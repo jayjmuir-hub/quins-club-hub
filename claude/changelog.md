@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 🔌 **Cursor (cloud and local) uses graft, and Cloud Agent Builds build the
+- `86e5e72` — 🔌 **Cursor (cloud and local) uses graft, and Cloud Agent Builds build the
   structural index first.** `.cursor/rules/graft.mdc` is always-apply;
   `AGENTS.md` tells Cloud agents to install/build if `graft/` is missing and
   never skip graft for Club Hub navigation; `.cursor/environment.json` runs
@@ -18,7 +18,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   into `$HOME/.local`, `graft build` — never `--deep`, no LLM concept map,
   no API key). `graft/` stays gitignored. `scripts/netlify-ignore.mjs` skips
   `.cursor/` so this does not deploy. Its own branch cannot cite this
-  squash SHA, so the NEXT pull request cites it.
+  squash SHA, so this entry does.
+- 🃏 **Member-app cards speak one language, and loading placeholders match them.**
+  Home's Squad contacts retire the glossy poster tiles (photo/gradient fill,
+  white type over a scrim) for the same editorial Card as Chat: circular
+  face, ink on paper, 44px contact actions in a list. Notices and Squad Hub
+  drop the first-load spinner for skeletons in the shape of those cards —
+  NoticeRow, calendar/doors/tracking, and the contacts rows on Home's own
+  skeleton. Frontend only.
 - `da5c52c` — 🪪 **Admin’s waiting count leads to Accounts** — the sidebar badge is
   `countAdminWaiting` (pending memberships plus people waiting for access),
   but `/admin` was a chooser that never mentioned that number. The landing

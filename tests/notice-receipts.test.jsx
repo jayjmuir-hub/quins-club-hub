@@ -184,3 +184,27 @@ describe('Receipts — who has seen a notice', () => {
     expect(screen.getAllByTestId('receipt-seen')).toHaveLength(5)
   })
 })
+
+describe('Notices — first-load skeleton', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    listNotices.mockReturnValue(new Promise(() => {}))
+    listMyReads.mockReturnValue(new Promise(() => {}))
+  })
+
+  it('holds NoticeRow-shaped cards while the board is in flight', () => {
+    render(
+      <MemoryRouter>
+        <Notices />
+      </MemoryRouter>,
+    )
+
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('Loading notices…')
+    const skeleton = screen.getByTestId('notices-skeleton')
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true')
+    expect(skeleton.querySelectorAll('.rounded-card').length).toBe(3)
+    expect(document.querySelector('.animate-spin')).toBeNull()
+  })
+})

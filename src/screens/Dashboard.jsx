@@ -1120,10 +1120,8 @@ export default function Dashboard() {
           ) : (
             // ⚠️ ONLY THE FIRST SQUAD OPENS, AND THIS ONE PROP IS THE WHOLE
             // MECHANISM. Jay's ceiling, 15 Aug 2026: "we have parents who could
-            // have up to 5 age groups worth of players". Measured at 390×844, an
-            // open four-person squad is 488px and a collapsed one is 44px — so
-            // five squads is 2,440px of contacts hanging off the bottom of Home,
-            // or 664px this way.
+            // have up to 5 age groups worth of players". Five open squads is
+            // still too much of Home even as rows rather than poster tiles.
             //
             // ⚠️ `myTeams` IS ALREADY IN CLUB ORDER (visibleTeams sorts by
             // `sort_order`), so "the first" is the youngest squad the parent is

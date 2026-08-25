@@ -352,3 +352,23 @@ describe('the phone tracking list', () => {
     expect(sheetRow).toHaveTextContent('A') // ...marked absent
   })
 })
+
+describe('the first-load skeleton', () => {
+  it('holds the hub card shapes while events are in flight, and announces it', () => {
+    useMembershipsMock.mockReturnValue(
+      membershipsFor([{ role: 'coach', team_id: 't-u12', status: 'active' }]),
+    )
+    listEventsMock.mockReturnValue(new Promise(() => {}))
+    listPlayersMock.mockReturnValue(new Promise(() => {}))
+
+    renderAt('/squad/t-u12')
+
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent('Loading squad…')
+    const skeleton = screen.getByTestId('squad-hub-skeleton')
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true')
+    expect(skeleton.querySelector('.rounded-card')).toBeTruthy()
+    expect(document.querySelector('.animate-spin')).toBeNull()
+  })
+})
