@@ -109,6 +109,17 @@ if (typeof URL.createObjectURL !== 'function') {
   URL.revokeObjectURL = () => {}
 }
 
+// jsdom implements window.scrollTo no further than a "Not implemented"
+// console error. The chat screens land on the newest message by scrolling
+// the window to the document end, so every suite that renders one would
+// print that error per load. Stubbed globally for the same reason as
+// createObjectURL above: a jsdom gap, not a property of any one suite.
+// Tests that care replace it with their own spy (tests/app-shell.test.jsx,
+// tests/chat-open-view.test.jsx).
+if (typeof window !== 'undefined') {
+  window.scrollTo = () => {}
+}
+
 beforeEach(() => {
   try {
     window.localStorage.clear()

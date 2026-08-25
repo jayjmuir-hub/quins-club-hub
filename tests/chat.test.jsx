@@ -242,12 +242,16 @@ describe('Chat — staff panel and receipts', () => {
 })
 
 describe('Chat — reading', () => {
-  it('marks the posts on screen read on arrival, and drops the unread dot', async () => {
+  it('marks the posts on screen read on arrival, and the dot SURVIVES the visit', async () => {
+    // 25 Aug 2026, Jay: "new messages should be highlighted somehow when a
+    // chat is opened". The dot used to vanish the moment mark-read ran —
+    // wiped under the reader. It now describes the moment the chat was
+    // opened (tests/chat-open-view.test.jsx carries the divider half).
     renderAt('/chat/team-a')
     await screen.findByTestId('message-row')
 
     await waitFor(() => expect(markMessagesReadMock).toHaveBeenCalledWith('parent-1', ['msg-1']))
-    await waitFor(() => expect(screen.queryByText('New.')).toBeNull())
+    expect(screen.getByText('New.', { exact: false })).toBeInTheDocument()
   })
 
   it('does not re-mark a post already read', async () => {
