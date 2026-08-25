@@ -25,6 +25,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 24 Aug 2026
 
+- `0006574` — 📝 **Chat round 6 and the badge closed** (#392) — `dcd0196`
+  cited, plan marked shipped. Its own branch could not cite this squash SHA,
+  so this entry carries it now.
 - `dcd0196` — 📌 **Pinned chats and archive** (#391) — the two navigation ideas
   parked "for a later round", picked up by Jay's "keep going"
   (`claude/plans/2026-08-24-chat-pins-archive.md`). A ⋯ menu on every list
