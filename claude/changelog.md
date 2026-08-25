@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 💬 **The floating dock speaks the same bubble language as a DM, from one
+- 🪪 **Creating a child as a parent writes `player_parents`, and existing
+  parent-memberships with an empty list are backfilled.** Admin Needs
+  Attention was tagging the truth: most create paths never wrote that
+  table (`register_my_player`, `apply_signup_intent`, AccessBuilder
+  granting a new child). A trigger on `memberships` copies the adult's
+  profile (name, email, phone) when `role = 'parent'` and a `player_id`
+  is set; self-register stays `role = 'player'` and is left alone.
+  Coaches saving from PlayerForm with no parent, and the importer, still
+  write no row — the badge keeps telling the truth. The NEXT pull request
+  cites this entry's squash SHA.
+- `4e0f377` — 💬 **The floating dock speaks the same bubble language as a DM, from one
   shell, and Home squad contacts are role-ordered without wrapping on a
   phone.** Jay, 25 Aug: a 1:1 in the dock still printed the other person's
   name in brand-red on every incoming paper bubble; own bubbles were the
@@ -29,8 +39,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   flag still beats a plain coach (`src/lib/squadStaff.js`, used by
   `listMySquadStaff`, `listSquadStaff`, and `SquadStaffCard`). The
   editorial Card row keeps 44px actions but they no longer `flex-wrap`
-  onto a ragged second line at phone width. Frontend only. The NEXT pull
-  request cites this entry's squash SHA.
+  onto a ragged second line at phone width. Frontend only.
 - `7ea4c79` — 💬 **Channel threads use the same bubbles as a DM.** Staff / squad / club
   at `/chat/:teamId` still rendered the old `MessageRow` layout Jay
   screenshotted on U11 Mixed · staff: rectangular green/white bubbles, a

@@ -192,12 +192,13 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
       return
     }
 
-    // ⚠️ THE SAME RULE PlayerForm ENFORCES, FROM THE SAME FUNCTION. Two screens
-    // write player_parents and they are the only two things that do; a second
-    // copy of "both names" here would be a rule free to disagree with the
-    // other, and the one nobody tested would be the one that let a one-word
-    // name through. Checked before `saving` is set, for the reason above: the
-    // photo upload below is the first irreversible side effect.
+    // ⚠️ THE SAME RULE PlayerForm ENFORCES, FROM THE SAME FUNCTION. These two
+    // screens are the places a human types a parent row. A parent-role
+    // membership also writes one from the adult's profile, and never comes
+    // through here. A second copy of "both names" on the forms would be a
+    // rule free to disagree with the other. Checked before `saving` is set,
+    // for the reason above: the photo upload below is the first irreversible
+    // side effect.
     const parentProblem = parentNameProblem(parents)
     if (parentProblem) {
       setError(parentProblem)
