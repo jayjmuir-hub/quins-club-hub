@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — **Email confirmation removed; the mail is now a welcome** —
+- (unmerged) — **The welcome harness counts only welcome queue rows.** Its
+  first production run failed honestly: assertion 1 measured a pg_net delta
+  of FOUR because the fixture's pending membership and access_request fire
+  the other notify triggers too. Every count now filters on the
+  `/notify-welcome` URL. Applied live the same hour (the deployed harness is
+  the fixed one); this commit is the repo catching up with production.
+- `4419ffd` — **Email confirmation removed; the mail is now a welcome** —
   Jay's decision, in his words: "remove the need to confirm an email
   address … just sending an email confirming they created their account and
   welcoming them to ClubHub". New `notify-welcome` edge function and a
