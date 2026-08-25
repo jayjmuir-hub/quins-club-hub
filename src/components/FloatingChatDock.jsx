@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../lib/auth.jsx'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import useStayPinnedToBottom from '../lib/useStayPinnedToBottom.js'
 import { RowAvatar, previewLine, scopeChatRows } from '../screens/ChatList.jsx'
 
 // The floating chat dock — claude/plans/2026-08-24-floating-chat-dock.md.
@@ -112,7 +113,7 @@ export default function FloatingChatDock({ badge = false }) {
   const [size, setSize] = useState(loadDockSize)
   // Round 3: my private labels, and the shared device wallpaper.
   const [nicknames, setNicknames] = useState(() => new Map())
-  const bottomRef = useRef(null)
+  const listRef = useRef(null)
   const draftRef = useRef(null)
   const fileRef = useRef(null)
   // The drag's fixed point: pointer position and size at pointerdown. The
@@ -193,9 +194,10 @@ export default function FloatingChatDock({ badge = false }) {
     }
   }, [open, loadList, loadThread])
 
-  useEffect(() => {
-    if (thread?.length) bottomRef.current?.scrollIntoView?.({ block: 'nearest' })
-  }, [thread])
+  // Same pin-to-newest contract as the full chat screens — the one-shot
+  // scrollIntoView this replaced landed short once photos grew the list
+  // (the whole story lives in src/lib/useStayPinnedToBottom.js).
+  useStayPinnedToBottom(thread, listRef)
 
   const scoped = useMemo(() => scopeChatRows(rows, memberships, teams), [rows, memberships, teams])
 
@@ -347,7 +349,7 @@ export default function FloatingChatDock({ badge = false }) {
 
           {active && (
             <>
-              <div className="flex flex-1 flex-col gap-1 overflow-y-auto bg-surface px-3 py-2" style={backgroundStyle(getChatBackground()) ?? undefined}>
+              <div ref={listRef} data-testid="dock-thread" className="flex flex-1 flex-col gap-1 overflow-y-auto bg-surface px-3 py-2" style={backgroundStyle(getChatBackground()) ?? undefined}>
                 {thread === null && <div className="py-8"><Spinner /></div>}
                 {thread?.length === 0 && <p className="px-1 py-4 text-[13px] text-ink-muted">Nothing here yet.</p>}
                 {thread?.map((m, index) => {
@@ -401,7 +403,6 @@ export default function FloatingChatDock({ badge = false }) {
                     </Fragment>
                   )
                 })}
-                <div ref={bottomRef} />
               </div>
               <div className="border-t border-line bg-surface-card p-2.5">
                 {photoPreview && (
