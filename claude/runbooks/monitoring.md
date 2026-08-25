@@ -188,6 +188,15 @@ place**, not a tidiness urge.
 ⚠️ **The SDK is lazy-loaded and must stay that way** — 159 KB gzip against a
 260 KB bundle. See `src/lib/errorReporting.js`.
 
+⚠️ **`integrations: []` DOES NOT STOP SENTRY'S OWN `unhandledrejection`
+HANDLER.** JAVASCRIPT-REACT-3 (25 Aug 2026) arrived with mechanism
+`auto.browser.global_handlers.onunhandledrejection` and the Outlook Safe
+Links / CefSharp scanner payload `Object Not Found Matching Id:…`. That
+is not Club Hub. `src/lib/errorReporting.js` drops the pattern in
+`reportError` and in the global handler, and `Sentry.init` lists it plus
+`Non-Error promise rejection captured` in `ignoreErrors` so Sentry's
+auto handler cannot page Jay either. A real `Error` still reports.
+
 
 ## Bot sign-ups, and the threshold for turning on Turnstile
 

@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- 🪪 **Creating a child as a parent writes `player_parents`, and existing
+- 🩹 **Outlook Safe Links / CefSharp scanner rejections never reach Sentry.**
+  Production issue JAVASCRIPT-REACT-3 was `Object Not Found Matching
+  Id:…, MethodName:…, ParamCount:…` — no stack, 0 users, culprit the
+  origin, mechanism Sentry's own `onunhandledrejection` even with
+  `integrations: []`. `reportError` and the global handler skip that
+  pattern (digits and method word can vary); `Sentry.init` also
+  `ignoreErrors` it and `Non-Error promise rejection captured`. Real
+  unhandled Errors still report. Frontend only. The NEXT pull request
+  cites this entry's squash SHA.
+- `a5c5efd` — 🪪 **Creating a child as a parent writes `player_parents`, and existing
   parent-memberships with an empty list are backfilled.** Admin Needs
   Attention was tagging the truth: most create paths never wrote that
   table (`register_my_player`, `apply_signup_intent`, AccessBuilder
@@ -18,8 +27,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   profile (name, email, phone) when `role = 'parent'` and a `player_id`
   is set; self-register stays `role = 'player'` and is left alone.
   Coaches saving from PlayerForm with no parent, and the importer, still
-  write no row — the badge keeps telling the truth. The NEXT pull request
-  cites this entry's squash SHA.
+  write no row — the badge keeps telling the truth.
 - `4e0f377` — 💬 **The floating dock speaks the same bubble language as a DM, from one
   shell, and Home squad contacts are role-ordered without wrapping on a
   phone.** Jay, 25 Aug: a 1:1 in the dock still printed the other person's

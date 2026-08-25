@@ -108,6 +108,68 @@ describe('installGlobalErrorReporting — the failures a boundary cannot see', (
     expect(sent.mock.calls[0][0].message).toBe('just a string')
   })
 
+  // Outlook Safe Links / CefSharp scanners reject with this shape while they
+  // walk the page. Invented numbers — the production burst used Id:2 /
+  // update / 4, and the regex must still match when those vary.
+  const SCANNER_STRING = 'Object Not Found Matching Id:7, MethodName:update, ParamCount:3'
+  const SCANNER_OTHER = 'Object Not Found Matching Id:1, MethodName:invoke, ParamCount:0'
+
+  it('does not report an Outlook/CefSharp scanner rejection (string reason)', () => {
+    const sent = vi.fn()
+    setErrorReporterForTests(sent)
+    const target = fakeTarget()
+
+    installGlobalErrorReporting(target)
+    target.handlers.unhandledrejection({ reason: SCANNER_STRING })
+
+    expect(sent).not.toHaveBeenCalled()
+  })
+
+  it('does not report an Outlook/CefSharp scanner rejection (Error message)', () => {
+    const sent = vi.fn()
+    setErrorReporterForTests(sent)
+    const target = fakeTarget()
+
+    installGlobalErrorReporting(target)
+    target.handlers.unhandledrejection({ reason: new Error(SCANNER_OTHER) })
+
+    expect(sent).not.toHaveBeenCalled()
+  })
+
+  it('reportError itself drops scanner noise, not only the listener', () => {
+    const sent = vi.fn()
+    setErrorReporterForTests(sent)
+
+    reportError(new Error(SCANNER_STRING), { kind: 'unhandledrejection' })
+    reportError(SCANNER_OTHER)
+
+    expect(sent).not.toHaveBeenCalled()
+  })
+
+  it('still reports a real unhandled Error after the scanner filter', () => {
+    const sent = vi.fn()
+    setErrorReporterForTests(sent)
+    const target = fakeTarget()
+
+    installGlobalErrorReporting(target)
+    const err = new Error('availability fetch failed')
+    target.handlers.unhandledrejection({ reason: err })
+
+    expect(sent).toHaveBeenCalledWith(err, { kind: 'unhandledrejection' })
+  })
+
+  it('still reports a rejection that only shares a few words with the scanner', () => {
+    const sent = vi.fn()
+    setErrorReporterForTests(sent)
+    const target = fakeTarget()
+
+    installGlobalErrorReporting(target)
+    target.handlers.unhandledrejection({ reason: 'Object Not Found in squad list' })
+
+    expect(sent).toHaveBeenCalledTimes(1)
+    expect(sent.mock.calls[0][0].message).toBe('Object Not Found in squad list')
+  })
+
   it('reports a genuine window error', () => {
     const sent = vi.fn()
     setErrorReporterForTests(sent)
