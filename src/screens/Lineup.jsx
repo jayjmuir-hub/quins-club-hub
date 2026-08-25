@@ -14,6 +14,7 @@ import { canEditTeam } from '../lib/scope.js'
 import { TIER_OK, tierEligibility } from '../lib/tierEligibility.js'
 import { rosterFormat, slotLabel } from '../lib/rosterFormats.js'
 import { useDragReorder } from '../lib/useDragReorder.js'
+import PitchDiagram from '../components/PitchDiagram.jsx'
 import {
   eventDate,
   eventTimeLabel,
@@ -27,6 +28,10 @@ import { shareElementAsImage } from '../lib/shareImage.js'
 // 2026 (claude/plans/2026-08-25-roster-builder-three-views.md): Quick is the
 // 14 Aug tap flow unchanged, Slots adds shirt numbers and drag-to-reorder,
 // Pitch lays the same roster out on a field. One state, one save, one share.
+// Phase 2 (same day): the pitch is drawn by components/PitchDiagram.jsx for
+// two customers — this screen's interactive view (which also gained
+// drag-a-circle-onto-another) and the share facsimile's pitch-style sheet,
+// chosen by the Sheet style toggle and remembered per device.
 //
 // ⚠️ COACH-ONLY, AND THAT IS A PRODUCT DECISION RATHER THAN A STUB (Jay, 14 Aug
 // 2026). Parents get the lineup as a WhatsApp image; the app shows it to nobody
@@ -80,19 +85,13 @@ const VIEWS = [
 ]
 
 const VIEW_STORAGE_KEY = 'lineup-view'
+const SHEET_STYLE_STORAGE_KEY = 'lineup-sheet-style'
 
 /** availability rows -> { [playerId]: 'in'|'maybe'|'out' }. */
 function statusMap(rows) {
   const map = new Map()
   for (const row of rows ?? []) map.set(row.player_id, row.status)
   return map
-}
-
-/** "Mika Featherwell" -> "Mika F." — the pitch circles have no room for more. */
-function shortName(fullName) {
-  const parts = String(fullName ?? '').trim().split(/\s+/)
-  if (parts.length < 2) return parts[0] ?? ''
-  return `${parts[0]} ${parts[1][0]}.`
 }
 
 function StatusChip({ status }) {
@@ -208,6 +207,16 @@ export default function Lineup() {
   // A filled pitch circle that has been tapped, awaiting a second tap (swap)
   // or an action button (bench / remove).
   const [selectedSlot, setSelectedSlot] = useState(null)
+  // What the SHARED IMAGE looks like: the two-column list, or the pitch
+  // graphic above it. Remembered per device like the view; 'list' is the
+  // default because it needs no format to make sense.
+  const [sheetStyle, setSheetStyle] = useState(() => {
+    try {
+      return window.localStorage.getItem(SHEET_STYLE_STORAGE_KEY) === 'pitch' ? 'pitch' : 'list'
+    } catch {
+      return 'list'
+    }
+  })
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -351,6 +360,15 @@ export default function Lineup() {
     }
   }
 
+  function switchSheetStyle(next) {
+    setSheetStyle(next)
+    try {
+      window.localStorage.setItem(SHEET_STYLE_STORAGE_KEY, next)
+    } catch {
+      // Private browsing: the toggle still works, it just isn't remembered.
+    }
+  }
+
   function firstFreeSlot(current) {
     const horizon = Math.max(perSide ?? 0, current.length)
     for (let i = 0; i < horizon; i += 1) {
@@ -419,6 +437,45 @@ export default function Lineup() {
       return next
     })
     setSelectedSlot(null)
+  }
+
+  // Pitch circle TAPS — the phase-1 logic verbatim, now fed by PitchDiagram
+  // (a tap is a drag that never travelled; see the component's header).
+  function handlePitchCircle(index) {
+    const playerId = slotted[index] ?? null
+    if (!playerId) {
+      setSelectedSlot(null)
+      setPendingSlot((current) => (current === index ? null : index))
+      return
+    }
+    setPendingSlot(null)
+    if (selectedSlot == null) {
+      setSelectedSlot(index)
+    } else if (selectedSlot === index) {
+      setSelectedSlot(null)
+    } else {
+      swapSlots(selectedSlot, index)
+    }
+  }
+
+  // Pitch circle DRAGS: released onto a filled circle swaps, onto an empty
+  // one moves — the same two outcomes the tap path already has, so drag adds
+  // a gesture and no new state transition.
+  function movePitchCircle(from, to) {
+    setSaved(false)
+    setSelectedSlot(null)
+    setPendingSlot(null)
+    if (slotted[to]) {
+      swapSlots(from, to)
+      return
+    }
+    setSlotted((current) => {
+      const next = [...current]
+      while (next.length <= Math.max(from, to)) next.push(null)
+      next[to] = next[from]
+      next[from] = null
+      return next
+    })
   }
 
   const { handleProps, rowRef, dragIndex, overIndex, dragOffset } = useDragReorder(
@@ -945,101 +1002,20 @@ export default function Lineup() {
             </Card>
           ) : (
             <Card className="mb-3 overflow-hidden p-0">
-              {/* ⚠️ TAP-FIRST, AS THE PLAN PROMISED: tap a circle then a player,
-                  or tap two filled circles to swap them. Dragging a name onto a
-                  17px circle while the page wants to scroll is the one gesture
-                  the 14 Aug ruling was RIGHT about on phones; it can arrive
-                  later as polish without this view waiting for it. */}
-              <svg
-                viewBox="0 0 100 106"
-                role="group"
-                aria-label="Pitch — the starting team by position"
-                className="block w-full"
-              >
-                {/* The turf is PAINTED, not themed — a pitch is green in dark
-                    mode too, the same reasoning as the share facsimile's
-                    force-light. As an SVG fill rather than a Tailwind
-                    arbitrary value, where tests/theme.test.js rightly bans
-                    raw hex. */}
-                <rect x="0" y="0" width="100" height="106" fill="#2F7D3D" />
-                <rect x="3" y="3" width="94" height="100" fill="none" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="0.7" />
-                <line x1="3" y1="24" x2="97" y2="24" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="0.5" />
-                <line x1="3" y1="63" x2="97" y2="63" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="0.5" strokeDasharray="2 1.6" />
-                {format.pitch.map((point, index) => {
-                  const playerId = slotted[index] ?? null
-                  const player = playerId ? playersById.get(playerId) : null
-                  const isPending = pendingSlot === index
-                  const isSelected = selectedSlot === index
-                  return (
-                    <g
-                      key={index}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={
-                        player
-                          ? `Shirt ${index + 1}: ${player.full_name}`
-                          : `Shirt ${index + 1}: empty`
-                      }
-                      className="cursor-pointer"
-                      onClick={() => {
-                        if (!player) {
-                          setSelectedSlot(null)
-                          setPendingSlot(isPending ? null : index)
-                          return
-                        }
-                        setPendingSlot(null)
-                        if (selectedSlot == null) {
-                          setSelectedSlot(index)
-                        } else if (selectedSlot === index) {
-                          setSelectedSlot(null)
-                        } else {
-                          swapSlots(selectedSlot, index)
-                        }
-                      }}
-                      onKeyDown={(domEvent) => {
-                        if (domEvent.key === 'Enter' || domEvent.key === ' ') {
-                          domEvent.preventDefault()
-                          domEvent.currentTarget.dispatchEvent(
-                            new MouseEvent('click', { bubbles: true }),
-                          )
-                        }
-                      }}
-                    >
-                      <circle
-                        cx={point.x}
-                        cy={point.y}
-                        r="5.2"
-                        fill={player ? '#ffffff' : 'transparent'}
-                        stroke={isSelected || isPending ? '#FAC775' : '#ffffff'}
-                        strokeWidth={isSelected || isPending ? 1.4 : 0.8}
-                        strokeDasharray={player ? undefined : '1.6 1.4'}
-                      />
-                      <text
-                        x={point.x}
-                        y={point.y + 1.1}
-                        textAnchor="middle"
-                        fontSize="3.6"
-                        fontWeight="700"
-                        fill={player ? '#8E1526' : '#ffffff'}
-                      >
-                        {index + 1}
-                      </text>
-                      {player && (
-                        <text
-                          x={point.x}
-                          y={point.y + 8.6}
-                          textAnchor="middle"
-                          fontSize="2.9"
-                          fontWeight="600"
-                          fill="#ffffff"
-                        >
-                          {shortName(player.full_name)}
-                        </text>
-                      )}
-                    </g>
-                  )
-                })}
-              </svg>
+              {/* ⚠️ TAP-FIRST STILL HOLDS — the phase-2 drag is ADDITIVE: a
+                  tap is a drag that never travelled past the wobble threshold
+                  (PitchDiagram.jsx), so every phase-1 gesture works untouched
+                  and drag-a-circle-onto-another is the new one on top. */}
+              <PitchDiagram
+                interactive
+                format={format}
+                slotted={slotted}
+                playersById={playersById}
+                selectedSlot={selectedSlot}
+                pendingSlot={pendingSlot}
+                onCircle={handlePitchCircle}
+                onMove={movePitchCircle}
+              />
               <div className="px-[14px] py-2.5">
                 {selectedSlot != null && slotted[selectedSlot] ? (
                   <div className="flex flex-wrap items-center gap-2">
@@ -1103,6 +1079,37 @@ export default function Lineup() {
         />
       </label>
 
+      {/* Sheet style — what the PICTURE looks like, not what the screen does.
+          Offered only with a format: a pitch sheet without pitch coordinates
+          is nothing to draw. The full-name lists are in BOTH styles — the
+          14 Aug full-names ruling is about what parents receive, and a
+          graphic with initials must never be the only naming on the sheet. */}
+      {format != null && (
+        <div className="mb-2 flex flex-wrap items-center gap-2" role="group" aria-label="Sheet style">
+          <span className="text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+            Sheet style
+          </span>
+          {[
+            { key: 'list', label: 'List' },
+            { key: 'pitch', label: 'Pitch' },
+          ].map((candidate) => (
+            <button
+              key={candidate.key}
+              type="button"
+              aria-pressed={sheetStyle === candidate.key}
+              onClick={() => switchSheetStyle(candidate.key)}
+              className={`rounded-[9px] px-3 py-1 text-[12.5px] font-bold ${
+                sheetStyle === candidate.key
+                  ? 'bg-brand text-white'
+                  : 'border-[1.5px] border-line text-ink hover:bg-surface-mute'
+              }`}
+            >
+              {candidate.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <Button onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save'}
@@ -1154,6 +1161,17 @@ export default function Lineup() {
               </p>
             </div>
           </div>
+
+          {/* The pitch-style sheet: the SAME drawing the Pitch view edits,
+              with every handler absent, above the lists. ⚠️ NEVER INSTEAD OF
+              THEM — the graphic carries first-name-plus-initial for space,
+              and the 14 Aug ruling is FULL NAMES on what parents receive, so
+              the lists below are the sheet and the pitch is its picture. */}
+          {sheetStyle === 'pitch' && format != null && (
+            <div className="mx-auto mt-5 w-[400px]">
+              <PitchDiagram format={format} slotted={slotted} playersById={playersById} />
+            </div>
+          )}
 
           <div className="mt-5 grid grid-cols-2 gap-8">
             <div>

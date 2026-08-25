@@ -218,3 +218,21 @@ export function slotLabel(format, slotIndex) {
   const position = format?.positions?.[slotIndex] ?? null
   return { shirt, position }
 }
+
+/**
+ * The slot whose pitch coordinate is closest to (x, y), or null when nothing
+ * is within `maxDistance`. Pure — this is the whole of the drag-onto-pitch
+ * drop decision, tested in tests/drag-reorder.test.js; PitchDiagram is wiring.
+ */
+export function nearestSlot(pitch, x, y, maxDistance) {
+  let best = null
+  let bestDistance = maxDistance
+  for (let index = 0; index < (pitch?.length ?? 0); index += 1) {
+    const distance = Math.hypot(pitch[index].x - x, pitch[index].y - y)
+    if (distance <= bestDistance) {
+      best = index
+      bestDistance = distance
+    }
+  }
+  return best
+}

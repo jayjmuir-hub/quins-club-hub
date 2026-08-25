@@ -202,6 +202,45 @@ describe('the pitch view', () => {
   })
 })
 
+describe('the sheet style (phase 2)', () => {
+  it('offers the toggle only when a format is chosen', async () => {
+    const user = renderScreen()
+    await loaded()
+    expect(screen.queryByRole('group', { name: 'Sheet style' })).toBeNull()
+    await chooseSevens(user)
+    expect(screen.getByRole('group', { name: 'Sheet style' })).toBeInTheDocument()
+  })
+
+  it('puts the pitch drawing in the share facsimile — above the lists, never instead', async () => {
+    const user = renderScreen()
+    await loaded()
+    await chooseSevens(user)
+    await user.click(screen.getByRole('tab', { name: 'Slots' }))
+    await user.click(screen.getByRole('button', { name: /tap to fill · fly-half/i }))
+    await user.click(screen.getByRole('button', { name: 'Give shirt 5 to Juno Kellaway' }))
+
+    const facsimile = () => document.querySelector('.force-light')
+    expect(facsimile().querySelector('svg')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Pitch', pressed: false }))
+    expect(facsimile().querySelector('svg')).not.toBeNull()
+    // ⚠️ THE 14 AUG FULL-NAMES RULING: the pitch graphic abbreviates for
+    // space, so the facsimile must STILL carry the full name in its list.
+    expect(facsimile().textContent).toContain('Juno Kellaway')
+    expect(window.localStorage.getItem('lineup-sheet-style')).toBe('pitch')
+  })
+
+  it('remembers pitch style across a reload', async () => {
+    window.localStorage.setItem('lineup-sheet-style', 'pitch')
+    const user = renderScreen()
+    await loaded()
+    await chooseSevens(user)
+    expect(
+      screen.getByRole('group', { name: 'Sheet style' }).querySelector('[aria-pressed="true"]'),
+    ).toHaveTextContent('Pitch')
+  })
+})
+
 describe('the slot-shaped save', () => {
   it('writes sort_order as the SLOT and the position from the preset, holes kept', async () => {
     const user = renderScreen()

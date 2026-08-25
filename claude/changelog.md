@@ -10,26 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 🖼️ **Doodle wallpaper JPEG lands** — decoded from
-  `cursor/chat-wallpapers` `doodle.jpg.b64` (20412 chars) into
-  `public/chat-backgrounds/doodle.jpg`, magic `ffd8`, 15309 bytes. All
-  five papers are now on the branch. Cites `44014d5`.
-- `44014d5` — 🖼️ **Harlequin wallpaper JPEG lands** — decoded from
-  `cursor/chat-wallpapers` `harlequin.jpg.b64` (23412 chars) into
-  `public/chat-backgrounds/harlequin.jpg`, magic `ffd8`, 17559 bytes.
-  Doodle `.b64` still 404; bytes not invented. Cites `fe00815`.
-- `fe00815` — 🖼️ **Dusk wallpaper JPEG lands** — decoded from
-  `cursor/chat-wallpapers` `dusk.jpg.b64` (33456 chars) into
-  `public/chat-backgrounds/dusk.jpg`, magic `ffd8`. Harlequin and doodle
-  `.b64` URLs still 404; bytes not invented. Cites `6aca995`.
-- `6aca995` — 🖼️ **Chat wallpapers are five photo papers; crest letterhead
+- (unmerged) — 🏉 **Phase 2 of the roster builder: the pitch is a SHEET
+  STYLE, and circles drag.** The Pitch view's drawing moved into
+  `src/components/PitchDiagram.jsx` and serves two customers: the
+  interactive view (which gained drag-a-circle-onto-another — onto a
+  filled circle swaps, onto an empty one moves; a tap is a drag that never
+  travelled) and the share facsimile, where a Sheet style toggle
+  (List/Pitch, remembered per device) puts the field graphic ABOVE the
+  full-name lists — never instead of them, per the 14 Aug full-names
+  ruling. Drop decision is `nearestSlot()` in `rosterFormats.js`, with a
+  test proving no preset has two circles within one drop-reach. Proven in
+  a real browser by the extended `harness/shoot-lineup.mjs`.
+- `e4435a2` — 🖼️ **Chat wallpapers are five photo papers; crest letterhead
   is the default on every chat.** Jay, 25 Aug 2026: land exactly five —
   harlequin, dusk, crest, doodle, kit — painted as covered JPEGs washed
-  toward `--surface-rgb`. Empty storage, unknown keys, and the old gallery
-  (`plain`, `green`, `warm`, `hoops`, maroon, sky, rose, slate, club, dawn,
-  pitch, pitchlines, balls, shield) fall back to `crest`. There is no
-  `plain`. Device-level, still `chat-background`. Plan:
-  `claude/plans/2026-08-25-chat-wallpaper-papers.md`. Cites `861c731`.
+  toward `--surface-rgb`, each decoded from its `.b64` on
+  `cursor/chat-wallpapers` and verified by magic bytes (`ffd8`). Empty
+  storage, unknown keys, and the old gallery (`plain`, `green`, `warm`,
+  `hoops`, maroon, sky, rose, slate, club, dawn, pitch, pitchlines, balls,
+  shield) fall back to `crest`. There is no `plain`. Device-level, still
+  `chat-background`. Plan: `claude/plans/2026-08-25-chat-wallpaper-papers.md`.
+  ⚠️ **Was FOUR entries chain-citing three SHAs that exist in no clone**
+  (`44014d5`, `fe00815`, `6aca995` — a Cursor session citing its own
+  branch commits, which died when the work landed as this one push), and
+  `main`'s docs-check went red at `e4435a2` because of it. Consolidated
+  here to the SHA that actually exists — the cite-the-squash rule in
+  `CLAUDE.md` is about exactly this.
 - `861c731` — 🧹 **The nulled `players.position` / `players.unit` columns are
   DROPPED, and the schema captures caught up on the pieces this change
   touched.** `20260825_drop_players_position_unit.sql`, applied to production
