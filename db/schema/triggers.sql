@@ -343,17 +343,15 @@ CREATE TRIGGER player_private_staff_dm_opt_in BEFORE UPDATE ON public.player_pri
 -- public.memberships → memberships_write_parent_row    ADDED 2026-08-25
 -- Migration: db/migrations/20260825_player_parents_from_parent_membership.sql
 --
--- ⛔ NOT LIVE — MEASURED 25 Aug 2026, THE SAME DAY THIS BLOCK WAS ADDED.
--- Neither this trigger nor private.memberships_write_parent_row() exists in
--- production, and supabase_migrations.schema_migrations has no matching row:
--- the migration was COMMITTED (squash a5c5efd) with this capture written as
--- if applied, but it was never run. This file is AHEAD of production here —
--- the opposite direction from every other drift found in the 25 Aug
--- reconciliation — so parent memberships created since a5c5efd merged are
--- NOT writing player_parents, which is the exact gap the migration exists to
--- close. Flagged to Jay the same day; the block below is kept as the record
--- of what the migration WILL create, and this warning comes out when a
--- measurement shows the trigger live.
+-- ✅ LIVE SINCE 25 Aug 2026, LATER THE SAME DAY IT WAS FOUND MISSING. The
+-- 25 Aug re-capture measured this block as NOT LIVE — the migration was
+-- committed (squash a5c5efd) with the capture written as if applied, but
+-- never run. Applied with Jay's yes that evening: trigger and helper
+-- measured present, the backfill wrote 21 rows (player_parents 62 -> 83,
+-- zero children left with a parent membership and an empty list), and the
+-- trigger was fault-injected in a rolled-back transaction — a fixture
+-- parent membership produced exactly one profile-linked primary row, and
+-- the rollback was confirmed with a positive control.
 --
 -- When a parent-role membership lands with a player_id, copy the adult's
 -- profile (name, email, phone, profile_id) onto public.player_parents if

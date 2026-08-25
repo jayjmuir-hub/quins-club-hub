@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 💬 **The keyboard stops marooning the composer, and every
+- (unmerged) — ✅ **`a5c5efd`'s player_parents migration is APPLIED and
+  PROVEN** — the unapplied migration the re-capture found, run with Jay's
+  yes. Trigger + helper measured live; backfill wrote 21 rows
+  (player_parents 62 → 83, zero children left with a parent membership and
+  an empty list); trigger fault-injected in a rolled-back transaction (one
+  profile-linked primary row from a fixture membership, rollback confirmed
+  with a positive control — the db:check harness needs SUPABASE_DB_URL,
+  which this machine does not hold, so the injection was done through the
+  same rolled-back mechanism it uses). triggers.sql's ⛔ NOT LIVE marker is
+  replaced by the applied record. The NEXT pull request cites this entry's
+  squash SHA.
+
+- `82dfeb9` — 💬 **The keyboard stops marooning the composer, and every
   chat name is a door.** Jay's screenshots: a DM with a handful of messages
   left the shell's min-h-screen surplus BELOW the composer, so the phone
   keyboard's pin-to-bottom scrolled it to mid-screen over a void.
