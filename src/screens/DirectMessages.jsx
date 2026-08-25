@@ -229,7 +229,20 @@ function Thread({ conversationId }) {
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
+    // Same growth-pinning as Chat.jsx: photos and reactions land after the
+    // messages do, and every arrival re-pins while the reader is near the
+    // bottom.
+    let observer
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        if (nearBottomRef.current) window.scrollTo(0, document.documentElement.scrollHeight)
+      })
+      observer.observe(document.body)
+    }
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      observer?.disconnect()
+    }
   }, [])
   useEffect(() => {
     // The TRUE document end — scrollIntoView({block:'end'}) parked the

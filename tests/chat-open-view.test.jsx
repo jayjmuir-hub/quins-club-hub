@@ -254,6 +254,73 @@ describe('opening a chat lands at the true document end', () => {
   })
 })
 
+describe('the page keeps growing after the messages render — and the reader stays pinned', () => {
+  // Jay's phone, 25 Aug 2026: "still when i open a chat i have to scroll
+  // down", with the composer floating mid-content in the screenshot. The
+  // one-shot scroll fires when the DATA arrives, but photos render as
+  // nothing until their signed URL lands and then grow the page below the
+  // viewport. A ResizeObserver on the body re-pins on every growth while
+  // the reader is near the bottom — and leaves them alone once they have
+  // scrolled up into history.
+  let observers
+
+  class FakeResizeObserver {
+    constructor(cb) {
+      this.cb = cb
+      observers.push(this)
+    }
+    observe(el) {
+      this.el = el
+    }
+    disconnect() {
+      this.disconnected = true
+    }
+  }
+
+  beforeEach(() => {
+    observers = []
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+  })
+
+  it('squad chat re-pins to the end when the body grows', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    renderChat()
+    await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+    const watching = observers.filter((o) => o.el === document.body)
+    expect(watching.length).toBeGreaterThan(0)
+    scrollTo.mockClear()
+    watching.forEach((o) => o.cb())
+    expect(scrollTo).toHaveBeenCalledWith(0, document.documentElement.scrollHeight)
+    scrollTo.mockRestore()
+  })
+
+  it('the DM thread re-pins to the end when the body grows', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    renderThread()
+    await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+    const watching = observers.filter((o) => o.el === document.body)
+    expect(watching.length).toBeGreaterThan(0)
+    scrollTo.mockClear()
+    watching.forEach((o) => o.cb())
+    expect(scrollTo).toHaveBeenCalledWith(0, document.documentElement.scrollHeight)
+    scrollTo.mockRestore()
+  })
+
+  it('does NOT yank a reader who has scrolled up into history', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    renderChat()
+    await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+    // Far from the bottom: a tall document, scrolled to the top.
+    Object.defineProperty(document.documentElement, 'scrollHeight', { value: 5000, configurable: true })
+    window.dispatchEvent(new Event('scroll'))
+    scrollTo.mockClear()
+    observers.filter((o) => o.el === document.body).forEach((o) => o.cb())
+    expect(scrollTo).not.toHaveBeenCalled()
+    delete document.documentElement.scrollHeight
+    scrollTo.mockRestore()
+  })
+})
+
 describe('what arrived since the last visit is highlighted', () => {
   it('a New divider marks where unread starts, and survives mark-read', async () => {
     m.listMessages.mockResolvedValue([

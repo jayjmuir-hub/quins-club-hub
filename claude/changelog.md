@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — 📱 **Opening a chat lands you on the newest message, above the
+- (unmerged) — 📌 **The reader stays pinned to the newest message as the page
+  grows** — Jay's phone, same morning: "still when i open a chat i have to
+  scroll down", composer floating mid-content in the screenshot. The #394
+  scroll fired once, when the DATA arrived — but chat photos render as
+  NOTHING until their signed URL lands (src/components/ChatPhoto.jsx) and
+  then grow the page below the viewport, so photo-heavy threads opened
+  short by exactly that growth. A ResizeObserver on the body re-pins to
+  the end on every growth while the reader is near the bottom, and leaves
+  them alone once they have scrolled up into history. This also sits the
+  composer back down against the tab bar — its floating-high look was the
+  sticky bar shown mid-scroll, not its resting place. The NEXT pull
+  request cites this entry's squash SHA.
+- `422b594` — 📱 **Opening a chat lands you on the newest message, above the
   chrome, with "New" marked** — Jay: "chat is not working correctly with the
   bottom and top menu bars", "the latest message is ... sometimes below the
   input bar", "new messages should be highlighted somehow when a chat is
@@ -23,8 +35,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   with unread dots captured at the moment of opening so the
   mark-read-on-arrival effect no longer wipes them under the reader.
   `tests/chat-open-view.test.jsx`; jsdom's missing `window.scrollTo`
-  stubbed in `src/test/setup.js`. The NEXT pull request cites this entry's
-  squash SHA.
+  stubbed in `src/test/setup.js`. (#394) Its own branch could not cite this
+  squash SHA, so this entry does.
 - `9f31939` — 📌 **The app icon is the club pin** (#393) — Jay walked the icon through a night
   of looks (green tiles, bigger crest, synthetic gold/silver/gunmetal pin
   rims) and landed on the real thing: an enamel-lapel-pin rendition of the
