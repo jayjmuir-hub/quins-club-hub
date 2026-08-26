@@ -302,6 +302,10 @@
 --   profiles.phone              authenticated   UPDATE
 --   profiles.no_player_confirmed_at  authenticated  SELECT, UPDATE  ← 16 Aug 2026
 --   profiles.no_role_confirmed_at    authenticated  SELECT, UPDATE  ← 16 Aug 2026
+--   profiles.last_seen_at            authenticated  SELECT only     ← 26 Aug 2026
+--     (20260826_last_seen.sql — readable so the admin Accounts screen can show
+--     "Last active"; NEVER granted UPDATE: public.touch_last_seen() is the
+--     only write path, SECURITY DEFINER, own-row, 12h-throttled.)
 --
 --   memberships.profile_id      authenticated   UPDATE
 --   memberships.club_id         authenticated   UPDATE

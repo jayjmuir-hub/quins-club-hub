@@ -271,6 +271,10 @@ CREATE TABLE public.profiles (
   signup_intent             jsonb,
   signup_intent_applied_at  timestamptz,
   welcomed_at               timestamptz,
+  -- 26 Aug 2026 (20260826_last_seen.sql): day-level "is this account alive?"
+  -- for admins. Written ONLY by public.touch_last_seen() (own row, 12h
+  -- floor); backfilled once from auth.users.last_sign_in_at.
+  last_seen_at              timestamptz,
   CONSTRAINT profiles_pkey   PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE,
   CONSTRAINT profiles_photo_focus_range CHECK ((((photo_focus_x IS NULL) OR ((photo_focus_x >= 0) AND (photo_focus_x <= 100))) AND ((photo_focus_y IS NULL) OR ((photo_focus_y >= 0) AND (photo_focus_y <= 100)))))

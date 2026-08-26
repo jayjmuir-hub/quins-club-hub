@@ -6285,3 +6285,30 @@ begin
   end if;
 end;
 $function$
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  public.touch_last_seen  (26 Aug 2026, 20260826_last_seen.sql)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- The ONLY write path to profiles.last_seen_at — the admin "Last active"
+-- fact. No arguments on purpose (cannot stamp anyone else's row); the
+-- 12-hour floor keeps it to roughly one write per person per day whatever
+-- the client does. Day granularity is the privacy line: the deliberate,
+-- admin-facing exception to chat's no-stored-presence ruling.
+CREATE OR REPLACE FUNCTION public.touch_last_seen()
+ RETURNS void
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  update profiles
+     set last_seen_at = now()
+   where id = auth.uid()
+     and (last_seen_at is null or last_seen_at < now() - interval '12 hours');
+$function$
+;
+
+REVOKE ALL ON FUNCTION public.touch_last_seen() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.touch_last_seen() FROM anon;
+GRANT EXECUTE ON FUNCTION public.touch_last_seen() TO authenticated;
