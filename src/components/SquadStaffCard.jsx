@@ -61,7 +61,7 @@ const MONOGRAM_TONE = {
   medic: 'bg-monogram-medic',
 }
 
-function PhoneIcon(props) {
+export function PhoneIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" />
@@ -69,7 +69,7 @@ function PhoneIcon(props) {
   )
 }
 
-function WhatsAppIcon(props) {
+export function WhatsAppIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M3.2 20.8l1.3-4a8.2 8.2 0 1 1 3.1 3l-4.4 1Z" />
@@ -86,7 +86,7 @@ function ChevronIcon(props) {
   )
 }
 
-function MailIcon(props) {
+export function MailIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
@@ -95,7 +95,7 @@ function MailIcon(props) {
   )
 }
 
-function ChatIcon(props) {
+export function ChatIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" />
@@ -120,7 +120,7 @@ function ChatIcon(props) {
  * control with no accessible name is a button that announces itself as "link",
  * which is the most common way a pretty toolbar becomes unusable.
  */
-function ContactButton({ href, label, tone = 'ghost', onClick, children }) {
+export function ContactButton({ href, label, tone = 'ghost', onClick, children }) {
   const base =
     'grid h-11 w-11 shrink-0 place-items-center rounded-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand'
   const tones = {
@@ -162,7 +162,7 @@ function ContactButton({ href, label, tone = 'ghost', onClick, children }) {
  * where the picker's PREVIEW gets its value — the only reason the preview can
  * be trusted to predict this face.
  */
-function StaffAvatar({ name, role, url, focus, size = 'md' }) {
+export function StaffAvatar({ name, role, url, focus, size = 'md' }) {
   const [failed, setFailed] = useState(false)
   const box = size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-11 w-11 text-[12px]'
   const tone = MONOGRAM_TONE[role] ?? MONOGRAM_TONE.manager
