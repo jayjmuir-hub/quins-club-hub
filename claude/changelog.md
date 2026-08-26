@@ -10,6 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
+- (unmerged) — 💬 **Shared-chat-thread phase 2: the dock's DMs and groups ARE
+  the main chat** — `FloatingChatDock` now mounts `useDmThread` + `DmThread`
+  for `dm`/`group` rows (its hand-rolled bubble list for those kinds is
+  deleted), so the dock's chevron carries the FULL menu: quote reply,
+  forward, star, pin, delete on own, report on others', reply privately —
+  which now STAYS IN THE DOCK, switching its panel. "More in full view"
+  leaves the DM menu (it is complete); the header's expand icon remains.
+  Channels stay thin until phase 4. Discriminating tests proven by running
+  them against the phase-1 dock: 9 fail there, all pass here.
 - (unmerged) — 🧩 **Shared-chat-thread phase 1: the DM thread moves out of
   its screen** — spec `claude/plans/2026-08-26-shared-chat-thread.md` (Jay
   approved same day: the dock should "function exactly as the main chat").

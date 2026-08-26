@@ -46,7 +46,8 @@ import useStayPinnedToBottom from './useStayPinnedToBottom.js'
 // Omitted, it defaults to navigation. `consumeReplyState` gates the
 // arrived-with-a-quote effect (location.state.replyPrivatelyTo) — true on
 // the screen, off in the dock, which must not rewrite history it never made.
-export default function useDmThread(conversationId, { openDm, consumeReplyState = true } = {}) {
+// `scrollRef` points pin-to-bottom at the dock's panel instead of the page.
+export default function useDmThread(conversationId, { openDm, consumeReplyState = true, scrollRef } = {}) {
   const { user } = useAuth()
   const { memberships } = useMemberships()
   const selfId = user?.id ?? null
@@ -201,7 +202,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
 
   // Stay pinned to the newest message unless the reader scrolled up into
   // history — the whole story lives in src/lib/useStayPinnedToBottom.js.
-  useStayPinnedToBottom(messages)
+  useStayPinnedToBottom(messages, scrollRef)
 
   const isGroup = conversation?.kind === 'group'
   const myMemberRow = isGroup ? members?.find((p) => p.profile_id === selfId) : null

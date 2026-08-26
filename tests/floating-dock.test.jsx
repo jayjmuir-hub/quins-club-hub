@@ -8,6 +8,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 // list is scoped by the same effective-membership filter as the Chats screen
 // — a dock that showed an admin every squad under View-as would reintroduce
 // the exact bug fixed the same day.
+//
+// Since 26 Aug 2026 (shared-chat-thread phase 2) a DM or group in the dock
+// IS the full thread — src/lib/useDmThread.js + src/components/DmThread.jsx,
+// the same pair DirectMessages.jsx renders — so those tests assert the FULL
+// chevron menu. Channels stay on the thin dock stream until phase 4.
 
 const useAuthMock = vi.fn()
 const useMembershipsMock = vi.fn()
@@ -26,11 +31,28 @@ const m = {
   subscribeReactions: vi.fn(),
   listDmCandidates: vi.fn(),
   openConversation: vi.fn(),
+  getConversation: vi.fn(),
+  listMyConversations: vi.fn(),
+  listMyBlocks: vi.fn(),
+  listMyMessageReads: vi.fn(),
+  listMyStars: vi.fn(),
+  listMessageReceipts: vi.fn(),
+  listGroupMembers: vi.fn(),
+  removeMessage: vi.fn(),
+  reportMessage: vi.fn(),
+  setPinned: vi.fn(),
+  toggleStar: vi.fn(),
+  forwardMessagesTo: vi.fn(),
+  logWelfareAccess: vi.fn(),
 }
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 // Presence is a live websocket; tests get a quiet empty room.
 vi.mock('../src/lib/presence.js', () => ({ usePresence: () => new Set() }))
+vi.mock('../src/data/nicknames.js', () => ({
+  listMyNicknames: vi.fn().mockResolvedValue(new Map()),
+  setNickname: vi.fn(),
+}))
 vi.mock('../src/data/messages.js', async (orig) => ({
   ...(await orig()),
   listChats: (...a) => m.listChats(...a),
@@ -47,6 +69,19 @@ vi.mock('../src/data/messages.js', async (orig) => ({
   subscribeReactions: (...a) => m.subscribeReactions(...a),
   listDmCandidates: (...a) => m.listDmCandidates(...a),
   openConversation: (...a) => m.openConversation(...a),
+  getConversation: (...a) => m.getConversation(...a),
+  listMyConversations: (...a) => m.listMyConversations(...a),
+  listMyBlocks: (...a) => m.listMyBlocks(...a),
+  listMyMessageReads: (...a) => m.listMyMessageReads(...a),
+  listMyStars: (...a) => m.listMyStars(...a),
+  listMessageReceipts: (...a) => m.listMessageReceipts(...a),
+  listGroupMembers: (...a) => m.listGroupMembers(...a),
+  removeMessage: (...a) => m.removeMessage(...a),
+  reportMessage: (...a) => m.reportMessage(...a),
+  setPinned: (...a) => m.setPinned(...a),
+  toggleStar: (...a) => m.toggleStar(...a),
+  forwardMessagesTo: (...a) => m.forwardMessagesTo(...a),
+  logWelfareAccess: (...a) => m.logWelfareAccess(...a),
 }))
 
 import FloatingChatDock from '../src/components/FloatingChatDock.jsx'
@@ -100,6 +135,29 @@ beforeEach(() => {
   m.subscribeMessages.mockReturnValue(() => {})
   m.listReactions.mockResolvedValue(new Map())
   m.subscribeReactions.mockReturnValue(() => {})
+  // What useDmThread loads on top of the old dock's fetches.
+  m.getConversation.mockImplementation(async (id) =>
+    id === 'g1' ? { id: 'g1', kind: 'group', title: 'Zz Car Pool' } : { id: 'c1', kind: 'dm', profile_a: ME, profile_b: 'other-1' },
+  )
+  m.listMyConversations.mockResolvedValue([
+    { conversation_id: 'c1', other_id: 'other-1', other_name: 'Zz Manager Probe', other_role: 'manager' },
+  ])
+  m.listMyBlocks.mockResolvedValue(new Set())
+  m.listMyMessageReads.mockResolvedValue(new Set())
+  m.listMyStars.mockResolvedValue(new Set())
+  m.listMessageReceipts.mockResolvedValue(new Map())
+  m.listGroupMembers.mockResolvedValue([
+    { profile_id: ME, full_name: 'Me Probe', is_owner: false },
+    { profile_id: 'other-2', full_name: 'Zz Parent Probe', is_owner: true },
+    { profile_id: 'other-3', full_name: 'Zz Third Probe', is_owner: false },
+  ])
+  m.removeMessage.mockResolvedValue()
+  m.reportMessage.mockResolvedValue()
+  m.setPinned.mockResolvedValue()
+  m.toggleStar.mockResolvedValue()
+  m.forwardMessagesTo.mockResolvedValue()
+  m.logWelfareAccess.mockResolvedValue()
+  m.openConversation.mockResolvedValue('c1')
 })
 
 describe('the floating chat dock', () => {
@@ -126,12 +184,13 @@ describe('the floating chat dock', () => {
     expect(labels).not.toContain('ZZ Probe U18')
   })
 
-  it('a DM row opens the thread in the panel and Send sends', async () => {
+  it('a DM row opens the REAL thread in the panel and Send sends', async () => {
     const user = userEvent.setup()
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[1])
-    const bubbles = await screen.findAllByTestId('dock-bubble')
+    // dm-bubble, not a dock-only bubble: this IS DmThread (phase 2).
+    const bubbles = await screen.findAllByTestId('dm-bubble')
     expect(bubbles[0]).toHaveTextContent('Zz two seats held')
     // First name only in the greeting (Jay, 25 Aug 2026) — the full name is
     // already the header's job. Squads keep their whole label.
@@ -146,7 +205,7 @@ describe('the floating chat dock', () => {
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[1])
-    const bubbles = await screen.findAllByTestId('dock-bubble')
+    const bubbles = await screen.findAllByTestId('dm-bubble')
     expect(bubbles).toHaveLength(2)
     // Incoming: the header already says Zz Manager Probe — the bubble must not.
     expect(within(bubbles[0]).queryByText('Zz Manager Probe')).not.toBeInTheDocument()
@@ -167,7 +226,7 @@ describe('the floating chat dock', () => {
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[2])
-    const bubble = await screen.findByTestId('dock-bubble')
+    const bubble = await screen.findByTestId('dm-bubble')
     expect(within(bubble).getByText('Zz Parent Probe')).toBeInTheDocument()
     expect(within(bubble).queryByText('You')).not.toBeInTheDocument()
   })
@@ -182,7 +241,7 @@ describe('the floating chat dock', () => {
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[1])
-    await screen.findAllByTestId('dock-bubble')
+    await screen.findAllByTestId('dm-bubble')
     // jsdom has no layout: give the panel real-looking scroll metrics only
     // NOW, after the initial pin already ran against zero heights.
     const panel = screen.getByTestId('dock-thread')
@@ -215,21 +274,52 @@ describe('the floating chat dock', () => {
   })
 })
 
-// 26 Aug 2026, Jay's screenshot: the full thread's chevron menu simply was
-// not in the dock. The dock's menu offers only what the dock can honestly
-// do — Reply where its send carries a quote, Copy where there is a body,
-// and the full view for everything richer.
-describe('the dock chevron menu', () => {
-  it('a DM bubble carries Reply, Copy and More in full view', async () => {
+// 26 Aug 2026, phase 2 of claude/plans/2026-08-26-shared-chat-thread.md.
+// Jay: the dock should "function exactly as the main chat". These are the
+// discriminating assertions — every one of them FAILS against the phase-1
+// dock, whose DM menu was Reply / Copy / More in full view and nothing else.
+describe('the dock chevron menu — full parity for DMs and groups', () => {
+  it('an incoming DM bubble carries the FULL menu, with no More in full view', async () => {
     const user = userEvent.setup()
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[1])
-    const bubbles = await screen.findAllByTestId('dock-bubble')
+    const bubbles = await screen.findAllByTestId('dm-bubble')
     await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
-    expect(screen.getByRole('menuitem', { name: 'Reply' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'More in full view' })).toBeInTheDocument()
+    for (const label of ['Reply', 'Forward', 'Copy', 'Pin', 'Star', 'Report']) {
+      expect(screen.getByRole('menuitem', { name: label })).toBeInTheDocument()
+    }
+    // Theirs, in a 1:1: no Delete, no Reply privately — same as the screen.
+    expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Reply privately' })).toBeNull()
+    // The menu is COMPLETE now — the expand icon in the header is the only
+    // remaining road to the full view.
+    expect(screen.queryByRole('menuitem', { name: 'More in full view' })).toBeNull()
+  })
+
+  it('own bubble offers Delete, and Delete deletes', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[1])
+    const bubbles = await screen.findAllByTestId('dm-bubble')
+    await user.click(within(bubbles[1]).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    await waitFor(() => expect(m.removeMessage).toHaveBeenCalledWith('x2'))
+  })
+
+  it('Report opens the form in the dock and sends the report', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[1])
+    const bubbles = await screen.findAllByTestId('dm-bubble')
+    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Report' }))
+    const form = await screen.findByTestId('report-form')
+    await user.type(within(form).getByLabelText('Report this message to the club'), 'Zz not okay')
+    await user.click(within(form).getByRole('button', { name: 'Send report' }))
+    await waitFor(() => expect(m.reportMessage).toHaveBeenCalledWith('x1', 'Zz not okay'))
   })
 
   it('Reply quotes into the composer and the send carries quotedId', async () => {
@@ -237,10 +327,10 @@ describe('the dock chevron menu', () => {
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[1])
-    const bubbles = await screen.findAllByTestId('dock-bubble')
+    const bubbles = await screen.findAllByTestId('dm-bubble')
     await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
     await user.click(screen.getByRole('menuitem', { name: 'Reply' }))
-    expect(screen.getByTestId('dock-quote-preview')).toHaveTextContent('Zz two seats held')
+    expect(screen.getByTestId('quote-preview')).toHaveTextContent('Zz two seats held')
     await user.type(screen.getByLabelText('Message'), 'Zz noted')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() =>
@@ -250,26 +340,32 @@ describe('the dock chevron menu', () => {
       }),
     )
     // The strip clears with the send — a second message must not re-quote.
-    expect(screen.queryByTestId('dock-quote-preview')).toBeNull()
+    expect(screen.queryByTestId('quote-preview')).toBeNull()
   })
 
-  it('More in full view expands to the real thread', async () => {
+  it('Reply privately from a group STAYS IN THE DOCK, quote armed', async () => {
     const user = userEvent.setup()
-    // A probe route instead of a navigate mock: the file renders a REAL
-    // MemoryRouter, so landing on the thread route is the assertion.
-    render(
-      <MemoryRouter initialEntries={['/roster']}>
-        <Routes>
-          <Route path="/chat/dm/:id" element={<div data-testid="probe-thread" />} />
-          <Route path="*" element={<FloatingChatDock badge />} />
-        </Routes>
-      </MemoryRouter>,
-    )
+    renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
-    await user.click((await screen.findAllByTestId('dock-row'))[1])
-    const bubbles = await screen.findAllByTestId('dock-bubble')
-    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
-    await user.click(screen.getByRole('menuitem', { name: 'More in full view' }))
-    expect(await screen.findByTestId('probe-thread')).toBeInTheDocument()
+    await user.click((await screen.findAllByTestId('dock-row'))[2])
+    const bubble = await screen.findByTestId('dm-bubble')
+    await user.click(within(bubble).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Reply privately' }))
+    // The panel switched to the 1:1 — no navigation, the dock is still here.
+    await waitFor(() => expect(m.openConversation).toHaveBeenCalledWith('other-2'))
+    expect(await screen.findByTestId('quote-preview')).toHaveTextContent('Zz seats sorted')
+    expect(screen.getByTestId('dock-panel')).toBeInTheDocument()
+  })
+
+  it('a channel bubble keeps the thin menu until phase 4 — Copy and the full view', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[0])
+    const bubble = await screen.findByTestId('dock-bubble')
+    await user.click(within(bubble).getByRole('button', { name: 'Message options' }))
+    expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'More in full view' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull()
   })
 })
