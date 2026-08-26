@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
+- (unmerged) — 💬 **Shared-chat-thread phase 4: the dock's channels ARE the
+  main chat, and the thin dock is gone** — `FloatingChatDock` mounts
+  `useChannelThread` + `ChannelThread` for squad, staff and club rows; its
+  last hand-rolled stream/composer is deleted, along with its own
+  loadThread/send/react plumbing (each thread loads and subscribes for
+  itself; the dock only keeps its list fresh). Channels in the dock now
+  carry inline thread replies, @mentions, fixture attach, pins, read
+  stats, reports — and the announce-only LOCK: a parent sees the same
+  "only staff can post" composer the main chat shows, where the old dock
+  offered a composer and let the database refuse. Discriminating tests
+  proven against the phase-3 dock: 4 fail there, 16/16 here. The CI red on
+  PR #433's first push was the harness-stubs alias count, already fixed in
+  the phase-3 commit.
 - (unmerged) — 🧩 **Shared-chat-thread phase 3: the channel moves out of its
   screen** — same split as phase 1, applied to `src/screens/Chat.jsx`: state
   and behaviour extracted verbatim to `src/lib/useChannelThread.js` (which

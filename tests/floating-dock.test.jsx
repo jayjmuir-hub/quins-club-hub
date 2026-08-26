@@ -9,10 +9,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 // — a dock that showed an admin every squad under View-as would reintroduce
 // the exact bug fixed the same day.
 //
-// Since 26 Aug 2026 (shared-chat-thread phase 2) a DM or group in the dock
-// IS the full thread — src/lib/useDmThread.js + src/components/DmThread.jsx,
-// the same pair DirectMessages.jsx renders — so those tests assert the FULL
-// chevron menu. Channels stay on the thin dock stream until phase 4.
+// Since 26 Aug 2026 (shared-chat-thread phases 2 and 4) EVERY thread in the
+// dock IS the full screen's: DMs/groups render useDmThread + DmThread, and
+// squad/staff/club channels render useChannelThread + ChannelThread — so
+// these tests assert the FULL menus, MessageRow bubbles in channels, and
+// the announce-only composer lock reaching the dock.
 
 const useAuthMock = vi.fn()
 const useMembershipsMock = vi.fn()
@@ -44,6 +45,10 @@ const m = {
   toggleStar: vi.fn(),
   forwardMessagesTo: vi.fn(),
   logWelfareAccess: vi.fn(),
+  getChannelSettings: vi.fn(),
+  listMentionablesFor: vi.fn(),
+  messageReadStats: vi.fn(),
+  replyToMessage: vi.fn(),
 }
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
@@ -53,6 +58,11 @@ vi.mock('../src/data/nicknames.js', () => ({
   listMyNicknames: vi.fn().mockResolvedValue(new Map()),
   setNickname: vi.fn(),
 }))
+// useChannelThread reaches these two for fixture threads and RSVP chips;
+// both are decoration the hook tolerates failing, but an unmocked import
+// would walk into the real Supabase client.
+vi.mock('../src/data/events.js', () => ({ listEvents: vi.fn().mockResolvedValue([]) }))
+vi.mock('../src/data/availability.js', () => ({ listAvailabilityForEvents: vi.fn().mockResolvedValue([]) }))
 vi.mock('../src/data/messages.js', async (orig) => ({
   ...(await orig()),
   listChats: (...a) => m.listChats(...a),
@@ -82,6 +92,10 @@ vi.mock('../src/data/messages.js', async (orig) => ({
   toggleStar: (...a) => m.toggleStar(...a),
   forwardMessagesTo: (...a) => m.forwardMessagesTo(...a),
   logWelfareAccess: (...a) => m.logWelfareAccess(...a),
+  getChannelSettings: (...a) => m.getChannelSettings(...a),
+  listMentionablesFor: (...a) => m.listMentionablesFor(...a),
+  messageReadStats: (...a) => m.messageReadStats(...a),
+  replyToMessage: (...a) => m.replyToMessage(...a),
 }))
 
 import FloatingChatDock from '../src/components/FloatingChatDock.jsx'
@@ -158,6 +172,12 @@ beforeEach(() => {
   m.forwardMessagesTo.mockResolvedValue()
   m.logWelfareAccess.mockResolvedValue()
   m.openConversation.mockResolvedValue('c1')
+  // Channel fetches (phase 4): announce-only ON, the default — the dock must
+  // show a parent the same locked composer the main chat shows.
+  m.getChannelSettings.mockResolvedValue({ announce_only: true })
+  m.listMentionablesFor.mockResolvedValue([])
+  m.messageReadStats.mockResolvedValue(new Map())
+  m.replyToMessage.mockResolvedValue()
 })
 
 describe('the floating chat dock', () => {
@@ -252,14 +272,29 @@ describe('the floating chat dock', () => {
     await waitFor(() => expect(y).toBe(480), { timeout: 2000 })
   })
 
-  it('a squad channel names theirs — same as MessageRow, not a third style', async () => {
+  it('a squad channel renders MessageRow itself — the SAME component as the main chat', async () => {
     const user = userEvent.setup()
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[0])
-    const bubble = await screen.findByTestId('dock-bubble')
-    expect(within(bubble).getByText('Zz Coach Probe')).toBeInTheDocument()
-    expect(bubble.querySelector('[class*="rounded-[14px]"]')).not.toBeNull()
+    // message-row/message-bubble, not a dock-only bubble: phase 4 mounts
+    // ChannelThread, so the channel post carries its author and role pill
+    // exactly as the full screen draws them.
+    const row = await screen.findByTestId('message-row')
+    expect(within(row).getByText('Zz Coach Probe')).toBeInTheDocument()
+    expect(screen.getByTestId('message-bubble')).toBeInTheDocument()
+  })
+
+  it('announce-only reaches the dock: a parent sees the locked composer, not a live one', async () => {
+    // The old dock showed everyone a composer and let the database refuse
+    // the send. Parity means the dock says what the main chat says.
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[0])
+    await screen.findByTestId('message-row')
+    expect(screen.getByTestId('composer-locked')).toBeInTheDocument()
+    expect(screen.queryByTestId('composer')).toBeNull()
   })
 
   it('empty storage paints crest on the thread — default on every chat', async () => {
@@ -267,10 +302,13 @@ describe('the floating chat dock', () => {
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[0])
+    // The wallpaper paints the STREAM inside the dock's scroll container —
+    // the same paint site as the full screens since phase 4.
     const panel = await screen.findByTestId('dock-thread')
-    expect(panel.getAttribute('data-background')).toBe('crest')
-    expect(panel.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
-    expect(panel.style.backgroundImage).not.toContain('data:image/svg+xml')
+    const stream = panel.querySelector('[data-background]')
+    expect(stream.getAttribute('data-background')).toBe('crest')
+    expect(stream.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+    expect(stream.style.backgroundImage).not.toContain('data:image/svg+xml')
   })
 })
 
@@ -357,15 +395,23 @@ describe('the dock chevron menu — full parity for DMs and groups', () => {
     expect(screen.getByTestId('dock-panel')).toBeInTheDocument()
   })
 
-  it('a channel bubble keeps the thin menu until phase 4 — Copy and the full view', async () => {
+  it('a channel post carries the SAME menu as the main chat — thread reply included (phase 4)', async () => {
     const user = userEvent.setup()
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[0])
-    const bubble = await screen.findByTestId('dock-bubble')
+    const bubble = await screen.findByTestId('message-bubble')
     await user.click(within(bubble).getByRole('button', { name: 'Message options' }))
-    expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'More in full view' })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull()
+    // A parent on an incoming coach post, exactly as MessageRow decides it.
+    for (const label of ['Reply', 'Reply privately', 'Report']) {
+      expect(screen.getByRole('menuitem', { name: label })).toBeInTheDocument()
+    }
+    expect(screen.queryByRole('menuitem', { name: 'More in full view' })).toBeNull()
+    // Reply opens the INLINE thread with its composer — full-view furniture
+    // no longer: it lives in the dock.
+    await user.click(screen.getByRole('menuitem', { name: 'Reply' }))
+    await user.type(screen.getByLabelText('Reply'), 'Zz got it, thanks')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(m.replyToMessage).toHaveBeenCalledWith('s1', 'Zz got it, thanks', { mentions: [] }))
   })
 })
