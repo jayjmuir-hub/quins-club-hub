@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ChannelThread from './ChannelThread.jsx'
 import DmThread from './DmThread.jsx'
+import IdentityBadges from './IdentityBadges.jsx'
 import Spinner from './Spinner.jsx'
 import { chatPath, listChats, subscribeMessages } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -98,6 +99,13 @@ function DockDmThread({ row, initialReplyTo, onOpenDm }) {
   }, [])
   return (
     <div ref={scrollRef} data-testid="dock-thread" className="flex flex-1 flex-col overflow-y-auto bg-surface px-3 py-2">
+      {/* Who they are, pinned to the dock's own scroll top — the same
+          component as the full screen's sticky header, per the no-drift
+          rule (claude/plans/2026-08-26-dm-identity-rows.md). Groups keep
+          their member line in the full view. */}
+      {thread.conversation?.kind !== 'group' && (
+        <IdentityBadges profileId={thread.other?.id} className="sticky top-0 z-10 -mx-3 -mt-2 bg-surface px-3 py-1.5" />
+      )}
       <DmThread thread={thread} compact />
     </div>
   )

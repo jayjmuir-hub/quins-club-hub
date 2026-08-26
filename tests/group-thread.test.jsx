@@ -39,6 +39,9 @@ const m = {
   listGroupCandidates: vi.fn(),
   createGroup: vi.fn(),
 }
+// The DM identity badges fetch member_identity (26 Aug 2026); empty here
+// keeps this file about its own subject and network-free.
+vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] }))
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../src/data/nicknames.js', () => ({

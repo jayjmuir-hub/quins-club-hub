@@ -16,6 +16,9 @@ import userEvent from '@testing-library/user-event'
 const media = { signChatPhotoUrl: vi.fn() }
 // The DM header identity line fetches the person card (26 Aug 2026);
 // null here keeps this file about its own subject and network-free.
+// The DM identity badges fetch member_identity (26 Aug 2026); empty here
+// keeps this file about its own subject and network-free.
+vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] }))
 vi.mock('../src/data/personCard.js', () => ({ getPersonCard: async () => null }))
 vi.mock('../src/data/chatMedia.js', () => ({
   signChatPhotoUrl: (...a) => media.signChatPhotoUrl(...a),
