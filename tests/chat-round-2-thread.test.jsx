@@ -36,6 +36,9 @@ const media = {
   removeChatPhoto: vi.fn(),
   signChatPhotoUrl: vi.fn(),
 }
+// The DM header identity line fetches the person card (26 Aug 2026);
+// null here keeps this file about its own subject and network-free.
+vi.mock('../src/data/personCard.js', () => ({ getPersonCard: async () => null }))
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 // Presence is a live websocket; tests get a quiet empty room.

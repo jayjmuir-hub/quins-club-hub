@@ -14,6 +14,9 @@ import userEvent from '@testing-library/user-event'
 // links. DirectMessages was already chrome-free (bc971f8 / #389).
 
 const media = { signChatPhotoUrl: vi.fn() }
+// The DM header identity line fetches the person card (26 Aug 2026);
+// null here keeps this file about its own subject and network-free.
+vi.mock('../src/data/personCard.js', () => ({ getPersonCard: async () => null }))
 vi.mock('../src/data/chatMedia.js', () => ({
   signChatPhotoUrl: (...a) => media.signChatPhotoUrl(...a),
   uploadChatPhoto: vi.fn(),
