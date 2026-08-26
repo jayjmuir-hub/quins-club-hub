@@ -55,7 +55,9 @@ export default function NoticeRow({ notice, teamsById, unread, stat, expired, on
       : { stripe: 'bg-accent', chip: 'bg-accent-bg text-accent-ink' }
 
   return (
-    <Card className="mb-2.5 overflow-hidden" data-testid="notice-row">
+    // break-inside-avoid: the Notices board lays these in CSS columns on
+    // desktop, and a card split across two columns is unreadable.
+    <Card className="mb-2.5 overflow-hidden break-inside-avoid" data-testid="notice-row">
       <div className="flex">
         {/* ⚠️ `aria-hidden` AND NOT A LIST MARKER. It repeats the chip beside
             it; a screen reader announcing a colour swatch is noise. */}

@@ -371,6 +371,11 @@ export default function ChatList() {
       {/* DMs FIRST (Jay, 25 Aug 2026: "DMs should always be at the top of
           the chat screen instead of having to scroll down"). The chips and
           the sidebar sub-items carry the same order. */}
+      {/* Desktop fills the width by putting the two parallel lists side by
+          side (26 Aug 2026); each section is conditional, so a person with
+          only one of them gets a single column that spans. Archived and
+          search results stay full-width below. */}
+      <div className="desktop:grid desktop:grid-cols-2 desktop:items-start desktop:gap-x-[18px]">
       {!searching && dmRows.length > 0 && (
         <section data-testid="section-dms" className="mt-[18px]">
           <FoldTitle label="Direct messages" count={dmRows.length} folded={Boolean(folds.dms)} onToggle={() => toggleFold('dms', Boolean(folds.dms))} />
@@ -400,6 +405,7 @@ export default function ChatList() {
           )}
         </section>
       )}
+      </div>
 
       {!searching && archivedRows.length > 0 && (
         <section data-testid="section-archived" className="mt-[18px]">

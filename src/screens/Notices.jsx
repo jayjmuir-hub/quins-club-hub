@@ -373,6 +373,12 @@ export default function Notices() {
         />
       )}
 
+      {/* Desktop fills the width with a two-column board (three at `wide`),
+          26 Aug 2026 — CSS columns rather than grid so each card keeps its
+          own height instead of stretching to its row-mate's. Reading order
+          runs down each column, which is how a pinboard reads anyway; the
+          cards themselves stay text-width-sane because the column does. */}
+      <div className="desktop:columns-2 desktop:gap-[18px] wide:columns-3">
       {shown.map((notice) => (
         <NoticeRow
           key={notice.id}
@@ -390,6 +396,7 @@ export default function Notices() {
           onDelete={stats.has(notice.id) ? handleDelete : null}
         />
       ))}
+      </div>
 
       {mayPost && (
         <NoticeComposer

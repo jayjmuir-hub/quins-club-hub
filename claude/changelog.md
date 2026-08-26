@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 💬 **The DM notice is gone for members, and the wallpaper
+- (unmerged) — 🖥️ **Desktop stops wasting the width** — Jay: "why can't we
+  have things fill the entire width of the screen?" The shell's 1120px cap
+  was already gone; the screens just never used the room. Three now do:
+  Schedule's table renders from the DESKTOP breakpoint (820px) instead of
+  `wide` (1280px), so a laptop gets columns instead of the phone list;
+  Notices lays its cards in CSS columns (two at desktop, three at `wide`,
+  break-inside-avoid on each card) so the board fills sideways while each
+  card keeps its own height and sane line length; the chat list puts Direct
+  messages and Your squads side by side in a two-column grid. Verified in a
+  real renderer (harness at 1440px: grid measured 555px + 555px; the column
+  utilities computed 3/18px/avoid). The NEXT pull request cites this
+  entry's squash SHA.
+
+- `bb4833b` — 💬 **The DM notice is gone for members, and the wallpaper
   fill is PROVEN on the full thread** — Jay's screenshots, both parts. The
   fill itself had shipped minutes earlier (`423ff1c`, 08:15; the
   screenshots were 08:23 against the cached app) — measured now in a real
@@ -22,7 +35,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   banner stays, and the welfare log is untouched. Harness gains ?dmCount=
   so a shorter-than-viewport thread can be reproduced. The NEXT pull
   request cites this entry's squash SHA.
-
 ## 25 Aug 2026
 
 - `423ff1c` — 🖼️ **The wallpaper is the slack-eater, and the dock grew its

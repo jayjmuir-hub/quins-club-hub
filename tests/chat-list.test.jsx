@@ -119,3 +119,19 @@ describe('ChatList', () => {
     expect(previewLine({ kind: 'dm', last_body: null }, ME)).toBe('No messages yet')
   })
 })
+
+// ── Desktop fills the width (26 Aug 2026) ──────────────────────────────────
+// The two parallel lists sit side by side from the desktop breakpoint up.
+// jsdom applies no CSS; the class tokens are the statement.
+describe('ChatList — desktop layout', () => {
+  it('puts DMs and squads in a two-column grid wrapper on desktop', async () => {
+    renderList()
+    const dms = await screen.findByTestId('section-dms')
+    const squads = screen.getByTestId('section-squads')
+    expect(dms.parentElement).toBe(squads.parentElement)
+    const tokens = dms.parentElement.className.split(/\s+/)
+    expect(tokens).toContain('desktop:grid')
+    expect(tokens).toContain('desktop:grid-cols-2')
+    expect(tokens).toContain('desktop:items-start')
+  })
+})
