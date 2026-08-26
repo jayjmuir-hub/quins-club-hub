@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
+import PersonCard from '../components/PersonCard.jsx'
+import PersonName from '../components/PersonName.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listAuditProfiles, listMembershipAudit } from '../data/audit.js'
+import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isSuperAdmin } from '../lib/scope.js'
 import {
@@ -63,9 +66,15 @@ function stamp(at) {
   })
 }
 
-function Entry({ row, nameById, teamName }) {
+function Entry({ row, nameById, teamName, onOpenCard = null, selfId = null }) {
   const details = auditDetails(row)
   const elevated = isElevation(row)
+  // The person card (claude/plans/2026-08-26-person-card.md): both names on an
+  // entry are doors. "The system" has nobody behind it, and an account whose
+  // name is GONE is deleted — both stay plain text via PersonName's null branch.
+  const subjectId = nameById?.get(row.profile_id) ? row.profile_id : null
+  const actorId =
+    row.actor_kind === 'system' || !nameById?.get(row.actor_id) ? null : row.actor_id
 
   return (
     <li
@@ -89,7 +98,11 @@ function Entry({ row, nameById, teamName }) {
             </span>
           ) : null}
         </p>
-        <p className="mt-0.5 text-sm text-ink">{subjectName(row, nameById)}</p>
+        <p className="mt-0.5 text-sm text-ink">
+          <PersonName profileId={subjectId} selfId={selfId} onOpen={onOpenCard}>
+            {subjectName(row, nameById)}
+          </PersonName>
+        </p>
         {details.length > 0 && (
           <ul className="mt-1 space-y-0.5">
             {details.map((line) => (
@@ -100,7 +113,10 @@ function Entry({ row, nameById, teamName }) {
           </ul>
         )}
         <p className="mt-1 text-[12.5px] text-ink-faint">
-          {stamp(row.at)} · by {actorName(row, nameById)}
+          {stamp(row.at)} · by{' '}
+          <PersonName profileId={actorId} selfId={selfId} onOpen={onOpenCard}>
+            {actorName(row, nameById)}
+          </PersonName>
         </p>
       </div>
     </li>
@@ -109,11 +125,15 @@ function Entry({ row, nameById, teamName }) {
 
 export default function AdminRightsLog() {
   const { memberships, teams } = useMemberships()
+  const { user } = useAuth()
+  const selfId = user?.id ?? null
   const viewerIsSuper = isSuperAdmin(memberships)
 
   const [rows, setRows] = useState(null)
   const [names, setNames] = useState(() => new Map())
   const [error, setError] = useState(null)
+  // The tapped person's profile id, or null — one card for the whole screen.
+  const [cardFor, setCardFor] = useState(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -196,6 +216,8 @@ export default function AdminRightsLog() {
                 row={row}
                 nameById={names}
                 teamName={row.team_id ? teamNameById.get(row.team_id) : null}
+                onOpenCard={setCardFor}
+                selfId={selfId}
               />
             ))}
           </ul>
@@ -205,6 +227,8 @@ export default function AdminRightsLog() {
       {/* ⚠️ SAYS THAT IT IS A WINDOW, rather than implying it is everything.
           listMembershipAudit caps at 200; a screen that quietly showed the most
           recent 200 of 4,000 would be read as the whole history. */}
+      <PersonCard profileId={cardFor} onClose={() => setCardFor(null)} />
+
       {rows.length >= 200 && (
         <p className="mt-3 text-[12.5px] text-ink-faint" data-testid="audit-truncated">
           Showing the most recent 200 changes. Older entries are kept but are not shown here

@@ -10,12 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 📋 **Session handoff for the 25–26 Aug batch** —
+- (unmerged) — 👤 **The person card: tap any name, contact the person** — Jay:
+  "click on a username, see their info and start a chat, email, call … from
+  anywhere in the system." Designed, approved and BUILT the same day
+  (`claude/plans/2026-08-26-person-card.md` + `-implementation.md`): tap any
+  adult's name → bottom-sheet card with Call/WhatsApp/Email/Chat. Ruling C —
+  a staff or admin role makes you contactable by ANYONE in the club
+  (`claude/decisions/2026-08-26-staff-contacts-club-wide.md`, extending
+  13 Aug's opt-in ruling club-wide); parents stay chat-only to everyone but
+  the staff who manage them; player names keep opening Player Detail; your
+  own name, "the system" and deleted accounts stay plain text. Enforced
+  server-side by the new `member_contact_card` RPC, which nulls the contact
+  columns in the database (`db/migrations/20260826_member_contact_card.sql`,
+  harness `db/tests/person-card.sql` — five asserts incl. an injected-fault
+  proof of the discriminator; `can_see_staff_photo` gains the matching arm).
+  Wired on: /admin Staff + Accounts pending queues + Rights log, Home/Squad
+  Hub staff cards, Player Detail parents, notice authors, group-thread
+  member line. Migration APPLIED to production before the PR (function
+  present, anon refused, harness green against live — measured). The NEXT
+  pull request cites this entry's squash SHA.
+- `f785a35` — 📋 **Session handoff for the 25–26 Aug batch** —
   `claude/handoffs/2026-08-26-desktop-chat-batch.md`: six shipped PRs, the
   session's reusable traps (docs-check local-vs-CI, the harness alias
   contract, execute_sql's last-statement-only results, the squatted 5199),
-  and the two deliberate ticks v1 cuts now recorded in open-items. The NEXT
-  pull request cites this entry's squash SHA.
+  and the two deliberate ticks v1 cuts now recorded in open-items.
 - `242d442` — 💬 **Online status and WhatsApp ticks land in chat** — Jay:
   "we need an online status in chat" and "delivered and viewed check marks
   for messages like whatsapp has". ONLINE is Supabase Realtime PRESENCE

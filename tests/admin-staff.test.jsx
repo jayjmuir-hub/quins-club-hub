@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 
 // /admin/staff — every squad and who looks after it.
 //
@@ -35,6 +36,18 @@ vi.mock('../src/data/photos.js', () => ({
   setStaffPhoto: (...args) => setStaffPhotoMock(...args),
   signStaffPhotoUrl: (...args) => signStaffPhotoUrlMock(...args),
   deleteStaffPhoto: (...args) => deleteStaffPhotoMock(...args),
+}))
+
+// The person card's fetch, mocked so this file stays network-free; the card's
+// own behaviour is covered by tests/person-card.test.jsx.
+const getPersonCardMock = vi.fn()
+vi.mock('../src/data/personCard.js', () => ({
+  getPersonCard: (...args) => getPersonCardMock(...args),
+}))
+
+// The screen reads only `user.id` (to keep your own name plain text).
+vi.mock('../src/lib/auth.jsx', () => ({
+  useAuth: () => ({ user: { id: 'p-admin-self' } }),
 }))
 
 import AdminStaff from '../src/screens/AdminStaff.jsx'
@@ -72,7 +85,15 @@ const SQUADS = [
 
 function renderStaff() {
   const user = userEvent.setup()
-  return { user, ...render(<AdminStaff />) }
+  // MemoryRouter because the person card's Chat button navigates.
+  return {
+    user,
+    ...render(
+      <MemoryRouter>
+        <AdminStaff />
+      </MemoryRouter>,
+    ),
+  }
 }
 
 // ⚠️ EVERY SQUAD IS COLLAPSED ON ARRIVAL SINCE 16 Aug 2026, so anything that
@@ -626,5 +647,31 @@ describe('the head-coach flag', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
     expect(headCoachBox()).not.toBeChecked()
+  })
+})
+
+// The person card (claude/plans/2026-08-26-person-card.md): the staff member's
+// name on /admin/staff is a door to the card — the exact screen Jay
+// screenshotted asking for this.
+describe('AdminStaff — names open the person card', () => {
+  it('a staff name is a button that opens the contact card', async () => {
+    getPersonCardMock.mockResolvedValue({
+      profileId: 'p-coach',
+      name: 'Alex Morgan',
+      role: 'coach',
+      title: 'Head Coach',
+      isSuper: false,
+      squads: ['U7 Tag'],
+      phone: '+971500000001',
+      email: 'alex@example.com',
+      photoUrl: null,
+      focus: null,
+    })
+    const { user } = renderStaff()
+    await openEverySquad(user)
+
+    await user.click(screen.getAllByRole('button', { name: 'Alex Morgan' })[0])
+    expect(await screen.findByTestId('person-card')).toBeInTheDocument()
+    expect(getPersonCardMock).toHaveBeenCalledWith('p-coach')
   })
 })

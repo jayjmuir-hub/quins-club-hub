@@ -10,6 +10,8 @@ import { Empty } from '../components/Empty.jsx'
 import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
+import PersonCard from '../components/PersonCard.jsx'
+import PersonName from '../components/PersonName.jsx'
 import { removeChatPhoto, uploadChatPhoto } from '../data/chatMedia.js'
 import { listMyNicknames, setNickname } from '../data/nicknames.js'
 import {
@@ -103,6 +105,8 @@ function Thread({ conversationId }) {
   // Groups (claude/plans/2026-08-24-group-chats.md): same thread screen,
   // membership from conversation_members instead of the profile_a/b pair.
   const [members, setMembers] = useState(null)
+  // The person card: the tapped member-line name's profile id, or null.
+  const [cardFor, setCardFor] = useState(null)
   const [reactions, setReactions] = useState(() => new Map())
   const [renaming, setRenaming] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -255,11 +259,18 @@ function Thread({ conversationId }) {
   // every point this screen renders a person.
   const nameFor = (profileId, fallback) => (profileId && nicknames.get(profileId)) || fallback
   const otherName = nameFor(other?.id, other?.name)
-  // The WhatsApp header line: first names, "You" for the reader.
+  // The WhatsApp header line: first names, "You" for the reader. Each name is
+  // a PersonName door to the contact card (claude/plans/2026-08-26-person-card.md);
+  // "You" stays plain text via its self branch.
   const memberLine = isGroup && members?.length
-    ? members
-        .map((p) => (p.profile_id === selfId ? 'You' : nameFor(p.profile_id, p.full_name).split(' ')[0] || 'Member'))
-        .join(', ')
+    ? members.map((p, index) => (
+        <Fragment key={p.profile_id}>
+          {index > 0 && ', '}
+          <PersonName profileId={p.profile_id} selfId={selfId} onOpen={setCardFor}>
+            {p.profile_id === selfId ? 'You' : nameFor(p.profile_id, p.full_name).split(' ')[0] || 'Member'}
+          </PersonName>
+        </Fragment>
+      ))
     : null
 
   function clearPhoto() {
@@ -992,6 +1003,8 @@ function Thread({ conversationId }) {
           Read-only. You are not part of this conversation.
         </p>
       )}
+
+      <PersonCard profileId={cardFor} onClose={() => setCardFor(null)} />
     </section>
   )
 }

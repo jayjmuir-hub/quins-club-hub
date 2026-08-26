@@ -501,7 +501,10 @@ describe('SquadStaffCard — editorial rows, not glossy tiles', () => {
   it('does not paint the name in white over a photo', () => {
     render(<SquadStaffCard squadName="U13 Mixed Contact" staff={[COACH_ROSA]} />)
 
-    const name = screen.getByText('Rosa Ferreira')
+    // The name now sits inside a PersonName wrapper; the ink lives on the
+    // enclosing <p>, so assert there — the intent (never white-on-photo) is
+    // unchanged.
+    const name = screen.getByText('Rosa Ferreira').closest('p')
     expect(name.className.split(/\s+/)).toContain('text-ink')
     expect(name.className.split(/\s+/)).not.toContain('text-white')
   })
@@ -815,5 +818,29 @@ describe('Squad contacts on the Dashboard', () => {
     // in scope; keying the staff read on that token would issue a round trip
     // per fixture edit, club-wide, for a result that cannot have moved.
     expect(listMySquadStaffMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+// The person card (claude/plans/2026-08-26-person-card.md): the staff name
+// itself becomes a door when the screen passes onOpenCard — and stays plain
+// text when it does not, the same contract ChatBubble's onAuthor set.
+describe('SquadStaffCard — the name opens the person card', () => {
+  it('with onOpenCard the name is a button reporting the profile id', () => {
+    const onOpenCard = vi.fn()
+    render(
+      <SquadStaffCard
+        squadName="U13 Mixed Contact"
+        staff={[{ ...COACH_ROSA, profileId: 'p-rosa' }]}
+        onOpenCard={onOpenCard}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Rosa Ferreira' }))
+    expect(onOpenCard).toHaveBeenCalledWith('p-rosa')
+  })
+
+  it('⚠️ without onOpenCard the name stays plain text — the discriminating pair', () => {
+    render(<SquadStaffCard squadName="U13 Mixed Contact" staff={[{ ...COACH_ROSA, profileId: 'p-rosa' }]} />)
+    expect(screen.queryByRole('button', { name: 'Rosa Ferreira' })).toBeNull()
+    expect(screen.getByText('Rosa Ferreira')).toBeInTheDocument()
   })
 })

@@ -9,7 +9,10 @@ import PhotoPositioner, {
   clampFocus,
   focusToObjectPosition,
 } from '../components/PhotoPositioner.jsx'
+import PersonCard from '../components/PersonCard.jsx'
+import PersonName from '../components/PersonName.jsx'
 import { listSquadStaff, setMembershipTitle, setMembershipHeadCoach } from '../data/staff.js'
+import { useAuth } from '../lib/auth.jsx'
 import { deleteStaffPhoto, setStaffPhoto, signStaffPhotoUrl, uploadStaffPhoto } from '../data/photos.js'
 import { initials } from '../lib/playerFormat.js'
 import { STAFF_TITLES, labelForRole, canHoldHeadCoachFlag } from '../lib/scope.js'
@@ -294,7 +297,7 @@ function StaffPhoto({ member, onPhoto }) {
   )
 }
 
-function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto }) {
+function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = null, selfId = null }) {
   const [title, setTitle] = useState(member.title ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -348,7 +351,16 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto }) {
   return (
     <div className="border-t border-line px-4 py-3 first:border-t-0" data-testid="staff-row">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-[15px] font-bold text-ink">{member.name}</span>
+        {/* The person card (claude/plans/2026-08-26-person-card.md): the name
+            is a door — the exact gap Jay screenshotted on this screen. */}
+        <PersonName
+          profileId={member.profileId}
+          selfId={selfId}
+          onOpen={onOpenCard}
+          className="text-[15px] font-bold text-ink"
+        >
+          {member.name}
+        </PersonName>
         {roleLabel && (
           <span className="rounded-[8px] border border-line px-2 py-0.5 text-[12px] font-bold text-ink-muted">
             {roleLabel}
@@ -449,7 +461,7 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto }) {
  * contacts card it borrows its look from is read-only. Moving editing behind a
  * second tap would have made it prettier and worse.
  */
-function SquadRow({ squad, open, onToggle, onSaved, onHeadCoachSaved, onPhoto }) {
+function SquadRow({ squad, open, onToggle, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = null, selfId = null }) {
   const panelId = `squad-panel-${squad.id}`
   const missing = squad.staff.length === 0
   // ⚠️ THE TITLE, FALLING BACK TO THE ROLE — Jay, 16 Aug 2026: "should be Head
@@ -536,6 +548,8 @@ function SquadRow({ squad, open, onToggle, onSaved, onHeadCoachSaved, onPhoto })
                 onSaved={onSaved}
                 onHeadCoachSaved={onHeadCoachSaved}
                 onPhoto={onPhoto}
+                onOpenCard={onOpenCard}
+                selfId={selfId}
               />
             ))
           )}
@@ -546,8 +560,12 @@ function SquadRow({ squad, open, onToggle, onSaved, onHeadCoachSaved, onPhoto })
 }
 
 export default function AdminStaff() {
+  const { user } = useAuth()
+  const selfId = user?.id ?? null
   const [squads, setSquads] = useState(null)
   const [error, setError] = useState(null)
+  // The tapped person's profile id, or null — one card for the whole screen.
+  const [cardFor, setCardFor] = useState(null)
   // ⚠️ A SET, AND SEVERAL MAY BE OPEN AT ONCE — Jay's choice, 16 Aug 2026, over
   // an accordion that closes the last one. The task this screen serves is a
   // SWEEP: "which squads have nobody" is answered by comparing rows, and an
@@ -701,10 +719,14 @@ export default function AdminStaff() {
               onSaved={onSaved}
               onHeadCoachSaved={onHeadCoachSaved}
               onPhoto={onPhoto}
+              onOpenCard={setCardFor}
+              selfId={selfId}
             />
           ))}
         </Card>
       )}
+
+      <PersonCard profileId={cardFor} onClose={() => setCardFor(null)} />
     </div>
   )
 }

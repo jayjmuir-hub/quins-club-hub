@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
+import PersonCard from './PersonCard.jsx'
+import PersonName from './PersonName.jsx'
 import NoticeAudienceIcon from './NoticeAudienceIcon.jsx'
 import { audienceLabel, postedLabel, seenSummary } from '../lib/notices.js'
 import { initials } from '../lib/playerFormat.js'
@@ -32,6 +34,10 @@ export default function NoticeRow({ notice, teamsById, unread, stat, expired, on
   // 14: a native dialog blocks the event loop and hangs the browser check dead.
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
+  // The person card (claude/plans/2026-08-26-person-card.md): the author's
+  // name is a door. Self-contained — the row owns its card, so NoticeBoard
+  // and /notices get it without threading a prop through either.
+  const [cardFor, setCardFor] = useState(null)
   const summary = seenSummary(stat)
 
   const clubWide = notice.team_id == null
@@ -89,7 +95,9 @@ export default function NoticeRow({ notice, teamsById, unread, stat, expired, on
           <div className="min-w-0 flex-1">
             {authorName ? (
               <p className="truncate text-[13.5px] font-extrabold leading-tight text-ink">
-                {authorName}
+                <PersonName profileId={notice.author_id} onOpen={setCardFor}>
+                  {authorName}
+                </PersonName>
               </p>
             ) : (
               <p className="truncate text-[13.5px] font-extrabold leading-tight text-ink-muted">
@@ -218,6 +226,8 @@ export default function NoticeRow({ notice, teamsById, unread, stat, expired, on
         )}
         </div>
       </div>
+
+      <PersonCard profileId={cardFor} onClose={() => setCardFor(null)} />
     </Card>
   )
 }
