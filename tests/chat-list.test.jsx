@@ -28,6 +28,14 @@ vi.mock('../src/data/messages.js', async (orig) => ({
   subscribeMessages: (...a) => m.subscribeMessages(...a),
   listMyConversations: (...a) => m.listMyConversations(...a),
 }))
+// ⚠️ chatPrefs must be mocked or load() makes a REAL supabase fetch before
+// listMyConversations — fast against the local .env project, but CI points
+// at placeholder.supabase.co, and the DNS failure there outlasts
+// findByRole's 1s timeout. Green locally, red in CI, 26 Aug 2026.
+vi.mock('../src/data/chatPrefs.js', () => ({
+  listMyChatPrefs: async () => new Map(),
+  setChatPref: vi.fn(),
+}))
 // Presence, injected per test. dotState mirrors the real pure function.
 const presenceMock = vi.fn(() => new Map())
 vi.mock('../src/lib/presence.js', () => ({
