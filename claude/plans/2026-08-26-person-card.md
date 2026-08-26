@@ -1,10 +1,10 @@
 # The person card — tap any name, contact the person
 
-**Status: BUILT, NOT YET SHIPPED — implemented on branch `claude/person-card`
-26 Aug 2026 (all nine tasks of the implementation plan, full suite green);
-awaiting Jay's merge and the live verification. ⚠️ The production migration
-was NOT applied by the session that built it — the apply was blocked by a
-permission gate and is listed in the hand-off.**
+**Status: SHIPPED — merged to `main` as `abef0d7` (#434) and VERIFIED LIVE
+on 26 Aug 2026: the card opened from /admin/staff on the deployed site with
+real tel:/wa.me/mailto: links read from the page. Both migrations applied to
+production (`member_contact_card`, and the same-day `_dedupe` fix for the
+doubled squad name Jay spotted in his first minute of use).**
 
 Jay, 25 Aug 2026: "click on any username … and have the option to chat with
 them." That request shipped only inside chat threads (`ChatBubble`'s

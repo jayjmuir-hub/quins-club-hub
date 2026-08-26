@@ -1,4 +1,6 @@
--- Harness for db/migrations/20260826_member_contact_card.sql.
+-- Harness for db/migrations/20260826_member_contact_card.sql AND its
+-- same-day fix 20260826_member_contact_card_dedupe.sql (the inline copy
+-- below is the DEDUPED body — the fixed function is the one under test).
 -- Run with `npm run db:check -- person-card`, or paste into the SQL editor.
 -- SAFE ON PRODUCTION: everything runs inside a transaction that ROLLS BACK.
 -- The migration is INLINED VERBATIM below (begin/commit stripped — the
@@ -15,6 +17,8 @@
 --  4. a login with NO active membership gets ZERO rows for anybody
 --  5. can_see_staff_photo: outsider→coach true (the new arm),
 --     parent→parent false (a parent is not staff)
+--  6. two membership rows on one squad name the squad ONCE — the
+--     "U10 MIXED · U10 MIXED" live finding; fails against the pre-dedupe body
 begin;
 
 create temporary table _log(seq serial, line text) on commit drop;
@@ -43,6 +47,10 @@ insert into players (id, club_id, team_id, full_name) values
 -- no squad shared with the coach, which is what assertion 1 needs.
 insert into memberships (profile_id, club_id, team_id, player_id, role, status) values
  ('f0000000-0000-4000-8000-0000000000e1','f0000000-0000-4000-8000-0000000000e0','f0000000-0000-4000-8000-0000000000e8', null, 'coach','active'),
+ -- the coach holds a SECOND row on the same squad — legitimate data
+ -- (memberships has no unique constraint), and the live case that made the
+ -- card read "U10 MIXED · U10 MIXED" on 26 Aug 2026. Assert 6 exists for it.
+ ('f0000000-0000-4000-8000-0000000000e1','f0000000-0000-4000-8000-0000000000e0','f0000000-0000-4000-8000-0000000000e8', null, 'manager','active'),
  ('f0000000-0000-4000-8000-0000000000e2','f0000000-0000-4000-8000-0000000000e0','f0000000-0000-4000-8000-0000000000e8','f0000000-0000-4000-8000-0000000000ea','parent','active'),
  ('f0000000-0000-4000-8000-0000000000e3','f0000000-0000-4000-8000-0000000000e0','f0000000-0000-4000-8000-0000000000e8','f0000000-0000-4000-8000-0000000000eb','parent','active'),
  ('f0000000-0000-4000-8000-0000000000e4','f0000000-0000-4000-8000-0000000000e0','f0000000-0000-4000-8000-0000000000e9','f0000000-0000-4000-8000-0000000000ec','parent','active');
@@ -107,7 +115,7 @@ as $$
   )
   select p.id, p.full_name,
          best.role, best.title, coalesce(best.is_super, false),
-         coalesce((select array_agg(t.name order by t.name)
+         coalesce((select array_agg(distinct t.name order by t.name)
                      from memberships m join teams t on t.id = m.team_id
                     where m.profile_id = _profile and m.status = 'active'
                       and m.team_id is not null), '{}') as squads,
@@ -226,6 +234,14 @@ begin
   reset role;
   if ok then raise exception 'ASSERT 5 FAILED: parent→parent photo allowed'; end if;
   insert into _log(line) values ('5 photo: staff face club-wide, parent face still private');
+
+  -- 6: two membership rows on one squad name the squad ONCE on the card —
+  --    the "U10 MIXED · U10 MIXED" live finding, 26 Aug 2026
+  perform pg_temp.as_user(outsider::text);
+  select coalesce(array_length(c.squads, 1), 0) into n from member_contact_card(coach) c;
+  reset role;
+  if n <> 1 then raise exception 'ASSERT 6 FAILED: squads has % entries, wanted 1 (dedupe)', n; end if;
+  insert into _log(line) values ('6 squads deduped: two rows, one name');
 end $fn$;
 
 select pg_temp.assert_person_card();
