@@ -24,6 +24,12 @@ const getSessionMock = vi.fn()
 const saveSessionBlocksMock = vi.fn()
 const listFocusMock = vi.fn()
 const listDrillsMock = vi.fn()
+const listTemplatesMock = vi.fn()
+const createSessionMock = vi.fn()
+const setSessionVisibilityMock = vi.fn()
+const saveSquadTemplateMock = vi.fn()
+const upsertDrillMock = vi.fn()
+const submitTemplateToClubMock = vi.fn()
 
 // ⚠️ MOCKED BECAUSE AN UNMOCKED DATA MODULE MAKES A REAL REQUEST. CI sets
 // placeholder Supabase env vars, so the client constructs happily, the promise
@@ -33,6 +39,12 @@ vi.mock('../src/data/trainingPlans.js', () => ({
   saveSessionBlocks: (...args) => saveSessionBlocksMock(...args),
   listFocus: (...args) => listFocusMock(...args),
   listDrills: (...args) => listDrillsMock(...args),
+  listTemplates: (...args) => listTemplatesMock(...args),
+  createSession: (...args) => createSessionMock(...args),
+  setSessionVisibility: (...args) => setSessionVisibilityMock(...args),
+  saveSquadTemplate: (...args) => saveSquadTemplateMock(...args),
+  upsertDrill: (...args) => upsertDrillMock(...args),
+  submitTemplateToClub: (...args) => submitTemplateToClubMock(...args),
 }))
 
 import SessionPlan from '../src/components/SessionPlan.jsx'
@@ -46,7 +58,7 @@ const EVENT = {
   starts_at: '2026-08-25T14:00:00.000Z',
 }
 
-const TEAM = { id: 't-u12', name: 'U12 Mixed', requires_contact: true }
+const TEAM = { id: 't-u12', name: 'U12 Mixed', requires_contact: true, club_id: 'club-1' }
 
 /** Invented drills. The SHAPES are the real ones. */
 const GRID = {
@@ -100,6 +112,8 @@ const SESSION = {
   template_id: 'tpl-1',
   published_at: '2026-08-20T06:00:00.000Z',
   coach_edited_at: null,
+  visibility: 'squad',
+  created_by: null,
   notes: 'Wet pitch, keep it tight.',
   blocks: [
     { id: 'b-1', position: 1, drill_id: 'd-grid', minutes: 15, coach_note: 'Keep the width', drill: GRID },
@@ -126,7 +140,12 @@ beforeEach(() => {
   getSessionMock.mockResolvedValue(null)
   listFocusMock.mockResolvedValue([])
   listDrillsMock.mockResolvedValue([GRID, LADDER, SENIORS_ONLY])
+  listTemplatesMock.mockResolvedValue([])
   saveSessionBlocksMock.mockResolvedValue(undefined)
+  createSessionMock.mockResolvedValue({ id: 's-new' })
+  setSessionVisibilityMock.mockResolvedValue({})
+  saveSquadTemplateMock.mockResolvedValue({ id: 'tpl-new' })
+  upsertDrillMock.mockResolvedValue({ ...GRID, id: 'd-made', title: 'Made drill' })
 })
 
 describe('SessionPlan — when it renders at all', () => {
@@ -326,5 +345,124 @@ describe('SessionPlan — the coach adjusting it', () => {
 
     expect(saveSessionBlocksMock).not.toHaveBeenCalled()
     expect(screen.getAllByRole('listitem')[0].textContent).toContain('15 min')
+  })
+})
+
+// ── The coach building their OWN plan (27 Aug 2026) ─────────────────────────
+// Jay: coaches create their own plans for sessions — freestyle or from a
+// template — and choose who sees it (draft/staff/squad). What is pinned here is
+// the shape a tidy-up would break: the build affordance only for canEdit; a new
+// plan is created with the author and the chosen visibility; a template seeds
+// the running order; a parent still sees no builder.
+describe('SessionPlan — a coach builds their own plan', () => {
+  it('offers "Build a session" to a coach on an event with no plan', async () => {
+    const { user } = show({ canEdit: true })
+    expect(await screen.findByTestId('build-session')).toBeInTheDocument()
+    await user.click(screen.getByTestId('build-session'))
+    // The visibility control appears, defaulting to squad staff.
+    const radios = within(screen.getByRole('radiogroup', { name: /who can see this plan/i })).getAllByRole('radio')
+    expect(radios.find((r) => r.getAttribute('aria-checked') === 'true')).toHaveTextContent('Squad staff')
+  })
+
+  it('shows a parent nothing on an event with no plan', async () => {
+    show({ canEdit: false })
+    await waitFor(() => expect(getSessionMock).toHaveBeenCalledWith('e-1'))
+    expect(screen.queryByTestId('build-session')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /session plan/i })).not.toBeInTheDocument()
+  })
+
+  it('creates a session with the chosen visibility and the blocks', async () => {
+    // ⚠️ THE AUTHOR IS NOT SENT — training_sessions.created_by defaults to
+    // auth.uid() in the DB, so the client needs no user id and no auth
+    // provider (which is why the EventDetail sheet can render this card
+    // everywhere without one).
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByTestId('build-session'))
+    await user.selectOptions(screen.getByLabelText(/add a drill/i), 'd-grid')
+    // Publish it to the whole squad.
+    await user.click(within(screen.getByRole('radiogroup', { name: /who can see this plan/i })).getByRole('radio', { name: /whole squad/i }))
+    await user.click(screen.getByRole('button', { name: /save plan/i }))
+
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalled())
+    const arg = createSessionMock.mock.calls[0][0]
+    expect(arg.eventId).toBe('e-1')
+    expect(arg.createdBy).toBeUndefined()
+    expect(arg.visibility).toBe('squad')
+    expect(arg.blocks).toEqual([{ drill_id: 'd-grid', minutes: 15, coach_note: null }])
+  })
+
+  it('seeds the running order from a chosen template', async () => {
+    listTemplatesMock.mockResolvedValue([
+      { id: 'tpl-a', name: 'Skills night', team_id: null, notes: null, blocks: [
+        { id: 'tb-1', position: 1, drill_id: 'd-grid', minutes: 15, coach_note: null, drill: GRID },
+      ] },
+    ])
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByTestId('build-session'))
+    await user.selectOptions(screen.getByLabelText(/start from a template/i), 'tpl-a')
+
+    // The seeded block is in the editor.
+    expect(screen.getByText('Grid passing')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /save plan/i }))
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalled())
+    expect(createSessionMock.mock.calls[0][0].blocks).toEqual([{ drill_id: 'd-grid', minutes: 15, coach_note: null }])
+  })
+
+  it('will not save an empty plan', async () => {
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByTestId('build-session'))
+    expect(screen.getByRole('button', { name: /save plan/i })).toBeDisabled()
+  })
+
+  it('creates a squad-owned drill inline and adds it to the plan', async () => {
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByTestId('build-session'))
+    await user.click(screen.getByRole('button', { name: /create a drill/i }))
+    await user.type(screen.getByLabelText('New drill title'), 'Ruck race')
+    await user.click(within(screen.getByTestId('new-drill')).getByRole('button', { name: /add drill/i }))
+
+    await waitFor(() => expect(upsertDrillMock).toHaveBeenCalled())
+    const drillArg = upsertDrillMock.mock.calls[0][0]
+    expect(drillArg.team_id).toBe('t-u12')
+    expect(drillArg.club_id).toBe('club-1')
+    expect(drillArg.title).toBe('Ruck race')
+  })
+})
+
+describe('SessionPlan — visibility on an existing plan', () => {
+  it('shows who can see the plan, to a coach', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    show({ canEdit: true })
+    expect(await screen.findByTestId('session-visibility')).toHaveTextContent('The whole squad')
+  })
+
+  it('does not show the visibility chip to a parent', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    show({ canEdit: false })
+    await screen.findByTestId('session-total')
+    expect(screen.queryByTestId('session-visibility')).not.toBeInTheDocument()
+  })
+
+  it('saves a changed visibility alongside an adjust', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByRole('button', { name: /adjust/i }))
+    await user.click(within(screen.getByRole('radiogroup', { name: /who can see this plan/i })).getByRole('radio', { name: /only me/i }))
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(setSessionVisibilityMock).toHaveBeenCalledWith('s-1', 'draft'))
+  })
+
+  it('saves the running order as the squad’s template', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByTestId('save-as-template'))
+    await user.click(screen.getByRole('button', { name: /save template/i }))
+
+    await waitFor(() => expect(saveSquadTemplateMock).toHaveBeenCalled())
+    const arg = saveSquadTemplateMock.mock.calls[0][0]
+    expect(arg.teamId).toBe('t-u12')
+    expect(arg.clubId).toBe('club-1')
+    expect(arg.blocks).toHaveLength(2)
   })
 })

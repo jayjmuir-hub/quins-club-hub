@@ -44,6 +44,13 @@ vi.mock('../src/data/trainingPlans.js', () => ({
   saveSessionBlocks: async () => {},
   listFocus: async () => [],
   listDrills: async () => [],
+  listTemplates: async () => [],
+  createSession: async () => ({ id: 's-new' }),
+  setSessionVisibility: async () => ({}),
+  saveSquadTemplate: async () => ({ id: 'tpl-new' }),
+  upsertDrill: async () => ({ id: 'd-new' }),
+  submitDrillToClub: async () => ({}),
+  submitTemplateToClub: async () => ({}),
 }))
 
 import EventDetail from '../src/screens/EventDetail.jsx'
@@ -307,10 +314,12 @@ describe('deleting an occurrence of a series', () => {
 // --- the session plan ------------------------------------------------------
 
 describe('EventDetail — the session plan', () => {
-  it('shows no heading for a training event with no plan', async () => {
+  it('shows no heading for a training event with no plan, to a member', async () => {
     // Most training sessions have no published plan. An empty "Session plan"
     // heading on every one of them is noise on the screen members read.
-    show(ONE_OFF)
+    // ⚠️ canEdit:false — since 27 Aug 2026 a COACH does get a card here (it is
+    // where they build the first plan); a parent still sees nothing.
+    show(ONE_OFF, { canEdit: false })
     await waitFor(() => expect(getSessionMock).toHaveBeenCalledWith('e-1'))
     expect(screen.queryByRole('heading', { name: /session plan/i })).not.toBeInTheDocument()
   })

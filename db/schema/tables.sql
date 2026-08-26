@@ -1889,6 +1889,11 @@ CREATE TABLE public.drills (
   is_active        boolean not null default true,
   created_by       uuid references public.profiles(id),
   created_at       timestamptz not null default now(),
+  -- 27 Aug 2026 (20260827_coach_training_plans.sql): NULL team_id = the club
+  -- library; set = one squad's own drill. submitted_at is a coach's request to
+  -- promote it into the club library.
+  team_id          uuid references public.teams(id) on delete cascade,
+  submitted_at     timestamptz,
   constraint drills_age_order check (min_age is null or max_age is null or min_age <= max_age)
 );
 ALTER TABLE public.drills ENABLE ROW LEVEL SECURITY;
@@ -1905,6 +1910,9 @@ CREATE TABLE public.session_templates (
   is_active        boolean not null default true,
   created_by       uuid references public.profiles(id),
   created_at       timestamptz not null default now(),
+  -- 27 Aug 2026: same team_id / submitted_at pattern as drills.
+  team_id          uuid references public.teams(id) on delete cascade,
+  submitted_at     timestamptz,
   constraint session_templates_age_order check (min_age is null or max_age is null or min_age <= max_age)
 );
 ALTER TABLE public.session_templates ENABLE ROW LEVEL SECURITY;
@@ -1940,7 +1948,14 @@ CREATE TABLE public.training_sessions (
   template_id     uuid references public.session_templates(id) on delete set null,
   published_at    timestamptz not null default now(),
   coach_edited_at timestamptz,
-  notes           text
+  notes           text,
+  -- 27 Aug 2026: who may see a coach-built plan. draft = the created_by author
+  -- only; staff = can_edit_team; squad = is_attached_to_team. DEFAULT 'squad'
+  -- so every existing row and every publish_training insert is family-visible.
+  visibility      text not null default 'squad' check (visibility in ('draft','staff','squad')),
+  -- DEFAULT auth.uid(): applied before the RLS WITH CHECK, so a coach's draft
+  -- insert is self-attributed without the client sending an id.
+  created_by      uuid default auth.uid() references public.profiles(id)
 );
 ALTER TABLE public.training_sessions ENABLE ROW LEVEL SECURITY;
 

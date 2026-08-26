@@ -4,7 +4,15 @@ import Card from '../components/Card.jsx'
 import Chip from '../components/Chip.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { listDrills, listTemplates, saveTemplate, setTemplateActive } from '../data/trainingPlans.js'
+import {
+  approveTemplateToClub,
+  dismissTemplateSubmission,
+  listDrills,
+  listSubmittedTemplates,
+  listTemplates,
+  saveTemplate,
+  setTemplateActive,
+} from '../data/trainingPlans.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import {
   ageDraftProblem,
@@ -231,6 +239,7 @@ function TemplatesBody() {
 
   const [templates, setTemplates] = useState([])
   const [drills, setDrills] = useState([])
+  const [submitted, setSubmitted] = useState([])
   const [loading, setLoading] = useState(true)
   const [settled, setSettled] = useState(false)
   const [error, setError] = useState(null)
@@ -254,16 +263,17 @@ function TemplatesBody() {
     setLoading(true)
     setError(null)
 
-    Promise.all([listTemplates({ includeRetired }), listDrills()])
-      .then(([templateRows, drillRows]) => {
+    Promise.allSettled([listTemplates({ includeRetired }), listDrills(), listSubmittedTemplates()])
+      .then(([templateResult, drillResult, submittedResult]) => {
         if (!mounted) return
-        setTemplates(templateRows)
-        setDrills(drillRows)
-      })
-      .catch((failure) => {
-        if (!mounted) return
-        setError(failure)
-        setTemplates([])
+        if (templateResult.status === 'fulfilled') {
+          setTemplates(templateResult.value)
+        } else {
+          setError(templateResult.reason)
+          setTemplates([])
+        }
+        setDrills(drillResult.status === 'fulfilled' ? drillResult.value ?? [] : [])
+        setSubmitted(submittedResult.status === 'fulfilled' ? submittedResult.value ?? [] : [])
       })
       .finally(() => {
         if (!mounted) return
@@ -462,6 +472,37 @@ function TemplatesBody() {
 
   return (
     <div>
+      {/* ⚠️ SUGGESTIONS FROM COACHES. A squad-owned template a coach offered to
+          the club: Add it (becomes a club template) or Keep it theirs. */}
+      {submitted.length > 0 && (
+        <Card className="mb-3.5 p-3.5" data-testid="template-suggestions">
+          <h3 className="mb-2 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+            Suggested by coaches
+          </h3>
+          <ul>
+            {submitted.map((template) => (
+              <li
+                key={template.id}
+                className="flex flex-wrap items-center gap-2 border-b border-line py-2 last:border-b-0"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-ink">{template.name}</span>
+                  <span className="text-[12px] text-ink-muted">
+                    {(template.blocks ?? []).length} blocks · {template.total_minutes ?? 0} min
+                  </span>
+                </span>
+                <Button size="sm" disabled={saving} onClick={() => run(() => approveTemplateToClub(template.id))}>
+                  Add to club library
+                </Button>
+                <Button variant="ghost" size="sm" disabled={saving} onClick={() => run(() => dismissTemplateSubmission(template.id))}>
+                  Keep it theirs
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card className="mb-3.5 p-3.5">
         <div className="flex flex-wrap items-center gap-2.5">
           {/* ⚠️ THIS RE-READS THE DATABASE — retired templates are excluded by

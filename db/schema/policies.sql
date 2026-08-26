@@ -1378,40 +1378,64 @@ CREATE POLICY "opt out is mine" ON public.notification_opt_outs
 -- tonight's plan; it holds no children's data), write is can_edit_team, the
 -- match-sheet pattern. Harness: db/tests/training-plans.sql.
 -- ---------------------------------------------------------------------
+-- ⚠️ MANAGE WIDENED 27 Aug 2026 (20260827_coach_training_plans.sql): a coach
+-- manages their OWN squad's drills/templates (team_id not null AND
+-- can_edit_team), the Director manages club ones and can null a team_id to
+-- approve a suggestion. Reads stay open — a drill holds no personal data and a
+-- squad-owned one appears inside a family-visible session plan.
 create policy "drill read"   on public.drills for select using (auth.uid() is not null);
 create policy "drill manage" on public.drills for all
-  using (private.is_admin(club_id)) with check (private.is_admin(club_id));
+  using (private.is_admin(club_id) or (team_id is not null and private.can_edit_team(team_id)))
+  with check (private.is_admin(club_id) or (team_id is not null and private.can_edit_team(team_id)));
 
 create policy "template read"   on public.session_templates for select using (auth.uid() is not null);
 create policy "template manage" on public.session_templates for all
-  using (private.is_admin(club_id)) with check (private.is_admin(club_id));
+  using (private.is_admin(club_id) or (team_id is not null and private.can_edit_team(team_id)))
+  with check (private.is_admin(club_id) or (team_id is not null and private.can_edit_team(team_id)));
 
 create policy "template block read" on public.session_template_blocks for select using (auth.uid() is not null);
 create policy "template block manage" on public.session_template_blocks for all
-  using (exists (select 1 from public.session_templates t where t.id = template_id and private.is_admin(t.club_id)))
-  with check (exists (select 1 from public.session_templates t where t.id = template_id and private.is_admin(t.club_id)));
+  using (exists (select 1 from public.session_templates t where t.id = template_id
+    and (private.is_admin(t.club_id) or (t.team_id is not null and private.can_edit_team(t.team_id)))))
+  with check (exists (select 1 from public.session_templates t where t.id = template_id
+    and (private.is_admin(t.club_id) or (t.team_id is not null and private.can_edit_team(t.team_id)))));
 
 create policy "focus read"   on public.training_focus for select using (auth.uid() is not null);
 create policy "focus manage" on public.training_focus for all
   using (private.is_admin(club_id)) with check (private.is_admin(club_id));
 
--- Sessions: read follows the EVENT (a parent may see tonight's plan — it holds
--- no children's data); write is can_edit_team via the event, the match-sheet
--- pattern. can_edit_team already carries a status-aware admin arm.
+-- ⚠️ VISIBILITY-AWARE 27 Aug 2026. read: squad→is_attached_to_team (a parent
+-- sees tonight's plan — no children's data), staff→can_edit_team, draft→the
+-- author. manage: can_edit_team, and a draft is the author's alone until they
+-- promote it. ⚠️ The session's own columns are qualified `training_sessions.*`
+-- — events carries its own created_by, and an unqualified reference bound to
+-- the EVENT's creator, refusing every draft insert (measured 27 Aug 2026).
 create policy "session read" on public.training_sessions for select
-  using (exists (select 1 from public.events e where e.id = event_id and private.is_attached_to_team(e.team_id)));
+  using (exists (select 1 from public.events e where e.id = training_sessions.event_id and (
+     (training_sessions.visibility = 'squad' and private.is_attached_to_team(e.team_id))
+     or (training_sessions.visibility = 'staff' and private.can_edit_team(e.team_id))
+     or (training_sessions.visibility = 'draft' and training_sessions.created_by = (select auth.uid())))));
 create policy "session manage" on public.training_sessions for all
-  using (exists (select 1 from public.events e where e.id = event_id and private.can_edit_team(e.team_id)))
-  with check (exists (select 1 from public.events e where e.id = event_id and private.can_edit_team(e.team_id)));
+  using (exists (select 1 from public.events e where e.id = training_sessions.event_id
+     and private.can_edit_team(e.team_id)
+     and (training_sessions.visibility <> 'draft' or training_sessions.created_by = (select auth.uid()))))
+  with check (exists (select 1 from public.events e where e.id = training_sessions.event_id
+     and private.can_edit_team(e.team_id)
+     and (training_sessions.visibility <> 'draft' or training_sessions.created_by = (select auth.uid()))));
 
 create policy "session block read" on public.training_session_blocks for select
   using (exists (select 1 from public.training_sessions s join public.events e on e.id = s.event_id
-                 where s.id = session_id and private.is_attached_to_team(e.team_id)));
+                 where s.id = session_id and (
+                   (s.visibility = 'squad' and private.is_attached_to_team(e.team_id))
+                   or (s.visibility = 'staff' and private.can_edit_team(e.team_id))
+                   or (s.visibility = 'draft' and s.created_by = (select auth.uid())))));
 create policy "session block manage" on public.training_session_blocks for all
   using (exists (select 1 from public.training_sessions s join public.events e on e.id = s.event_id
-                 where s.id = session_id and private.can_edit_team(e.team_id)))
+                 where s.id = session_id and private.can_edit_team(e.team_id)
+                   and (s.visibility <> 'draft' or s.created_by = (select auth.uid()))))
   with check (exists (select 1 from public.training_sessions s join public.events e on e.id = s.event_id
-                      where s.id = session_id and private.can_edit_team(e.team_id)));
+                      where s.id = session_id and private.can_edit_team(e.team_id)
+                        and (s.visibility <> 'draft' or s.created_by = (select auth.uid()))));
 
 -- ── publish_training ──────────────────────────────────────────────────────
 -- ONE function for preview and for real, switched by _preview, so the table

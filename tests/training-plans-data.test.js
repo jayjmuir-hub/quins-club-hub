@@ -25,6 +25,8 @@ const CHAIN_METHODS = [
   'neq',
   'in',
   'is',
+  'not',
+  'or',
   'gte',
   'lte',
   'order',
@@ -69,8 +71,15 @@ import {
   saveSessionBlocks,
   deleteFocus,
   setDrillActive,
+  listDrills,
   listTemplates,
   getSession,
+  createSession,
+  setSessionVisibility,
+  saveSquadTemplate,
+  submitDrillToClub,
+  approveDrillToClub,
+  dismissDrillSubmission,
 } from '../src/data/trainingPlans.js'
 
 beforeEach(() => {
@@ -307,5 +316,84 @@ describe('embed sort', () => {
     }))
     const session = await getSession('ev1')
     expect(session.blocks.map((b) => b.id)).toEqual(['b1', 'b2', 'b3'])
+  })
+})
+
+// ── Coach training plans (27 Aug 2026) ──────────────────────────────────────
+describe('coach scoping and suggestions', () => {
+  const opFor = (table, name) =>
+    calls.filter((c) => c.table === table).flatMap((c) => c.ops).find((o) => o.name === name)
+
+  it('listDrills without a team asks for the whole library (no or-filter)', async () => {
+    resultFor.mockImplementation(() => ({ data: [], error: null }))
+    await listDrills()
+    expect(opFor('drills', 'or')).toBeUndefined()
+  })
+
+  it('listDrills with a team scopes to the club library plus that squad', async () => {
+    resultFor.mockImplementation(() => ({ data: [], error: null }))
+    await listDrills({ teamId: 'team-9' })
+    expect(opFor('drills', 'or').args[0]).toBe('team_id.is.null,team_id.eq.team-9')
+  })
+
+  it('createSession stamps coach_edited_at and the author, then inserts blocks', async () => {
+    resultFor.mockImplementation((chain) =>
+      chain.table === 'training_sessions'
+        ? { data: { id: 's-new' }, error: null }
+        : { data: null, error: null },
+    )
+    await createSession({
+      eventId: 'ev1',
+      visibility: 'staff',
+      createdBy: 'coach-1',
+      blocks: [{ drill_id: 'd1', minutes: 20 }],
+      notes: 'wet',
+    })
+    const inserted = opFor('training_sessions', 'insert').args[0]
+    expect(inserted.event_id).toBe('ev1')
+    expect(inserted.visibility).toBe('staff')
+    expect(inserted.created_by).toBe('coach-1')
+    expect(inserted.coach_edited_at).toBeTruthy()
+    // The block insert carries position 1..n against the new session id.
+    const blockIns = opFor('training_session_blocks', 'insert').args[0]
+    expect(blockIns).toEqual([{ session_id: 's-new', position: 1, drill_id: 'd1', minutes: 20, coach_note: null }])
+  })
+
+  it('createSession throws on a refused session write (RLS zero-row)', async () => {
+    resultFor.mockImplementation(() => ({ data: null, error: null }))
+    await expect(createSession({ eventId: 'ev1', blocks: [] })).rejects.toThrow()
+  })
+
+  it('setSessionVisibility updates the one column', async () => {
+    resultFor.mockImplementation(() => ({ data: { id: 's1' }, error: null }))
+    await setSessionVisibility('s1', 'squad')
+    expect(opFor('training_sessions', 'update').args[0]).toEqual({ visibility: 'squad' })
+  })
+
+  it('saveSquadTemplate inserts a team-owned template with its blocks', async () => {
+    resultFor.mockImplementation((chain) =>
+      chain.table === 'session_templates'
+        ? { data: { id: 'tpl-new' }, error: null }
+        : { data: null, error: null },
+    )
+    await saveSquadTemplate({ clubId: 'c1', teamId: 't9', name: 'Mine', blocks: [{ drill_id: 'd1', minutes: 30 }] })
+    const row = opFor('session_templates', 'insert').args[0]
+    expect(row.team_id).toBe('t9')
+    expect(row.club_id).toBe('c1')
+    expect(row.total_minutes).toBe(30)
+  })
+
+  it('submit / approve / dismiss move a drill through the queue', async () => {
+    resultFor.mockImplementation(() => ({ data: { id: 'd1' }, error: null }))
+    await submitDrillToClub('d1')
+    expect(opFor('drills', 'update').args[0].submitted_at).toBeTruthy()
+
+    calls.length = 0
+    await approveDrillToClub('d1')
+    expect(opFor('drills', 'update').args[0]).toEqual({ team_id: null, submitted_at: null })
+
+    calls.length = 0
+    await dismissDrillSubmission('d1')
+    expect(opFor('drills', 'update').args[0]).toEqual({ submitted_at: null })
   })
 })

@@ -1,14 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from './Button.jsx'
 import Chip from './Chip.jsx'
-import { getSession, listDrills, listFocus, saveSessionBlocks } from '../data/trainingPlans.js'
 import {
+  createSession,
+  getSession,
+  listDrills,
+  listFocus,
+  listTemplates,
+  saveSessionBlocks,
+  saveSquadTemplate,
+  setSessionVisibility,
+  submitDrillToClub,
+  submitTemplateToClub,
+  upsertDrill,
+} from '../data/trainingPlans.js'
+import {
+  ageOrNull,
+  CATEGORIES,
   CATEGORY_LABELS,
   squadFitsTemplate,
   textOrNull,
   totalMinutes,
 } from '../lib/trainingPlans.js'
 import { clubDateTimeInputs, eventDate } from '../lib/eventFormat.js'
+
+// Who sees a coach's plan. The order is the promotion path: a coach starts a
+// plan as their own (draft), shares it with the squad's other staff, then
+// publishes it to the families — never the other way by accident, which is why
+// 'staff' is the default a new plan is born at (Jay, 27 Aug 2026).
+const VISIBILITY = [
+  { value: 'draft', label: 'Only me', hint: 'A private draft while you build it.' },
+  { value: 'staff', label: 'Squad staff', hint: 'The other coaches and managers of this squad.' },
+  { value: 'squad', label: 'The whole squad', hint: 'Players and their families see it too.' },
+]
+
+const BLANK_DRILL = {
+  title: '',
+  minutes: '10',
+  category: CATEGORIES[0],
+  requires_contact: false,
+  min_age: '',
+  max_age: '',
+}
 
 // Tonight's session plan, on the event sheet.
 // Plan: claude/plans/2026-08-21-training-plans-implementation.md (Task 9).
@@ -207,18 +240,40 @@ function EditRow({ block, index, count, onChange, onMove, onRemove, busy }) {
 }
 
 export default function SessionPlan({ event, team, canEdit }) {
+  // The event's team carries its club (EventDetail passes the full row). A new
+  // drill/template needs a club_id; the session author is filled by the DB
+  // default (created_by = auth.uid()), so no auth provider is needed here.
+  const clubId = team?.club_id ?? null
+
   const [session, setSession] = useState(null)
   const [focus, setFocus] = useState(null)
   const [drills, setDrills] = useState([])
+  const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // `editing` = adjusting an existing session; `creating` = building the first
+  // plan for an event that has none. Both drive the same block editor below.
   const [editing, setEditing] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [blocks, setBlocks] = useState([])
   const [notes, setNotes] = useState('')
   const [picked, setPicked] = useState('')
+  const [seedId, setSeedId] = useState('')
+  const [visibility, setVisibility] = useState('staff')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
+
+  // The inline "create a drill" form, so a coach is not limited to the club
+  // library while planning. A squad-owned drill (team_id = this squad).
+  const [newDrillOpen, setNewDrillOpen] = useState(false)
+  const [newDrill, setNewDrill] = useState(BLANK_DRILL)
+  const [drillBusy, setDrillBusy] = useState(false)
+
+  // "Save this running order as my template" — a squad-owned template.
+  const [tplName, setTplName] = useState('')
+  const [tplBusy, setTplBusy] = useState(false)
+  const [tplSaved, setTplSaved] = useState(null) // null | { id } | 'suggested'
 
   // ⚠️ A REF, NOT THE STATE, BECAUSE THE READER BELOW IS ASYNCHRONOUS. The
   // effect's `.then` runs long after the effect body captured its variables,
@@ -226,7 +281,7 @@ export default function SessionPlan({ event, team, canEdit }) {
   // `editing` was when the fetch started. The ref always reads what is true
   // now.
   const editingRef = useRef(false)
-  editingRef.current = editing
+  editingRef.current = editing || creating
 
   // ⚠️ THE EVENT'S DATE IN CLUB TIME, never a bare `new Date()` and never
   // date.getDate(). A 20:00 Abu Dhabi session is 16:00 UTC the same day but
@@ -249,12 +304,17 @@ export default function SessionPlan({ event, team, canEdit }) {
     // ⚠️ THE DRILL LIBRARY IS FETCHED ONLY FOR SOMEBODY WHO MAY EDIT. A parent
     // reading tonight's plan has no picker and no use for every drill the club
     // owns; asking for them anyway is a wasted round trip on a phone.
+    // ⚠️ THE DRILL LIBRARY IS SCOPED TO THE SQUAD FOR A COACH — the club
+    // library plus this squad's own drills, never another squad's (listDrills's
+    // teamId). Templates the same, and only for somebody who may edit; a parent
+    // reading tonight's plan needs neither.
     Promise.allSettled([
       getSession(event.id),
       listFocus(),
-      canEdit ? listDrills() : Promise.resolve([]),
+      canEdit ? listDrills({ teamId: event.team_id }) : Promise.resolve([]),
+      canEdit ? listTemplates({ teamId: event.team_id }) : Promise.resolve([]),
     ])
-      .then(([sessionResult, focusResult, drillResult]) => {
+      .then(([sessionResult, focusResult, drillResult, templateResult]) => {
         if (!mounted) return
 
         const loaded = sessionResult.status === 'fulfilled' ? sessionResult.value : null
@@ -268,6 +328,9 @@ export default function SessionPlan({ event, team, canEdit }) {
         if (!editingRef.current) {
           setNotes(loaded?.notes ?? '')
           setBlocks(draftFrom(loaded))
+          // An existing session with no visibility is a legacy 'squad' one;
+          // openCreate sets 'staff' for a brand-new coach plan.
+          setVisibility(loaded?.visibility ?? 'squad')
         }
 
         const focusRows = focusResult.status === 'fulfilled' ? focusResult.value ?? [] : []
@@ -282,6 +345,7 @@ export default function SessionPlan({ event, team, canEdit }) {
         )
 
         setDrills(drillResult.status === 'fulfilled' ? drillResult.value ?? [] : [])
+        setTemplates(templateResult.status === 'fulfilled' ? templateResult.value ?? [] : [])
       })
       .finally(() => {
         if (mounted) setLoading(false)
@@ -292,11 +356,16 @@ export default function SessionPlan({ event, team, canEdit }) {
     }
   }, [event.id, event.team_id, clubDate, canEdit, reloadToken])
 
-  if (loading) return null
-  // Nothing published and no theme for the fortnight: nothing to say.
-  if (!session && !focus) return null
+  const building = editing || creating
 
-  const numericBlocks = editing
+  if (loading) return null
+  // Nothing published and no theme for the fortnight. A coach still gets a card
+  // — it is where they build the first plan — but a parent sees nothing, the
+  // same as before this feature (the card must not be an empty labelled block
+  // on every training session in the club).
+  if (!session && !focus && !canEdit) return null
+
+  const numericBlocks = building
     ? blocks.map((block) => ({ minutes: Number(block.minutes) }))
     : session?.blocks ?? []
   const total = totalMinutes(numericBlocks)
@@ -355,6 +424,53 @@ export default function SessionPlan({ event, team, canEdit }) {
     setBlocks((current) => [...current, blockFromDrill(drill)])
   }
 
+  // ── Building the FIRST plan for an event that has none ──────────────────
+  function openCreate() {
+    setBlocks([])
+    setNotes('')
+    setPicked('')
+    setSeedId('')
+    setVisibility('staff')
+    setError(null)
+    setCreating(true)
+  }
+
+  function cancelCreate() {
+    setCreating(false)
+    setBlocks([])
+    setNotes('')
+    setSeedId('')
+    setError(null)
+  }
+
+  // Seed the running order from a template (club or this squad's own). Replaces
+  // whatever is in the builder — the coach chose this template on purpose.
+  function seedFrom(templateId) {
+    setSeedId(templateId)
+    const template = templates.find((row) => row.id === templateId)
+    if (!template) {
+      setBlocks([])
+      return
+    }
+    setBlocks(
+      (template.blocks ?? []).map((block) => ({
+        key: `sp-seed-${block.id}`,
+        drill_id: block.drill_id ?? block.drill?.id ?? null,
+        drill: block.drill ?? null,
+        minutes: String(block.minutes ?? 10),
+        coach_note: block.coach_note ?? '',
+      })),
+    )
+    if (template.notes) setNotes(template.notes)
+  }
+
+  const blockPayload = () =>
+    blocks.map((block) => ({
+      drill_id: block.drill_id ?? block.drill?.id ?? null,
+      minutes: Number(block.minutes),
+      coach_note: textOrNull(block.coach_note),
+    }))
+
   /**
    * ⚠️ THE EDITOR STAYS OPEN, WITH THE TYPING INTACT, ON A REFUSED WRITE. The
    * data layer turns the RLS zero-row result — a successful nothing — into a
@@ -365,19 +481,26 @@ export default function SessionPlan({ event, team, canEdit }) {
     setSaving(true)
     setError(null)
     try {
-      await saveSessionBlocks(
-        session.id,
-        // ⚠️ NUMBERS, AND IN THE ORDER ON SCREEN. The boxes hold strings, the
-        // column is an integer, and the data layer renumbers positions 1..n
-        // from this array — so this order is the only source of truth.
-        blocks.map((block) => ({
-          drill_id: block.drill_id ?? block.drill?.id ?? null,
-          minutes: Number(block.minutes),
-          coach_note: textOrNull(block.coach_note),
-        })),
-        textOrNull(notes),
-      )
-      setEditing(false)
+      if (creating) {
+        await createSession({
+          eventId: event.id,
+          visibility,
+          // created_by is filled by the DB default (auth.uid()).
+          // ⚠️ NUMBERS, IN THE ORDER ON SCREEN — createSession renumbers 1..n.
+          blocks: blockPayload(),
+          notes: textOrNull(notes),
+        })
+        setCreating(false)
+      } else {
+        await saveSessionBlocks(session.id, blockPayload(), textOrNull(notes))
+        // Visibility is a second column, not part of the block replace; only
+        // written when the coach actually changed it, so an Adjust that leaves
+        // it alone makes no extra round trip.
+        if (visibility !== (session.visibility ?? 'squad')) {
+          await setSessionVisibility(session.id, visibility)
+        }
+        setEditing(false)
+      }
       // ⚠️ RELOADED, NOT GUESSED. coach_edited_at is stamped by the write, and
       // the chip that reads it must come from the row the database now holds.
       setReloadToken((token) => token + 1)
@@ -385,6 +508,83 @@ export default function SessionPlan({ event, team, canEdit }) {
       setError(failure)
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ── A new squad-owned drill, created without leaving the builder ────────
+  const newDrillMinutes = Number(newDrill.minutes)
+  const newDrillOk =
+    newDrill.title.trim() !== '' &&
+    Number.isFinite(newDrillMinutes) &&
+    newDrillMinutes >= 1 &&
+    newDrillMinutes <= 120 &&
+    clubId != null
+
+  async function saveNewDrill() {
+    setDrillBusy(true)
+    setError(null)
+    try {
+      const created = await upsertDrill({
+        club_id: clubId,
+        team_id: event.team_id,
+        title: newDrill.title.trim(),
+        minutes: newDrillMinutes,
+        category: newDrill.category,
+        requires_contact: newDrill.requires_contact === true,
+        min_age: ageOrNull(newDrill.min_age),
+        max_age: ageOrNull(newDrill.max_age),
+      })
+      // Offer it to the club library too, if the coach asked. The drill is
+      // theirs to use either way; suggesting only puts it in the Director's
+      // queue (submitted_at), it does not move it.
+      if (newDrill.suggest && created?.id) await submitDrillToClub(created.id)
+      setDrills((current) => [...current, created])
+      setBlocks((current) => [...current, blockFromDrill(created)])
+      setNewDrill(BLANK_DRILL)
+      setNewDrillOpen(false)
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setDrillBusy(false)
+    }
+  }
+
+  // ── Save the running order as this squad's own template ─────────────────
+  async function saveAsTemplate() {
+    setTplBusy(true)
+    setError(null)
+    try {
+      const saved = await saveSquadTemplate({
+        clubId,
+        teamId: event.team_id,
+        name: tplName.trim(),
+        notes: textOrNull(notes),
+        blocks: (session?.blocks ?? []).map((block) => ({
+          drill_id: block.drill_id ?? block.drill?.id ?? null,
+          minutes: block.minutes,
+          coach_note: block.coach_note ?? null,
+        })),
+      })
+      setTplSaved(saved?.id ? { id: saved.id } : 'suggested')
+      setTplName('')
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setTplBusy(false)
+    }
+  }
+
+  async function suggestTemplate() {
+    if (!tplSaved?.id) return
+    setTplBusy(true)
+    setError(null)
+    try {
+      await submitTemplateToClub(tplSaved.id)
+      setTplSaved('suggested')
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setTplBusy(false)
     }
   }
 
@@ -402,17 +602,26 @@ export default function SessionPlan({ event, team, canEdit }) {
         </p>
       )}
 
-      {session && !editing && (
+      {session && !building && (
         <div>
-          {session.coach_edited_at && (
-            <p className="mb-2">
-              {/* ⚠️ NOT DECORATION. publish_training skips a coach-edited
-                  session, so this is the only thing on screen that explains why
-                  tonight's plan did not change when a new template was
-                  published to the squad. */}
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {session.coach_edited_at && (
+              // ⚠️ NOT DECORATION. publish_training skips a coach-edited
+              // session, so this is the only thing on screen that explains why
+              // tonight's plan did not change when a new template was
+              // published to the squad.
               <Chip>Edited by the coach</Chip>
-            </p>
-          )}
+            )}
+            {/* Who can see it — shown to staff only; a family sees a squad plan
+                and does not need telling it is a squad plan. */}
+            {canEdit && (
+              <span data-testid="session-visibility">
+                <Chip>
+                  {VISIBILITY.find((v) => v.value === (session.visibility ?? 'squad'))?.label ?? 'The whole squad'}
+                </Chip>
+              </span>
+            )}
+          </div>
 
           <ol className="mb-2">
             {session.blocks.map((block) => (
@@ -429,17 +638,103 @@ export default function SessionPlan({ event, team, canEdit }) {
           )}
 
           {canEdit && (
-            <div className="mt-2.5">
+            <div className="mt-2.5 flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={openEdit}>
                 Adjust
               </Button>
+              {!tplSaved && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setTplName(tplName || `${team?.name ?? 'Squad'} session`)}
+                  data-testid="save-as-template"
+                >
+                  Save as my template
+                </Button>
+              )}
             </div>
+          )}
+
+          {/* Save-as-template: names the running order and keeps it as this
+              squad's own template, ready to reuse. Squad-owned until suggested
+              to the club. */}
+          {canEdit && tplName !== '' && !tplSaved && (
+            <div className="mt-2.5 flex flex-wrap items-end gap-2">
+              <label className="min-w-0 flex-1">
+                <span className={LABEL}>Template name</span>
+                <input
+                  type="text"
+                  aria-label="Template name"
+                  value={tplName}
+                  disabled={tplBusy}
+                  onChange={(domEvent) => setTplName(domEvent.target.value)}
+                  className={INPUT}
+                />
+              </label>
+              <Button disabled={tplBusy || tplName.trim() === ''} onClick={saveAsTemplate}>
+                {tplBusy ? 'Saving…' : 'Save template'}
+              </Button>
+              <Button variant="ghost" disabled={tplBusy} onClick={() => setTplName('')}>
+                Cancel
+              </Button>
+            </div>
+          )}
+          {tplSaved && tplSaved !== 'suggested' && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="text-[12.5px] font-semibold text-brand-ink">
+                Saved to your squad&apos;s templates.
+              </p>
+              <Button variant="ghost" size="sm" disabled={tplBusy} onClick={suggestTemplate}>
+                Suggest to the club
+              </Button>
+            </div>
+          )}
+          {tplSaved === 'suggested' && (
+            <p className="mt-2 text-[12.5px] font-semibold text-brand-ink">
+              Suggested to the club — the Rugby Performance Director will see it.
+            </p>
           )}
         </div>
       )}
 
-      {session && editing && (
+      {/* No plan yet — the coach builds one. A parent never reaches here (the
+          guard above returns null for them). */}
+      {!session && canEdit && !creating && (
         <div>
+          <p className="mb-2.5 text-[13px] leading-relaxed text-ink-muted">
+            No plan for this session yet. Build your own — from scratch, or start from a template.
+          </p>
+          <Button size="sm" onClick={openCreate} data-testid="build-session">
+            Build a session
+          </Button>
+        </div>
+      )}
+
+      {building && (
+        <div>
+          {/* Seed from a template — only when building a NEW plan. The club's
+              templates and this squad's own; another squad's never appear. */}
+          {creating && templates.length > 0 && (
+            <label className="mb-2.5 block">
+              <span className={LABEL}>Start from a template</span>
+              <select
+                aria-label="Start from a template"
+                value={seedId}
+                disabled={saving}
+                onChange={(domEvent) => seedFrom(domEvent.target.value)}
+                className={INPUT}
+              >
+                <option value="">Freestyle — an empty plan</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                    {template.team_id ? ' (your squad)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <ol>
             {blocks.map((block, index) => (
               <EditRow
@@ -490,6 +785,109 @@ export default function SessionPlan({ event, team, canEdit }) {
             </select>
           </label>
 
+          {/* Not in the library? Make one, without leaving the plan. A squad
+              drill, yours to reuse and to suggest to the club later. */}
+          {!newDrillOpen ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => setNewDrillOpen(true)}
+              className="mt-2 text-[12.5px] font-bold text-brand-ink underline"
+            >
+              + Create a drill
+            </button>
+          ) : (
+            <div className="mt-2.5 rounded-[10px] border border-line p-2.5" data-testid="new-drill">
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="min-w-0 flex-1">
+                  <span className={LABEL}>New drill title</span>
+                  <input
+                    type="text"
+                    aria-label="New drill title"
+                    value={newDrill.title}
+                    disabled={drillBusy}
+                    onChange={(domEvent) => setNewDrill((d) => ({ ...d, title: domEvent.target.value }))}
+                    className={INPUT}
+                  />
+                </label>
+                <label className="w-20">
+                  <span className={LABEL}>Minutes</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    aria-label="New drill minutes"
+                    value={newDrill.minutes}
+                    disabled={drillBusy}
+                    onChange={(domEvent) => setNewDrill((d) => ({ ...d, minutes: domEvent.target.value }))}
+                    className={INPUT}
+                  />
+                </label>
+              </div>
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <label className="min-w-0 flex-1">
+                  <span className={LABEL}>Category</span>
+                  <select
+                    aria-label="New drill category"
+                    value={newDrill.category}
+                    disabled={drillBusy}
+                    onChange={(domEvent) => setNewDrill((d) => ({ ...d, category: domEvent.target.value }))}
+                    className={INPUT}
+                  >
+                    {CATEGORIES.map((category) => (
+                      <option key={category} value={category}>
+                        {CATEGORY_LABELS[category]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-label="New drill is contact"
+                  aria-checked={newDrill.requires_contact === true}
+                  disabled={drillBusy}
+                  onClick={() => setNewDrill((d) => ({ ...d, requires_contact: !d.requires_contact }))}
+                  className={[
+                    'rounded-[8px] border-[1.5px] px-2.5 py-2 text-[12.5px] font-bold transition',
+                    newDrill.requires_contact
+                      ? 'border-brand bg-brand text-white'
+                      : 'border-line text-ink hover:border-brand hover:text-brand-ink',
+                  ].join(' ')}
+                >
+                  {newDrill.requires_contact ? 'Contact' : 'Tag'}
+                </button>
+              </div>
+              <label className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-ink">
+                <input
+                  type="checkbox"
+                  aria-label="Suggest this drill to the club"
+                  checked={newDrill.suggest === true}
+                  disabled={drillBusy}
+                  onChange={() => setNewDrill((d) => ({ ...d, suggest: !d.suggest }))}
+                  className="h-4 w-4 accent-[color:var(--brand)]"
+                />
+                Suggest this to the club library too
+              </label>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" disabled={drillBusy || !newDrillOk} onClick={saveNewDrill}>
+                  {drillBusy ? 'Adding…' : 'Add drill'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={drillBusy}
+                  onClick={() => {
+                    setNewDrillOpen(false)
+                    setNewDrill(BLANK_DRILL)
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
           <label className="mt-2.5 block">
             <span className={LABEL}>Notes for this session</span>
             <textarea
@@ -503,13 +901,41 @@ export default function SessionPlan({ event, team, canEdit }) {
             />
           </label>
 
+          {/* Who sees it. draft → staff → squad, the promotion path. */}
+          <fieldset className="mt-2.5 border-0 p-0">
+            <legend className={LABEL}>Who can see this plan</legend>
+            <div role="radiogroup" aria-label="Who can see this plan" className="flex flex-wrap gap-1.5">
+              {VISIBILITY.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={visibility === option.value}
+                  disabled={saving}
+                  onClick={() => setVisibility(option.value)}
+                  className={[
+                    'rounded-[8px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold transition',
+                    visibility === option.value
+                      ? 'border-brand bg-brand text-white'
+                      : 'border-line text-ink hover:border-brand hover:text-brand-ink',
+                  ].join(' ')}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[12px] leading-relaxed text-ink-muted">
+              {VISIBILITY.find((v) => v.value === visibility)?.hint}
+            </p>
+          </fieldset>
+
           <p className="mt-2 text-[12.5px] font-bold text-ink-muted">Total {total} min</p>
 
           <div className="mt-2.5 flex gap-2">
-            <Button disabled={saving || !minutesOk} onClick={save}>
-              {saving ? 'Saving…' : 'Save'}
+            <Button disabled={saving || !minutesOk || blocks.length === 0} onClick={save}>
+              {saving ? 'Saving…' : creating ? 'Save plan' : 'Save'}
             </Button>
-            <Button variant="ghost" disabled={saving} onClick={cancelEdit}>
+            <Button variant="ghost" disabled={saving} onClick={creating ? cancelCreate : cancelEdit}>
               Cancel
             </Button>
           </div>
