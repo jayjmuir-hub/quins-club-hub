@@ -15,6 +15,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // so the upload tests assert what upload does, not what the canvas does.
 vi.mock('../src/lib/imageResize.js', () => ({
   resizePhoto: (file) => Promise.resolve(file),
+  // The gate's own judgments (order, HEIC, size-after-resize) are proved in
+  // tests/image-resize.test.js against the real implementation; this hands
+  // the file through so these tests stay about the upload call's shape.
+  preparePhotoUpload: vi.fn(async (file) => {
+    if (!file) throw new Error('Choose a photo first.')
+    return file
+  }),
 }))
 
 vi.mock('../src/lib/supabase.js', () => ({
@@ -343,23 +350,20 @@ describe('uploadPlayerPhoto', () => {
     )
   })
 
-  it('rejects a non-image before touching the network', async () => {
+  it('defers refusals to the shared gate, before touching the network', async () => {
+    // The gate's own rules (type first, resize second, size LAST — so a big
+    // camera original is shrunk rather than refused) are proved against the
+    // real implementation in tests/image-resize.test.js. This proves a gate
+    // refusal stops the upload cold.
     const bucket = createStorageBucket()
     supabase.storage.from.mockReturnValue(bucket)
+    const { preparePhotoUpload } = await import('../src/lib/imageResize.js')
+    preparePhotoUpload.mockRejectedValueOnce(new Error('That file is not a photo. Use a JPEG, PNG or WebP image.'))
 
     await expect(uploadPlayerPhoto('player-1', { type: 'application/pdf', size: 10 })).rejects.toThrow(
       /not a photo/i,
     )
     expect(bucket.upload).not.toHaveBeenCalled()
-  })
-
-  it('rejects a file over 5 MB', async () => {
-    const bucket = createStorageBucket()
-    supabase.storage.from.mockReturnValue(bucket)
-
-    await expect(
-      uploadPlayerPhoto('player-1', { type: 'image/png', size: 6 * 1024 * 1024 }),
-    ).rejects.toThrow(/too large/i)
   })
 
   it('gives each upload a new key so a replaced photo is not served from cache', async () => {

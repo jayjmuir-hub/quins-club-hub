@@ -102,7 +102,7 @@ export default function IdeaForm({ open, onClose, event = null, onSubmitted }) {
           <input
             id="idea-photo"
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             className="mt-1 block w-full text-[13px] text-ink"
           />

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { resizePhoto } from '../lib/imageResize.js'
+import { preparePhotoUpload } from '../lib/imageResize.js'
 import { signPhotoUrl } from './photos.js'
 
 // Chat photos — round 2 (claude/plans/2026-08-24-chat-round-2.md), under the
@@ -20,31 +20,24 @@ import { signPhotoUrl } from './photos.js'
 // authorisation the write policy has.
 export const CHAT_MEDIA_BUCKET = 'chat-media'
 
-// Matches the bucket's allowed_mime_types; checked here too so the user gets
-// "that's not a photo" instead of an opaque storage error. HEIC off an
-// iPhone arrives as whatever the browser hands us — resizePhoto re-encodes
-// what it can; a type it cannot decode fails this list with the plain
-// message rather than uploading something the bucket will refuse.
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const MAX_BYTES = 5 * 1024 * 1024 // the bucket's file_size_limit
+// The type/size/HEIC contract lives in preparePhotoUpload
+// (src/lib/imageResize.js) — type first, resize second, size LAST, so a 7 MB
+// camera original is shrunk rather than refused. What it resolves with is
+// always inside the bucket's allowed_mime_types: JPEG when the re-encode ran
+// (including a decoded HEIC), or the untouched JPEG/PNG/WebP original when
+// the resize failed on a type that is safe to store as-is.
 const EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
 /**
  * Uploads one chat photo into the caller's own folder and returns the object
  * key, for the message's attachment_path. Downscaled before upload
- * (src/lib/imageResize.js) — a 4 MB camera photo becomes tens of KB.
+ * (src/lib/imageResize.js) — a 4 MB camera photo becomes ~200 KB, keeping
+ * its shape (claude/plans/2026-08-26-photo-pipeline-and-positioner.md).
  */
 export async function uploadChatPhoto(profileId, file) {
   if (!profileId) throw new Error('uploadChatPhoto needs a profile id.')
-  if (!file) throw new Error('Choose a photo first.')
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    throw new Error('That file is not a photo. Use a JPEG, PNG or WebP image.')
-  }
-  if (file.size > MAX_BYTES) {
-    throw new Error('That photo is too large. The limit is 5 MB.')
-  }
 
-  const upload = await resizePhoto(file)
+  const upload = await preparePhotoUpload(file)
   const extension = EXTENSIONS[upload.type] ?? 'jpg'
   const key = `${profileId}/${crypto.randomUUID()}.${extension}`
 

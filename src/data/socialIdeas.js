@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { resizePhoto } from '../lib/imageResize.js'
+import { preparePhotoUpload } from '../lib/imageResize.js'
 
 // Social post ideas: any member submits, the Social Media Management screen
 // marks and removes. Ruling: claude/decisions/2026-08-12-social-media-management.md.
@@ -18,8 +18,8 @@ import { resizePhoto } from '../lib/imageResize.js'
 
 export const IDEA_BUCKET = 'social-ideas'
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const MAX_BYTES = 5 * 1024 * 1024 // matches the bucket's file_size_limit
+// Type/size judgments live in preparePhotoUpload (src/lib/imageResize.js),
+// one gate for every photo path; its output fits the bucket's mime list.
 const SIGNED_URL_TTL_SECONDS = 3600
 
 // What the caller may send. ⚠️ `from_staff`, `club_id`, `submitted_by` and
@@ -45,17 +45,9 @@ export async function uploadIdeaPhoto(profileId, file) {
   if (!profileId) throw new Error('uploadIdeaPhoto needs a profile id.')
   if (!file) throw new Error('Choose a photo to upload.')
 
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    throw new Error('That file is not a photo. Use a JPEG, PNG or WebP image.')
-  }
-  if (file.size > MAX_BYTES) {
-    throw new Error('That photo is too large. The limit is 5 MB.')
-  }
-
-  // Downscale before upload, exactly as player photos do — a 4 MB camera
-  // photo becomes ~40 KB. resizePhoto returns the original untouched if it
-  // cannot do the work, so this can only improve on the input.
-  const upload = await resizePhoto(file)
+  // Shared gate: type, keep-the-shape resize, THEN size
+  // (src/lib/imageResize.js) — exactly as chat and profile photos do.
+  const upload = await preparePhotoUpload(file)
   const extension = upload.type === 'image/png' ? 'png' : upload.type === 'image/webp' ? 'webp' : 'jpg'
   const key = `${profileId}/${Date.now()}.${extension}`
 

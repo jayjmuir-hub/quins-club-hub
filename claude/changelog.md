@@ -10,7 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 📅 **The fortnight strip offers a choice on a busy day** — Jay:
+- (unmerged) — 📷 **Photos keep their shape, and the positioner becomes one
+  honest circle** — three Jay observations that turned out to be one problem:
+  chat pics "don't work as well as whatsapp", "the ios pic issue", and "can't
+  we have a simple one size view and slide the photo around in the focus
+  circle?". Every upload path ran the 600px SQUARE head-shot resizer (a
+  landscape team photo lost both ends, and the focal-point picker was handed
+  a photo whose edges were already gone — positioning was a no-op on the 1:1
+  avatars), the 5 MB check ran BEFORE the resize (modern phones' 5–8 MB
+  files refused while the resizer would have made them ~200 KB), and HEIC —
+  every iPhone's default — was refused as "not a photo". Now: one shared
+  gate `preparePhotoUpload` (type → keep-the-shape resize to 1600px → size
+  LAST; HEIC re-encoded to JPEG where decodable, refused with save-as-JPEG
+  advice where not) used by chat, player, staff and social-idea uploads; and
+  the positioner is ONE 240px circle you slide the photo under — the
+  three-shape preview strip previewed tile shapes measured from a
+  SquadStaffCard layout that no longer exists (its own "re-measure when the
+  tile layout changes" warning, broken silently). Focal point storage
+  unchanged; zoom examined and deliberately deferred. Drag geometry proved
+  in real Chromium via the harness scenario (−20px on a 4:3 photo → exactly
+  75%, locked axis inert, clamped at the edge). Spec:
+  `claude/plans/2026-08-26-photo-pipeline-and-positioner.md`.
+
+- `affb2b6` — 📅 **The fortnight strip offers a choice on a busy day** — Jay:
   tapping a date in the Dashboard's "Next two weeks" with several events
   "pops up one of them with no choice to select any of the others like in
   the calendar view". It was `onSelect(dayEvents[0])` — the exact defect
