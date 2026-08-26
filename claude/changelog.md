@@ -26,9 +26,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   proof of the discriminator; `can_see_staff_photo` gains the matching arm).
   Wired on: /admin Staff + Accounts pending queues + Rights log, Home/Squad
   Hub staff cards, Player Detail parents, notice authors, group-thread
-  member line. ⚠️ Migration NOT yet applied to production — blocked by a
-  permission gate; apply before or with the merge. The NEXT pull request
-  cites this entry's squash SHA.
+  member line. Migration APPLIED to production before the PR (function
+  present, anon refused, harness green against live — measured). The NEXT
+  pull request cites this entry's squash SHA.
+- `f785a35` — 📋 **Session handoff for the 25–26 Aug batch** —
+  `claude/handoffs/2026-08-26-desktop-chat-batch.md`: six shipped PRs, the
+  session's reusable traps (docs-check local-vs-CI, the harness alias
+  contract, execute_sql's last-statement-only results, the squatted 5199),
+  and the two deliberate ticks v1 cuts now recorded in open-items.
 - `242d442` — 💬 **Online status and WhatsApp ticks land in chat** — Jay:
   "we need an online status in chat" and "delivered and viewed check marks
   for messages like whatsapp has". ONLINE is Supabase Realtime PRESENCE
