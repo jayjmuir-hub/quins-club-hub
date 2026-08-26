@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 📋 **Session handoff for the chat-parity and officers day** —
+- (unmerged) — 💬 **The composer stays put on desktop** — Jay: the chat input
+  box "moves up and down depending on where i scroll". `<main>`'s shared
+  `desktop:pb-16` opened 64px of slack under the sticky composer, so it pinned
+  flush to the viewport mid-scroll and rested 64px higher at full scroll. The
+  padding now lives only in the non-conversation branch; conversations get no
+  main bottom padding at all (the composer carries its own, safe-area
+  included). Measured flush (gap 0) mid-scroll and at rest, desktop and phone,
+  in the harness.
+
+- `e2bc9da` — 📋 **Session handoff for the chat-parity and officers day** —
   `claude/handoffs/2026-08-26-chat-parity-and-officers.md`: ten PRs, the
   six reusable traps (specifier-text harness aliases, the one-behind
   cadence under two sessions, branch-names-as-paths, the merge classifier
