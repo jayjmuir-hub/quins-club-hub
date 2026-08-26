@@ -1,16 +1,15 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ChatHeader from '../components/ChatHeader.jsx'
 import DmThread from '../components/DmThread.jsx'
-import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
+import { Avatar } from '../components/NewChatPicker.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import PersonCard from '../components/PersonCard.jsx'
 import PersonName from '../components/PersonName.jsx'
 import { listMyNicknames, setNickname } from '../data/nicknames.js'
-import { getPersonCard } from '../data/personCard.js'
-import { labelForRole } from '../lib/scope.js'
+import IdentityBadges from '../components/IdentityBadges.jsx'
 import { blockDm, deleteConversation, leaveGroup, renameGroup, unblockDm } from '../data/messages.js'
 import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
 import { setChatBackground } from '../lib/chatBackgrounds.js'
@@ -71,22 +70,6 @@ function Thread({ conversationId }) {
 
   // The person card: the tapped member-line name's profile id, or null.
   const [cardFor, setCardFor] = useState(null)
-  // The identity line (26 Aug 2026, Jay: "you should see their badge and
-  // details"): the other person's REAL title and squads, from the same
-  // member_contact_card ruling the tap-a-name card reads — the database
-  // decides who may see what. Decoration: a failure or a null card renders
-  // exactly what rendered before this existed.
-  const [otherCard, setOtherCard] = useState(null)
-  useEffect(() => {
-    if (isGroup || !other?.id) return undefined
-    let mounted = true
-    getPersonCard(other.id)
-      .then((card) => mounted && setOtherCard(card))
-      .catch(() => mounted && setOtherCard(null))
-    return () => {
-      mounted = false
-    }
-  }, [isGroup, other?.id])
   const [renaming, setRenaming] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [addingPeople, setAddingPeople] = useState(false)
@@ -231,42 +214,31 @@ function Thread({ conversationId }) {
 
   return (
     <section className="flex flex-1 flex-col px-1">
-      <ChatHeader
-        avatar={<Avatar name={isGroup ? conversation?.title : otherName} staff={!isGroup && STAFF.has(other?.role)} size="sm" />}
-        title={(isGroup ? conversation?.title : otherName) ?? '…'}
-        subtitle={
-          reviewing
-            ? 'Reviewing as a club admin'
-            : isGroup
-              ? // Round 3: "at the top it previews who is in the chat under
-                // the name of the chat" — first names, You for the reader.
-                (memberLine ?? `${members?.length ?? '…'} people`)
-              : other?.id && online.has(other.id)
-              ? 'Online'
-              : `Private · you and ${otherName ?? 'them'}`
-        }
-        actions={actions}
-      />
-      {/* The identity line: real title (Head Coach, not just Coach) and the
-          squads they run, whenever member_contact_card grants the read. The
-          plain inbox-row pill stays as the fallback so a refused or failed
-          card loses nothing. */}
-      {!isGroup && otherCard && (otherCard.title || otherCard.isSuper || STAFF.has(otherCard.role)) ? (
-        <div data-testid="dm-identity" className="-mt-1 mb-2 flex flex-wrap items-center gap-1.5 px-1">
-          <span className="rounded-[6px] bg-danger-bg px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.4px] text-danger-ink">
-            {otherCard.isSuper ? 'Club Hub admin' : otherCard.title ?? labelForRole(otherCard.role) ?? otherCard.role}
-          </span>
-          {otherCard.squads?.length > 0 && (
-            <span className="text-[12px] font-semibold text-ink-muted">{otherCard.squads.join(', ')}</span>
-          )}
-        </div>
-      ) : (
-        !isGroup && other?.role && STAFF.has(other.role) && (
-          <div className="-mt-1 mb-2 px-1">
-            <RolePill role={other.role} />
-          </div>
-        )
-      )}
+      {/* ⚠️ STICKY, AND THE IDENTITY RIDES INSIDE IT (26 Aug 2026, Jay: the
+          badges "scroll off the screen in longer chats… they should always
+          be visible"). The mirror of the composer's sticky bottom-0: name
+          and badges hold the top while the stream scrolls between them.
+          Every hat renders — claude/plans/2026-08-26-dm-identity-rows.md
+          replaced the single best-role pill the same day it shipped. */}
+      <div data-testid="dm-header" className="sticky top-0 z-20 -mx-1 bg-surface px-1">
+        <ChatHeader
+          avatar={<Avatar name={isGroup ? conversation?.title : otherName} staff={!isGroup && STAFF.has(other?.role)} size="sm" />}
+          title={(isGroup ? conversation?.title : otherName) ?? '…'}
+          subtitle={
+            reviewing
+              ? 'Reviewing as a club admin'
+              : isGroup
+                ? // Round 3: "at the top it previews who is in the chat under
+                  // the name of the chat" — first names, You for the reader.
+                  (memberLine ?? `${members?.length ?? '…'} people`)
+                : other?.id && online.has(other.id)
+                ? 'Online'
+                : `Private · you and ${otherName ?? 'them'}`
+          }
+          actions={actions}
+        />
+        {!isGroup && <IdentityBadges profileId={other?.id} className="-mt-1 px-1 pb-2" />}
+      </div>
 
       {renaming && (
         <form onSubmit={submitRename} className="mb-3 rounded-card bg-surface-card p-3 shadow-card" data-testid="rename-form">
