@@ -503,7 +503,15 @@ export function scopeChatRows(rows, memberships, teams) {
   return (rows ?? []).filter((r) => {
     if (r.kind === 'staff') return canEditTeam(memberships, r.team_id)
     if (r.team_id) return visible.has(r.team_id)
-    return true // club, DMs and groups are not squad-scoped
+    // A DM nobody has ever messaged in is hidden until somebody does (26 Aug
+    // 2026, Jay: "no need to save a chat like that if it wasn't used") — the
+    // person card's Chat button creates the conversation on TAP, so a look
+    // without a message was littering both people's lists. last_author_id is
+    // the signal: my_chats fills it from the newest VISIBLE message, so a
+    // photo-only chat keeps its author and stays. Groups are deliberate
+    // creations and always show; the row returns the moment a message lands.
+    if (r.kind === 'dm') return r.last_author_id != null
+    return true // club and groups are not squad-scoped
   })
 }
 

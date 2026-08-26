@@ -45,6 +45,10 @@ vi.mock('../src/lib/presence.js', () => ({
   usePresence: (...a) => onlineMock(...a),
   dotState: (map, id) => (id && map?.get?.(id)) || 'offline',
 }))
+// The header's identity line fetches the person card (26 Aug 2026) — the
+// same server ruling the tap-a-name card uses, injected per test.
+const getPersonCardMock = vi.fn(async () => null)
+vi.mock('../src/data/personCard.js', () => ({ getPersonCard: (...a) => getPersonCardMock(...a) }))
 vi.mock('../src/data/messages.js', () => ({
   // Ticks (26 Aug 2026): the receipts map is injected per test; receiptState
   // mirrors the real pure function so tick states are exercised for real.
@@ -168,6 +172,41 @@ describe('DirectMessages — /chat/dm', () => {
   it('the old inbox URL goes to the Chats list', async () => {
     renderAt('/chat/dm')
     expect(await screen.findByText('the list')).toBeInTheDocument()
+  })
+})
+
+// 26 Aug 2026, Jay: "when you have a chat with someone you should see their
+// badge and details" — a staff member's DM header carries their real title
+// (head or assistant) and their squads, from the same member_contact_card
+// ruling the tap-a-name person card reads. The database decides who may see
+// what; a null card renders exactly what rendered before.
+describe('the DM identity line', () => {
+  it('shows a coach’s title and squads under the header', async () => {
+    getPersonCardMock.mockResolvedValue({
+      profileId: OTHER,
+      name: 'Zz Manager Probe',
+      role: 'coach',
+      title: 'Head Coach',
+      isSuper: false,
+      squads: ['U14B'],
+      phone: null,
+      email: null,
+      photoUrl: null,
+      focus: null,
+    })
+    renderAt('/chat/dm/c1')
+    const line = await screen.findByTestId('dm-identity')
+    expect(within(line).getByText('Head Coach')).toBeInTheDocument()
+    expect(within(line).getByText(/U14B/)).toBeInTheDocument()
+  })
+
+  it('a null card falls back to the plain role pill, nothing invented', async () => {
+    getPersonCardMock.mockResolvedValue(null)
+    renderAt('/chat/dm/c1')
+    await screen.findByTestId('dm-composer')
+    expect(screen.queryByTestId('dm-identity')).toBeNull()
+    // The pre-existing pill from the inbox row's role still renders.
+    expect(screen.getByText('Team Manager')).toBeInTheDocument()
   })
 })
 

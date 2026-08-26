@@ -13,6 +13,30 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Needs Jay (account creations — Claude does not do these)
 
+- **Should a player with their OWN account still count as "no parent on
+  file"? — measured 26 Aug 2026, decision not yet made.** Of the players the
+  Needs Attention screen flags for parents, none has an unlinked parent
+  membership (the 25 Aug trigger is holding); most hold a PLAYER-role
+  account themselves (largely U16B — plausibly set up by a parent under the
+  child's identity through the old path) and a couple have no account link
+  at all. If a self-managed older player is acceptable without a recorded
+  guardian, `src/lib/completeness.js` should learn that exception and most
+  of the list clears itself; if the club wants a guardian on file for every
+  minor regardless, the list is real and the families need chasing (several
+  have contact details on file to chase with — counts rot, measure fresh).
+  Jay's call either way; measured with the queries in the 26 Aug session.
+  **Parked 26 Aug, same session — the parent-match automation idea.** Jay
+  asked for suggested matches with a confirm-to-merge; brainstorming got as
+  far as one load-bearing finding before he chose to think on it: matching
+  a registration contact email to an account is NOT evidence the account is
+  a parent — measured live, every player-role account whose email matched
+  the family contact is ALSO named as the child, so a blanket
+  "reclassify as parent" would have converted self-managed teenagers'
+  own logins. Any future build must GRADE the evidence: offer an attach
+  only when the matched account bears a different adult's name; a
+  child-named match is the self-managed-player policy question above, not
+  a merge. Do not re-open without this finding in hand.
+
 - ✅ ~~**Leaked-password protection is OFF.** Supabase → Authentication → Policies.~~
   — **IT IS ON. Read off the dashboard 15 Aug 2026**, after Jay said he thought
   he had already done it and this file said otherwise for two days.
