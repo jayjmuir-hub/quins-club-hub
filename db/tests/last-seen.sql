@@ -109,14 +109,21 @@ begin
   end if;
   insert into _log(line) values ('3 no-argument proof: the other row never moves');
 
-  -- 2: a second immediate touch does NOT move it…
+  -- 2: a touch INSIDE the 12h window does not move the stamp.
+  --    ⚠️ BACK-DATED ONE HOUR, NOT COMPARED AGAINST AN IMMEDIATE RE-TOUCH:
+  --    now() is frozen per transaction, so an UN-throttled second touch
+  --    rewrites the identical timestamp and an equality assert passes
+  --    against the very bug. Found by injecting the fault (the throttle
+  --    clause deleted) and watching the first version of this assert
+  --    fail to fail, 26 Aug 2026.
+  update profiles set last_seen_at = now() - interval '1 hour' where id = one;
   select last_seen_at into before_touch from profiles where id = one;
   perform pg_temp.as_user(one::text);
   perform touch_last_seen();
   reset role;
   select last_seen_at into seen_one from profiles where id = one;
   if seen_one is distinct from before_touch then
-    raise exception 'ASSERT 2 FAILED: throttled touch moved the stamp';
+    raise exception 'ASSERT 2 FAILED: a 1h-old stamp moved — the 12h throttle is not holding';
   end if;
   -- …with the CONTROL: back-date 13 hours and the same call DOES move it,
   -- so the non-move above is the throttle refusing, not the touch breaking.
