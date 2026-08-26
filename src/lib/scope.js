@@ -176,6 +176,29 @@ export function isAdmin(memberships) {
   return memberships.some((m) => isActiveMembership(m) && m.role === 'admin')
 }
 
+/**
+ * The squads whose PARENT view a coach or team manager may preview — their
+ * own, and no one else's. Jay's ruling, 26 Aug 2026: "i want them to be able
+ * to view as a parent of their own age group so they can see what parents
+ * will see", after declining the wider offer (other squads, coach personas).
+ * Medic deliberately absent — he named coaches and managers.
+ *
+ * Like everything in this file this decides what the UI offers; the preview
+ * only narrows what the browser displays and never widens RLS access.
+ */
+export function parentPreviewTeamIds(memberships) {
+  return [
+    ...new Set(
+      (memberships ?? [])
+        .filter(
+          (m) =>
+            isActiveMembership(m) && (m.role === 'coach' || m.role === 'manager') && m.team_id,
+        )
+        .map((m) => m.team_id),
+    ),
+  ]
+}
+
 // ══ SUPER ADMIN, AND PER-ADMIN RIGHTS (10 Aug 2026) ═══════════════════════
 //
 // ⚠️ A FLAG ON THE MEMBERSHIP, NOT A ROLE VALUE, and the reason is measured:

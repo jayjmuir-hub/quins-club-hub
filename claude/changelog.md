@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 📮 **The staff notifiers stop bouncing their own To line** — the
+- (unmerged) — 👀 **Coaches and managers preview their squad as a parent** —
+  Jay: "i want them to be able to view as a parent of their own age group so
+  they can see what parents will see" (he declined other squads and the
+  coach persona in the same answer). `parentPreviewTeamIds()` in
+  `src/lib/scope.js` is the one rule: active coach/manager rows, own squads,
+  parent persona only — read by the provider's gate (a stored preview in any
+  other shape self-heals away like a forged admin one), the AccountMenu
+  trigger, `ViewAsOptions` (staff variant: "My normal view", no Coach
+  buttons) and the banner. Medic deliberately absent; pending rows count for
+  nothing, as everywhere. Flips view-as.test's "is not offered to a coach"
+  and memberships.test's "refuses a non-admin" — both were the old ruling's
+  tests, rewritten with the refusals that still hold. The NEXT pull request
+  cites this entry's squash SHA.
+- `b108163` — 📮 **The staff notifiers stop bouncing their own To line** — the
   week's Resend dashboard read 21% bounced (83 of 396) and it was ONE bug:
   notify-approval, notify-access-request and notify-pitch-request sent
   `to: [MAIL_FROM]` — noreply@ on the SENDING subdomain, which nothing
@@ -22,7 +35,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the bug. Measured while here: `_dmarc.adhquins-clubhub.com` EXISTS
   (p=quarantine, rua set) — the "no DMARC" line in the pasted health report was
   wrong, and the send subdomain inherits the root policy by spec.
-
 - `c1a5132` — 💬 **The composer stays put on desktop** — Jay: the chat input
   box "moves up and down depending on where i scroll". `<main>`'s shared
   `desktop:pb-16` opened 64px of slack under the sticky composer, so it pinned

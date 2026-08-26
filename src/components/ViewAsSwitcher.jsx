@@ -1,8 +1,11 @@
 import { useMemo } from 'react'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { isAdmin, parentPreviewTeamIds, roleLabel, visibleTeams } from '../lib/scope.js'
 
-// The admin-only "view as" preview (design spec 2026-08-03 §1). Two exports,
+// The "view as" preview (design spec 2026-08-03 §1) — admins preview any
+// persona in any squad; since 26 Aug 2026 a coach or team manager previews
+// the PARENT view of their own squads (Jay: "so they can see what parents
+// will see"). Two exports,
 // both reached from AppShell: `ViewAsOptions`, the persona list that
 // AccountMenu shows as its second page, and `ViewAsBanner`, the sticky banner
 // above the masthead.
@@ -77,22 +80,35 @@ function optionClasses(active) {
  * fifteen buttons all called "Coach". The heading is aria-hidden for the same
  * reason (claude/specs/accessibility.md).
  *
- * Renders nothing for anyone who is not a real admin.
+ * Renders nothing for anyone who is neither a real admin nor a real
+ * coach/manager of at least one squad.
  *
  * @param {{ onChoose?: () => void }} props  Called after a persona is set.
  */
 export function ViewAsOptions({ onChoose }) {
   const { realMemberships, teams, viewAs, setViewAs } = useMemberships()
   const admin = isAdmin(realMemberships)
+  // 26 Aug 2026, Jay: a coach or team manager previews the PARENT view of
+  // their OWN squads — "so they can see what parents will see". No coach
+  // persona for them and no other squads; he declined both when offered.
+  // The provider enforces the same shape when deriving the preview, so this
+  // list and the gate can never disagree.
+  const staffTeamIds = useMemo(() => parentPreviewTeamIds(realMemberships), [realMemberships])
 
   // Built from the REAL set: while previewing, the effective set holds a single
   // team and this list would collapse to just that one.
-  const previewTeams = useMemo(
-    () => (admin ? visibleTeams(realMemberships, teams) : []),
-    [admin, realMemberships, teams],
-  )
+  const previewTeams = useMemo(() => {
+    if (admin) return visibleTeams(realMemberships, teams)
+    return (teams ?? [])
+      .filter((team) => staffTeamIds.includes(team.id))
+      .sort((a, b) => {
+        const orderDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0)
+        if (orderDiff !== 0) return orderDiff
+        return a.name.localeCompare(b.name)
+      })
+  }, [admin, realMemberships, teams, staffTeamIds])
 
-  if (!admin) return null
+  if (!admin && staffTeamIds.length === 0) return null
 
   function choose(next) {
     setViewAs(next)
@@ -102,9 +118,11 @@ export function ViewAsOptions({ onChoose }) {
   return (
     <>
       <p className="px-3 pb-2 pt-1 text-[12px] leading-relaxed text-ink-muted">
-        Preview how the app looks for a coach or parent in one age group.
-        This filters what this browser displays; your own access is
-        unchanged.
+        {admin
+          ? 'Preview how the app looks for a coach or parent in one age group. ' +
+            'This filters what this browser displays; your own access is unchanged.'
+          : 'Preview how the app looks for a parent in your age group. ' +
+            'This filters what this browser displays; your own access is unchanged.'}
       </p>
 
       <button
@@ -113,7 +131,7 @@ export function ViewAsOptions({ onChoose }) {
         onClick={() => choose(null)}
         className={optionClasses(!viewAs)}
       >
-        <span>All age groups (Admin)</span>
+        <span>{admin ? 'All age groups (Admin)' : 'My normal view'}</span>
         {!viewAs && (
           <span className="text-[11px] font-bold uppercase tracking-[.4px]">Current</span>
         )}
@@ -127,15 +145,17 @@ export function ViewAsOptions({ onChoose }) {
           >
             {team.name}
           </p>
-          <button
-            type="button"
-            role="menuitem"
-            aria-label={`Coach of ${team.name}`}
-            onClick={() => choose({ role: 'coach', teamId: team.id })}
-            className={optionClasses(viewAs?.role === 'coach' && viewAs?.teamId === team.id)}
-          >
-            <span>Coach</span>
-          </button>
+          {admin && (
+            <button
+              type="button"
+              role="menuitem"
+              aria-label={`Coach of ${team.name}`}
+              onClick={() => choose({ role: 'coach', teamId: team.id })}
+              className={optionClasses(viewAs?.role === 'coach' && viewAs?.teamId === team.id)}
+            >
+              <span>Coach</span>
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -159,7 +179,12 @@ export function ViewAsOptions({ onChoose }) {
 export function ViewAsBanner() {
   const { realMemberships, teams, viewAs, setViewAs } = useMemberships()
 
-  if (!isAdmin(realMemberships) || !viewAs) return null
+  // Same rule as everywhere in this file: gate on the REAL set. The provider
+  // only ever derives a non-null viewAs for someone allowed to hold it
+  // (admin, or coach/manager parent-previewing their own squad), so this
+  // check mirrors that derivation rather than adding a different one.
+  const canPreview = isAdmin(realMemberships) || parentPreviewTeamIds(realMemberships).length > 0
+  if (!canPreview || !viewAs) return null
 
   const role = personaRoleLabel(viewAs.role)
   const team = teamName(teams, viewAs.teamId)

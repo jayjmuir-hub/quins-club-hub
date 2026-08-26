@@ -3,7 +3,7 @@ import { useAuth } from './auth.jsx'
 import { supabase } from './supabase'
 import { claimRosterAccess, loadMyMemberships } from '../data/members.js'
 import { linkMyParentRows } from '../data/parents.js'
-import { isAdmin } from './scope.js'
+import { isAdmin, parentPreviewTeamIds } from './scope.js'
 
 // Membership/teams context: loads the current user's membership rows and the
 // club's teams once a session exists, so the rest of the app can read "who
@@ -256,11 +256,20 @@ export function MembershipProvider({ children }) {
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), [])
 
-  // Only a real admin may preview, and only into a team that actually exists.
-  // Both checks are applied when *deriving* the effective preview so a stale or
-  // forged localStorage value can never take effect for even one render — the
-  // effect below then tidies up the stored value.
-  const previewAllowed = isAdmin(memberships)
+  // Who may preview, and only into a team that actually exists. Both checks
+  // are applied when *deriving* the effective preview so a stale or forged
+  // localStorage value can never take effect for even one render — the effect
+  // below then tidies up the stored value.
+  //
+  // An admin previews any persona in any squad. A coach or team manager
+  // (26 Aug 2026, Jay) previews ONLY the parent persona, ONLY in their own
+  // squads — a stored value outside that shape self-heals away exactly like
+  // a forged admin one. Either way the preview narrows what this browser
+  // displays; RLS access is unchanged.
+  const previewAllowed =
+    isAdmin(memberships) ||
+    (viewAsState?.role === 'parent' &&
+      parentPreviewTeamIds(memberships).includes(viewAsState.teamId))
   const previewTeamExists = viewAsState ? teams.some((team) => team.id === viewAsState.teamId) : false
   const viewAs = viewAsState && previewAllowed && previewTeamExists ? viewAsState : null
 
