@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🏅 **The ninth officer title: Social Media Director** — Jay,
+- (unmerged) — 📅 **The fortnight strip offers a choice on a busy day** — Jay:
+  tapping a date in the Dashboard's "Next two weeks" with several events
+  "pops up one of them with no choice to select any of the others like in
+  the calendar view". It was `onSelect(dayEvents[0])` — the exact defect
+  the calendar's day sheet was built to kill in Task 23, still alive in the
+  strip. DaySheet extracted from `Schedule.jsx` to
+  `src/components/DaySheet.jsx` (history and comments moved with it) and
+  the Dashboard opens it for a multi-event day; a single-event day still
+  opens the detail directly, and empty days stay untappable. The strip now
+  hands the caller the WHOLE day in kick-off order, and the screen-reader
+  count no longer inherits the three-dot cap (four events used to read
+  "3 events").
+
+- `c5493fb` — 🏅 **The ninth officer title: Social Media Director** — Jay,
   minutes after the eight shipped. The closed-vocabulary design working as
   designed: one migration widening the CHECK
   (`db/migrations/20260826_officer_title_social_media.sql`, APPLIED to
