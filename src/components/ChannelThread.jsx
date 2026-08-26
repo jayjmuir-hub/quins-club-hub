@@ -88,13 +88,19 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           }
         />
       )}
-      {/* Same paint site as the DM thread: the stream wrapper, wearing the
-          device wallpaper; data-background is what the tests read. Day
+      {/* Same paint site as the DM thread: the stream wrapper carries
+          data-background (what the tests read), and the photo rides the
+          sticky viewport-height layer inside it — NOT the wrapper itself,
+          which grows with the thread and stretched the paper blurry (26 Aug
+          2026). See the DM thread's comment for the full mechanism. Day
           dividers and gap-1 match DirectMessages Thread so a staff chat
           does not look like a third style. flex-1 + justify-end make the
           wallpaper itself the slack-eater — see the DM thread's comment for
           the 26 Aug screenshot that decided it. */}
-      <div className="-mx-1 flex flex-1 flex-col justify-end gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
+      <div className="relative isolate -mx-1 flex flex-1 flex-col justify-end gap-1 rounded-[12px] px-2 py-1" data-background={background}>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-clip rounded-[12px]">
+        <div data-testid="chat-wallpaper" className="sticky top-0 h-dvh w-full" style={backgroundStyle(background) ?? undefined} />
+      </div>
       {messages?.map((m, index) => (
         <Fragment key={m.id}>
         {daysDiffer(messages[index - 1]?.created_at, m.created_at) && (

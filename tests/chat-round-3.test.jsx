@@ -215,9 +215,13 @@ describe('the wallpaper', () => {
     await user.click(within(screen.getByTestId('background-picker')).getByRole('button', { name: /Club doodle/ }))
     const stream = document.querySelector('[data-background]')
     expect(stream.getAttribute('data-background')).toBe('doodle')
-    expect(stream.style.backgroundImage).toContain('/chat-backgrounds/doodle.jpg')
-    expect(stream.style.backgroundImage).toContain('url(')
-    expect(stream.style.backgroundImage).not.toContain('data:image/svg+xml')
+    // ⚠️ Not on the growing wrapper (the 26 Aug stretch bug) — the photo
+    // rides the sticky viewport-sized layer, so long threads stay crisp.
+    expect(stream.style.backgroundImage ?? '').toBe('')
+    const paper = document.querySelector('[data-testid="chat-wallpaper"]')
+    expect(paper.style.backgroundImage).toContain('/chat-backgrounds/doodle.jpg')
+    expect(paper.style.backgroundImage).toContain('url(')
+    expect(paper.style.backgroundImage).not.toContain('data:image/svg+xml')
     expect(localStorage.getItem('chat-background')).toBe('doodle')
   })
 })
