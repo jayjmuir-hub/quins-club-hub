@@ -11,7 +11,13 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 const useAuthMock = vi.fn()
 const useMembershipsMock = vi.fn()
-const m = { listChats: vi.fn(), listDmCandidates: vi.fn(), openConversation: vi.fn(), subscribeMessages: vi.fn() }
+const m = {
+  listChats: vi.fn(),
+  listDmCandidates: vi.fn(),
+  openConversation: vi.fn(),
+  subscribeMessages: vi.fn(),
+  listMyConversations: vi.fn(),
+}
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/data/messages.js', async (orig) => ({
@@ -20,6 +26,21 @@ vi.mock('../src/data/messages.js', async (orig) => ({
   listDmCandidates: (...a) => m.listDmCandidates(...a),
   openConversation: (...a) => m.openConversation(...a),
   subscribeMessages: (...a) => m.subscribeMessages(...a),
+  listMyConversations: (...a) => m.listMyConversations(...a),
+}))
+// ⚠️ chatPrefs must be mocked or load() makes a REAL supabase fetch before
+// listMyConversations — fast against the local .env project, but CI points
+// at placeholder.supabase.co, and the DNS failure there outlasts
+// findByRole's 1s timeout. Green locally, red in CI, 26 Aug 2026.
+vi.mock('../src/data/chatPrefs.js', () => ({
+  listMyChatPrefs: async () => new Map(),
+  setChatPref: vi.fn(),
+}))
+// Presence, injected per test. dotState mirrors the real pure function.
+const presenceMock = vi.fn(() => new Map())
+vi.mock('../src/lib/presence.js', () => ({
+  usePresence: (...a) => presenceMock(...a),
+  dotState: (map, id) => (id && map?.get?.(id)) || 'offline',
 }))
 
 import ChatList, { previewLine, shortBand } from '../src/screens/ChatList.jsx'
@@ -52,6 +73,7 @@ beforeEach(() => {
     teams: [{ id: 't1', name: 'ZZ Probe U13', sort_order: 1 }],
   })
   m.listChats.mockResolvedValue(ROWS)
+  m.listMyConversations.mockResolvedValue([])
   m.subscribeMessages.mockReturnValue(() => {})
   m.listDmCandidates.mockResolvedValue([
     { profile_id: 'p9', full_name: 'Zz Other Parent', role: 'parent', via_team: 'ZZ Probe U13' },
@@ -156,5 +178,35 @@ describe('ChatList — desktop layout', () => {
     expect(tokens).toContain('desktop:grid')
     expect(tokens).toContain('desktop:grid-cols-2')
     expect(tokens).toContain('desktop:items-start')
+  })
+})
+
+// ⚠️ THE PAIRING REGRESSION, 26 Aug 2026 — found LIVE by Jay within minutes:
+// thread header green, list row grey. listMyConversations returns the
+// my_conversations RPC's INBOX shape ({ conversation_id, other_id, … }); the
+// first wiring filtered on fields that do not exist (kind, id, profile_a),
+// built an empty map, and every list dot fell to offline. This test renders
+// the SCREEN with the real row shape — the component-only test could not
+// catch it.
+describe('ChatList — presence dots use the real my_conversations shape', () => {
+  it('a DM row goes green when its other person is online', async () => {
+    m.listMyConversations.mockResolvedValue([
+      { conversation_id: 'c1', other_id: 'other-1', other_name: 'Zz Manager Probe', other_role: 'manager', last_at: null, last_body: null, last_author_id: null, unread: false },
+    ])
+    presenceMock.mockReturnValue(new Map([['other-1', 'online']]))
+    renderList()
+
+    expect(await screen.findByRole('img', { name: 'Online' })).toBeInTheDocument()
+  })
+
+  it('…and grey only when they truly are not connected', async () => {
+    m.listMyConversations.mockResolvedValue([
+      { conversation_id: 'c1', other_id: 'other-1', other_name: 'Zz Manager Probe', other_role: 'manager', last_at: null, last_body: null, last_author_id: null, unread: false },
+    ])
+    presenceMock.mockReturnValue(new Map())
+    renderList()
+
+    expect(await screen.findByRole('img', { name: 'Offline' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Online' })).toBeNull()
   })
 })

@@ -173,18 +173,20 @@ export default function ChatList() {
       setPrefs(new Map())
     }
     try {
+      // ⚠️ my_conversations RPC rows: { conversation_id, other_id, … } — the
+      // INBOX shape, not the conversations table. The first wiring filtered
+      // on table columns (kind/id/profile_a) that do not exist here, built
+      // an empty map, and every list dot fell to grey while the thread
+      // header (which pairs from other.id directly) was green. Found live by
+      // Jay minutes after deploy, 26 Aug 2026.
       const conversations = await listMyConversations()
       setDmOthers(
-        new Map(
-          conversations
-            .filter((c) => c.kind === 'dm')
-            .map((c) => [c.id, c.profile_a === selfId ? c.profile_b : c.profile_a]),
-        ),
+        new Map(conversations.filter((c) => c.other_id).map((c) => [c.conversation_id, c.other_id])),
       )
     } catch {
       setDmOthers(new Map())
     }
-  }, [selfId])
+  }, [])
   useEffect(() => {
     load()
   }, [load])
