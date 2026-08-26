@@ -1,6 +1,9 @@
 # Person Card Implementation Plan
 
-**Status: NOT SHIPPED — plan written 26 Aug 2026, execution not started.**
+**Status: EXECUTED on branch `claude/person-card`, 26 Aug 2026 — all tasks
+done except Task 2's production apply (blocked by a permission gate; needs
+Jay or an approved session) and Task 9's post-deploy live check. Full suite
+green at execution. Not merged, so NOT SHIPPED yet.**
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

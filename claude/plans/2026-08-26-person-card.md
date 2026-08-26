@@ -1,7 +1,10 @@
 # The person card — tap any name, contact the person
 
-**Status: NOT SHIPPED — design approved by Jay 26 Aug 2026; implementation
-not started.**
+**Status: BUILT, NOT YET SHIPPED — implemented on branch `claude/person-card`
+26 Aug 2026 (all nine tasks of the implementation plan, full suite green);
+awaiting Jay's merge and the live verification. ⚠️ The production migration
+was NOT applied by the session that built it — the apply was blocked by a
+permission gate and is listed in the hand-off.**
 
 Jay, 25 Aug 2026: "click on any username … and have the option to chat with
 them." That request shipped only inside chat threads (`ChatBubble`'s
