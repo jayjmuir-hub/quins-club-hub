@@ -64,6 +64,14 @@ export default defineConfig({
         find: /^\.\.\/lib\/memberships\.jsx$/,
         replacement: path.resolve(__dirname, 'stubs/memberships.jsx'),
       },
+      // The './' depth-variants for src/lib/useDmThread.js (26 Aug 2026, the
+      // shared chat thread). It lives IN src/lib, so it writes './memberships
+      // .jsx' and './presence.js' — the exact escape the './auth.jsx' comment
+      // above warns about, and it took the dock down in the harness with
+      // "useMemberships must be used within a MembershipProvider" while the
+      // jsdom suite (which mocks by resolved path, not text) stayed green.
+      { find: /^\.\/memberships\.jsx$/, replacement: path.resolve(__dirname, 'stubs/memberships.jsx') },
+      { find: /^\.\/presence\.js$/, replacement: path.resolve(__dirname, 'stubs/presence.js') },
       // Same trick for the two data modules Schedule/EventDetail reach
       // Supabase through. Both screens live in src/screens/, one level below
       // src/, so the specifier text is identical from both call sites.

@@ -10,7 +10,55 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 👤 **The person card: tap any name, contact the person** — Jay:
+- (unmerged) — 💬 **Shared-chat-thread phase 4: the dock's channels ARE the
+  main chat, and the thin dock is gone** — `FloatingChatDock` mounts
+  `useChannelThread` + `ChannelThread` for squad, staff and club rows; its
+  last hand-rolled stream/composer is deleted, along with its own
+  loadThread/send/react plumbing (each thread loads and subscribes for
+  itself; the dock only keeps its list fresh). Channels in the dock now
+  carry inline thread replies, @mentions, fixture attach, pins, read
+  stats, reports — and the announce-only LOCK: a parent sees the same
+  "only staff can post" composer the main chat shows, where the old dock
+  offered a composer and let the database refuse. Discriminating tests
+  proven against the phase-3 dock: 4 fail there, 16/16 here. The CI red on
+  PR #433's first push was the harness-stubs alias count, already fixed in
+  the phase-3 commit.
+- (unmerged) — 🧩 **Shared-chat-thread phase 3: the channel moves out of its
+  screen** — same split as phase 1, applied to `src/screens/Chat.jsx`: state
+  and behaviour extracted verbatim to `src/lib/useChannelThread.js` (which
+  also becomes `tallyByEvent`'s home, re-exported from Chat.jsx), rendering
+  to `src/components/ChannelThread.jsx`. The screen keeps chrome: header,
+  the ?thread=/?event= deep links, announce-only, clear-chat, wallpaper
+  picking. Chat-screen tests passed UNCHANGED. Also pays a phase-2 debt the
+  harness-stubs count assertion caught (its sixth catch): the two './'
+  depth-variant aliases were added to the config after that phase's
+  full-suite run, so the guard went red one commit late — both are now
+  registered, and the lesson (run `npm test` after the LAST commit) is
+  recorded in the guard itself.
+- (unmerged) — 💬 **Shared-chat-thread phase 2: the dock's DMs and groups ARE
+  the main chat** — `FloatingChatDock` now mounts `useDmThread` + `DmThread`
+  for `dm`/`group` rows (its hand-rolled bubble list for those kinds is
+  deleted), so the dock's chevron carries the FULL menu: quote reply,
+  forward, star, pin, delete on own, report on others', reply privately —
+  which now STAYS IN THE DOCK, switching its panel. "More in full view"
+  leaves the DM menu (it is complete); the header's expand icon remains.
+  Channels stay thin until phase 4. Discriminating tests proven by running
+  them against the phase-1 dock: 9 fail there, all pass here. Found live in
+  the harness, invisible to jsdom: `useDmThread` sits IN src/lib so it
+  writes `./memberships.jsx` / `./presence.js`, escaping the specifier-text
+  aliases exactly as `harness/vite.config.js`'s own './auth.jsx' comment
+  warns — the dock died with "useMemberships must be used within a
+  MembershipProvider" until the two './' depth-variant rules were added.
+- (unmerged) — 🧩 **Shared-chat-thread phase 1: the DM thread moves out of
+  its screen** — spec `claude/plans/2026-08-26-shared-chat-thread.md` (Jay
+  approved same day: the dock should "function exactly as the main chat").
+  State and behaviour extracted verbatim to `src/lib/useDmThread.js`,
+  rendering to `src/components/DmThread.jsx`; `src/screens/DirectMessages.jsx`
+  keeps only chrome (header, rename/nickname/block/leave/delete/wallpaper
+  sheets). Behaviour-preserving by contract: the whole suite passes with
+  ZERO test edits. Phase 2 points the floating dock at the same components.
+  The NEXT pull request cites this entry's squash SHA.
+- `abef0d7` — 👤 **The person card: tap any name, contact the person** — Jay:
   "click on a username, see their info and start a chat, email, call … from
   anywhere in the system." Designed, approved and BUILT the same day
   (`claude/plans/2026-08-26-person-card.md` + `-implementation.md`): tap any
@@ -27,8 +75,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Wired on: /admin Staff + Accounts pending queues + Rights log, Home/Squad
   Hub staff cards, Player Detail parents, notice authors, group-thread
   member line. Migration APPLIED to production before the PR (function
-  present, anon refused, harness green against live — measured). The NEXT
-  pull request cites this entry's squash SHA.
+  present, anon refused, harness green against live — measured).
 - `f785a35` — 📋 **Session handoff for the 25–26 Aug batch** —
   `claude/handoffs/2026-08-26-desktop-chat-batch.md`: six shipped PRs, the
   session's reusable traps (docs-check local-vs-CI, the harness alias

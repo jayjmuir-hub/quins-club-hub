@@ -1,32 +1,13 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import Button from './Button.jsx'
-import ChatBubble from './ChatBubble.jsx'
-import EmojiPicker from './EmojiPicker.jsx'
+import ChannelThread from './ChannelThread.jsx'
+import DmThread from './DmThread.jsx'
 import Spinner from './Spinner.jsx'
-import { uploadChatPhoto } from '../data/chatMedia.js'
-import { listMyNicknames } from '../data/nicknames.js'
-import { backgroundStyle, getChatBackground } from '../lib/chatBackgrounds.js'
-import { dayLabel, daysDiffer } from '../lib/chatDays.js'
-import {
-  chatPath,
-  listChats,
-  listDirectMessages,
-  listMessages,
-  listReactions,
-  listStaffMessages,
-  markMessagesRead,
-  postMessage,
-  postStaffMessage,
-  sendDirectMessage,
-  subscribeMessages,
-  subscribeReactions,
-  toggleReaction,
-} from '../data/messages.js'
+import { chatPath, listChats, subscribeMessages } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
-import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import useStayPinnedToBottom from '../lib/useStayPinnedToBottom.js'
+import useChannelThread from '../lib/useChannelThread.js'
+import useDmThread from '../lib/useDmThread.js'
 import { RowAvatar, previewLine, scopeChatRows } from '../screens/ChatList.jsx'
 
 // The floating chat dock — claude/plans/2026-08-24-floating-chat-dock.md.
@@ -36,11 +17,20 @@ import { RowAvatar, previewLine, scopeChatRows } from '../screens/ChatList.jsx'
 // (the full page IS chat there), opening a compact panel — list, then any
 // thread — over whatever you were doing, which never navigates away.
 //
-// ⚠️ DELIBERATELY THIN. DMs, groups and channels get stream + composer; the
-// database's announce-only refusal is the announce-only UX; everything
-// richer (fixture threads, mentions, pins, read stats, reports, group
-// admin) lives one click away behind the expand icon. This dock is for
-// answering a parent while you're on the Roster, not for moderating.
+// ⚠️ SINCE 26 Aug 2026 THE DOCK IS NOT THIN AT ALL. Jay: it should
+// "function exactly as the main chat" — so every thread here IS the full
+// screen's own components (claude/plans/2026-08-26-shared-chat-thread.md):
+// DMs and groups render src/lib/useDmThread.js + src/components/DmThread.jsx
+// (phase 2), and squad, staff and club channels render
+// src/lib/useChannelThread.js + src/components/ChannelThread.jsx (phase 4)
+// — inline thread replies, @mentions, fixture attach, pins, read stats,
+// reports, announce-only, the lot. The hand-rolled bubble/composer copy
+// this file used to carry is GONE — do not re-add one; a dock copy is
+// exactly the drift the shared components exist to prevent.
+//
+// What stays behind the header's expand icon is conversation MANAGEMENT
+// (rename, leave, block, delete chat, announce-only, wallpaper picking) —
+// the spec's scope line, not a capability gap.
 //
 // Mounted once in AppShell so an open panel and a half-written draft survive
 // navigation. Mobile never sees it: the tab bar already carries Chat, and a
@@ -92,6 +82,43 @@ function saveDockSize(size) {
   }
 }
 
+// A DM or group thread inside the dock: the SAME hook and view the full
+// screen renders, scrolled inside the panel instead of the page. Keyed by
+// conversation id at the call site, so switching rows remounts with fresh
+// state. `initialReplyTo` arms a quote carried across a reply-privately
+// hop from one dock thread into another.
+function DockDmThread({ row, initialReplyTo, onOpenDm }) {
+  const scrollRef = useRef(null)
+  const thread = useDmThread(row.conversation_id, { openDm: onOpenDm, consumeReplyState: false, scrollRef })
+  const { setReplyTo } = thread
+  useEffect(() => {
+    if (initialReplyTo) setReplyTo(initialReplyTo)
+    // Armed once per mount — the quote belongs to the hop that opened us.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return (
+    <div ref={scrollRef} data-testid="dock-thread" className="flex flex-1 flex-col overflow-y-auto bg-surface px-3 py-2">
+      <DmThread thread={thread} compact />
+    </div>
+  )
+}
+
+// A squad, staff or club channel inside the dock — phase 4's twin of
+// DockDmThread. Same hook and view as src/screens/Chat.jsx; the row's kind
+// maps onto the route shapes the hook already speaks.
+function DockChannelThread({ row, onOpenDm }) {
+  const scrollRef = useRef(null)
+  const thread = useChannelThread(
+    { param: row.kind === 'club' ? 'club' : row.team_id, wantStaff: row.kind === 'staff' },
+    { openDm: onOpenDm, scrollRef },
+  )
+  return (
+    <div ref={scrollRef} data-testid="dock-thread" className="flex flex-1 flex-col overflow-y-auto bg-surface px-3 py-2">
+      <ChannelThread thread={thread} compact />
+    </div>
+  )
+}
+
 export default function FloatingChatDock({ badge = false }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -102,26 +129,11 @@ export default function FloatingChatDock({ badge = false }) {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState(null)
   const [active, setActive] = useState(null) // a my_chats row, or null for the list
-  const [thread, setThread] = useState(null)
-  const [reactions, setReactions] = useState(() => new Map())
   const [error, setError] = useState(null)
-  const [draft, setDraft] = useState('')
-  // Reply-with-quote in the dock (26 Aug 2026 — Jay's screenshot: the full
-  // thread's chevron menu simply wasn't here). DMs and groups only: their
-  // send already rides sendDirectMessage's quotedId. Squad and staff
-  // channels reply in THREADS, which is full-view furniture — the dock's
-  // menu sends people there instead of half-implementing it.
-  const [replyTo, setReplyTo] = useState(null)
-  const [sending, setSending] = useState(false)
-  // Round 2: a photo waiting in the dock's composer, and the picker's handle.
-  const [photo, setPhoto] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(null)
   const [size, setSize] = useState(loadDockSize)
-  // Round 3: my private labels, and the shared device wallpaper.
-  const [nicknames, setNicknames] = useState(() => new Map())
-  const listRef = useRef(null)
-  const draftRef = useRef(null)
-  const fileRef = useRef(null)
+  // A quote riding a reply-privately hop between dock threads — consumed by
+  // the DockDmThread mounted for the destination, then cleared.
+  const pendingQuoteRef = useRef(null)
   // The drag's fixed point: pointer position and size at pointerdown. The
   // panel grows LEFT and UP from its anchored corner, so dragging the grip
   // left/up makes it bigger — dx/dy are subtracted, not added.
@@ -156,116 +168,50 @@ export default function FloatingChatDock({ badge = false }) {
     } catch (err) {
       setError(err.message || 'Could not load your chats.')
     }
-    // Decoration — a failure renders real names, never an error.
-    try {
-      setNicknames(await listMyNicknames())
-    } catch {
-      setNicknames(new Map())
-    }
   }, [])
 
-  const loadThread = useCallback(async () => {
-    if (!active) return
-    try {
-      let list
-      if (active.kind === 'dm' || active.kind === 'group') list = await listDirectMessages(active.conversation_id)
-      else if (active.kind === 'staff') list = await listStaffMessages(active.team_id)
-      else list = await listMessages(active.team_id ?? null)
-      setThread(list)
-      try {
-        setReactions(await listReactions(list.map((m) => m.id)))
-      } catch {
-        setReactions(new Map())
-      }
-      const theirs = list.filter((m) => m.author_id !== selfId && !m.deleted_at).map((m) => m.id)
-      if (theirs.length && selfId) markMessagesRead(selfId, theirs)
-    } catch (err) {
-      setError(err.message || 'Could not load this chat.')
-    }
-  }, [active, selfId])
-
+  // The threads load and subscribe for themselves (that is the point of the
+  // shared hooks); the dock only keeps its LIST fresh while open.
   useEffect(() => {
     if (!open) return undefined
     setError(null)
     loadList()
-    loadThread()
-    const offMessages = subscribeMessages(() => {
-      loadList()
-      loadThread()
-    })
-    const offReactions = subscribeReactions(loadThread)
-    return () => {
-      offMessages()
-      offReactions()
-    }
-  }, [open, loadList, loadThread])
-
-  // Same pin-to-newest contract as the full chat screens — the one-shot
-  // scrollIntoView this replaced landed short once photos grew the list
-  // (the whole story lives in src/lib/useStayPinnedToBottom.js).
-  useStayPinnedToBottom(thread, listRef)
+    return subscribeMessages(loadList)
+  }, [open, loadList])
 
   const scoped = useMemo(() => scopeChatRows(rows, memberships, teams), [rows, memberships, teams])
 
   // The full chat page owns /chat — a dock there is furniture on furniture.
   if (location.pathname.startsWith('/chat')) return null
 
-  function clearPhoto() {
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhoto(null)
-    setPhotoPreview(null)
-  }
-
-  function pickPhoto(domEvent) {
-    const file = domEvent.target.files?.[0]
-    domEvent.target.value = ''
-    if (!file) return
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhoto(file)
-    try {
-      setPhotoPreview(URL.createObjectURL(file))
-    } catch {
-      setPhotoPreview(null)
-    }
-  }
-
-  async function send(domEvent) {
-    domEvent.preventDefault()
-    if ((!draft.trim() && !photo) || sending || !active) return
-    setSending(true)
-    setError(null)
-    try {
-      // Photo first, message second — same order as the full thread.
-      const attachmentPath = photo ? await uploadChatPhoto(selfId, photo) : null
-      if (active.kind === 'dm' || active.kind === 'group') await sendDirectMessage(active.conversation_id, draft, { attachmentPath, quotedId: replyTo?.id ?? null })
-      else if (active.kind === 'staff') await postStaffMessage(active.team_id, draft, { attachmentPath })
-      else await postMessage(active.team_id ?? null, draft, { attachmentPath })
-      setDraft('')
-      clearPhoto()
-      setReplyTo(null)
-      await loadThread()
-      await loadList()
-    } catch (err) {
-      setError(err.message || 'Could not send that.')
-    } finally {
-      setSending(false)
-    }
-  }
-
-  async function react(messageId, emoji, on) {
-    try {
-      await toggleReaction(messageId, selfId, emoji, on)
-      await loadThread()
-    } catch (err) {
-      setError(err.message || 'Could not react to that.')
-    }
-  }
-
   function expand() {
     const target = active ? chatPath(active) : '/chat'
     setOpen(false)
     navigate(target)
   }
+
+  // The dock's answer to the shared hooks' openDm seam: reply-privately and
+  // tap-the-author STAY IN THE DOCK, switching its panel to the destination
+  // thread. Only a conversation the chat list cannot see yet (brand new,
+  // list fetch failed) falls back to the full view.
+  async function openDmInDock(dmId, { replyTo: quote } = {}) {
+    try {
+      const fresh = await listChats()
+      setRows(fresh)
+      const row = scopeChatRows(fresh, memberships, teams)?.find((r) => r.conversation_id === dmId)
+      if (row) {
+        pendingQuoteRef.current = quote ?? null
+        setActive(row)
+        return
+      }
+    } catch {
+      // fall through to the full view
+    }
+    setOpen(false)
+    navigate(`/chat/dm/${dmId}`, quote ? { state: { replyPrivatelyTo: quote } } : undefined)
+  }
+
+  const activeIsDm = active && (active.kind === 'dm' || active.kind === 'group')
 
   // ⚠️ THE BOTTOM-RIGHT CORNER IS OURS ONLY BECAUSE HELP LEFT IT. The first
   // cut sat under the floating HelpButton and Help ate every click (found in
@@ -300,7 +246,7 @@ export default function FloatingChatDock({ badge = false }) {
               the contrast gate. */}
           <div className="flex items-center gap-2.5 bg-accent-deep py-2.5 pl-9 pr-3.5 text-white">
             {active ? (
-              <button type="button" aria-label="Back to chats" onClick={() => { setActive(null); setThread(null); setError(null); setReplyTo(null) }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
+              <button type="button" aria-label="Back to chats" onClick={() => { setActive(null); setError(null); pendingQuoteRef.current = null }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
               </button>
             ) : null}
@@ -334,7 +280,7 @@ export default function FloatingChatDock({ badge = false }) {
                     const unread = Number(row.unread) > 0
                     return (
                       <li key={`${row.kind}-${row.team_id ?? row.conversation_id ?? 'club'}`} className="border-b border-line last:border-b-0">
-                        <button type="button" data-testid="dock-row" onClick={() => { setActive(row); setThread(null); setReplyTo(null) }} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-surface-mute">
+                        <button type="button" data-testid="dock-row" onClick={() => { setActive(row); pendingQuoteRef.current = null }} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-surface-mute">
                           <RowAvatar row={row} />
                           <span className="min-w-0 flex-1">
                             <span className={`block truncate text-[14px] ${unread ? 'font-extrabold' : 'font-bold'} text-ink`}>{row.label}</span>
@@ -354,143 +300,12 @@ export default function FloatingChatDock({ badge = false }) {
             </div>
           )}
 
-          {active && (
-            <>
-              <div ref={listRef} data-testid="dock-thread" className="flex flex-1 flex-col gap-1 overflow-y-auto bg-surface px-3 py-2" style={backgroundStyle(getChatBackground()) ?? undefined} data-background={getChatBackground()}>
-                {thread === null && <div className="py-8"><Spinner /></div>}
-                {thread?.length === 0 && <p className="px-1 py-4 text-[13px] text-ink-muted">Nothing here yet.</p>}
-                {thread?.map((m, index) => {
-                  const mine = m.author_id === selfId
-                  const authorName = nicknames.get(m.author_id) ?? m.author?.full_name ?? 'Someone'
-                  const tallies = reactions.get(m.id) ?? []
-                  // 1:1 chrome already names them. Groups, staff and squad
-                  // channels still need the name on THEIRS — same rule as
-                  // DirectMessages Thread / MessageRow.
-                  const named = active.kind !== 'dm'
-                  // The chevron, at dock size (26 Aug 2026 — it simply
-                  // wasn't here). Only what the dock can HONESTLY do: Reply
-                  // where its send carries a quote, Copy where there is a
-                  // body, and the full view for everything richer — the
-                  // "deliberately thin" contract in the header, made
-                  // navigable instead of invisible.
-                  const canQuote = active.kind === 'dm' || active.kind === 'group'
-                  const menuItems = m.deleted_at
-                    ? []
-                    : [
-                        ...(canQuote ? [{ label: 'Reply', onClick: () => setReplyTo(m) }] : []),
-                        ...(m.body?.trim()
-                          ? [{ label: 'Copy', onClick: () => navigator.clipboard?.writeText(m.body) }]
-                          : []),
-                        { label: 'More in full view', onClick: expand },
-                      ]
-                  const quote = m.quoted?.id && !m.deleted_at ? (
-                    <p
-                      className={`mb-0.5 truncate rounded-[6px] border-l-2 px-1.5 py-0.5 text-[11px] ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-brand bg-surface-mute text-ink-muted'}`}
-                      data-testid="quote-block"
-                    >
-                      {m.quoted.deleted_at ? 'Message deleted' : (m.quoted.body?.trim() ? m.quoted.body : '📷 Photo')}
-                    </p>
-                  ) : null
-                  return (
-                    <Fragment key={m.id}>
-                      {daysDiffer(thread[index - 1]?.created_at, m.created_at) && (
-                        <div className="my-1 flex justify-center" data-testid="day-divider" role="separator">
-                          <span className="rounded-pill bg-surface-mute px-2 py-0.5 text-[10.5px] font-bold text-ink-muted shadow-card">
-                            {dayLabel(m.created_at)}
-                          </span>
-                        </div>
-                      )}
-                      <ChatBubble
-                        mine={mine}
-                        messageId={m.id}
-                        testId="dock-bubble"
-                        menuItems={menuItems}
-                        showAuthor={named && !mine}
-                        authorLabel={authorName}
-                        forwarded={Boolean(m.forwarded)}
-                        quote={quote}
-                        deleted={Boolean(m.deleted_at)}
-                        createdAt={m.created_at}
-                        body={m.body}
-                        photoPath={m.attachment_path}
-                        extra={
-                          !m.deleted_at && m.replies?.length ? (
-                            <p className={`mt-0.5 text-[10px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
-                              {m.replies.length} repl{m.replies.length === 1 ? 'y' : 'ies'} in full view
-                            </p>
-                          ) : null
-                        }
-                        reactions={tallies}
-                        selfId={selfId}
-                        onReact={react}
-                      />
-                    </Fragment>
-                  )
-                })}
-              </div>
-              <div className="border-t border-line bg-surface-card p-2.5">
-                {replyTo && (
-                  <div className="mb-1.5 flex items-center gap-2 rounded-[10px] border-l-2 border-brand bg-surface-mute px-2.5 py-1.5" data-testid="dock-quote-preview">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-extrabold text-brand-ink">
-                        Replying to {replyTo.author_id === selfId ? 'yourself' : (nicknames.get(replyTo.author_id) ?? replyTo.author?.full_name ?? 'Member')}
-                      </p>
-                      <p className="truncate text-[12px] text-ink-muted">{replyTo.body?.trim() ? replyTo.body : '📷 Photo'}</p>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label="Cancel reply"
-                      onClick={() => setReplyTo(null)}
-                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface"
-                    >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-                    </button>
-                  </div>
-                )}
-                {photoPreview && (
-                  <div className="mb-1.5 flex items-center gap-2 rounded-[10px] bg-surface-mute px-2 py-1" data-testid="photo-preview">
-                    <img src={photoPreview} alt="Photo to send" className="h-9 w-9 rounded-[7px] object-cover" />
-                    <p className="min-w-0 flex-1 truncate text-[11.5px] text-ink-muted">{photo?.name ?? 'Photo'}</p>
-                    <button type="button" aria-label="Remove photo" onClick={clearPhoto} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-                    </button>
-                  </div>
-                )}
-                <form onSubmit={send} className="flex items-end gap-2" data-testid="dock-composer">
-                  <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pickPhoto} data-testid="photo-input" />
-                  <button
-                    type="button"
-                    aria-label="Attach a photo"
-                    onClick={() => fileRef.current?.click?.()}
-                    className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
-                    data-testid="photo-button"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <rect x="3" y="5" width="18" height="14" rx="2" />
-                      <circle cx="9" cy="10" r="1.6" />
-                      <path d="m21 15-4.5-4.5L7 20" />
-                    </svg>
-                  </button>
-                  <label className="sr-only" htmlFor="dock-draft">Message</label>
-                  <textarea
-                    id="dock-draft"
-                    ref={draftRef}
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onInput={(e) => autoGrow(e.currentTarget, 110)}
-                    onKeyDown={composerKeyDown}
-                    rows={1}
-                    maxLength={2000}
-                    placeholder={`Message ${active.kind === 'dm' ? active.label.split(' ')[0] : active.label}`}
-                    className="min-h-[38px] flex-1 resize-none rounded-[12px] border border-line bg-surface px-3 py-2 text-[13.5px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
-                  />
-                  <EmojiPicker onPick={(emoji) => setDraft(insertAtCursor(draftRef.current, emoji))} />
-                  <Button type="submit" size="sm" disabled={sending || (!draft.trim() && !photo)}>
-                    Send
-                  </Button>
-                </form>
-              </div>
-            </>
+          {activeIsDm && (
+            <DockDmThread key={active.conversation_id} row={active} initialReplyTo={pendingQuoteRef.current} onOpenDm={openDmInDock} />
+          )}
+
+          {active && !activeIsDm && (
+            <DockChannelThread key={`${active.kind}-${active.team_id ?? 'club'}`} row={active} onOpenDm={openDmInDock} />
           )}
         </div>
       )}

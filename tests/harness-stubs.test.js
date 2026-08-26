@@ -43,6 +43,18 @@ const ALIASES = [
   // simply runs against the same pair a second time, which is harmless.
   ['harness/stubs/auth.jsx', 'src/lib/auth.jsx'],
   ['harness/stubs/memberships.jsx', 'src/lib/memberships.jsx'],
+  // memberships.jsx and presence.js gained './' depth-variant rules on
+  // 26 Aug 2026 for src/lib/useDmThread.js (shared chat thread, phase 2) —
+  // the same twice-aliased shape as auth.jsx above, listed again so the
+  // count stays honest.
+  //
+  // ⚠️ SIXTH TIME THE COUNT ASSERTION CAUGHT AN UNREGISTERED ALIAS — 23 vs
+  // 21, and this once the miss was compounded: the alias commit was made
+  // AFTER that phase's full-suite run, so the red arrived one commit late.
+  // The lesson is the push rule, not a new mechanism: `npm test` goes after
+  // the LAST commit, not the most interesting one.
+  ['harness/stubs/memberships.jsx', 'src/lib/memberships.jsx'],
+  ['harness/stubs/presence.js', 'src/lib/presence.js'],
   ['harness/stubs/events.js', 'src/data/events.js'],
   ['harness/stubs/availability.js', 'src/data/availability.js'],
   ['harness/stubs/players.js', 'src/data/players.js'],
