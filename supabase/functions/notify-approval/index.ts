@@ -73,6 +73,16 @@
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const MAIL_FROM = Deno.env.get('MAIL_FROM') ?? ''
 const REPLY_TO = Deno.env.get('REPLY_TO') ?? ''
+// !! THE `to` ADDRESS MUST HAVE A REAL INBOX — measured 26 Aug 2026, when it
+// did not: `to` was MAIL_FROM itself (noreply@ on the SENDING subdomain, which
+// nothing receives), so every single send logged a transient bounce against
+// that recipient and the week's Resend bounce rate read 21% while every bcc
+// copy delivered fine. A sustained bounce rate like that is what gets a
+// sending domain suspended. The club's real shared mailbox lives at the same
+// local part on the ROOT domain (claude/runbooks/m365-add-alias-to-shared-mailbox.md),
+// so the fallback derives it by dropping the "send." label; MAIL_TO overrides
+// when set. The collective-address design is unchanged — see sendMail.
+const MAIL_TO = Deno.env.get('MAIL_TO') || MAIL_FROM.replace('@send.', '@')
 const NOTIFY_SECRET = Deno.env.get('APPROVAL_NOTIFY_SECRET') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -127,11 +137,12 @@ async function sendMail(bcc: string[], subject: string, html: string, text: stri
     // volunteers during an onboarding weekend, so it gets the same treatment as
     // the auth mail - see the note on plainText below.
     text,
-    // !! `to` IS THE SENDER, recipients are in bcc. Resend requires a `to`,
-    // and putting the first coach there would single them out as the person
-    // being asked while everyone else was merely copied. Addressing it to the
-    // club makes the ask collective, which is what it is.
-    to: [MAIL_FROM],
+    // !! `to` IS THE CLUB'S SHARED MAILBOX, recipients are in bcc. Resend
+    // requires a `to`, and putting the first coach there would single them out
+    // as the person being asked while everyone else was merely copied.
+    // Addressing it to the club makes the ask collective, which is what it is
+    // — and the address must RECEIVE, or every send bounces (see MAIL_TO).
+    to: [MAIL_TO],
     bcc,
     subject,
     html,

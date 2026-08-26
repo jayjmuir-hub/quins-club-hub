@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 💬 **The composer stays put on desktop** — Jay: the chat input
+- (unmerged) — 📮 **The staff notifiers stop bouncing their own To line** — the
+  week's Resend dashboard read 21% bounced (83 of 396) and it was ONE bug:
+  notify-approval, notify-access-request and notify-pitch-request sent
+  `to: [MAIL_FROM]` — noreply@ on the SENDING subdomain, which nothing
+  receives — so every send bounced its To copy while the bcc recipients
+  delivered fine. Now `to: [MAIL_TO]`: the env var, or the root-domain shared
+  mailbox derived by dropping "send." (the mailbox proven receiving on 18 Aug).
+  The bcc design is untouched — it was never the problem.
+  tests/mail-to-receivable.test.js guards the shape and was proven red against
+  the bug. Measured while here: `_dmarc.adhquins-clubhub.com` EXISTS
+  (p=quarantine, rua set) — the "no DMARC" line in the pasted health report was
+  wrong, and the send subdomain inherits the root policy by spec.
+
+- `c1a5132` — 💬 **The composer stays put on desktop** — Jay: the chat input
   box "moves up and down depending on where i scroll". `<main>`'s shared
   `desktop:pb-16` opened 64px of slack under the sticky composer, so it pinned
   flush to the viewport mid-scroll and rested 64px higher at full scroll. The
