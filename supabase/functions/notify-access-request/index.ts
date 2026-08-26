@@ -24,6 +24,16 @@
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const MAIL_FROM = Deno.env.get('MAIL_FROM') ?? ''
 const REPLY_TO = Deno.env.get('REPLY_TO') ?? ''
+// !! THE `to` ADDRESS MUST HAVE A REAL INBOX — measured 26 Aug 2026, when it
+// did not: `to` was MAIL_FROM itself (noreply@ on the SENDING subdomain, which
+// nothing receives), so every single send logged a transient bounce against
+// that recipient and the week's Resend bounce rate read 21% while every bcc
+// copy delivered fine. A sustained bounce rate like that is what gets a
+// sending domain suspended. The club's real shared mailbox lives at the same
+// local part on the ROOT domain (claude/runbooks/m365-add-alias-to-shared-mailbox.md),
+// so the fallback derives it by dropping the "send." label; MAIL_TO overrides
+// when set. The collective-address design is unchanged — see sendMail.
+const MAIL_TO = Deno.env.get('MAIL_TO') || MAIL_FROM.replace('@send.', '@')
 // !! REUSES THE APPROVAL SECRET DELIBERATELY. Same trust domain, same caller.
 const NOTIFY_SECRET = Deno.env.get('APPROVAL_NOTIFY_SECRET') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -67,10 +77,10 @@ async function sendMail(bcc: string[], subject: string, html: string, text: stri
   const body: Record<string, unknown> = {
     from: MAIL_FROM,
     text,
-    // `to` is the club, recipients in bcc - addressing it to one admin would
-    // single them out, and bcc keeps volunteers' addresses off each other's
-    // screens.
-    to: [MAIL_FROM],
+    // `to` is the club's shared mailbox (it must RECEIVE — see MAIL_TO),
+    // recipients in bcc - addressing it to one admin would single them out,
+    // and bcc keeps volunteers' addresses off each other's screens.
+    to: [MAIL_TO],
     bcc,
     subject,
     html,
