@@ -75,6 +75,29 @@ describe('ChatList', () => {
     expect(screen.getByTestId('chat-hero')).toHaveAttribute('href', '/chat/club')
   })
 
+  // 26 Aug 2026, Jay: "no need to save a chat like that if it wasn't used" —
+  // the person card's Chat button creates a conversation on TAP, and four
+  // never-messaged "No messages yet" rows appeared in his list within a day.
+  // An empty DM is hidden until its first message; last_author_id is the
+  // signal (my_chats sets it from the newest VISIBLE message, so a photo-only
+  // chat keeps its author and stays).
+  it('⚠️ hides a DM nobody has messaged in — until somebody does', async () => {
+    m.listChats.mockResolvedValue([
+      ...ROWS,
+      { kind: 'dm', team_id: null, conversation_id: 'c-empty', label: 'Zz Untouched Probe', detail: 'Direct message', last_at: '2026-08-26T09:00:00Z', last_body: null, last_author_id: null, last_author_name: null, unread: 0 },
+      { kind: 'dm', team_id: null, conversation_id: 'c-photo', label: 'Zz Photo Probe', detail: 'Direct message', last_at: '2026-08-26T09:05:00Z', last_body: null, last_author_id: 'other-7', last_author_name: 'Zz Photo Probe', unread: 0 },
+      { kind: 'group', team_id: null, conversation_id: 'g-new', label: 'Zz Fresh Group', detail: 'Group · 3 people', last_at: '2026-08-26T09:10:00Z', last_body: null, last_author_id: null, last_author_name: null, unread: 0 },
+    ])
+    renderList()
+    await screen.findAllByTestId('chat-row')
+    // Never-messaged DM: not listed.
+    expect(screen.queryByText('Zz Untouched Probe')).toBeNull()
+    // A photo-only DM has an author and stays.
+    expect(screen.getByText('Zz Photo Probe')).toBeInTheDocument()
+    // A brand-new GROUP is a deliberate creation and stays.
+    expect(screen.getByText('Zz Fresh Group')).toBeInTheDocument()
+  })
+
   it('previews who said the last thing, shows the unread count, and says nothing is here when nothing is', async () => {
     renderList()
     const rows = await screen.findAllByTestId('chat-row')
