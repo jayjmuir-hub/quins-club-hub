@@ -2390,3 +2390,23 @@ CREATE TABLE public.message_deliveries (
   CONSTRAINT message_deliveries_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
 ALTER TABLE public.message_deliveries ENABLE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------
+-- club_officers   (26 Aug 2026 — titles without rights)
+-- Recorded with the migration (20260826_club_officers) and APPLIED to
+-- production the same day (table measured present; harness green rolled
+-- back). Honours only — NO permission keys off this table; the CHECK is
+-- the eight-title vocabulary, RLS is member-read / super-write.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.club_officers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  club_id uuid NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
+  profile_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  title text NOT NULL CHECK (title IN (
+    'Club President', 'Vice Chairman', 'Rugby Junior Manager',
+    'Club Secretary', 'Treasurer', 'Membership Secretary',
+    'Director of Rugby', 'Rugby Performance Director'
+  )),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (club_id, profile_id, title)
+);

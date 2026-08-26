@@ -12,6 +12,8 @@ import { identityBadges } from '../lib/identity.js'
 // renders NOTHING — never an error, and never a guess.
 
 const TONE = {
+  // Officer titles wear the brand itself — club constitution, not app role.
+  officer: 'bg-brand text-ink-invert',
   admin: 'bg-danger-bg text-danger-ink',
   staff: 'bg-danger-bg text-danger-ink',
   family: 'bg-surface-mute text-ink-muted',

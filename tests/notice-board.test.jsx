@@ -5,6 +5,9 @@ import { MemoryRouter } from 'react-router-dom'
 // The person card's fetch, mocked so this file stays network-free; the card's
 // own behaviour is covered by tests/person-card.test.jsx.
 const getPersonCardMock = vi.fn()
+// IdentityBadges fetches member_identity (26 Aug 2026); empty here keeps
+// this file about its own subject and network-free.
+vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] }))
 vi.mock('../src/data/personCard.js', () => ({
   getPersonCard: (...args) => getPersonCardMock(...args),
 }))

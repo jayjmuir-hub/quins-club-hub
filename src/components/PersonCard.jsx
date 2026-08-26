@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sheet from './Sheet.jsx'
+import IdentityBadges from './IdentityBadges.jsx'
 import {
   ChatIcon,
   ContactButton,
@@ -105,6 +106,10 @@ function PersonCardBody({ profileId, onClose }) {
               )}
             </div>
           </div>
+          {/* Every hat, officer titles first — the same strip as the DM
+              header (claude/plans/2026-08-26-club-officers.md: titles
+              "should also appear everywhere titles appear"). */}
+          <IdentityBadges profileId={person.profileId} className="px-1 pb-1" />
           <div className="flex flex-nowrap gap-2 px-1 pb-1 pt-2" data-testid="person-card-actions">
             {person.phone && (
               <ContactButton href={`tel:${person.phone}`} label={`Call ${person.name}`} tone="solid">

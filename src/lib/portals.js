@@ -65,6 +65,9 @@ export const PORTALS = [
       // other admin route already has. visibleTabs is what keeps it out of the
       // row; RLS is what keeps the rows out of the response.
       { to: '/admin/rights-log', label: 'Rights log', superOnly: true },
+      // The committee list — titles without rights, appointed by super
+      // admins only (claude/plans/2026-08-26-club-officers.md).
+      { to: '/admin/officers', label: 'Club officers', superOnly: true },
     ],
   },
   {

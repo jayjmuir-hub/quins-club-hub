@@ -10,6 +10,7 @@ import PhoneInput from '../components/PhoneInput.jsx'
 import EnterSendsToggle from '../components/EnterSendsToggle.jsx'
 import PushNotificationsToggle from '../components/PushNotificationsToggle.jsx'
 import YourPlayers from '../components/YourPlayers.jsx'
+import IdentityBadges from '../components/IdentityBadges.jsx'
 import { updateMyProfile } from '../data/members.js'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
@@ -197,6 +198,10 @@ function YouCard({ profile, email, role, squads }) {
 
   return (
     <Card className="p-[14px]">
+      {/* Your own hats, officer titles first — Jay, 26 Aug 2026: "those
+          people should see their own titles too". Same shared strip as the
+          DM header and the person card; renders nothing for most members. */}
+      <IdentityBadges profileId={profile?.id} className="mb-3" />
       <form onSubmit={handleSubmit}>
         {error && (
           <p

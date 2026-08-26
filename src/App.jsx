@@ -26,6 +26,7 @@ import TrainingPublish from './screens/TrainingPublish.jsx'
 import AdminClub from './screens/AdminClub.jsx'
 import AdminNeedsAttention from './screens/AdminNeedsAttention.jsx'
 import AdminRightsLog from './screens/AdminRightsLog.jsx'
+import AdminOfficers from './screens/AdminOfficers.jsx'
 import AdminStaff from './screens/AdminStaff.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
@@ -261,6 +262,11 @@ export default function App() {
                 membership_audit's read policy (`private.is_super_admin()`, and
                 no other) is what actually decides. */}
             <Route path="rights-log" element={<AdminRightsLog />} />
+            {/* The committee list — titles WITHOUT rights (Jay: "no special
+                rights with those, just titles"). Super-only via the
+                rights-log pattern: the tab hides, the screen re-checks, and
+                club_officers' RLS actually decides. */}
+            <Route path="officers" element={<AdminOfficers />} />
             {/* Pitch setup. The `pitches` admin right decides whether the TAB
                 is shown; the screen itself repeats the check, because a route
                 is linkable and somebody will paste the URL. Neither is

@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🟢 **Last active for admins + presence dots** — Jay: "admin
+- (unmerged) — 🏅 **Club officers: titles without rights** — Jay: a super
+  admin tags people with the club's eight officer titles (President →
+  Rugby Performance Director), "no special rights with those, just
+  titles", appearing everywhere titles appear, and "those people should
+  see their own titles too". New `public.club_officers` table — honours
+  only, deliberately NOT on memberships because a membership row IS a
+  grant; member-read / super-write RLS; the eight titles as a CHECK
+  (a ninth is a migration, on purpose). `member_identity` unions the
+  officer rows in, so the DM header, dock strip, person card and the
+  More screen's You card all show them through the one shared
+  IdentityBadges strip — officers first, in Jay's stated dignity order
+  (pure-function ordered and unit-tested). New super-only Admin tab
+  "Club officers" (`/admin/officers`, the rights-log pattern). APPLIED to
+  production before the PR; `db/tests/club-officers.sql` green rolled
+  back — five asserts including the discriminator (an ordinary admin's
+  write REFUSED) and the closed vocabulary. Spec:
+  `claude/plans/2026-08-26-club-officers.md`.
+
+- `6f9bbe7` — 🟢 **Last active for admins + presence dots** — Jay: "admin
   should be able to see a last logged in item on every account" and, on
   finding the 25 Aug Online feature was one subtitle word: "fold that in,
   green dot for online, yellow dot for away … use the grey dot".

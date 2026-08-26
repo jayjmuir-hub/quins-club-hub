@@ -6325,6 +6325,8 @@ CREATE OR REPLACE FUNCTION public.member_identity(_profile uuid)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
+-- ⚠️ BODY REPLACED 26 Aug 2026 by 20260826_club_officers.sql (officer rows
+-- union in) — APPLIED to production the same day, harness green rolled back.
 AS $function$
   select m.role, m.title, coalesce(m.is_super, false), t.name, t.sort_order
     from memberships m
@@ -6336,5 +6338,15 @@ AS $function$
         where me.profile_id = auth.uid()
           and me.status = 'active'
           and me.club_id = m.club_id
+     )
+  union all
+  select 'officer', o.title, false, null::text, null::integer
+    from club_officers o
+   where o.profile_id = _profile
+     and exists (
+       select 1 from memberships me
+        where me.profile_id = auth.uid()
+          and me.status = 'active'
+          and me.club_id = o.club_id
      )
 $function$

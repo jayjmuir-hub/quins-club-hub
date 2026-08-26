@@ -14,10 +14,33 @@ import { labelForRole } from './scope.js'
 
 const STAFF_ROLES = new Set(['coach', 'manager', 'medic'])
 
-/** @returns [{ label, tone: 'admin'|'staff'|'family', squads? }] */
+// Jay's eight, in his stated order — the dignity order the badges render in
+// (claude/plans/2026-08-26-club-officers.md). An unknown title (a future
+// migration's) still renders, after the known ones, rather than vanishing.
+export const OFFICER_TITLES = [
+  'Club President',
+  'Vice Chairman',
+  'Rugby Junior Manager',
+  'Club Secretary',
+  'Treasurer',
+  'Membership Secretary',
+  'Director of Rugby',
+  'Rugby Performance Director',
+]
+
+/** @returns [{ label, tone: 'officer'|'admin'|'staff'|'family', squads? }] */
 export function identityBadges(rows) {
   const list = rows ?? []
   const badges = []
+
+  // Club officers lead — titles without rights, dignity order, deduped.
+  const officerRank = (title) => {
+    const i = OFFICER_TITLES.indexOf(title)
+    return i === -1 ? OFFICER_TITLES.length : i
+  }
+  const officers = [...new Set(list.filter((r) => r.role === 'officer' && r.title).map((r) => r.title))]
+    .sort((a, b) => officerRank(a) - officerRank(b) || a.localeCompare(b))
+  for (const title of officers) badges.push({ label: title, tone: 'officer' })
 
   // One admin badge however many rows carry it — is_super or a bare admin
   // role both read as the club's administrator to a member.
