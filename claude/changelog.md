@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 💬 **Shared-chat-thread phase 4: the dock's channels ARE the
+- (unmerged) — 🔗 **Needs-attention names are doors** — Jay: "i can't click on
+  those names… why not?" Each name on /admin/needs-attention now links to
+  `/roster?open=<player id>`, and the Roster's `?open=` handler (previously
+  add-player/import only) opens that player's detail sheet once the list has
+  loaded — waiting out the load so a slow fetch cannot eat the link, and
+  falling through to the plain roster on an unknown id. Navigation only: the
+  attention screen still fetches no contact detail, so its privacy shape is
+  untouched. Background, measured live the same day: the 25 Aug parent-link
+  trigger is holding (zero unlinked parent memberships); the remaining
+  "no parent on file" rows are players with PLAYER-role accounts (mostly
+  U16B) or no account at all — a data-collection gap, with a policy question
+  for Jay recorded in open-items.
+
+- `a412763` — 💬 **Shared-chat-thread phase 4: the dock's channels ARE the
   main chat, and the thin dock is gone** — `FloatingChatDock` mounts
   `useChannelThread` + `ChannelThread` for squad, staff and club rows; its
   last hand-rolled stream/composer is deleted, along with its own
@@ -23,7 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   proven against the phase-3 dock: 4 fail there, 16/16 here. The CI red on
   PR #433's first push was the harness-stubs alias count, already fixed in
   the phase-3 commit.
-- (unmerged) — 🧩 **Shared-chat-thread phase 3: the channel moves out of its
+- `a412763` — 🧩 **Shared-chat-thread phase 3: the channel moves out of its
   screen** — same split as phase 1, applied to `src/screens/Chat.jsx`: state
   and behaviour extracted verbatim to `src/lib/useChannelThread.js` (which
   also becomes `tallyByEvent`'s home, re-exported from Chat.jsx), rendering
@@ -35,7 +48,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   full-suite run, so the guard went red one commit late — both are now
   registered, and the lesson (run `npm test` after the LAST commit) is
   recorded in the guard itself.
-- (unmerged) — 💬 **Shared-chat-thread phase 2: the dock's DMs and groups ARE
+- `a412763` — 💬 **Shared-chat-thread phase 2: the dock's DMs and groups ARE
   the main chat** — `FloatingChatDock` now mounts `useDmThread` + `DmThread`
   for `dm`/`group` rows (its hand-rolled bubble list for those kinds is
   deleted), so the dock's chevron carries the FULL menu: quote reply,
@@ -49,7 +62,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   aliases exactly as `harness/vite.config.js`'s own './auth.jsx' comment
   warns — the dock died with "useMemberships must be used within a
   MembershipProvider" until the two './' depth-variant rules were added.
-- (unmerged) — 🧩 **Shared-chat-thread phase 1: the DM thread moves out of
+- `a412763` — 🧩 **Shared-chat-thread phase 1: the DM thread moves out of
   its screen** — spec `claude/plans/2026-08-26-shared-chat-thread.md` (Jay
   approved same day: the dock should "function exactly as the main chat").
   State and behaviour extracted verbatim to `src/lib/useDmThread.js`,
@@ -57,7 +70,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   keeps only chrome (header, rename/nickname/block/leave/delete/wallpaper
   sheets). Behaviour-preserving by contract: the whole suite passes with
   ZERO test edits. Phase 2 points the floating dock at the same components.
-  The NEXT pull request cites this entry's squash SHA.
 - `abef0d7` — 👤 **The person card: tap any name, contact the person** — Jay:
   "click on a username, see their info and start a chat, email, call … from
   anywhere in the system." Designed, approved and BUILT the same day

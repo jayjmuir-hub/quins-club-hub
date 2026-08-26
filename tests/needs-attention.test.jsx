@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render as renderBare, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+
+// The names are LINKS since 26 Aug 2026 (Jay: "i can't click on those names…
+// why not?") — each opens the player's detail sheet via /roster?open=<id>.
+// A router is therefore part of the screen's contract.
+const render = (ui) => renderBare(<MemoryRouter>{ui}</MemoryRouter>)
 
 // /admin/needs-attention — the third and last surface of the completeness rule
 // (item 6 of claude/plans/2026-08-16-account-creation-redesign.md).
@@ -106,6 +112,17 @@ describe('AdminNeedsAttention', () => {
     expect(rows).toHaveLength(1)
     expect(within(rows[0]).getByText('Bo Nkemelu')).toBeInTheDocument()
     expect(within(rows[0]).getByText('No date of birth')).toBeInTheDocument()
+  })
+
+  it('a name is a LINK to that player on the roster (26 Aug 2026)', async () => {
+    listPlayersMock.mockResolvedValue([NO_DOB])
+    listParentsForPlayersMock.mockResolvedValue([{ id: 'pp-2', player_id: 'p-nodob' }])
+
+    render(<AdminNeedsAttention />)
+
+    const row = (await screen.findAllByTestId('attention-player'))[0]
+    const link = within(row).getByRole('link', { name: 'Bo Nkemelu' })
+    expect(link).toHaveAttribute('href', '/roster?open=p-nodob')
   })
 
   // ⚠️ THE DENOMINATOR IS WHAT MAKES IT ACTIONABLE. "1" says how much work there

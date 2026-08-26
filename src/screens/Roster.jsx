@@ -326,9 +326,17 @@ export default function Roster() {
       setFormState({ player: null })
     } else if (openParam === 'import' && canEditAnything && isDesktop) {
       setImporting(true)
+    } else if (openParam !== 'add-player' && openParam !== 'import') {
+      // A player id: the Needs Attention names deep-link here (26 Aug 2026).
+      // ⚠️ WAIT FOR THE ROSTER — `players` starts [] (not null), so `loading`
+      // is the only honest signal; clearing the param before the list arrives
+      // would eat the link on a slow load. An id the loaded list does not
+      // hold (deleted player, mistyped URL) just falls through to the roster.
+      if (loading) return
+      if (players.some((p) => p.id === openParam)) setSelectedPlayerId(openParam)
     }
     setSearchParams({}, { replace: true })
-  }, [openParam, canEditAnything, membershipsLoading, isDesktop, setSearchParams])
+  }, [openParam, canEditAnything, membershipsLoading, isDesktop, setSearchParams, players, loading])
 
   // ⚠️ STAFF ONLY, AND THE READ IS NOT ISSUED AT ALL OTHERWISE — the same rule
   // the Tier column follows below, for the same reason. RLS on `player_private`

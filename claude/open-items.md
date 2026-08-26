@@ -13,6 +13,19 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Needs Jay (account creations — Claude does not do these)
 
+- **Should a player with their OWN account still count as "no parent on
+  file"? — measured 26 Aug 2026, decision not yet made.** Of the players the
+  Needs Attention screen flags for parents, none has an unlinked parent
+  membership (the 25 Aug trigger is holding); most hold a PLAYER-role
+  account themselves (largely U16B — plausibly set up by a parent under the
+  child's identity through the old path) and a couple have no account link
+  at all. If a self-managed older player is acceptable without a recorded
+  guardian, `src/lib/completeness.js` should learn that exception and most
+  of the list clears itself; if the club wants a guardian on file for every
+  minor regardless, the list is real and the families need chasing (several
+  have contact details on file to chase with — counts rot, measure fresh).
+  Jay's call either way; measured with the queries in the 26 Aug session.
+
 - ✅ ~~**Leaked-password protection is OFF.** Supabase → Authentication → Policies.~~
   — **IT IS ON. Read off the dashboard 15 Aug 2026**, after Jay said he thought
   he had already done it and this file said otherwise for two days.
