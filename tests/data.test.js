@@ -1387,7 +1387,7 @@ describe('listClubMembers select shape', () => {
     // had no phone control at all. A regression to the old embed leaves the
     // sheet's fields blank and, worse, saving then writes those blanks back.
     expect(builder.select).toHaveBeenCalledWith(
-      '*, profiles(full_name, first_name, last_name, email, phone), teams(name), players(full_name, gender)',
+      '*, profiles(full_name, first_name, last_name, email, phone, last_seen_at), teams(name), players(full_name, gender)',
     )
   })
 
