@@ -10,7 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🤝 **A committee member signs up without an age group** — a
+- (unmerged) — 📋 **Session handoff for the chat-parity and officers day** —
+  `claude/handoffs/2026-08-26-chat-parity-and-officers.md`: ten PRs, the
+  six reusable traps (specifier-text harness aliases, the one-behind
+  cadence under two sessions, branch-names-as-paths, the merge classifier
+  and its settings rule, drop-inside-rollback for applied tables, the
+  bundle-marker control pattern), and the parked decisions.
+  state-of-play's chat entry rewritten to LIVE.
+- `ec159b4` — 🤝 **A committee member signs up without an age group** — a
   real one hit the wizard's "Choose at least one squad" wall the day it
   mattered, and Jay reversed his 17 Aug "keep the requirement" ruling
   (`claude/decisions/2026-08-26-volunteer-no-squad.md`). Helper-ONLY now
@@ -20,7 +27,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   'volunteer' (`db/migrations/20260826_volunteer_no_squad.sql`, proven both
   directions by `db/tests/volunteer-no-squad.sql`; the trigger previously
   created NO request at all for that signup, leaving the person invisible
-  to admins). The NEXT pull request cites this entry's squash SHA.
+  to admins).
 - `3fdf8ab` — 🩹 **The list dots pair from the shape my_conversations
   actually returns** — found LIVE by Jay minutes after the dots shipped:
   thread header green, chat-list row grey. `listMyConversations()` returns
