@@ -101,14 +101,17 @@ async function switchToSignUp(user) {
   await user.click(screen.getByRole('tab', { name: /create account/i }))
 }
 
-/** Walk the pre-signup wizard as a volunteer so tests can reach email+password. */
+/** Walk the pre-signup wizard as a volunteer so tests can reach email+password.
+ * ⚠️ No squad tick since 26 Aug 2026: helper-only HIDES the age-group picker
+ * (claude/decisions/2026-08-26-volunteer-no-squad.md), so a committee member's
+ * walk is name → tick → Continue — which is also what makes this the shortest
+ * route to the email panel for every test below. */
 async function finishWizardAsHelper(user) {
   await switchToSignUp(user)
   await screen.findByLabelText(/your first name/i)
   await user.type(screen.getByLabelText(/your first name/i), 'Anne')
   await user.type(screen.getByLabelText(/your family name/i), 'Granelli')
   await user.click(screen.getByRole('checkbox', { name: /i help the club another way/i }))
-  await user.click(await screen.findByRole('checkbox', { name: /u12a contact/i }))
   await user.click(screen.getByRole('button', { name: /^continue$/i }))
   await screen.findByLabelText(/email address/i)
 }
@@ -293,7 +296,8 @@ describe('Login screen — creating an account', () => {
     expect(password).toBe(GOOD_PASSWORD)
     expect(intent.claimed_role).toBe('volunteer')
     expect(intent.first_name).toBe('Anne')
-    expect(intent.squad_ids).toEqual(['team-u12'])
+    // Empty on purpose — a helper-only signup carries no squads (26 Aug 2026).
+    expect(intent.squad_ids).toEqual([])
   })
 
   // Confirmation is OFF since 25 Aug 2026: a genuinely new signup comes back

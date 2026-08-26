@@ -250,9 +250,11 @@ CREATE POLICY "access request admin" ON public.access_requests
 -- Re-captured 25 Aug 2026: live is TO authenticated (not public) and the
 -- 16 Aug who-and-which-squad migration added the two NOT NULL requirements —
 -- the table comment described them; this block had not caught up.
+-- 26 Aug 2026: a volunteer may carry no squad — Jay's reversal of his 17 Aug
+-- ruling; 20260826_volunteer_no_squad.sql. Every other role still needs one.
 CREATE POLICY "access request insert own" ON public.access_requests
   AS PERMISSIVE FOR INSERT TO authenticated
-  WITH CHECK (((profile_id = ( SELECT auth.uid() AS uid)) AND (status = 'pending'::text) AND (requested_role IS NOT NULL) AND (requested_team_id IS NOT NULL)));
+  WITH CHECK (((profile_id = ( SELECT auth.uid() AS uid)) AND (status = 'pending'::text) AND (requested_role IS NOT NULL) AND ((requested_team_id IS NOT NULL) OR (requested_role = 'volunteer'::text))));
 
 CREATE POLICY "access request read own" ON public.access_requests
   AS PERMISSIVE FOR SELECT TO public

@@ -5,6 +5,7 @@ import RequestAccess from './RequestAccess.jsx'
 import { createAccessRequest, getMyAccessRequest } from '../data/accessRequests.js'
 import { getMyProfile, requestStaffRole, updateProfileNames } from '../data/members.js'
 import { primeMyProfileCache } from '../lib/useMyProfile.js'
+import { needsSquads } from '../lib/signupIntent.js'
 
 // What a signed-in account with NO membership sees: who are you, and what
 // brings you to the Quins? Item 5 of
@@ -277,7 +278,12 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
     // ever satisfy it — the dead-affordance defect this codebase has shipped
     // once already. Caught by tests/parent-self-registration.test.jsx, which
     // renders exactly that case.
-    if (teams.length > 0 && squadIds.length === 0) {
+    // ⚠️ …AND NOT WHEN "I help another way" IS THE ONLY TICK. A committee
+    // member has no age group; demanding one blocked a real one on 26 Aug
+    // 2026 and Jay reversed his 17 Aug keep-the-requirement ruling —
+    // claude/decisions/2026-08-26-volunteer-no-squad.md. The INSERT policy
+    // allows a null team for 'volunteer' and only 'volunteer'.
+    if (teams.length > 0 && squadIds.length === 0 && needsSquads(answers)) {
       setError(new Error(NO_SQUAD_CHOSEN))
       return
     }
@@ -669,7 +675,7 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
             groups" is already on the record against the minis work, and one
             squad per request cannot express it. The first squad ticked is what
             satisfies the INSERT policy; the array carries the rest. */}
-        {teams.length > 0 && (
+        {teams.length > 0 && needsSquads(answers) && (
         <fieldset className="mb-4 border-0 p-0">
           <legend className={`${LABEL} p-0`}>
             Which squad? Tick every one that applies

@@ -509,6 +509,37 @@ describe('the squads, asked on the first screen', () => {
     expect(createAccessRequestMock).not.toHaveBeenCalled()
   })
 
+  // ⚠️ 26 Aug 2026 — a real committee member was walled out of the signup
+  // wizard by the squad requirement, and Jay reversed his 17 Aug "keep it"
+  // ruling: helper-ONLY skips the squads, the whole chain down to the INSERT
+  // policy agreeing (claude/decisions/2026-08-26-volunteer-no-squad.md).
+  it('a helper-only ask skips the squads and writes a squadless volunteer request', async () => {
+    const user = userEvent.setup()
+    renderRollCall()
+
+    await tick(user, /help the club another way/i)
+    expect(screen.queryByRole('group', { name: /which squad/i })).toBeNull()
+    await user.click(await screen.findByRole('button', { name: /^continue$/i }))
+
+    await waitFor(() => expect(createAccessRequestMock).toHaveBeenCalled())
+    const sent = createAccessRequestMock.mock.calls[0][0]
+    expect(sent.role).toBe('volunteer')
+    expect(sent.teamIds).toEqual([])
+  })
+
+  it('…but helper WITH a child brings the squads back, still required', async () => {
+    const user = userEvent.setup()
+    renderRollCall()
+
+    await tick(user, /help the club another way/i)
+    await tick(user, /child playing here/i)
+    expect(await screen.findByRole('group', { name: /which squad/i })).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /^continue$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/at least one squad/i)
+    expect(createAccessRequestMock).not.toHaveBeenCalled()
+  })
+
   it('⚠️ asks which staff role, because "staff" alone cannot be written', async () => {
     // requested_role is CHECKed against a fixed list and the INSERT policy
     // requires it. Coach, manager and medic are three different claims and

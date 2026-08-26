@@ -63,6 +63,19 @@ export function needsPlayers(answers = {}) {
   return Boolean(answers.child || answers.self)
 }
 
+/**
+ * Whether the who-step must collect squads. False only when "I help the club
+ * another way" is the SOLE tick: a committee member has no age group, and
+ * demanding one blocked a real one on 26 Aug 2026 — Jay's ruling that day
+ * reopened and reversed the 17 Aug "keep the squad requirement" decision
+ * (claude/decisions/2026-08-26-volunteer-no-squad.md). Any other tick still
+ * requires squads; ticking helper AS WELL AS a squad-shaped answer changes
+ * nothing.
+ */
+export function needsSquads(answers = {}) {
+  return !(answers.helper && !answers.child && !answers.self && !answers.staff)
+}
+
 function cleanIdList(ids) {
   if (!Array.isArray(ids)) return []
   return [...new Set(ids.filter((id) => typeof id === 'string' && id.length > 0))]
@@ -115,7 +128,7 @@ export function buildSignupIntent({
   }
 
   const squads = cleanIdList(squadIds)
-  if (squads.length === 0) return { error: NO_SQUAD_CHOSEN }
+  if (squads.length === 0 && needsSquads(answers)) return { error: NO_SQUAD_CHOSEN }
 
   const staffTeam = answers.staff ? staffTeamId || squads[0] : null
   if (answers.staff && !staffTeam) {

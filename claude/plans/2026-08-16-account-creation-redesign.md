@@ -716,6 +716,12 @@ a confirmed email and nothing else.
 
 ### ✅ RESOLVED 17 Aug 2026 — Jay chose the role, and kept the squad
 
+> ⚠️ **REVERSED 26 Aug 2026 — not quietly.** A real committee member hit the
+> squad wall in the signup wizard; the tombstone below was read back to Jay
+> and he chose the reversal: helper-only skips the squads.
+> `claude/decisions/2026-08-26-volunteer-no-squad.md`. The section below is
+> the record of the nine days it stood.
+
 Offered three options: add `volunteer` and keep the squad requirement; add it and
 relax the requirement; or drop the fourth box. **He chose the first.**
 `db/migrations/20260817_access_request_volunteer_role.sql`, applied and proved in
