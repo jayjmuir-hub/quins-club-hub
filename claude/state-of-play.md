@@ -25,6 +25,16 @@ history was a rotted measurement; the rulings never rotted. Measure it.
 **Live at https://adhquins-clubhub.com with real families on it.** The club went
 live 13 Aug 2026. Assume a real parent is looking at whatever you touch.
 
+💬 **The shared chat thread is BUILT and waiting on Jay's merge of PR #433**
+— all four code phases of `claude/plans/2026-08-26-shared-chat-thread.md`,
+on branch `claude/shared-chat-thread`. The floating dock renders the SAME
+components as the full chat screens (useDmThread/DmThread,
+useChannelThread/ChannelThread); its hand-rolled thread copy is gone.
+Blocked on: Jay's review and explicit yes (a merge is a production deploy).
+Coordinate with the person-card branch (`claude/person-card`): its Task 8
+touches the slimmed `src/screens/DirectMessages.jsx`; whoever lands second
+rebases, agreed between the two sessions on 26 Aug.
+
 🏉 **The Rugby Performance Director dashboard (pieces 1–3) is LIVE** — merged
 `d92adb7` (#276) on 21 Aug 2026 and verified end to end on the deployed site.
 Both migrations are applied (`training_plans`, `publish_training_fit_check`),

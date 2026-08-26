@@ -1,6 +1,9 @@
 # One chat thread everywhere — full parity for the floating dock
 
-**Date:** 26 Aug 2026 · **STATUS: not shipped — spec awaiting Jay's approval; no code yet**
+**Date:** 26 Aug 2026 · **STATUS: phases 1–4 built and on PR #433 (branch
+`claude/shared-chat-thread`), awaiting Jay's merge — not yet live. Phase 5's
+docs sweep rides the same PR; the harness-screenshot check found no
+parent-facing guide showing the dock, so no reshoot was needed.**
 
 Jay, 26 Aug 2026: the floating dock's chevron menu had only Reply, Copy and
 "More in full view" while the full screens carry Delete, Report, Reply
