@@ -1385,7 +1385,9 @@ describe('Accounts — the approval queue', () => {
     const queue = await screen.findByTestId('pending-approvals')
     const card = within(queue).getByTestId('pending-membership')
     expect(within(card).getByText(/chidi okafor/i)).toBeInTheDocument()
-    expect(within(card).getByText(/added by hannah okafor/i)).toBeInTheDocument()
+    // "Added by" and the name now sit in separate elements — the name became a
+    // PersonName door to the contact card — so match on the row's whole text.
+    expect(card).toHaveTextContent(/added by hannah okafor/i)
     expect(within(card).getByText('U13')).toBeInTheDocument()
   })
 

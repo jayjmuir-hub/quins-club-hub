@@ -29,6 +29,12 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+// The screen reads only `user.id` (to keep your own name plain text on the
+// person card's PersonName wrapper).
+vi.mock('../src/lib/auth.jsx', () => ({
+  useAuth: () => ({ user: { id: 'p-viewer' } }),
+}))
+
 import AdminRightsLog from '../src/screens/AdminRightsLog.jsx'
 import {
   GONE,
@@ -196,7 +202,11 @@ describe('AdminRightsLog', () => {
     const row = await screen.findByTestId('audit-entry')
     expect(within(row).getByText(/Approved/)).toBeInTheDocument()
     expect(within(row).getByText('Robin Oyelaran-Whyte')).toBeInTheDocument()
-    expect(within(row).getByText(/by Kit Amankwah/)).toBeInTheDocument()
+    // The actor's name is now a PersonName inside the stamp line, so the
+    // string spans elements — match on the <p>'s whole text.
+    expect(
+      within(row).getByText((_, el) => el?.tagName === 'P' && /by Kit Amankwah/.test(el.textContent)),
+    ).toBeInTheDocument()
     expect(within(row).getByText(/U16B/)).toBeInTheDocument()
   })
 
@@ -272,5 +282,31 @@ describe('AdminRightsLog', () => {
     await waitFor(() => {
       expect(screen.queryByText(/Nothing recorded yet/i)).not.toBeInTheDocument()
     })
+  })
+})
+
+// The person card (claude/plans/2026-08-26-person-card.md): both names on an
+// entry are doors. "The system" and a deleted account stay plain text —
+// PersonName's null branch, asserted here because the rights log is the one
+// screen where a non-person actor is routine.
+describe('AdminRightsLog — names open the person card', () => {
+  it('subject and actor render as buttons for real profiles', async () => {
+    listMembershipAuditMock.mockResolvedValue([entry()])
+    render(<AdminRightsLog />)
+
+    const row = await screen.findByTestId('audit-entry')
+    expect(within(row).getByRole('button', { name: 'Robin Oyelaran-Whyte' })).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Kit Amankwah' })).toBeInTheDocument()
+  })
+
+  it('⚠️ "the system" is not a button — there is nobody behind it', async () => {
+    listMembershipAuditMock.mockResolvedValue([entry({ actor_id: null, actor_kind: 'system' })])
+    render(<AdminRightsLog />)
+
+    const row = await screen.findByTestId('audit-entry')
+    expect(
+      within(row).getByText((_, el) => el?.tagName === 'P' && /by the system/.test(el.textContent)),
+    ).toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: /the system/ })).toBeNull()
   })
 })

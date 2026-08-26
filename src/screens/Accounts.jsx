@@ -6,6 +6,8 @@ import AdminRightsEditor from '../components/AdminRightsEditor.jsx'
 import Card from '../components/Card.jsx'
 import ApprovalRecipients from '../components/ApprovalRecipients.jsx'
 import Empty from '../components/Empty.jsx'
+import PersonCard from '../components/PersonCard.jsx'
+import PersonName from '../components/PersonName.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
 import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -271,6 +273,8 @@ function PendingApprovals({
   gapsByPlayer = new Map(),
   vouchesByMembership = new Map(),
   onVouch = () => {},
+  onOpenCard = null,
+  selfId = null,
 }) {
   return (
     <section data-testid="pending-approvals" className="mb-5">
@@ -420,7 +424,10 @@ function PendingApprovals({
                   )}
                 </span>
                 <span className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
-                  Added by {personName}
+                  Added by{' '}
+                  <PersonName profileId={member.profile_id} selfId={selfId} onOpen={onOpenCard}>
+                    {personName}
+                  </PersonName>
                   {/* Only when the name slot is holding an actual name \u2014
                       otherwise this prints the address twice in one line. */}
                   {realName && personEmail ? ` \u00b7 ${personEmail}` : ''}
@@ -497,6 +504,8 @@ function PendingStaffRequests({
   onApprove,
   vouchesByMembership = new Map(),
   onVouch = () => {},
+  onOpenCard = null,
+  selfId = null,
 }) {
   return (
     <section data-testid="pending-staff" className="mb-5">
@@ -545,7 +554,14 @@ function PendingStaffRequests({
                 {/* THE PERSON leads here, not a child — the opposite of the
                     players queue, and for the same reason: the decision is
                     about whoever is named first. */}
-                <span className="block text-[15px] font-bold text-ink">{personName}</span>
+                <PersonName
+                  profileId={member.profile_id}
+                  selfId={selfId}
+                  onOpen={onOpenCard}
+                  className="block text-[15px] font-bold text-ink"
+                >
+                  {personName}
+                </PersonName>
                 <span data-testid="staff-asking" className={`block text-[12.5px] ${MUTED_ON_PAPER}`}>
                   Asking to be {asking}
                 </span>
@@ -721,6 +737,11 @@ export default function Accounts() {
   // persona they are previewing would never see.
   const viewerIsSuper = isSuperAdmin(memberships)
   const { user } = useAuth()
+  // The person card: the tapped person's profile id, or null. The ACTIVE
+  // account rows deliberately do not use it — tapping one opens the editor
+  // sheet, which already carries the full contact detail and more; the card
+  // is for the pending queues, where the name used to be inert text.
+  const [cardFor, setCardFor] = useState(null)
   // The signed-in person's own id, for the vouch buttons: mine on each tally
   // is what makes a pressed button show as pressed, and a control that does not
   // show its own state reads as one that did not save.
@@ -1620,6 +1641,8 @@ export default function Accounts() {
             onApprove={approve}
             vouchesByMembership={vouchesByMembership}
             onVouch={handleVouch}
+            onOpenCard={setCardFor}
+            selfId={selfId}
           />
         )}
 
@@ -1633,6 +1656,8 @@ export default function Accounts() {
             gapsByPlayer={gapsByPlayer}
             vouchesByMembership={vouchesByMembership}
             onVouch={handleVouch}
+            onOpenCard={setCardFor}
+            selfId={selfId}
           />
         )}
       </section>
@@ -1701,6 +1726,8 @@ export default function Accounts() {
           onApprove={approve}
           vouchesByMembership={vouchesByMembership}
           onVouch={handleVouch}
+          onOpenCard={setCardFor}
+          selfId={selfId}
         />
       )}
 
@@ -1714,6 +1741,8 @@ export default function Accounts() {
           gapsByPlayer={gapsByPlayer}
           vouchesByMembership={vouchesByMembership}
           onVouch={handleVouch}
+          onOpenCard={setCardFor}
+          selfId={selfId}
         />
       )}
 
@@ -2510,6 +2539,8 @@ export default function Accounts() {
           </div>
         </Sheet>
       )}
+
+      <PersonCard profileId={cardFor} onClose={() => setCardFor(null)} />
     </section>
   )
 }

@@ -27,6 +27,14 @@ import { whatsappUrl } from '../lib/phone.js'
 // Whether a DM is even allowed stays openConversation's call — its refusal
 // is the database's words, the same contract Chat.jsx's openDmWith documents.
 export default function PersonCard({ profileId, onClose }) {
+  // ⚠️ THE NULL BRANCH RUNS NO HOOKS. Screens render <PersonCard> permanently
+  // and pass profileId only when a name is tapped; useNavigate would throw for
+  // every screen test not wrapped in a Router if it ran while closed.
+  if (!profileId) return null
+  return <PersonCardBody profileId={profileId} onClose={onClose} />
+}
+
+function PersonCardBody({ profileId, onClose }) {
   const navigate = useNavigate()
   const [person, setPerson] = useState(null)
   const [error, setError] = useState(null)
@@ -63,8 +71,6 @@ export default function PersonCard({ profileId, onClose }) {
       setChatError(err.message || 'Could not open a chat with them.')
     }
   }
-
-  if (!profileId) return null
 
   const wa = person?.phone ? whatsappUrl(person.phone) : null
   // The title replaces the role label rather than joining it — "Head Coach"
