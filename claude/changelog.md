@@ -18,7 +18,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   which now STAYS IN THE DOCK, switching its panel. "More in full view"
   leaves the DM menu (it is complete); the header's expand icon remains.
   Channels stay thin until phase 4. Discriminating tests proven by running
-  them against the phase-1 dock: 9 fail there, all pass here.
+  them against the phase-1 dock: 9 fail there, all pass here. Found live in
+  the harness, invisible to jsdom: `useDmThread` sits IN src/lib so it
+  writes `./memberships.jsx` / `./presence.js`, escaping the specifier-text
+  aliases exactly as `harness/vite.config.js`'s own './auth.jsx' comment
+  warns — the dock died with "useMemberships must be used within a
+  MembershipProvider" until the two './' depth-variant rules were added.
 - (unmerged) — 🧩 **Shared-chat-thread phase 1: the DM thread moves out of
   its screen** — spec `claude/plans/2026-08-26-shared-chat-thread.md` (Jay
   approved same day: the dock should "function exactly as the main chat").
