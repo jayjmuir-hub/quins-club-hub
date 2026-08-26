@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
@@ -23,6 +23,7 @@ import InstallPrompt from './InstallPrompt.jsx'
 import GetAppSheet from './AppButton.jsx'
 import HelpSheet from './HelpSheet.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
+import { touchLastSeenOncePerDay } from '../data/activity.js'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
 // role label, nav) plus the membership-loading gate that decides whether the
@@ -201,6 +202,13 @@ export default function AppShell({ children }) {
   // sticky wrapper and is contractually persistent and unmissable — an admin
   // forgetting they are in a preview is the failure it exists to prevent.
   const mastheadHidden = useAutoHideOnScroll({ disabled: Boolean(viewAs) })
+
+  // "Last active" for admins: one fire-and-forget stamp per day
+  // (claude/plans/2026-08-26-last-active-and-presence-dots.md). Nothing on
+  // screen depends on it, so a failure changes nothing visible.
+  useEffect(() => {
+    if (user) touchLastSeenOncePerDay()
+  }, [user])
   const location = useLocation()
   // ❌ `askingForAccess` IS GONE — 17 Aug 2026. It held which of TWO mutually
   // exclusive zero-membership routes was showing, and that fork is the bug the

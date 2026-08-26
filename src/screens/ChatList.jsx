@@ -4,9 +4,18 @@ import Card from '../components/Card.jsx'
 import { Empty } from '../components/Empty.jsx'
 import NewChatPicker, { Avatar } from '../components/NewChatPicker.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
+import PresenceDot from '../components/PresenceDot.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listMyChatPrefs, setChatPref } from '../data/chatPrefs.js'
-import { chatPath, listChats, listDmCandidates, openConversation, subscribeMessages } from '../data/messages.js'
+import {
+  chatPath,
+  listChats,
+  listDmCandidates,
+  listMyConversations,
+  openConversation,
+  subscribeMessages,
+} from '../data/messages.js'
+import { dotState, usePresence } from '../lib/presence.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
@@ -26,8 +35,20 @@ import { postedLabel } from '../lib/notices.js'
 //
 // ⚠️ INITIALS, NEVER A PHOTO. No child's face is ever in a chat.
 
-export function RowAvatar({ row }) {
-  if (row.kind === 'dm') return <Avatar name={row.label} staff={row.detail !== 'Direct message'} />
+export function RowAvatar({ row, presence = null }) {
+  if (row.kind === 'dm') {
+    const face = <Avatar name={row.label} staff={row.detail !== 'Direct message'} />
+    // The presence dot rides only when the screen passes a state — pickers
+    // pass nothing, and channels below never get one: a channel is not a
+    // person (claude/plans/2026-08-26-last-active-and-presence-dots.md).
+    if (!presence) return face
+    return (
+      <span className="relative shrink-0">
+        {face}
+        <PresenceDot state={presence} />
+      </span>
+    )
+  }
   const glyph = row.kind === 'club' ? '🏉' : row.kind === 'staff' ? '🛡' : shortBand(row.label)
   return (
     <span
@@ -129,6 +150,16 @@ export default function ChatList() {
   // Round 6: my pins and my archive — decoration; a failure renders the
   // plain list, never an error.
   const [prefs, setPrefs] = useState(() => new Map())
+  // Presence dots (claude/plans/2026-08-26-last-active-and-presence-dots.md):
+  // which person a DM row is with. my_chats() deliberately does not return
+  // the other profile id, so the pairs come from listMyConversations — a
+  // light second fetch, and decoration: a failure means grey dots, never an
+  // error.
+  const [dmOthers, setDmOthers] = useState(() => new Map())
+  const presenceMap = usePresence(selfId)
+  const presenceFor = (row) =>
+    row.kind === 'dm' ? dotState(presenceMap, dmOthers.get(row.conversation_id)) : null
+
   const load = useCallback(async () => {
     setError(null)
     try {
@@ -141,7 +172,19 @@ export default function ChatList() {
     } catch {
       setPrefs(new Map())
     }
-  }, [])
+    try {
+      const conversations = await listMyConversations()
+      setDmOthers(
+        new Map(
+          conversations
+            .filter((c) => c.kind === 'dm')
+            .map((c) => [c.id, c.profile_a === selfId ? c.profile_b : c.profile_a]),
+        ),
+      )
+    } catch {
+      setDmOthers(new Map())
+    }
+  }, [selfId])
   useEffect(() => {
     load()
   }, [load])
@@ -383,7 +426,7 @@ export default function ChatList() {
             <Card className="overflow-hidden">
               <ul>
                 {dmRows.map((row) => (
-                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} />
+                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} presence={presenceFor(row)} />
                 ))}
               </ul>
             </Card>
@@ -398,7 +441,7 @@ export default function ChatList() {
             <Card className="overflow-hidden">
               <ul>
                 {squadRows.map((row) => (
-                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} />
+                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} presence={presenceFor(row)} />
                 ))}
               </ul>
             </Card>
@@ -419,7 +462,7 @@ export default function ChatList() {
             <Card className="overflow-hidden">
               <ul>
                 {archivedRows.map((row) => (
-                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} />
+                  <ChatRow key={rowKey(row)} row={row} selfId={selfId} pref={prefs.get(rowKey(row))} onPref={togglePref} presence={presenceFor(row)} />
                 ))}
               </ul>
             </Card>
@@ -431,7 +474,7 @@ export default function ChatList() {
         <Card className="overflow-hidden">
           <ul>
             {shown.map((row) => (
-              <ChatRow key={rowKey(row)} row={row} selfId={selfId} />
+              <ChatRow key={rowKey(row)} row={row} selfId={selfId} presence={presenceFor(row)} />
             ))}
           </ul>
         </Card>
@@ -472,7 +515,7 @@ export function scopeChatRows(rows, memberships, teams) {
   })
 }
 
-function ChatRow({ row, selfId, pref = null, onPref = null }) {
+function ChatRow({ row, selfId, pref = null, onPref = null, presence = null }) {
   const unread = Number(row.unread) > 0
   const pinned = Boolean(pref?.pinned)
   const archived = Boolean(pref?.archived)
@@ -497,7 +540,7 @@ function ChatRow({ row, selfId, pref = null, onPref = null }) {
         data-kind={row.kind}
         className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3"
       >
-        <RowAvatar row={row} />
+        <RowAvatar row={row} presence={presence} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
             <span className={`flex min-w-0 items-baseline gap-1.5 truncate text-[15px] ${unread ? 'font-extrabold' : 'font-bold'} text-ink`}>

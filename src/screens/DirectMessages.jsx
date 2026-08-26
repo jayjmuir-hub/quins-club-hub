@@ -8,6 +8,8 @@ import { Avatar } from '../components/NewChatPicker.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import PersonCard from '../components/PersonCard.jsx'
 import PersonName from '../components/PersonName.jsx'
+import PresenceDot from '../components/PresenceDot.jsx'
+import { dotState } from '../lib/presence.js'
 import { listMyNicknames, setNickname } from '../data/nicknames.js'
 import IdentityBadges from '../components/IdentityBadges.jsx'
 import { blockDm, deleteConversation, leaveGroup, renameGroup, unblockDm } from '../data/messages.js'
@@ -222,7 +224,19 @@ function Thread({ conversationId }) {
           replaced the single best-role pill the same day it shipped. */}
       <div data-testid="dm-header" className="sticky top-0 z-20 -mx-1 bg-surface px-1">
         <ChatHeader
-          avatar={<Avatar name={isGroup ? conversation?.title : otherName} staff={!isGroup && STAFF.has(other?.role)} size="sm" />}
+          avatar={
+            // In a 1:1 the avatar carries the presence dot — the at-a-glance
+            // replacement for the subtitle's retired 'Online' word. A group
+            // is not a person and gets no dot.
+            isGroup ? (
+              <Avatar name={conversation?.title} staff={false} size="sm" />
+            ) : (
+              <span className="relative shrink-0">
+                <Avatar name={otherName} staff={STAFF.has(other?.role)} size="sm" />
+                <PresenceDot state={dotState(online, other?.id)} />
+              </span>
+            )
+          }
           title={(isGroup ? conversation?.title : otherName) ?? '…'}
           subtitle={
             reviewing
@@ -231,9 +245,10 @@ function Thread({ conversationId }) {
                 ? // Round 3: "at the top it previews who is in the chat under
                   // the name of the chat" — first names, You for the reader.
                   (memberLine ?? `${members?.length ?? '…'} people`)
-                : other?.id && online.has(other.id)
-                ? 'Online'
-                : `Private · you and ${otherName ?? 'them'}`
+                : // The subtitle's 'Online' word retired 26 Aug 2026 — the
+                  // avatar's presence dot says it at a glance instead
+                  // (claude/plans/2026-08-26-last-active-and-presence-dots.md).
+                  `Private · you and ${otherName ?? 'them'}`
           }
           actions={actions}
         />

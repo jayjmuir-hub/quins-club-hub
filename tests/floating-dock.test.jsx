@@ -56,7 +56,10 @@ vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] })
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 // Presence is a live websocket; tests get a quiet empty room.
-vi.mock('../src/lib/presence.js', () => ({ usePresence: () => new Set() }))
+vi.mock('../src/lib/presence.js', () => ({
+  usePresence: () => new Map(),
+  dotState: (map, id) => (id && map?.get?.(id)) || 'offline',
+}))
 vi.mock('../src/data/nicknames.js', () => ({
   listMyNicknames: vi.fn().mockResolvedValue(new Map()),
   setNickname: vi.fn(),

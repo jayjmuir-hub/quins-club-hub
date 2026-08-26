@@ -2668,3 +2668,33 @@ describe('the Edit sheet — contact actions', () => {
     expect(within(sheet).queryByRole('link', { name: /call/i })).toBeNull()
   })
 })
+
+// "Last active" (claude/plans/2026-08-26-last-active-and-presence-dots.md):
+// admin sees a day-level aliveness fact on every account — the list row and
+// the Edit sheet — and "Never signed in" rather than a blank.
+describe('last active on the Accounts screen', () => {
+  it('a stamped profile shows Active on the row and Last active in the sheet', async () => {
+    listClubMembersMock.mockResolvedValue([
+      { ...SARA_COACH, profiles: { ...SARA_COACH.profiles, last_seen_at: '2026-08-24T07:00:00Z' } },
+    ])
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+
+    const card = screen
+      .getAllByTestId('account-person')
+      .find((block) => within(block).queryByText('Sara Coach'))
+    expect(card).toHaveTextContent(/Active 24 Aug 2026/)
+
+    const sheet = await openPerson(user, 'Sara Coach')
+    expect(within(sheet).getByTestId('last-active')).toHaveTextContent('Last active 24 Aug 2026')
+  })
+
+  it('⚠️ no stamp says "Never signed in" — never a blank', async () => {
+    listClubMembersMock.mockResolvedValue([SARA_COACH])
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+
+    const sheet = await openPerson(user, 'Sara Coach')
+    expect(within(sheet).getByTestId('last-active')).toHaveTextContent('Never signed in')
+  })
+})

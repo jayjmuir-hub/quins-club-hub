@@ -22,7 +22,10 @@ vi.mock('../src/data/chatMedia.js', () => ({
   signChatPhotoUrl: vi.fn(async () => null),
 }))
 // Presence is a live websocket; tests get a quiet empty room.
-vi.mock('../src/lib/presence.js', () => ({ usePresence: () => new Set() }))
+vi.mock('../src/lib/presence.js', () => ({
+  usePresence: () => new Map(),
+  dotState: (map, id) => (id && map?.get?.(id)) || 'offline',
+}))
 vi.mock('../src/data/messages.js', () => ({
   // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
   listMessageReceipts: async () => new Map(),

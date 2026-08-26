@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🎖️ **DM identity rows: every hat, always visible** — Jay,
+- (unmerged) — 🟢 **Last active for admins + presence dots** — Jay: "admin
+  should be able to see a last logged in item on every account" and, on
+  finding the 25 Aug Online feature was one subtitle word: "fold that in,
+  green dot for online, yellow dot for away … use the grey dot".
+  `claude/plans/2026-08-26-last-active-and-presence-dots.md`, built the
+  same session. HALF 1: `profiles.last_seen_at` — day-level, stamped only
+  by the no-argument `touch_last_seen()` (12h server floor + once-a-day
+  client throttle), backfilled from auth's last sign-in
+  (`db/migrations/20260826_last_seen.sql`, APPLIED — 82 rows backfilled,
+  measured); shown on Accounts rows ("· Active 24 Aug") and the Edit sheet
+  ("Last active …" / "Never signed in"). Harness `db/tests/last-seen.sql`
+  — whose assert 2 needed a real lesson: now() is frozen per transaction,
+  so the first throttle assert PASSED against the injected fault; rebuilt
+  around a 1h back-date and proven to fail against the throttle-less body.
+  HALF 2: presence payloads carry online/away (visibility + 5-min idle),
+  `PresenceDot` (green/yellow/grey — grey explicit by Jay's call) rides DM
+  avatars on the Chats list, thread header (the subtitle's 'Online' word
+  retired) and dock; groups and pickers get nothing. Everything ephemeral —
+  the no-stored-presence ruling intact, last_seen_at its deliberate
+  admin-only exception. The NEXT pull request cites this entry's squash SHA.
+- `b739099` — 🎖️ **DM identity rows: every hat, always visible** — Jay,
   over a live DM with a multi-hat account: the header must say ALL of it
   ("Club Hub admin, U16B Assistant Coach, U18B Assistant Coach"), parents
   and players get badges with their squads, and the badges must not scroll
