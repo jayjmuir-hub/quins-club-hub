@@ -244,7 +244,9 @@ describe('countUnreadMessages', () => {
   it('counts recent head posts not by me that I have not read', async () => {
     const posts = builder({ data: [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }], error: null })
     const reads = builder({ data: [{ message_id: 'p2' }], error: null })
-    supabase.from.mockImplementation((table) => (table === 'messages' ? posts.b : reads.b))
+    const deliveries = builder({ data: null, error: null })
+    supabase.from.mockImplementation((table) =>
+      table === 'messages' ? posts.b : table === 'message_deliveries' ? deliveries.b : reads.b)
 
     expect(await countUnreadMessages('me')).toBe(2)
 
@@ -252,6 +254,13 @@ describe('countUnreadMessages', () => {
     expect(posts.calls.neq[0]).toEqual(['author_id', 'me'])
     // Bounded to a recent window, on purpose — see the function's note.
     expect(posts.calls.gte[0][0]).toBe('created_at')
+    // ⚠️ THE SECOND TICK RIDES ON THIS FETCH (26 Aug 2026): every unread id
+    // is recorded as delivered to this device, fire-and-forget.
+    expect(deliveries.calls.upsert[0][0]).toEqual([
+      { message_id: 'p1', profile_id: 'me' },
+      { message_id: 'p3', profile_id: 'me' },
+    ])
+    expect(deliveries.calls.upsert[0][1]).toMatchObject({ ignoreDuplicates: true })
   })
 
   it('returns 0 without a query when there is no signed-in profile', async () => {

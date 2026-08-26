@@ -31,6 +31,7 @@ const m = {
   subscribeMessages: vi.fn(),
   removeMessage: vi.fn(),
   deleteConversation: vi.fn(),
+  listMessageReceipts: vi.fn(),
 }
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
@@ -38,7 +39,21 @@ vi.mock('../src/data/nicknames.js', () => ({
   listMyNicknames: async () => new Map(),
   setNickname: async () => {},
 }))
+// Presence is a live websocket; tests inject who is "online" per test.
+const onlineMock = vi.fn(() => new Set())
+vi.mock('../src/lib/presence.js', () => ({ usePresence: (...a) => onlineMock(...a) }))
 vi.mock('../src/data/messages.js', () => ({
+  // Ticks (26 Aug 2026): the receipts map is injected per test; receiptState
+  // mirrors the real pure function so tick states are exercised for real.
+  listMessageReceipts: (...a) => m.listMessageReceipts(...a),
+  receiptState: (receipt, recipients) => {
+    const others = (recipients ?? []).filter(Boolean)
+    if (others.length === 0) return 'sent'
+    if (receipt && others.every((id) => receipt.read.has(id))) return 'read'
+    if (receipt && others.every((id) => receipt.delivered.has(id))) return 'delivered'
+    return 'sent'
+  },
+  markMessagesDelivered: async () => {},
   listMyConversations: (...a) => m.listMyConversations(...a),
   listMyMessageReads: (...a) => m.listMyMessageReads(...a),
   listReactions: (...a) => m.listReactions(...a),
@@ -101,6 +116,41 @@ beforeEach(() => {
   m.subscribeMessages.mockReturnValue(() => {})
   m.removeMessage.mockResolvedValue(undefined)
   m.deleteConversation.mockResolvedValue(undefined)
+  m.listMessageReceipts.mockResolvedValue(new Map())
+  onlineMock.mockReturnValue(new Set())
+})
+
+// ── Ticks and online status (26 Aug 2026) ──────────────────────────────────
+describe('ticks and online status', () => {
+  it('my message shows delivered ticks once their device has it, viewed once they read it', async () => {
+    m.listMessageReceipts.mockResolvedValue(new Map([
+      ['d2', { delivered: new Set([OTHER]), read: new Set() }],
+    ]))
+    renderAt('/chat/dm/c1')
+    const bubbles = await screen.findAllByTestId('dm-bubble')
+    const mine = bubbles.find((b) => b.dataset.mine === 'true')
+    expect(within(mine).getByTestId('message-ticks')).toHaveAttribute('data-state', 'delivered')
+
+    m.listMessageReceipts.mockResolvedValue(new Map([
+      ['d2', { delivered: new Set([OTHER]), read: new Set([OTHER]) }],
+    ]))
+  })
+
+  it('an unreceipted message of mine shows a single sent tick; theirs shows none', async () => {
+    renderAt('/chat/dm/c1')
+    const bubbles = await screen.findAllByTestId('dm-bubble')
+    const mine = bubbles.find((b) => b.dataset.mine === 'true')
+    const theirs = bubbles.find((b) => b.dataset.mine === 'false')
+    expect(within(mine).getByTestId('message-ticks')).toHaveAttribute('data-state', 'sent')
+    expect(within(theirs).queryByTestId('message-ticks')).toBeNull()
+  })
+
+  it('the header says Online while they are, and falls back to the private line when not', async () => {
+    onlineMock.mockReturnValue(new Set([OTHER]))
+    renderAt('/chat/dm/c1')
+    expect(await screen.findByText('Online')).toBeInTheDocument()
+    expect(screen.queryByText(/Private · you and/)).toBeNull()
+  })
 })
 
 describe('DirectMessages — /chat/dm', () => {

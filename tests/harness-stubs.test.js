@@ -29,6 +29,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const ALIASES = [
   // The Squad Hub pair, added 21 Aug 2026 with the dark-mode repro scenario.
   ['harness/stubs/attendance.js', 'src/data/attendance.js'],
+  // Online presence, 26 Aug 2026 — a lib stub, not a data one: the real
+  // module opens a websocket through src/lib/supabase.js at import scope.
+  ['harness/stubs/presence.js', 'src/lib/presence.js'],
   ['harness/stubs/announcements.js', 'src/data/announcements.js'],
   ['harness/stubs/messages.js', 'src/data/messages.js'],
   ['harness/stubs/auth.jsx', 'src/lib/auth.jsx'],

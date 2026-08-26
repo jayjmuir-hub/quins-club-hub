@@ -73,7 +73,13 @@ vi.mock('../src/data/chatMedia.js', () => ({
   signChatPhotoUrl: vi.fn(async () => null),
 }))
 // Lazy arrows only — the factory is hoisted above `m`'s initialization.
+// Presence is a live websocket; tests get a quiet empty room.
+vi.mock('../src/lib/presence.js', () => ({ usePresence: () => new Set() }))
 vi.mock('../src/data/messages.js', () => ({
+  // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
+  listMessageReceipts: async () => new Map(),
+  receiptState: () => null,
+  markMessagesDelivered: async () => {},
   listMessages: (...a) => m.listMessages(...a),
   listMyMessageReads: (...a) => m.listMyMessageReads(...a),
   markMessagesRead: (...a) => m.markMessagesRead(...a),

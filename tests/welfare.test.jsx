@@ -10,6 +10,10 @@ const useMembershipsMock = vi.fn()
 const m = { welfareOverview: vi.fn(), listWelfareAccessLog: vi.fn(), listOpenReports: vi.fn(), removeMessage: vi.fn(), resolveReport: vi.fn() }
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/data/messages.js', () => ({
+  // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
+  listMessageReceipts: async () => new Map(),
+  receiptState: () => null,
+  markMessagesDelivered: async () => {},
   welfareOverview: (...a) => m.welfareOverview(...a),
   listWelfareAccessLog: (...a) => m.listWelfareAccessLog(...a),
   listOpenReports: (...a) => m.listOpenReports(...a),

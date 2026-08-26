@@ -8,7 +8,11 @@ import userEvent from '@testing-library/user-event'
 
 const setStaffDmOptInMock = vi.fn()
 const maybeSingleMock = vi.fn()
-vi.mock('../src/data/messages.js', () => ({ setStaffDmOptIn: (...a) => setStaffDmOptInMock(...a) }))
+vi.mock('../src/data/messages.js', () => ({
+  // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
+  listMessageReceipts: async () => new Map(),
+  receiptState: () => null,
+  markMessagesDelivered: async () => {}, setStaffDmOptIn: (...a) => setStaffDmOptInMock(...a) }))
 vi.mock('../src/lib/supabase', () => ({
   supabase: {
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => maybeSingleMock() }) }) }),

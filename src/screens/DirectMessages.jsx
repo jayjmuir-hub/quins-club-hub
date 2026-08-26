@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-route
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import ChatBubble from '../components/ChatBubble.jsx'
+import { usePresence } from '../lib/presence.js'
 import ChatHeader from '../components/ChatHeader.jsx'
 import EmojiPicker from '../components/EmojiPicker.jsx'
 import { Empty } from '../components/Empty.jsx'
@@ -38,6 +39,8 @@ import {
   toggleReaction,
   toggleStar,
   unblockDm,
+  listMessageReceipts,
+  receiptState,
 } from '../data/messages.js'
 import { useAuth } from '../lib/auth.jsx'
 import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
@@ -123,6 +126,9 @@ function Thread({ conversationId }) {
   const [pickingBackground, setPickingBackground] = useState(false)
   // Round 4 (claude/plans/2026-08-24-chat-round-4.md): my private stars.
   const [stars, setStars] = useState(() => new Set())
+  // Ticks (26 Aug 2026): receipts for MY messages, message id → sets.
+  const [receipts, setReceipts] = useState(() => new Map())
+  const online = usePresence(selfId)
   const navigate = useNavigate()
   const location = useLocation()
   const bottomRef = useRef(null)
@@ -168,6 +174,13 @@ function Thread({ conversationId }) {
         setStars(await listMyStars())
       } catch {
         setStars(new Set())
+      }
+      // And the ticks — decoration with the same stance: a thread whose
+      // receipts failed is still a thread, showing single ticks.
+      try {
+        setReceipts(await listMessageReceipts(selfId, rows.filter((m) => m.author_id === selfId).map((m) => m.id)))
+      } catch {
+        setReceipts(new Map())
       }
       const group = conv?.kind === 'group'
       const people = group ? await listGroupMembers(conversationId) : null
@@ -225,6 +238,13 @@ function Thread({ conversationId }) {
 
   const isGroup = conversation?.kind === 'group'
   const myMemberRow = isGroup ? members?.find((p) => p.profile_id === selfId) : null
+  // Everyone in the chat but me — the set the ticks answer for. WhatsApp's
+  // rule: ALL of them delivered/read, or the tick stays at the lower state.
+  const recipientIds = isGroup
+    ? (members ?? []).map((p) => p.profile_id).filter((id) => id !== selfId)
+    : other?.id
+      ? [other.id]
+      : []
   const participant = isGroup
     ? Boolean(myMemberRow)
     : conversation && selfId && (selfId === conversation.profile_a || selfId === conversation.profile_b)
@@ -537,6 +557,8 @@ function Thread({ conversationId }) {
               ? // Round 3: "at the top it previews who is in the chat under
                 // the name of the chat" — first names, You for the reader.
                 (memberLine ?? `${members?.length ?? '…'} people`)
+              : other?.id && online.has(other.id)
+              ? 'Online'
               : `Private · you and ${otherName ?? 'them'}`
         }
         actions={actions}
@@ -780,6 +802,7 @@ function Thread({ conversationId }) {
               <ChatBubble
                 mine={mine}
                 messageId={m.id}
+                receipt={mine ? receiptState(receipts.get(m.id), recipientIds) : null}
                 testId="dm-bubble"
                 id={`msg-${m.id}`}
                 selected={selecting && selected.has(m.id)}
