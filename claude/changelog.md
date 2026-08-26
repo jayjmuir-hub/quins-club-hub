@@ -27,7 +27,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   pill the day it shipped. Spec:
   `claude/plans/2026-08-26-dm-identity-rows.md`.
 
-- (unmerged) — 💬 **Two chat courtesies from Jay's live afternoon** —
+- `16c67ff` — 💬 **Two chat courtesies from Jay's live afternoon** —
   (1) *An unused DM stays out of the list*: the person card's Chat button
   creates the conversation on tap, so a look without a message littered
   both people's lists with "No messages yet" rows (four in one day,
