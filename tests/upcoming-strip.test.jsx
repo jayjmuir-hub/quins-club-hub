@@ -156,7 +156,43 @@ describe('UpcomingStrip — what is tappable', () => {
     const buttons = screen.getAllByRole('button')
     expect(buttons).toHaveLength(1)
     await userEvent.click(buttons[0])
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'e1' }))
+    expect(onSelect).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: 'e1' })],
+      { year: 2026, month: 7, day: 8 },
+    )
+  })
+
+  it('hands over EVERY event on the day, in kick-off order', async () => {
+    // ⚠️ THE BUG THIS PREVENTS. This used to call onSelect(dayEvents[0]) — the
+    // same defect DaySheet's comment records for the calendar (Task 23): a
+    // Saturday with three age groups playing showed three dots, opened one
+    // fixture, and gave no route to the other two. The strip now hands the
+    // whole day to the caller, which decides whether to open or to offer.
+    const onSelect = vi.fn()
+    render(
+      <UpcomingStrip
+        // Deliberately out of kick-off order, so a pass-through of push order
+        // cannot pass this test.
+        events={[ev('late', '2026-08-08T14:00:00Z'), ev('early', '2026-08-08T06:00:00Z')]}
+        now={NOW}
+        onSelect={onSelect}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button'))
+    expect(onSelect).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: 'early' }), expect.objectContaining({ id: 'late' })],
+      { year: 2026, month: 7, day: 8 },
+    )
+  })
+
+  it('counts every event for the screen reader, not just the three dots', () => {
+    // The dots are capped at three so a busy day cannot stretch the row; the
+    // COUNT must not inherit that cap. Four events used to read "3 events".
+    const onSelect = vi.fn()
+    const four = Array.from({ length: 4 }, (_, i) => ev(`e${i}`, '2026-08-08T10:00:00Z'))
+    render(<UpcomingStrip events={four} now={NOW} onSelect={onSelect} />)
+    expect(screen.getByRole('button', { name: /4 events/ })).toBeInTheDocument()
   })
 
   it('leaves EMPTY days untappable', () => {

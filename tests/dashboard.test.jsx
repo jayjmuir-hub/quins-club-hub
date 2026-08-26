@@ -770,6 +770,55 @@ describe('Dashboard — upcoming list and last result', () => {
     expect(await screen.findByRole('heading', { name: 'Edit event' })).toBeInTheDocument()
   })
 
+  // ⚠️ THE FORTNIGHT STRIP USED TO OPEN dayEvents[0] DIRECTLY — the exact
+  // defect the calendar fixed in Task 23 (see DaySheet's comment): a day with
+  // two dots opened one event and gave no route to the other. The strip now
+  // opens the same day chooser the calendar uses whenever a day holds more
+  // than one event, and still goes straight to the detail for exactly one.
+  it('offers a choice when a strip day has several events', async () => {
+    listEventsMock.mockResolvedValue([
+      ...EVENTS,
+      // Same club day as NEXT_MATCH (24 July), earlier kick-off.
+      {
+        id: 'e-same-day',
+        team_id: 'team-u10',
+        type: 'training',
+        title: 'U10 captains run',
+        starts_at: '2026-07-24T06:00:00Z',
+        result_us: null,
+        result_them: null,
+      },
+    ])
+    renderDashboard()
+
+    await userEvent.click(await screen.findByRole('button', { name: /Fri 24, 2 events/ }))
+
+    // The chooser lists both, rather than opening either directly.
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/U10 captains run/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Al Ain Amblers/)).toBeInTheDocument()
+
+    // Picking the one that was previously unreachable opens ITS detail.
+    await userEvent.click(
+      within(dialog).getByText(/Al Ain Amblers/).closest('[data-testid="fixture-row"]'),
+    )
+    const detail = await screen.findByRole('dialog')
+    expect(within(detail).getByText(/Al Ain Amblers/)).toBeInTheDocument()
+    expect(within(detail).queryByText(/U10 captains run/)).not.toBeInTheDocument()
+  })
+
+  it('still opens a lone event directly from the strip, without the chooser', async () => {
+    renderDashboard()
+
+    // 21 July holds only the U10 training.
+    await userEvent.click(await screen.findByRole('button', { name: /Tue 21, 1 event/ }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/U10 skills session/)).toBeInTheDocument()
+    // It is the detail sheet, not a one-row chooser.
+    expect(within(dialog).queryByTestId('fixture-row')).not.toBeInTheDocument()
+  })
+
   it('opens the event detail sheet when a fixture row is tapped', async () => {
     renderDashboard()
 

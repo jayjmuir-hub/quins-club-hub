@@ -5,6 +5,7 @@ import Card from '../components/Card.jsx'
 import { BlockTitle, Kicker } from '../components/Editorial.jsx'
 import Greeting from '../components/Greeting.jsx'
 import UpcomingStrip from '../components/UpcomingStrip.jsx'
+import DaySheet from '../components/DaySheet.jsx'
 import Empty from '../components/Empty.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
 import { DashboardSkeleton } from '../components/Skeleton.jsx'
@@ -37,6 +38,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import { recordsScores, squadFormat } from '../lib/minis.js'
 import {
+  clubDayParts,
   clubToday,
   eventDate,
   eventTimeLabel,
@@ -485,6 +487,10 @@ export default function Dashboard() {
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
   const [selectedEventId, setSelectedEventId] = useState(null)
+  // The fortnight strip's day chooser: { year, month, day } club-day parts for
+  // a tapped day holding SEVERAL events, or null. A single-event day never
+  // sets this — it opens the event directly (see the strip's onSelect below).
+  const [stripDay, setStripDay] = useState(null)
   // null = closed; { event } = editing that event. The dashboard never opens
   // the form for a NEW event (that lives on the Schedule screen), so there
   // is no "adding" case here.
@@ -881,7 +887,20 @@ export default function Dashboard() {
           answer. */}
       <BlockTitle>Next two weeks</BlockTitle>
       <Card>
-        <UpcomingStrip events={toPlay} now={now} onSelect={(event) => openEvent(event.id)} />
+        <UpcomingStrip
+          events={toPlay}
+          now={now}
+          // ⚠️ ONE EVENT OPENS DIRECTLY; SEVERAL GET THE CHOOSER. This used to
+          // receive a single event and open it — which for a day with three
+          // dots meant dayEvents[0] and no route to the other two, the exact
+          // defect the calendar's DaySheet was built to fix in Task 23. The
+          // single-event day skips the chooser on purpose: a one-row sheet
+          // between the tap and the detail is a step that answers nothing.
+          onSelect={(dayEvents, day) => {
+            if (dayEvents.length === 1) openEvent(dayEvents[0].id)
+            else setStripDay(day)
+          }}
+        />
       </Card>
 
       {/* STAFF ONLY (Jay, 6 Aug 2026). Hidden from anyone who cannot edit —
@@ -1167,6 +1186,33 @@ export default function Dashboard() {
           the Schedule screen only (design-system.md §5.2); the quick-actions
           card above stays as it is until Task 15's player form lands with
           it. */}
+      {/* Same precedence rule as Schedule's: the day chooser sits below the
+          detail and form sheets — opening a fixture from it replaces it
+          rather than stacking. Events are filtered from live state at render,
+          not captured at tap time, so an edit or delete while it is open
+          cannot leave a stale row. canManage is false by design: the
+          dashboard has no route to creating events (see formState above). */}
+      {stripDay && !selectedEvent && !formState && (
+        <DaySheet
+          day={stripDay}
+          events={toPlay.filter((event) => {
+            const parts = clubDayParts(eventDate(event))
+            return (
+              parts.year === stripDay.year &&
+              parts.month === stripDay.month &&
+              parts.day === stripDay.day
+            )
+          })}
+          teamsById={teamsById}
+          canManage={false}
+          onClose={() => setStripDay(null)}
+          onSelectEvent={(id) => {
+            openEvent(id)
+            setStripDay(null)
+          }}
+        />
+      )}
+
       {selectedEvent && !formState && !availabilityOpen && !registerOpen && (
         <EventDetail
           event={selectedEvent}

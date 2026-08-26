@@ -4,8 +4,8 @@ import Button from '../components/Button.jsx'
 import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
+import DaySheet from '../components/DaySheet.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
-import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import TeamFilter, { ALL_TEAMS_ID, PillButton } from '../components/TeamFilter.jsx'
 import Availability from './Availability.jsx'
@@ -397,53 +397,9 @@ function isoDay({ year, month, day }) {
   return `${year}-${pad(month + 1)}-${pad(day)}`
 }
 
-// Opened by tapping any calendar cell (Task 23). Replaces the old behaviour,
-// which opened dayEvents[0] directly — that silently swallowed every event
-// after the first, so a Saturday with three age groups playing showed three
-// dots, opened one fixture, and gave you no route to the other two.
-//
-// Deliberately shown for empty days too. "Nothing on, add something" is the
-// answer to the question the tap asked, and it is the only place in the app
-// where the date is already known when the form opens.
-function DaySheet({ day, events, teamsById, canManage, onClose, onSelectEvent, onAddEvent }) {
-  const title = monthAnchor(day.year, day.month, day.day).toLocaleDateString(undefined, {
-    timeZone: 'UTC',
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
-
-  return (
-    <Sheet open onClose={onClose} title={title}>
-      {events.length === 0 ? (
-        <Empty message="Nothing on this day." />
-      ) : (
-        <div className="overflow-hidden rounded-[11px] border border-line">
-          {events.map((event) => (
-            <FixtureRow
-              key={event.id}
-              event={event}
-              teamName={teamsById.get(event.team_id)?.name}
-              onSelect={onSelectEvent}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* ⚠️ This carried `hover:bg-brand-dark` until 10 Aug 2026. There is no
-          `brand.dark` in tailwind.config.js — only `DEFAULT`, `deep`, `ink` and
-          `onDark` — so Tailwind emitted nothing and this button, alone in the
-          app, had NO hover state. It was the single use of that name anywhere
-          in src, which is exactly how a typo in a class string survives:
-          nothing fails, the button just quietly does less. */}
-      {canManage && (
-        <Button size="lg" full onClick={onAddEvent} className="mt-3.5">
-          Add event
-        </Button>
-      )}
-    </Sheet>
-  )
-}
+// The day sheet (Task 23) moved to src/components/DaySheet.jsx when the
+// Dashboard's fortnight strip turned out to need the same chooser — its
+// history and reasoning travelled with it.
 
 export default function Schedule() {
   // Routing out to the full-page match sheet. See onOpenMatchSheet below.

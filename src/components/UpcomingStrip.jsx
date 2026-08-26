@@ -1,4 +1,4 @@
-import { CLUB_TIME_ZONE, clubDayParts } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, clubDayParts, sortByStart } from '../lib/eventFormat.js'
 
 // A fortnight of days across the top of the home screen, with a dot on any
 // day that has something on. Option C of the three Jay compared.
@@ -94,7 +94,14 @@ export default function UpcomingStrip({ events = [], now = Date.now(), onSelect 
       className="flex gap-1.5 overflow-x-auto p-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {days.map(({ parts, isToday, date }) => {
-        const dayEvents = (byDay.get(dayKey(parts)) ?? []).slice(0, 3)
+        // ⚠️ THE WHOLE DAY, IN KICK-OFF ORDER — the dots below cap themselves
+        // at three, but the tap and the screen-reader count must not inherit
+        // that cap. This used to call onSelect(dayEvents[0]), the same defect
+        // DaySheet's comment records for the calendar (Task 23): a day with
+        // three dots opened one fixture and gave no route to the other two.
+        // The caller now receives every event on the day and decides whether
+        // to open the one or offer the several.
+        const dayEvents = sortByStart(byDay.get(dayKey(parts)) ?? [], 'asc')
         const weekday = WEEKDAY_FORMAT.format(date)
         // ⚠️ Only days with something on are interactive. A tappable empty day
         // would be a control that looks live and does nothing — the exact
@@ -109,7 +116,7 @@ export default function UpcomingStrip({ events = [], now = Date.now(), onSelect 
             {...(interactive
               ? {
                   type: 'button',
-                  onClick: () => onSelect(dayEvents[0]),
+                  onClick: () => onSelect(dayEvents, { year: parts.year, month: parts.month, day: parts.day }),
                   'aria-label': `${weekday} ${parts.day}, ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}`,
                 }
               : { 'aria-hidden': dayEvents.length === 0 ? undefined : undefined })}
@@ -146,7 +153,7 @@ export default function UpcomingStrip({ events = [], now = Date.now(), onSelect 
             {/* Fixed-height rail whether or not there are dots, so the cells
                 do not jump in height across the row. */}
             <span className="mt-1.5 flex h-1 items-center justify-center gap-[3px]">
-              {dayEvents.map((event) => (
+              {dayEvents.slice(0, 3).map((event) => (
                 <span
                   key={event.id}
                   data-testid="strip-dot"
