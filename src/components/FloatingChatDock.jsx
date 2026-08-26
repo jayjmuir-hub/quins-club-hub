@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import ChannelThread from './ChannelThread.jsx'
 import DmThread from './DmThread.jsx'
 import Spinner from './Spinner.jsx'
-import { chatPath, listChats, subscribeMessages } from '../data/messages.js'
+import { chatPath, listChats, listMyConversations, subscribeMessages } from '../data/messages.js'
+import { dotState, usePresence } from '../lib/presence.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import useChannelThread from '../lib/useChannelThread.js'
@@ -162,13 +163,33 @@ export default function FloatingChatDock({ badge = false }) {
     window.addEventListener('pointerup', onUp)
   }
 
+  // Presence dots — same pairing the Chats list builds
+  // (claude/plans/2026-08-26-last-active-and-presence-dots.md). Decoration:
+  // a failure means grey dots, never an error.
+  const [dmOthers, setDmOthers] = useState(() => new Map())
+  const presenceMap = usePresence(open ? selfId : null)
+  const presenceFor = (row) =>
+    row.kind === 'dm' ? dotState(presenceMap, dmOthers.get(row.conversation_id)) : null
+
   const loadList = useCallback(async () => {
     try {
       setRows(await listChats())
     } catch (err) {
       setError(err.message || 'Could not load your chats.')
     }
-  }, [])
+    try {
+      const conversations = await listMyConversations()
+      setDmOthers(
+        new Map(
+          conversations
+            .filter((c) => c.kind === 'dm')
+            .map((c) => [c.id, c.profile_a === selfId ? c.profile_b : c.profile_a]),
+        ),
+      )
+    } catch {
+      setDmOthers(new Map())
+    }
+  }, [selfId])
 
   // The threads load and subscribe for themselves (that is the point of the
   // shared hooks); the dock only keeps its LIST fresh while open.
@@ -281,7 +302,7 @@ export default function FloatingChatDock({ badge = false }) {
                     return (
                       <li key={`${row.kind}-${row.team_id ?? row.conversation_id ?? 'club'}`} className="border-b border-line last:border-b-0">
                         <button type="button" data-testid="dock-row" onClick={() => { setActive(row); pendingQuoteRef.current = null }} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-surface-mute">
-                          <RowAvatar row={row} />
+                          <RowAvatar row={row} presence={presenceFor(row)} />
                           <span className="min-w-0 flex-1">
                             <span className={`block truncate text-[14px] ${unread ? 'font-extrabold' : 'font-bold'} text-ink`}>{row.label}</span>
                             <span className={`block truncate text-[12.5px] ${unread ? 'font-semibold text-ink' : 'text-ink-muted'}`}>{previewLine(row, selfId)}</span>
