@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 👤 **Person-card follow-ups from Jay's first live minutes** —
+- (unmerged) — 📐 **Last active for admins + presence dots — designed and
+  approved** — Jay: "admin should be able to see a last logged in item on
+  every account" and, on finding the 25 Aug Online feature was one subtitle
+  word: "fold that in, green dot for online, yellow dot for away … use the
+  grey dot". `claude/plans/2026-08-26-last-active-and-presence-dots.md`:
+  day-level `profiles.last_seen_at` (admin-only, backfilled from auth's
+  last sign-in) + three-state ephemeral dots on DM avatars. Doc only — no
+  code yet. The NEXT pull request cites this entry's squash SHA.
+- `f7dce1c` — 👤 **Person-card follow-ups from Jay's first live minutes** —
   (1) the card said "U10 MIXED · U10 MIXED" for a person holding two
   membership rows on one squad: `member_contact_card` now aggregates with
   `distinct` (`db/migrations/20260826_member_contact_card_dedupe.sql`,
@@ -19,8 +27,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   (2) Jay, over the Edit-person sheet: "how can i initiate a chat with this
   parent from their profile? doesn't seem possible currently" — the sheet
   gains the standard contact row (Call/WhatsApp/Email from the saved
-  profile, Chat straight into the DM). The NEXT pull request cites this
-  entry's squash SHA.
+  profile, Chat straight into the DM).
 - `a412763` — 💬 **Shared-chat-thread phase 4: the dock's channels ARE the
   main chat, and the thin dock is gone** — `FloatingChatDock` mounts
   `useChannelThread` + `ChannelThread` for squad, staff and club rows; its
