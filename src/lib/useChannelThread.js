@@ -24,8 +24,9 @@ import {
   subscribeReactions,
   toggleReaction,
 } from '../data/messages.js'
+import { getMyChatPref, setChatPref } from '../data/chatPrefs.js'
 import { useAuth } from './auth.jsx'
-import { getChatBackground } from './chatBackgrounds.js'
+import { DEFAULT_BACKGROUND, resolveBackground } from './chatBackgrounds.js'
 import { useMemberships } from './memberships.jsx'
 import { canEditTeam, isAdmin, visibleTeams } from './scope.js'
 import useStayPinnedToBottom from './useStayPinnedToBottom.js'
@@ -93,7 +94,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   // the composer, and the emoji picker's cursor handle.
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
-  const [background, setBackground] = useState(getChatBackground)
+  const [background, setBackground] = useState(DEFAULT_BACKGROUND)
   // Where "New" starts and what was unread, captured ONCE per visit — the
   // mark-read-on-arrival effect updates `reads` moments later, so a live
   // value would wipe the highlight under the reader. Same stance as the DM
@@ -105,6 +106,31 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
 
   // A squad the reader is not on: the screen redirects; do not fetch for it.
   const unknownTeam = !isClub && myTeams.length > 0 && !team
+
+  // My wallpaper for THIS chat — chat_prefs, keyed by the list's own row key
+  // (rowKey in ChatList.jsx). Decoration: a failure paints the default, never
+  // an error. `staffChannel` can flip from false to true when memberships
+  // land, so the key is a dependency, not a constant.
+  const chatKey = isClub ? 'club-club' : `${staffChannel ? 'staff' : 'squad'}-${teamId}`
+  useEffect(() => {
+    if (!param || unknownTeam) return
+    let stale = false
+    getMyChatPref(chatKey)
+      .then((pref) => {
+        if (!stale && pref?.background) setBackground(resolveBackground(pref.background))
+      })
+      .catch(() => {})
+    return () => {
+      stale = true
+    }
+  }, [param, chatKey, unknownTeam])
+
+  // The picker's landing point: paint now, persist for every device. A failed
+  // write keeps the on-screen pick for this session — decoration again.
+  function pickBackground(key) {
+    setBackground(resolveBackground(key))
+    if (selfId) setChatPref(selfId, chatKey, { background: key }).catch(() => {})
+  }
 
   const load = useCallback(async () => {
     if (!param || unknownTeam) return
@@ -366,7 +392,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     reactions,
     mentionables,
     background,
-    setBackground,
+    pickBackground,
     photo,
     photoPreview,
     clearPhoto,

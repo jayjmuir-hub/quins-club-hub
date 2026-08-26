@@ -69,6 +69,13 @@ vi.mock('../src/data/nicknames.js', () => ({
 // would walk into the real Supabase client.
 vi.mock('../src/data/events.js', () => ({ listEvents: vi.fn().mockResolvedValue([]) }))
 vi.mock('../src/data/availability.js', () => ({ listAvailabilityForEvents: vi.fn().mockResolvedValue([]) }))
+// The wallpaper rides chat_prefs since 26 Aug 2026: no pref here, so the
+// dock's threads paint the default doodle.
+vi.mock('../src/data/chatPrefs.js', () => ({
+  getMyChatPref: async () => null,
+  setChatPref: async () => {},
+  listMyChatPrefs: async () => new Map(),
+}))
 vi.mock('../src/data/messages.js', async (orig) => ({
   ...(await orig()),
   listChats: (...a) => m.listChats(...a),
@@ -303,7 +310,7 @@ describe('the floating chat dock', () => {
     expect(screen.queryByTestId('composer')).toBeNull()
   })
 
-  it('empty storage paints crest on the thread — default on every chat', async () => {
+  it('no stored pref paints the doodle on the thread — default on every chat', async () => {
     const user = userEvent.setup()
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
@@ -313,10 +320,10 @@ describe('the floating chat dock', () => {
     // stream wrapper itself carries no image (the 26 Aug stretch bug).
     const panel = await screen.findByTestId('dock-thread')
     const stream = panel.querySelector('[data-background]')
-    expect(stream.getAttribute('data-background')).toBe('crest')
+    expect(stream.getAttribute('data-background')).toBe('doodle')
     expect(stream.style.backgroundImage ?? '').toBe('')
     const paper = panel.querySelector('[data-testid="chat-wallpaper"]')
-    expect(paper.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+    expect(paper.style.backgroundImage).toContain('/chat-backgrounds/doodle.jpg')
     expect(paper.style.backgroundImage).not.toContain('data:image/svg+xml')
   })
 })

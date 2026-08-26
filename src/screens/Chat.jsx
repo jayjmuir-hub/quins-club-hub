@@ -5,7 +5,6 @@ import Card from '../components/Card.jsx'
 import ChannelThread from '../components/ChannelThread.jsx'
 import ChatHeader from '../components/ChatHeader.jsx'
 import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
-import { setChatBackground } from '../lib/chatBackgrounds.js'
 import { clearChannel } from '../data/messages.js'
 import useChannelThread, { tallyByEvent as tallyByEventImpl } from '../lib/useChannelThread.js'
 import { shortBand } from './ChatList.jsx'
@@ -65,7 +64,6 @@ export default function Chat() {
     announceOnly,
     mentionables,
     setError,
-    setBackground,
     toggleAnnounceOnly,
     reload,
   } = thread
@@ -102,8 +100,7 @@ export default function Chat() {
       : `${mentionables.length > 0 ? `${mentionables.length} members · ` : ''}${announceOnly ? 'announce-only' : 'open chat'}`
 
   function pickBackground(key) {
-    setChatBackground(key)
-    setBackground(key)
+    thread.pickBackground(key)
     setPickingBackground(false)
   }
 

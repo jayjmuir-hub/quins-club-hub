@@ -91,6 +91,13 @@ vi.mock('../src/screens/ChatList.jsx', () => ({
   scopeChatRows: (rows) => rows,
   previewLine: () => '',
 }))
+// The wallpaper rides chat_prefs since 26 Aug 2026 — per-chat, cross-device.
+const prefs = { getMyChatPref: vi.fn(async () => null), setChatPref: vi.fn(async () => {}) }
+vi.mock('../src/data/chatPrefs.js', () => ({
+  getMyChatPref: (...a) => prefs.getMyChatPref(...a),
+  setChatPref: (...a) => prefs.setChatPref(...a),
+  listMyChatPrefs: async () => new Map(),
+}))
 
 import DirectMessages from '../src/screens/DirectMessages.jsx'
 
@@ -206,7 +213,7 @@ describe('nicknames', () => {
 })
 
 describe('the wallpaper', () => {
-  it('picking a preset paints the stream and persists per device', async () => {
+  it('picking a preset paints the stream and persists to chat_prefs for this chat', async () => {
     const user = userEvent.setup()
     renderThread()
     await screen.findAllByTestId('dm-bubble')
@@ -222,6 +229,9 @@ describe('the wallpaper', () => {
     expect(paper.style.backgroundImage).toContain('/chat-backgrounds/doodle.jpg')
     expect(paper.style.backgroundImage).toContain('url(')
     expect(paper.style.backgroundImage).not.toContain('data:image/svg+xml')
-    expect(localStorage.getItem('chat-background')).toBe('doodle')
+    // Cross-device: the pick lands in the database, keyed to THIS chat —
+    // nothing device-local survives (26 Aug 2026).
+    expect(prefs.setChatPref).toHaveBeenCalledWith(ME, 'dm-c1', { background: 'doodle' })
+    expect(localStorage.getItem('chat-background')).toBeNull()
   })
 })

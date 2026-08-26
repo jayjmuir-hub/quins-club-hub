@@ -14,7 +14,6 @@ import { listMyNicknames, setNickname } from '../data/nicknames.js'
 import IdentityBadges from '../components/IdentityBadges.jsx'
 import { blockDm, deleteConversation, leaveGroup, renameGroup, unblockDm } from '../data/messages.js'
 import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
-import { setChatBackground } from '../lib/chatBackgrounds.js'
 import useDmThread from '../lib/useDmThread.js'
 
 // Direct messages — squad chat phase 3. claude/plans/2026-08-23-squad-chat.md.
@@ -59,7 +58,6 @@ function Thread({ conversationId }) {
     setNicknames,
     online,
     setError,
-    setBackground,
     isGroup,
     participant,
     owner,
@@ -138,8 +136,7 @@ function Thread({ conversationId }) {
   }
 
   function pickBackground(key) {
-    setChatBackground(key)
-    setBackground(key)
+    thread.pickBackground(key)
     setPickingBackground(false)
   }
 

@@ -1,13 +1,15 @@
--- Harness for db/migrations/20260824_chat_prefs.sql.
+-- Harness for db/migrations/20260824_chat_prefs.sql and
+-- db/migrations/20260826_chat_background.sql (the wallpaper column).
 -- Run with `npm run db:check -- chat-prefs`, or paste into the SQL editor.
 -- SAFE ON PRODUCTION: everything ROLLS BACK.
--- The migration is INLINED VERBATIM below (regenerate if it changes; the
--- begin/commit pair is stripped — the harness owns the transaction).
+-- The migrations are INLINED VERBATIM below (regenerate if they change; the
+-- begin/commit pairs are stripped — the harness owns the transaction).
 -- ⚠️ A SYNTHETIC CLUB, AND EVERY NAME IS INVENTED — CLAUDE.md rule 9.
 --
 --  1. an owner pins, archives, flips back, and clears their own pref rows
 --  2. prefs are INVISIBLE across accounts (with a seeing control)
 --  3. writing a pref AS somebody else is refused
+--  4. the wallpaper: set, clear back to default, over-long value refused
 begin;
 
 create temporary table _log(seq serial, line text) on commit drop;
@@ -59,7 +61,14 @@ drop policy if exists "chat pref remove own" on public.chat_prefs;
 create policy "chat pref remove own" on public.chat_prefs
   for delete using (owner_id = (select auth.uid()));
 
--- ── end of inlined migration ────────────────────────────────────────────────
+-- ── migration under test: db/migrations/20260826_chat_background.sql, verbatim ──
+-- (begin/commit stripped — the harness owns the transaction)
+
+alter table public.chat_prefs
+  add column if not exists background text
+    check (background is null or length(background) between 1 and 40);
+
+-- ── end of inlined migrations ───────────────────────────────────────────────
 
 create function pg_temp.assert_prefs() returns void language plpgsql as $fn$
 declare
@@ -100,6 +109,23 @@ begin
   reset role;
   if caught is distinct from 'forged' then raise exception 'ASSERT 3 FAILED: wrote a pref as somebody else'; end if;
   insert into _log(line) values ('3 a pref in somebody else''s name is refused');
+
+  -- 4: the wallpaper column (26 Aug 2026) — own write/read/clear, an
+  --    over-long key refused by the check, and NULL (the default) accepted
+  perform pg_temp.as_user(one::text);
+  insert into chat_prefs (owner_id, chat_key, background) values (one, 'dm-zz4', 'doodle');
+  select background into caught from chat_prefs where owner_id = one and chat_key = 'dm-zz4';
+  if caught is distinct from 'doodle' then raise exception 'ASSERT 4 FAILED: background read back %', caught; end if;
+  update chat_prefs set background = null where owner_id = one and chat_key = 'dm-zz4';
+  select count(*) into n from chat_prefs where owner_id = one and chat_key = 'dm-zz4' and background is null;
+  if n <> 1 then raise exception 'ASSERT 4 FAILED: could not clear the background'; end if;
+  begin
+    update chat_prefs set background = repeat('x', 41) where owner_id = one and chat_key = 'dm-zz4';
+    caught := null;
+  exception when check_violation then caught := 'refused'; end;
+  reset role;
+  if caught is distinct from 'refused' then raise exception 'ASSERT 4 FAILED: a 41-char background was accepted'; end if;
+  insert into _log(line) values ('4 wallpaper: set, clear to default, over-long key refused');
 end $fn$;
 
 select pg_temp.assert_prefs();

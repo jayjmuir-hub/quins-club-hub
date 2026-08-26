@@ -33,6 +33,13 @@ const listAvailabilityForEventsMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
+// The wallpaper rides chat_prefs since 26 Aug 2026 — quiet defaults keep
+// this file about its own subject and network-free.
+vi.mock('../src/data/chatPrefs.js', () => ({
+  getMyChatPref: async () => null,
+  setChatPref: async () => {},
+  listMyChatPrefs: async () => new Map(),
+}))
 const listReactionsMock = vi.fn()
 const subscribeReactionsMock = vi.fn()
 vi.mock('../src/data/messages.js', () => ({

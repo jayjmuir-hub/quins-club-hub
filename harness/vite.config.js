@@ -43,6 +43,10 @@ export default defineConfig({
       { find: /^\.\.\/data\/announcements\.js$/, replacement: path.resolve(__dirname, 'stubs/announcements.js') },
       // The dock's Chat dot (src/lib/useDockBadges.js) — see stubs/messages.js.
       { find: /^\.\.\/data\/messages\.js$/, replacement: path.resolve(__dirname, 'stubs/messages.js') },
+      // Pins/archive and the per-chat wallpaper (26 Aug 2026). ChatList and
+      // both thread hooks import it as '../data/chatPrefs.js' (screens and
+      // lib both sit one level below src/), so one rule covers all three.
+      { find: /^\.\.\/data\/chatPrefs\.js$/, replacement: path.resolve(__dirname, 'stubs/chatPrefs.js') },
       // The DM thread's photos (25 Aug 2026) — signed LATE on purpose, so the
       // dm-thread scenario reproduces the page growing after the open-scroll.
       { find: /^\.\.\/data\/chatMedia\.js$/, replacement: path.resolve(__dirname, 'stubs/chatMedia.js') },
