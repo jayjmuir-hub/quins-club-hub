@@ -120,7 +120,7 @@ export async function listClubMembers() {
       // and completeness.js's whole rule is that an UNKNOWN is not a GAP. The
       // first version of that chip reported a missing gender for every pending
       // player in a single-gender squad, because the embed did not carry it.
-      '*, profiles(full_name, first_name, last_name, email, phone), teams(name), players(full_name, gender)',
+      '*, profiles(full_name, first_name, last_name, email, phone, last_seen_at), teams(name), players(full_name, gender)',
     )
   if (error) throw error
   return data ?? []

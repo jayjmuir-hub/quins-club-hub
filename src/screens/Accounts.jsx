@@ -249,11 +249,23 @@ function groupByProfile(members) {
       profileId: member.profile_id ?? null,
       name: member.profiles?.full_name ?? null,
       email: member.profiles?.email ?? null,
+      lastSeenAt: member.profiles?.last_seen_at ?? null,
       memberships: [member],
     })
   })
 
   return [...groups.values()].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+}
+
+/**
+ * "Last active 24 Aug 2026" / "Never signed in" — the admin aliveness fact
+ * (claude/plans/2026-08-26-last-active-and-presence-dots.md). Day-level on
+ * purpose; NULL is a real answer (a login that never completed a sign-in)
+ * and gets words, never a blank.
+ */
+function lastActiveLabel(value) {
+  const formatted = formatJoined(value)
+  return formatted ? `Last active ${formatted}` : 'Never signed in'
 }
 
 function formatJoined(value) {
@@ -2340,6 +2352,15 @@ export default function Accounts() {
                           <span data-testid="account-summary">{summary}</span>
                         </>
                       )}
+                      {/* The aliveness fact, scannable without opening anyone.
+                          Only when a stamp exists — the row line truncates,
+                          and the sheet carries the "Never signed in" words. */}
+                      {formatJoined(group.lastSeenAt) && (
+                        <>
+                          {' · '}
+                          <span data-testid="account-active">Active {formatJoined(group.lastSeenAt)}</span>
+                        </>
+                      )}
                     </span>
                   </div>
 
@@ -2398,6 +2419,10 @@ export default function Accounts() {
           />
 
           <EditorContactRow group={editingGroup} />
+
+          <p className={`mt-3 text-[12.5px] ${MUTED_ON_PAPER}`} data-testid="last-active">
+            {lastActiveLabel(editingGroup.lastSeenAt)}
+          </p>
 
           <div className="mt-5">
             <h4 className="mb-2 text-[12.5px] font-extrabold uppercase tracking-[.4px] text-ink-muted">
