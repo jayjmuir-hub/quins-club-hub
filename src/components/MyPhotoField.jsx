@@ -273,7 +273,7 @@ export default function MyPhotoField({ profile, userId }) {
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
         className="sr-only"
         aria-label="Choose a photo of yourself"
         onChange={choose}

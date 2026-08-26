@@ -11,10 +11,18 @@ vi.mock('../src/lib/supabase.js', () => ({
 }))
 vi.mock('../src/lib/imageResize.js', () => ({
   resizePhoto: vi.fn(async (file) => file),
+  // The gate's own behaviour (order, HEIC refusal, size-after-resize) is
+  // proved in tests/image-resize.test.js against the real implementation;
+  // here it just hands the file through so these tests stay about the
+  // upload call's SHAPE.
+  preparePhotoUpload: vi.fn(async (file) => {
+    if (!file) throw new Error('Choose a photo first.')
+    return file
+  }),
 }))
 
 import { supabase } from '../src/lib/supabase.js'
-import { resizePhoto } from '../src/lib/imageResize.js'
+import { preparePhotoUpload, resizePhoto } from '../src/lib/imageResize.js'
 import { forwardMessagesTo, postMessage, sendDirectMessage } from '../src/data/messages.js'
 import { removeChatPhoto, uploadChatPhoto } from '../src/data/chatMedia.js'
 
@@ -35,6 +43,7 @@ beforeEach(() => {
   supabase.from.mockReset()
   supabase.storage.from.mockReset()
   resizePhoto.mockClear()
+  preparePhotoUpload.mockClear()
 })
 
 describe('sendDirectMessage — round 2 options', () => {
@@ -127,16 +136,22 @@ describe('uploadChatPhoto', () => {
     return { upload, remove }
   }
 
-  it('refuses a non-image and a giant file with plain words', async () => {
+  it('lets the shared gate refuse rather than judging the file itself', async () => {
+    // ⚠️ THE OLD SHAPE THIS REPLACES: this function used to check type and
+    // size ITSELF, size before resize — which refused the 5–8 MB files real
+    // phones produce. The whole judgment now lives in preparePhotoUpload
+    // (proved against the real implementation in tests/image-resize.test.js);
+    // this proves the function actually defers to it.
     storageBucket()
+    preparePhotoUpload.mockRejectedValueOnce(new Error('That file is not a photo. Use a JPEG, PNG or WebP image.'))
     await expect(uploadChatPhoto('me-1', { type: 'application/pdf', size: 100 })).rejects.toThrow('not a photo')
-    await expect(uploadChatPhoto('me-1', { type: 'image/jpeg', size: 6 * 1024 * 1024 })).rejects.toThrow('too large')
+    expect(preparePhotoUpload).toHaveBeenCalledTimes(1)
   })
 
-  it('resizes, uploads under the caller’s own folder and returns the key', async () => {
+  it('uploads what the gate resolves with, under the caller’s own folder', async () => {
     const { upload } = storageBucket()
     const key = await uploadChatPhoto('me-1', { type: 'image/jpeg', size: 1000 })
-    expect(resizePhoto).toHaveBeenCalledTimes(1)
+    expect(preparePhotoUpload).toHaveBeenCalledTimes(1)
     expect(key).toMatch(/^me-1\/[0-9a-f-]{36}\.jpg$/)
     expect(upload).toHaveBeenCalledWith(key, expect.anything(), { contentType: 'image/jpeg', upsert: false })
   })

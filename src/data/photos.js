@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { resizePhoto } from '../lib/imageResize.js'
+import { preparePhotoUpload } from '../lib/imageResize.js'
 
 // Head-shot photos for players, held in the PRIVATE Supabase Storage bucket
 // `player-photos`.
@@ -40,10 +40,10 @@ export const PHOTO_BUCKET = 'player-photos'
 // storage policy keys off it. A key in any other shape fails closed.
 export const STAFF_PHOTO_BUCKET = 'staff-photos'
 
-// Matches the bucket's allowed_mime_types. Checked client-side too so the
-// user gets "that's not an image" instead of an opaque storage error.
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const MAX_BYTES = 5 * 1024 * 1024 // 5 MB, same as the bucket's file_size_limit
+// Type and size judgments moved into preparePhotoUpload
+// (src/lib/imageResize.js) on 26 Aug 2026 — one gate for every photo path,
+// ordered type → resize → size so a big camera original is shrunk rather
+// than refused. Its output always fits the buckets' allowed_mime_types.
 
 // One hour. Long enough that a roster left open on a phone doesn't go blank
 // mid-scroll, short enough that a URL copied out of devtools is not a durable
@@ -137,19 +137,13 @@ export async function uploadPlayerPhoto(playerId, file) {
   if (!playerId) throw new Error('uploadPlayerPhoto needs a player_id.')
   if (!file) throw new Error('Choose a photo to upload.')
 
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    throw new Error('That file is not a photo. Use a JPEG, PNG or WebP image.')
-  }
-  if (file.size > MAX_BYTES) {
-    throw new Error('That photo is too large. The limit is 5 MB.')
-  }
-
-  // Downscale BEFORE upload (see src/lib/imageResize.js). This is where
-  // almost all of the bandwidth saving in this feature comes from: a 4 MB
-  // camera photo becomes ~40 KB, both on the way up and on every subsequent
-  // read. resizePhoto returns the original untouched if it cannot do the
-  // work, so this can only improve on the input, never block it.
-  const upload = await resizePhoto(file)
+  // Type, resize, THEN size — the shared gate in src/lib/imageResize.js.
+  // ⚠️ KEEP-THE-SHAPE, NOT THE OLD SQUARE CROP, and that is what makes the
+  // focal-point picker mean anything: the square crop threw the photo's
+  // edges away BEFORE anybody positioned it, so a square photo in a square
+  // avatar had nothing left to slide
+  // (claude/plans/2026-08-26-photo-pipeline-and-positioner.md).
+  const upload = await preparePhotoUpload(file)
 
   const extension = EXTENSIONS[upload.type] ?? 'jpg'
   const key = `${playerId}/${Date.now()}.${extension}`
@@ -278,14 +272,8 @@ export async function uploadStaffPhoto(profileId, file) {
   if (!profileId) throw new Error('uploadStaffPhoto needs a profile id.')
   if (!file) throw new Error('Choose a photo to upload.')
 
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    throw new Error('That file is not a photo. Use a JPEG, PNG or WebP image.')
-  }
-  if (file.size > MAX_BYTES) {
-    throw new Error('That photo is too large. The limit is 5 MB.')
-  }
-
-  const upload = await resizePhoto(file)
+  // Shared gate: type, keep-the-shape resize, THEN size — see uploadPlayerPhoto.
+  const upload = await preparePhotoUpload(file)
   const extension = EXTENSIONS[upload.type] ?? 'jpg'
   const key = `${profileId}/${Date.now()}.${extension}`
 

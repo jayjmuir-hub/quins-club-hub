@@ -321,7 +321,7 @@ export default function DmThread({ thread, compact = false }) {
                 </div>
               )}
               <form onSubmit={thread.send} className="flex items-end gap-2" data-testid="dm-composer">
-                <input ref={thread.fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
+                <input ref={thread.fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
                 <button
                   type="button"
                   aria-label="Attach a photo"

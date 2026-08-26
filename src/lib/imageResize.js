@@ -65,6 +65,105 @@ export async function resizePhoto(file) {
   }
 }
 
+// ══ THE KEEP-THE-SHAPE MODE ═══════════════════════════════════════════════
+// (claude/plans/2026-08-26-photo-pipeline-and-positioner.md)
+//
+// resizePhoto above was built for HEAD SHOTS and every upload path ran it —
+// which centre-cropped chat photos (a landscape team photo lost both ends)
+// and threw away the edges of profile photos BEFORE the focal-point picker
+// ever saw them. This mode keeps the aspect ratio and caps the longest edge:
+// a 4000×3000 camera original becomes 1600×1200 at ~200–400 KB.
+
+const FIT_MAX_EDGE = 1600 // px. ~WhatsApp's default-quality output; sharp on
+                          // a phone screen, and enough headroom that the
+                          // largest avatar (112px) can never look soft.
+
+/**
+ * Resizes a File/Blob preserving its shape and resolves with a new JPEG File.
+ *
+ * ⚠️ RESOLVES WITH NULL ON FAILURE — NOT THE ORIGINAL. That is the opposite
+ * of resizePhoto's contract, on purpose: falling back to the original is safe
+ * for JPEG/PNG/WebP (displayable anyway) and WRONG for HEIC, which half the
+ * club's phones cannot render. The caller decides what a null means — see
+ * preparePhotoUpload below, which is the only intended caller.
+ */
+export async function resizePhotoFit(file) {
+  if (!file || typeof document === 'undefined') return null
+
+  try {
+    const bitmap = await loadBitmap(file)
+    if (!bitmap) return null
+
+    // Never upscale: a photo already smaller than the cap is re-encoded at
+    // its own size (still worth doing — a small PNG screenshot re-encodes to
+    // a much smaller JPEG, and the output type becomes predictable).
+    const scale = Math.min(1, FIT_MAX_EDGE / Math.max(bitmap.width, bitmap.height))
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    if (!context) return null
+
+    context.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height, 0, 0, width, height)
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', QUALITY)
+    })
+    if (!blob) return null
+
+    return new File([blob], 'photo.jpg', { type: 'image/jpeg' })
+  } catch {
+    return null
+  }
+}
+
+// The types a picker offers and the gate accepts. HEIC/HEIF are Apple's
+// camera formats: Safari can decode them, so on the devices that produce
+// them the re-encode above turns them into JPEG — and on devices that
+// cannot decode them the gate refuses rather than uploading a file half
+// the club's phones cannot display.
+const UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+const HEIC_TYPES = ['image/heic', 'image/heif']
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 // every photo bucket's file_size_limit
+
+/**
+ * The one upload gate every photo path shares: type first, RESIZE SECOND,
+ * size LAST — so the 5 MB judgment falls on what would actually be uploaded.
+ *
+ * ⚠️ THE ORDER IS THE FIX. The old paths checked size BEFORE resizing, so
+ * the 5–8 MB files modern phone cameras produce were refused with "too
+ * large" while the resizer one line later would have made them ~200 KB.
+ *
+ * Throws user-facing messages; resolves with the File to upload (always
+ * image/jpeg when the resize ran; the untouched original only when the
+ * resize failed on a type that is safe to store as-is).
+ */
+export async function preparePhotoUpload(file, { maxBytes = MAX_UPLOAD_BYTES } = {}) {
+  if (!file) throw new Error('Choose a photo first.')
+  if (!UPLOAD_TYPES.includes(file.type)) {
+    throw new Error('That file is not a photo. Use a JPEG, PNG or WebP image.')
+  }
+
+  const resized = await resizePhotoFit(file)
+  if (resized) {
+    // A 1600px JPEG at this quality is ~200–400 KB; this only trips on
+    // pathological input, and then the message is at least true.
+    if (resized.size > maxBytes) throw new Error('That photo is too large. The limit is 5 MB.')
+    return resized
+  }
+
+  // The resize failed. An undecodable HEIC must be refused — uploading it
+  // would store a photo most members' phones render as a broken square.
+  if (HEIC_TYPES.includes(file.type)) {
+    throw new Error('Could not read that photo. Try saving it as a JPEG first.')
+  }
+  if (file.size > maxBytes) throw new Error('That photo is too large. The limit is 5 MB.')
+  return file
+}
+
 /**
  * Decodes a file into something drawable. createImageBitmap is the fast path
  * (off the main thread, no DOM node); the <img> fallback covers Safari

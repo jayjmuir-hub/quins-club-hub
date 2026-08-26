@@ -190,7 +190,7 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
                   thread.setDraftMentions((m) => (m.some((x) => x.profile_id === p.profile_id) ? m : [...m, p]))
                 }}
               />
-              <input ref={thread.fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
+              <input ref={thread.fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
               <button
                 type="button"
                 aria-label="Attach a photo"

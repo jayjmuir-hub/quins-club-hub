@@ -102,7 +102,7 @@ export default function PhotoField({
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
             className="sr-only"
             disabled={disabled}
             onChange={(event) => {

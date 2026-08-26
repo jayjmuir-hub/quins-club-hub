@@ -59,8 +59,18 @@ describe('PhotoField — positioning', () => {
     )
 
     expect(screen.getByTestId('player-photo-positioner')).toBeInTheDocument()
+
+    // The stage is inert until the photo reports its size (jsdom never
+    // decodes, so stand one in), and the arrows move the PHOTO since 26 Aug
+    // 2026: ArrowRight slides it right, revealing more of the LEFT — focus x
+    // decreases. The full keyboard contract is tests/photo-positioner.test.jsx.
+    const img = screen.getByTestId('photo-stage').querySelector('img')
+    Object.defineProperty(img, 'naturalWidth', { value: 800, configurable: true })
+    Object.defineProperty(img, 'naturalHeight', { value: 600, configurable: true })
+    fireEvent.load(img)
+
     fireEvent.keyDown(screen.getByTestId('photo-stage'), { key: 'ArrowRight' })
-    expect(onFocusChange).toHaveBeenCalledWith({ x: 52, y: 50 })
+    expect(onFocusChange).toHaveBeenCalledWith({ x: 48, y: 50 })
   })
 
   // ⚠️ WITHOUT `onFocusChange` THERE IS NO POSITIONER. A caller that has not
