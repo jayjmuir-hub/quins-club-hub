@@ -910,3 +910,14 @@ REVOKE ALL ON public.chat_prefs FROM PUBLIC, anon;
 -- ---------------------------------------------------------------------
 GRANT SELECT, INSERT ON public.message_deliveries TO authenticated;
 REVOKE ALL ON public.message_deliveries FROM anon;
+
+
+-- ---------------------------------------------------------------------
+-- club_officers  (26 Aug 2026 — titles without rights)
+-- Recorded with the migration (20260826_club_officers): honours only,
+-- NO permission keys off this table. SELECT/INSERT/DELETE for
+-- authenticated (RLS gates writes to super admins; titles are never
+-- edited in place — retag is delete + insert, so no UPDATE).
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT, DELETE ON public.club_officers TO authenticated;
+REVOKE ALL ON public.club_officers FROM PUBLIC, anon;

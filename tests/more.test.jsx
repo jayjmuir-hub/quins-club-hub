@@ -24,6 +24,9 @@ const listPlayerPrivateMock = vi.fn()
 const registerMyPlayerMock = vi.fn()
 const updateProfileNamesMock = vi.fn()
 
+// IdentityBadges fetches member_identity (26 Aug 2026); empty here keeps
+// this file about its own subject and network-free.
+vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] }))
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))

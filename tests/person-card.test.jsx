@@ -6,6 +6,9 @@ import { MemoryRouter } from 'react-router-dom'
 import PersonCard from '../src/components/PersonCard.jsx'
 
 const getPersonCard = vi.fn()
+// IdentityBadges fetches member_identity (26 Aug 2026); empty here keeps
+// this file about its own subject and network-free.
+vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] }))
 vi.mock('../src/data/personCard.js', () => ({
   getPersonCard: (...args) => getPersonCard(...args),
 }))

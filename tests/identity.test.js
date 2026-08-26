@@ -63,6 +63,38 @@ describe('identityBadges', () => {
     ])
   })
 
+  // Club officers (claude/plans/2026-08-26-club-officers.md): titles without
+  // rights, FIRST in the row, in Jay's stated dignity order — never the
+  // order the database happened to return them.
+  it('officer titles lead, in dignity order, ahead of the admin badge', () => {
+    expect(
+      identityBadges([
+        row('coach', { title: 'Assistant Coach', squad: 'U16B', squad_sort: 10 }),
+        row('officer', { title: 'Treasurer' }),
+        row('admin', { is_super: true }),
+        row('officer', { title: 'Club President' }),
+      ]),
+    ).toEqual([
+      { label: 'Club President', tone: 'officer' },
+      { label: 'Treasurer', tone: 'officer' },
+      { label: 'Club Hub admin', tone: 'admin' },
+      { label: 'U16B Assistant Coach', tone: 'staff' },
+    ])
+  })
+
+  it('a duplicate officer row renders once; an unknown officer title still renders, last', () => {
+    expect(
+      identityBadges([
+        row('officer', { title: 'Club Secretary' }),
+        row('officer', { title: 'Club Secretary' }),
+        row('officer', { title: 'ZZ Future Title' }),
+      ]),
+    ).toEqual([
+      { label: 'Club Secretary', tone: 'officer' },
+      { label: 'ZZ Future Title', tone: 'officer' },
+    ])
+  })
+
   it('empty or missing rows mean no badges, never a throw', () => {
     expect(identityBadges([])).toEqual([])
     expect(identityBadges(null)).toEqual([])
