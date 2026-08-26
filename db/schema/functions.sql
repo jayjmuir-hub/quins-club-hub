@@ -2730,6 +2730,19 @@ AS $function$
         and staff.status = 'active'
         and staff.role in ('coach', 'manager', 'medic')
         and staff.team_id is not null
+    )
+    -- 26 Aug 2026, ruling C (20260826_member_contact_card.sql): any active
+    -- member may see any staff/admin's photo — the face follows the card.
+    or (
+      exists (
+        select 1 from memberships mine
+         where mine.profile_id = auth.uid() and mine.status = 'active'
+      )
+      and exists (
+        select 1 from memberships staff
+         where staff.profile_id = _profile and staff.status = 'active'
+           and (staff.role in ('coach','manager','medic','admin') or staff.is_super)
+      )
     );
 $function$
 ;
@@ -2737,6 +2750,79 @@ $function$
 REVOKE ALL ON FUNCTION private.can_see_staff_photo(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION private.can_see_staff_photo(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION private.can_see_staff_photo(uuid) TO authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+--  public.member_contact_card  (26 Aug 2026, 20260826_member_contact_card.sql)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- The person card's one fetch — and the place the visibility ruling LIVES.
+-- Ruling C (claude/plans/2026-08-26-person-card.md, Jay 26 Aug 2026): an
+-- active staff or admin role makes your phone + email visible to ANY active
+-- member; a parent's contacts go only to the existing manage scopes (super
+-- admins, or staff of a squad the parent belongs to). The contact columns
+-- are nulled HERE, server-side — the screen never has what it must not show.
+CREATE OR REPLACE FUNCTION public.member_contact_card(_profile uuid)
+ RETURNS TABLE(profile_id uuid, full_name text, role text, title text, is_super boolean, squads text[], phone text, email text, photo_path text, photo_focus_x smallint, photo_focus_y smallint)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with viewer as (
+    select exists (
+      select 1 from memberships m
+       where m.profile_id = auth.uid() and m.status = 'active'
+    ) as is_member
+  ),
+  best as (
+    select m.role, m.title, m.is_super
+      from memberships m
+     where m.profile_id = _profile and m.status = 'active'
+     order by case when m.is_super then 0
+                   when m.role = 'admin' then 1
+                   when m.role = 'coach' then 2
+                   when m.role = 'manager' then 3
+                   when m.role = 'medic' then 4
+                   else 5 end
+     limit 1
+  ),
+  entitled as (
+    select
+      exists (
+        select 1 from memberships m
+         where m.profile_id = _profile and m.status = 'active'
+           and (m.role in ('coach','manager','medic','admin') or m.is_super)
+      )
+      or private.is_admin_anywhere()
+      or exists (
+        select 1 from memberships m
+         where m.profile_id = _profile and m.status = 'active'
+           and m.role = 'parent' and m.team_id is not null
+           and private.can_edit_team(m.team_id)
+      ) as contacts
+  )
+  select p.id, p.full_name,
+         best.role, best.title, coalesce(best.is_super, false),
+         coalesce((select array_agg(t.name order by t.name)
+                     from memberships m join teams t on t.id = m.team_id
+                    where m.profile_id = _profile and m.status = 'active'
+                      and m.team_id is not null), '{}') as squads,
+         case when entitled.contacts then p.phone else null end,
+         case when entitled.contacts then p.email else null end,
+         case when private.can_see_staff_photo(p.id) then p.photo_path else null end,
+         p.photo_focus_x, p.photo_focus_y
+    from profiles p
+   cross join viewer
+   cross join entitled
+    left join best on true
+   where p.id = _profile
+     and viewer.is_member;
+$function$
+;
+
+REVOKE ALL ON FUNCTION public.member_contact_card(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.member_contact_card(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.member_contact_card(uuid) TO authenticated;
 
 
 -- ══════════════════════════════════════════════════════════════════════════

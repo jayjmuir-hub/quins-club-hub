@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -6,6 +6,8 @@ import ChatHeader from '../components/ChatHeader.jsx'
 import DmThread from '../components/DmThread.jsx'
 import { Avatar, RolePill } from '../components/NewChatPicker.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
+import PersonCard from '../components/PersonCard.jsx'
+import PersonName from '../components/PersonName.jsx'
 import { listMyNicknames, setNickname } from '../data/nicknames.js'
 import { blockDm, deleteConversation, leaveGroup, renameGroup, unblockDm } from '../data/messages.js'
 import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
@@ -60,10 +62,13 @@ function Thread({ conversationId }) {
     owner,
     reviewing,
     otherName,
-    memberLine,
+    nameFor,
+    selfId,
     reload,
   } = thread
 
+  // The person card: the tapped member-line name's profile id, or null.
+  const [cardFor, setCardFor] = useState(null)
   const [renaming, setRenaming] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [addingPeople, setAddingPeople] = useState(false)
@@ -134,6 +139,22 @@ function Thread({ conversationId }) {
     setBackground(key)
     setPickingBackground(false)
   }
+
+  // The WhatsApp header line: first names, "You" for the reader. Each name is
+  // a PersonName door to the contact card (claude/plans/2026-08-26-person-card.md);
+  // "You" stays plain text via its self branch. Carried across from #434 when
+  // the thread moved into useDmThread — the JSX needs this screen's cardFor,
+  // so the line is derived HERE from the hook's members and nameFor.
+  const memberLine = isGroup && members?.length
+    ? members.map((p, index) => (
+        <Fragment key={p.profile_id}>
+          {index > 0 && ', '}
+          <PersonName profileId={p.profile_id} selfId={selfId} onOpen={setCardFor}>
+            {p.profile_id === selfId ? 'You' : nameFor(p.profile_id, p.full_name).split(' ')[0] || 'Member'}
+          </PersonName>
+        </Fragment>
+      ))
+    : null
 
   if (missing) {
     return (
@@ -318,6 +339,8 @@ function Thread({ conversationId }) {
       )}
 
       <DmThread thread={thread} />
+
+      <PersonCard profileId={cardFor} onClose={() => setCardFor(null)} />
     </section>
   )
 }

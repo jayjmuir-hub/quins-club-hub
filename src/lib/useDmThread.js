@@ -223,12 +223,9 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   // every point a surface renders a person.
   const nameFor = (profileId, fallback) => (profileId && nicknames.get(profileId)) || fallback
   const otherName = nameFor(other?.id, other?.name)
-  // The WhatsApp header line: first names, "You" for the reader.
-  const memberLine = isGroup && members?.length
-    ? members
-        .map((p) => (p.profile_id === selfId ? 'You' : nameFor(p.profile_id, p.full_name).split(' ')[0] || 'Member'))
-        .join(', ')
-    : null
+  // The member line lives in the SCREEN since #434's person card: each name
+  // is a PersonName needing the screen's cardFor state, so the screen builds
+  // the JSX from `members` and `nameFor` here.
 
   function clearPhoto() {
     if (photoPreview) URL.revokeObjectURL(photoPreview)
@@ -423,7 +420,6 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     recipientIds,
     nameFor,
     otherName,
-    memberLine,
     newFromRef,
     draft,
     setDraft,

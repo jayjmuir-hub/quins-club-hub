@@ -13,6 +13,7 @@ import Register from './Register.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import SquadStaffCard from '../components/SquadStaffCard.jsx'
+import PersonCard from '../components/PersonCard.jsx'
 import NoticeBoard from '../components/NoticeBoard.jsx'
 import NotificationsNudge from '../components/NotificationsNudge.jsx'
 import PostNoticeAction from '../components/PostNoticeAction.jsx'
@@ -401,6 +402,8 @@ export default function Dashboard() {
   // Only for the notice read-receipt write, which needs the caller's own
   // profile id. Everything else on this screen is scoped by RLS.
   const { user } = useAuth()
+  // The person card: the tapped staff name's profile id, or null.
+  const [cardFor, setCardFor] = useState(null)
 
   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
@@ -1136,6 +1139,7 @@ export default function Dashboard() {
                 staff={staffByTeam.get(team.id) ?? []}
                 defaultOpen={index === 0}
                 selfId={user?.id ?? null}
+                onOpenCard={setCardFor}
                 // Round 2, Jay: "chat icon option in all coach, manager, etc
                 // pills". Find-or-create the DM and land in it; whether the
                 // DM is allowed is open_conversation's call, and its refusal
@@ -1153,6 +1157,8 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+      <PersonCard profileId={cardFor} onClose={() => setCardFor(null)} />
 
       {/* The dashboard's fixture rows open the same detail sheet the
           schedule does, so they get the same Edit/Delete footer and the same

@@ -80,6 +80,13 @@ vi.mock('../src/data/messages.js', () => ({
   createGroup: (...a) => m.createGroup(...a),
 }))
 
+// The person card's fetch, mocked so this file stays network-free; the card's
+// own behaviour is covered by tests/person-card.test.jsx.
+const getPersonCardMock = vi.fn()
+vi.mock('../src/data/personCard.js', () => ({
+  getPersonCard: (...args) => getPersonCardMock(...args),
+}))
+
 import DirectMessages from '../src/screens/DirectMessages.jsx'
 
 const ME = 'me-1'
@@ -194,5 +201,32 @@ describe('a group thread', () => {
     await user.click(screen.getByRole('button', { name: 'Leave group' }))
     await waitFor(() => expect(m.leaveGroup).toHaveBeenCalledWith('g1'))
     expect(await screen.findByText('the list')).toBeInTheDocument()
+  })
+})
+
+// The person card (claude/plans/2026-08-26-person-card.md): each name in the
+// group header's member line is a door; "You" stays plain text.
+describe('group thread — member names open the person card', () => {
+  it('a member name is a button, You is not', async () => {
+    getPersonCardMock.mockResolvedValue({
+      profileId: 'p-2',
+      name: 'Mira Vantel',
+      role: 'parent',
+      title: null,
+      isSuper: false,
+      squads: [],
+      phone: null,
+      email: null,
+      photoUrl: null,
+      focus: null,
+    })
+    const user = userEvent.setup()
+    renderAt('/chat/dm/g1')
+
+    const subtitle = await screen.findByTestId('chat-subtitle')
+    await user.click(within(subtitle).getByRole('button', { name: 'Mira' }))
+    expect(await screen.findByTestId('person-card')).toBeInTheDocument()
+    expect(getPersonCardMock).toHaveBeenCalledWith('p-2')
+    expect(within(subtitle).queryByRole('button', { name: 'You' })).toBeNull()
   })
 })
