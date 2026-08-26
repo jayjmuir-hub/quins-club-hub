@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 💬 **Online status and WhatsApp ticks land in chat** — Jay:
+- (unmerged) — 👤 **The person card is designed and approved** — Jay: "click
+  on a username, see their info and start a chat, email, call … from
+  anywhere in the system." Design doc `claude/plans/2026-08-26-person-card.md`:
+  tap any adult's name → bottom-sheet card with Call/WhatsApp/Email/Chat;
+  ruling C — a staff or admin role makes you contactable by ANYONE in the
+  club (extends 13 Aug's opt-in ruling club-wide); parents stay chat-only
+  to everyone but the staff who manage them; player names keep opening
+  Player Detail. Enforced server-side by a new `member_contact_card` RPC,
+  never by the screen. Doc only — no code yet. The NEXT pull request cites
+  this entry's squash SHA.
+- `242d442` — 💬 **Online status and WhatsApp ticks land in chat** — Jay:
   "we need an online status in chat" and "delivered and viewed check marks
   for messages like whatsapp has". ONLINE is Supabase Realtime PRESENCE
   with deliberately NO table — ephemeral, one shared channel per tab,
