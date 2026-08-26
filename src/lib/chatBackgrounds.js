@@ -11,6 +11,13 @@
 // screen. Each paper is a covered, centered JPEG washed toward the theme
 // surface via `--surface-rgb` (not a hardcoded grey), so dark mode stays
 // dark and light stays light without per-theme variants.
+//
+// ⚠️ WHERE THE STYLE GOES MATTERS (26 Aug 2026): `cover` on the growing
+// message stream stretched the photo over the whole thread height, so long
+// chats went blurry. Both threads now paint it on a sticky, viewport-height
+// layer (see DmThread.jsx), so `cover` always resolves against a screen-
+// sized box. The picker's swatch tiles still use these styles directly —
+// a 64px tile is its own box and covers crisply.
 
 const KEY = 'chat-background'
 const DEFAULT_KEY = 'crest'

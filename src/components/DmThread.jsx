@@ -107,8 +107,29 @@ export default function DmThread({ thread, compact = false }) {
           bubbles, so the paper covers the whole message area however short
           the thread — and the composer stays the document bottom, which is
           what the keyboard fix relies on (AppShell's <main> comment). Both
-          classes are no-ops once the thread is taller than the viewport. */}
-      <div className="-mx-1 flex flex-1 flex-col justify-end gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
+          classes are no-ops once the thread is taller than the viewport.
+          ⚠️ THE PHOTO IS NOT ON THIS WRAPPER — 26 Aug 2026, Jay: cover on
+          the growing stream stretched the paper over the whole thread
+          height, so long chats went blurry. WhatsApp-style instead: a
+          sticky, viewport-height layer inside an absolute clip. It pins to
+          whichever scrollport owns the thread (the document on the full
+          screen, the panel in the dock), so the photo is always painted at
+          screen size and messages scroll over it.
+          ⚠️ NO min-h-full HERE — measured in the harness, 26 Aug 2026: 100%
+          of the absolute clip is the WRAPPER height, so it silently grew the
+          layer back to the full stream and the stretch survived. h-dvh only;
+          a browser without dvh (pre-2022) shows plain surface, not a blur.
+          NOT background-attachment: fixed — broken on iOS. `isolate` traps
+          the layer's -z-10 under the bubbles without touching them.
+          ⚠️ overflow-CLIP on the clip div, not overflow-hidden — measured in
+          the harness, 26 Aug 2026: hidden makes the clip div the sticky
+          layer's scrollport (a scroll container that never scrolls), so the
+          paper never pinned and a bare band opened above the composer.
+          `overflow: clip` clips without becoming a scroll container. */}
+      <div className="relative isolate -mx-1 flex flex-1 flex-col justify-end gap-1 rounded-[12px] px-2 py-1" data-background={background}>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-clip rounded-[12px]">
+          <div data-testid="chat-wallpaper" className="sticky top-0 h-dvh w-full" style={backgroundStyle(background) ?? undefined} />
+        </div>
         {messages?.map((m, index) => {
           const mine = m.author_id === selfId
           const authorName = mine ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')

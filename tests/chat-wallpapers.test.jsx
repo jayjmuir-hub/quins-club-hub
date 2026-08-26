@@ -190,10 +190,20 @@ describe('the squad chat wears the wallpaper', () => {
   it('empty storage paints crest — the default on every chat', async () => {
     renderChat()
     await waitFor(() => expect(screen.getByTestId('composer-locked')).toBeInTheDocument())
-    const painted = document.querySelector('[data-background]')
-    expect(painted?.getAttribute('data-background')).toBe('crest')
-    expect(painted?.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
-    expect(painted?.style.backgroundImage).toContain('url(')
+    const stream = document.querySelector('[data-background]')
+    expect(stream?.getAttribute('data-background')).toBe('crest')
+    // ⚠️ The stretch bug (26 Aug 2026): the photo used to sit on this growing
+    // wrapper with background-size: cover, so a long thread scaled it to
+    // thousands of pixels and it went blurry. The wrapper itself must carry
+    // NO image — this line fails against that implementation on purpose.
+    expect(stream?.style.backgroundImage ?? '').toBe('')
+    // The paper lives on a sticky, viewport-height layer inside the stream's
+    // clip: always painted at screen size, messages scroll over it.
+    const paper = document.querySelector('[data-testid="chat-wallpaper"]')
+    expect(paper?.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+    expect(paper?.style.backgroundImage).toContain('url(')
+    expect(paper?.className).toContain('sticky')
+    expect(paper?.className).toContain('h-dvh')
   })
 
   it('offers Chat background in the header menu and opens the gallery', async () => {

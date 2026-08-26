@@ -308,13 +308,16 @@ describe('the floating chat dock', () => {
     renderAt('/roster')
     await user.click(screen.getByTestId('dock-bubble-button'))
     await user.click((await screen.findAllByTestId('dock-row'))[0])
-    // The wallpaper paints the STREAM inside the dock's scroll container —
-    // the same paint site as the full screens since phase 4.
+    // The wallpaper rides the sticky viewport layer inside the dock's scroll
+    // container — the same paint site as the full screens. The growing
+    // stream wrapper itself carries no image (the 26 Aug stretch bug).
     const panel = await screen.findByTestId('dock-thread')
     const stream = panel.querySelector('[data-background]')
     expect(stream.getAttribute('data-background')).toBe('crest')
-    expect(stream.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
-    expect(stream.style.backgroundImage).not.toContain('data:image/svg+xml')
+    expect(stream.style.backgroundImage ?? '').toBe('')
+    const paper = panel.querySelector('[data-testid="chat-wallpaper"]')
+    expect(paper.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+    expect(paper.style.backgroundImage).not.toContain('data:image/svg+xml')
   })
 })
 

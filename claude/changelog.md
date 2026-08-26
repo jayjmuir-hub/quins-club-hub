@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 📷 **Photos keep their shape, and the positioner becomes one
+- (unmerged) — 🖼 **Chat wallpaper no longer stretches blurry on long threads** —
+  Jay, via a Grok diagnosis he verified: the photo sat on the growing stream
+  wrapper with `background-size: cover`, so a long chat scaled it over
+  thousands of pixels and all five papers went mushy. WhatsApp-style now: a
+  sticky, viewport-height layer inside an absolute clip on the stream —
+  always painted at screen size, messages scroll over it, in the full
+  screens and the dock alike. Short-thread slack-eater fill preserved
+  (measured in the harness); `background-attachment: fixed` avoided (broken
+  on iOS). Two traps measured live and recorded in the DmThread comment:
+  `min-h-full` regrew the layer to the wrapper, and `overflow-hidden` made
+  the clip the sticky's scrollport so it never pinned — `overflow-clip` is
+  the one that clips without becoming a scroll container. Same PR: the full
+  club doodle Jay sent replaces `doodle.jpg`.
+
+- `6863d47` — 📷 **Photos keep their shape, and the positioner becomes one
   honest circle** — three Jay observations that turned out to be one problem:
   chat pics "don't work as well as whatsapp", "the ios pic issue", and "can't
   we have a simple one size view and slide the photo around in the focus
