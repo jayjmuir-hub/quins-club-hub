@@ -10,6 +10,8 @@ import { formatPhone } from '../lib/phone.js'
 import { genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import Button from '../components/Button.jsx'
+import PersonCard from '../components/PersonCard.jsx'
+import PersonName from '../components/PersonName.jsx'
 
 // The player detail sheet (design-system.md §5.7): a branded hero carrying
 // the player's initials, a set of key/value rows, and — only when the database
@@ -100,6 +102,15 @@ function ParentsBlock({ playerId }) {
   const [parents, setParents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // The person card (claude/plans/2026-08-26-person-card.md). A parent row's
+  // profile_id is set only once they have claimed an account — an unclaimed
+  // row stays plain text via PersonName's null branch, which is honest: there
+  // is no account to chat with.
+  //
+  // ⚠️ NO selfId HERE, DELIBERATELY. This block does not know who is signed in
+  // (useAuth would need a provider ten test files never mount), so a parent
+  // tapping their OWN name gets a card about themselves — odd, never harmful.
+  const [cardFor, setCardFor] = useState(null)
 
   useEffect(() => {
     let mounted = true
@@ -162,7 +173,13 @@ function ParentsBlock({ playerId }) {
       {parents.map((parent) => (
         <div key={parent.id} className="border-b border-line py-3 last:border-b-0">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-[15px] font-bold text-ink">{parent.full_name}</span>
+            <PersonName
+              profileId={parent.profile_id}
+              onOpen={setCardFor}
+              className="text-[15px] font-bold text-ink"
+            >
+              {parent.full_name}
+            </PersonName>
             {parent.relationship && (
               <span className="shrink-0 text-[13px] font-semibold text-ink-faint">
                 {parent.relationship}
@@ -204,6 +221,8 @@ function ParentsBlock({ playerId }) {
           )}
         </div>
       ))}
+
+      <PersonCard profileId={cardFor} onClose={() => setCardFor(null)} />
     </div>
   )
 }

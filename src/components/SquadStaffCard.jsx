@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Card from './Card.jsx'
+import PersonName from './PersonName.jsx'
 import { compareSquadStaff } from '../lib/squadStaff.js'
 import { labelForRole } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
@@ -200,7 +201,7 @@ export function StaffAvatar({ name, role, url, focus, size = 'md' }) {
   )
 }
 
-function StaffRow({ member, onChat = null, selfId = null }) {
+function StaffRow({ member, onChat = null, selfId = null, onOpenCard = null }) {
   const role = labelForRole(member.role)
   const line = member.title ?? role
   const wa = whatsappUrl(member.phone)
@@ -216,7 +217,14 @@ function StaffRow({ member, onChat = null, selfId = null }) {
         focus={member.focus}
       />
       <div className="min-w-0 flex-1 overflow-hidden">
-        <p className="truncate text-[15px] font-extrabold text-ink">{member.name}</p>
+        <p className="truncate text-[15px] font-extrabold text-ink">
+          {/* The person card (claude/plans/2026-08-26-person-card.md): the name
+              itself is a door when the screen passes onOpenCard; the row's
+              buttons stay — the card is additive, not a replacement. */}
+          <PersonName profileId={member.profileId} selfId={selfId} onOpen={onOpenCard}>
+            {member.name}
+          </PersonName>
+        </p>
         {/* ⚠️ THE TITLE REPLACES THE ROLE LABEL RATHER THAN JOINING IT. "Head
             Coach" beside a "Coach" chip is the same word twice. When there is
             no title the role label carries the line on its own.
@@ -309,7 +317,7 @@ function FaceStack({ staff }) {
  * attached to a squad should see that squad named on their home screen whether
  * or not anyone has been attached to it yet.
  */
-export function SquadStaffCard({ squadName, staff = [], defaultOpen = true, onChat = null, selfId = null }) {
+export function SquadStaffCard({ squadName, staff = [], defaultOpen = true, onChat = null, selfId = null, onOpenCard = null }) {
   const [open, setOpen] = useState(defaultOpen)
   // Sort here as well as in the data module: tests (and any future caller)
   // can hand an unsorted array and the card still draws the agreed order.
@@ -379,6 +387,7 @@ export function SquadStaffCard({ squadName, staff = [], defaultOpen = true, onCh
               member={member}
               onChat={onChat}
               selfId={selfId}
+              onOpenCard={onOpenCard}
             />
           ))}
         </Card>
