@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 💬 **Online status and WhatsApp ticks land in chat** — Jay:
+- (unmerged) — 📋 **Session handoff for the 25–26 Aug batch** —
+  `claude/handoffs/2026-08-26-desktop-chat-batch.md`: six shipped PRs, the
+  session's reusable traps (docs-check local-vs-CI, the harness alias
+  contract, execute_sql's last-statement-only results, the squatted 5199),
+  and the two deliberate ticks v1 cuts now recorded in open-items. The NEXT
+  pull request cites this entry's squash SHA.
+- `242d442` — 💬 **Online status and WhatsApp ticks land in chat** — Jay:
   "we need an online status in chat" and "delivered and viewed check marks
   for messages like whatsapp has". ONLINE is Supabase Realtime PRESENCE
   with deliberately NO table — ephemeral, one shared channel per tab,
