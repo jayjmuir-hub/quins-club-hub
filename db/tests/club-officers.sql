@@ -11,7 +11,10 @@
 --  3. member_identity now carries the officer row (role 'officer', the
 --     title, no squad) alongside the person's membership rows
 --  4. a member of ANOTHER club reads zero officer rows and zero identity
---  5. a ninth, invented title is refused by the CHECK — vocabulary closed
+--  5. an INVENTED title is refused by the CHECK — vocabulary closed
+--  6. Social Media Director — the ninth title, added by its own migration
+--     (20260826_officer_title_social_media.sql, inlined below) — is accepted:
+--     the closed-vocabulary design admitting a title the DESIGNED way
 begin;
 
 create temporary table _log(seq serial, line text) on commit drop;
@@ -48,6 +51,14 @@ end $$;
 
 -- ── migration under test: db/migrations/20260826_club_officers.sql,
 --    verbatim (begin/commit stripped — the harness owns the transaction) ──
+--
+-- ⚠️ THE DROP IS SAFE ONLY BECAUSE THIS TRANSACTION ROLLS BACK. The table
+-- is LIVE since #440, so the verbatim create collides without it; inside
+-- begin…rollback the drop, the recreate, and every fixture row all vanish
+-- together and production's real officer rows come back untouched. The
+-- brief ACCESS EXCLUSIVE lock on a rows-few table is the accepted cost.
+
+drop table if exists public.club_officers cascade;
 
 create table public.club_officers (
   id uuid primary key default gen_random_uuid(),
@@ -84,6 +95,20 @@ create policy "officers delete super" on public.club_officers
 revoke all on table public.club_officers from public, anon;
 grant select, insert, delete on table public.club_officers to authenticated;
 grant all on table public.club_officers to service_role;
+
+-- ── and 20260826_officer_title_social_media.sql, verbatim (begin/commit
+--    stripped) — the ninth title, added the designed way ──────────────────
+
+alter table public.club_officers
+  drop constraint club_officers_title_check;
+
+alter table public.club_officers
+  add constraint club_officers_title_check check (title in (
+    'Club President', 'Vice Chairman', 'Rugby Junior Manager',
+    'Club Secretary', 'Treasurer', 'Membership Secretary',
+    'Director of Rugby', 'Rugby Performance Director',
+    'Social Media Director'
+  ));
 
 create or replace function public.member_identity(_profile uuid)
 returns table(role text, title text, is_super boolean, squad text, squad_sort integer)
@@ -179,6 +204,17 @@ begin
   reset role;
   if not refused then raise exception 'ASSERT 5 FAILED: an invented title was accepted'; end if;
   insert into _log(line) values ('5 vocabulary closed: invented title refused');
+
+  -- 6: the ninth title, admitted the designed way, is accepted and readable
+  perform pg_temp.as_user(superad::text);
+  insert into club_officers (club_id, profile_id, title) values (clubid, officer, 'Social Media Director');
+  reset role;
+  perform pg_temp.as_user(member1::text);
+  select count(*) into n from member_identity(officer) i
+   where i.role = 'officer' and i.title = 'Social Media Director';
+  reset role;
+  if n <> 1 then raise exception 'ASSERT 6 FAILED: Social Media Director rows = %, wanted 1', n; end if;
+  insert into _log(line) values ('6 ninth title: Social Media Director accepted via its migration');
 end $fn$;
 
 select pg_temp.assert_club_officers();

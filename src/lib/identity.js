@@ -26,6 +26,9 @@ export const OFFICER_TITLES = [
   'Membership Secretary',
   'Director of Rugby',
   'Rugby Performance Director',
+  // The ninth — added by 20260826_officer_title_social_media.sql, the
+  // closed vocabulary admitting a title the designed way.
+  'Social Media Director',
 ]
 
 /** @returns [{ label, tone: 'officer'|'admin'|'staff'|'family', squads? }] */
