@@ -391,20 +391,70 @@ describe('MembershipProvider view-as preview', () => {
     expect(window.localStorage.getItem(VIEW_AS_KEY)).toBeNull()
   })
 
-  it('refuses to preview for a non-admin, even if one is stored', async () => {
+  // ⚠️ FLIPPED 26 Aug 2026 — this test used to be "refuses to preview for a
+  // non-admin, even if one is stored", and MEMBERSHIP_ROW (an active coach on
+  // team-1) previewing parent/team-1 is now EXACTLY the shape Jay asked for:
+  // "view as a parent of their own age group so they can see what parents
+  // will see". The refusals below keep every other shape dead.
+  it('a coach previews the parent view of their own squad', async () => {
     const user = userEvent.setup()
-    window.localStorage.setItem(VIEW_AS_KEY, JSON.stringify({ role: 'parent', teamId: 'team-1' }))
-
     renderAs({ memberships: [MEMBERSHIP_ROW] })
     await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
 
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+
+    // Same exact-shape assertion as the admin case above, same reason: a
+    // missing `status: 'active'` silently starves the preview of features.
+    const effective = JSON.parse(screen.getByTestId('memberships').textContent)
+    expect(effective).toEqual([
+      {
+        id: 'view-as',
+        role: 'parent',
+        team_id: 'team-1',
+        player_id: null,
+        club_id: MEMBERSHIP_ROW.club_id ?? null,
+        status: 'active',
+      },
+    ])
+    expect(screen.getByTestId('real')).toHaveTextContent('m-1')
+  })
+
+  it('drops a coach\'s stored preview in any other shape — wrong persona or wrong squad', async () => {
+    // The coach persona: not theirs to wear, even in their own squad.
+    window.localStorage.setItem(VIEW_AS_KEY, JSON.stringify({ role: 'coach', teamId: 'team-1' }))
+    const first = renderAs({ memberships: [MEMBERSHIP_ROW] })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
     expect(screen.getByTestId('viewAs')).toHaveTextContent('null')
-    expect(screen.getByTestId('memberships')).toHaveTextContent('m-1')
+    await waitFor(() => expect(window.localStorage.getItem(VIEW_AS_KEY)).toBeNull())
+    first.unmount()
+
+    // Another squad's parent view: the team exists, but it is not theirs.
+    window.localStorage.setItem(VIEW_AS_KEY, JSON.stringify({ role: 'parent', teamId: 'team-2' }))
+    renderAs({
+      memberships: [MEMBERSHIP_ROW],
+      teams: [TEAM_ROW, { id: 'team-2', name: 'U14', sort_order: 9 }],
+    })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    expect(screen.getByTestId('viewAs')).toHaveTextContent('null')
+    await waitFor(() => expect(window.localStorage.getItem(VIEW_AS_KEY)).toBeNull())
+  })
+
+  it('still refuses a parent, even with a stored preview', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(VIEW_AS_KEY, JSON.stringify({ role: 'parent', teamId: 'team-1' }))
+
+    renderAs({
+      memberships: [{ id: 'm-p', role: 'parent', status: 'active', team_id: 'team-1', player_id: 'p1' }],
+    })
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+
+    expect(screen.getByTestId('viewAs')).toHaveTextContent('null')
+    expect(screen.getByTestId('memberships')).toHaveTextContent('m-p')
     await waitFor(() => expect(window.localStorage.getItem(VIEW_AS_KEY)).toBeNull())
 
-    // And a coach who calls the setter directly still gets the real set.
+    // And calling the setter directly still gets the real set.
     await user.click(screen.getByRole('button', { name: 'Preview' }))
-    expect(screen.getByTestId('memberships')).toHaveTextContent('m-1')
+    expect(screen.getByTestId('memberships')).toHaveTextContent('m-p')
     await waitFor(() => expect(screen.getByTestId('viewAs')).toHaveTextContent('null'))
   })
 

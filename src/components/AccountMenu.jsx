@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin } from '../lib/scope.js'
+import { isAdmin, parentPreviewTeamIds } from '../lib/scope.js'
 import { effectiveTheme, toggleTheme, watchSystemTheme } from '../lib/theme.js'
 import { ViewAsOptions } from './ViewAsSwitcher.jsx'
 import { GetAppMenuItem } from './AppButton.jsx'
@@ -153,6 +153,9 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
   // effective set is not an admin's, and gating on it would hide the only way
   // to change or leave the preview (the ViewAsSwitcher rule, kept here).
   const admin = isAdmin(realMemberships)
+  // A coach/manager gets "View as" too since 26 Aug 2026 — parent persona,
+  // own squads only. ViewAsOptions itself decides what the list offers.
+  const canViewAs = admin || parentPreviewTeamIds(realMemberships).length > 0
 
   // Follow OS-level theme flips while mounted, so the row never lies.
   useEffect(() => {
@@ -306,7 +309,7 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
                 My account
               </Link>
 
-              {admin && (
+              {canViewAs && (
                 <button
                   type="button"
                   role="menuitem"

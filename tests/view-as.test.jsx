@@ -171,9 +171,54 @@ describe('View as, reached through the account menu', () => {
     expect(screen.queryByTestId('account-menu')).not.toBeInTheDocument()
   })
 
-  it('is not offered to a coach', async () => {
+  // ⚠️ FLIPPED 26 Aug 2026 — this used to assert a coach gets nothing. Jay:
+  // "i want them to be able to view as a parent of their own age group so
+  // they can see what parents will see." Own squads, parent persona only;
+  // he declined other squads and the coach persona in the same breath.
+  it('is offered to an active coach — parent persona, own squad only', async () => {
     const user = userEvent.setup()
-    renderAdmin(ctx({ realMemberships: [{ id: 'm9', role: 'coach', team_id: 't1' }] }))
+    renderAdmin(
+      ctx({ realMemberships: [{ id: 'm9', role: 'coach', status: 'active', team_id: 't1', club_id: 'c1' }] }),
+    )
+
+    await user.click(screen.getByTestId('account-button'))
+    await user.click(screen.getByTestId('view-as-trigger'))
+
+    // Their own squad's parent persona, and nothing else: no coach persona,
+    // no other squads, and the exit row is not labelled as an admin's.
+    expect(await screen.findByRole('menuitem', { name: 'Parent in U12 Boys' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /coach of/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('U14 Girls')).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /my normal view/i })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /all age groups/i })).not.toBeInTheDocument()
+  })
+
+  it('is offered to an active team manager the same way', async () => {
+    const user = userEvent.setup()
+    renderAdmin(
+      ctx({ realMemberships: [{ id: 'm9', role: 'manager', status: 'active', team_id: 't2', club_id: 'c1' }] }),
+    )
+
+    await user.click(screen.getByTestId('account-button'))
+    await user.click(screen.getByTestId('view-as-trigger'))
+    expect(await screen.findByRole('menuitem', { name: 'Parent in U14 Girls' })).toBeInTheDocument()
+  })
+
+  it('is NOT offered to a pending coach — a request is not access', async () => {
+    const user = userEvent.setup()
+    renderAdmin(
+      ctx({ realMemberships: [{ id: 'm9', role: 'coach', status: 'pending', team_id: 't1', club_id: 'c1' }] }),
+    )
+
+    await user.click(screen.getByTestId('account-button'))
+    expect(screen.queryByTestId('view-as-trigger')).not.toBeInTheDocument()
+  })
+
+  it('is not offered to a medic — Jay named coaches and managers', async () => {
+    const user = userEvent.setup()
+    renderAdmin(
+      ctx({ realMemberships: [{ id: 'm9', role: 'medic', status: 'active', team_id: 't1', club_id: 'c1' }] }),
+    )
 
     await user.click(screen.getByTestId('account-button'))
     expect(screen.queryByTestId('view-as-trigger')).not.toBeInTheDocument()
