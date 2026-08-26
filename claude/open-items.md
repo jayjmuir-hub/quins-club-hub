@@ -85,6 +85,13 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Cheap (under an hour each)
 
+- **The ticks' two small gaps (26 Aug 2026, shipped with #430).** The
+  floating dock renders no ticks (its bubbles pass no `receipt`), and the
+  chat LIST cannot show online dots because `my_chats()` does not return the
+  DM counterpart's profile id — a one-column widening of that function plus
+  a dot on `RowAvatar`. Both deliberate v1 cuts, named in the PR.
+
+
 - ✅ ~~**The suite passes with 5–7 "Unhandled Errors" every run — measured 23 Aug
   2026 on `main` at `c593795`.** `TypeError: The "event" argument must be an
   instance of Event` from undici's WebSocket, originating in five screen suites
