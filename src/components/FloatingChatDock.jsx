@@ -186,18 +186,16 @@ export default function FloatingChatDock({ badge = false }) {
       setError(err.message || 'Could not load your chats.')
     }
     try {
+      // ⚠️ INBOX shape ({ conversation_id, other_id, … }) — same regression
+      // and same fix as ChatList's loadList; see the note there.
       const conversations = await listMyConversations()
       setDmOthers(
-        new Map(
-          conversations
-            .filter((c) => c.kind === 'dm')
-            .map((c) => [c.id, c.profile_a === selfId ? c.profile_b : c.profile_a]),
-        ),
+        new Map(conversations.filter((c) => c.other_id).map((c) => [c.conversation_id, c.other_id])),
       )
     } catch {
       setDmOthers(new Map())
     }
-  }, [selfId])
+  }, [])
 
   // The threads load and subscribe for themselves (that is the point of the
   // shared hooks); the dock only keeps its LIST fresh while open.

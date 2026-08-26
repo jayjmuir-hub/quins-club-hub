@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🖼 **The wallpaper follows the person, not the device — and the
+- (unmerged) — 🩹 **The list dots pair from the shape my_conversations
+  actually returns** — found LIVE by Jay minutes after the dots shipped:
+  thread header green, chat-list row grey. `listMyConversations()` returns
+  the INBOX shape (`{ conversation_id, other_id, … }`); the pairing filtered
+  on table columns that do not exist there, built an empty map, and every
+  list dot fell to offline. Fixed in ChatList and the dock; the new
+  screen-level test renders the real row shape and FAILED against the bug —
+  the component-only test could not see it (its lesson is written at the
+  test). The NEXT pull request cites this entry's squash SHA.
+- (unmerged) — 🖼 **Chat wallpaper no longer stretches blurry on long threads** —
+- `7b88a8a` — 🖼 **The wallpaper follows the person, not the device — and the
   doodle is the default** — Jay: "can we make it do those things? also lets set
   the club doodle now as the default background for everyone on every device in
   all chats". `chat_prefs.background`
@@ -100,7 +110,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   back — five asserts including the discriminator (an ordinary admin's
   write REFUSED) and the closed vocabulary. Spec:
   `claude/plans/2026-08-26-club-officers.md`.
-
 - `6f9bbe7` — 🟢 **Last active for admins + presence dots** — Jay: "admin
   should be able to see a last logged in item on every account" and, on
   finding the 25 Aug Online feature was one subtitle word: "fold that in,
@@ -120,7 +129,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   avatars on the Chats list, thread header (the subtitle's 'Online' word
   retired) and dock; groups and pickers get nothing. Everything ephemeral —
   the no-stored-presence ruling intact, last_seen_at its deliberate
-  admin-only exception. The NEXT pull request cites this entry's squash SHA.
+  admin-only exception.
 - `b739099` — 🎖️ **DM identity rows: every hat, always visible** — Jay,
   over a live DM with a multi-hat account: the header must say ALL of it
   ("Club Hub admin, U16B Assistant Coach, U18B Assistant Coach"), parents
