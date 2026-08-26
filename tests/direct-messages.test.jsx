@@ -40,8 +40,11 @@ vi.mock('../src/data/nicknames.js', () => ({
   setNickname: async () => {},
 }))
 // Presence is a live websocket; tests inject who is "online" per test.
-const onlineMock = vi.fn(() => new Set())
-vi.mock('../src/lib/presence.js', () => ({ usePresence: (...a) => onlineMock(...a) }))
+const onlineMock = vi.fn(() => new Map())
+vi.mock('../src/lib/presence.js', () => ({
+  usePresence: (...a) => onlineMock(...a),
+  dotState: (map, id) => (id && map?.get?.(id)) || 'offline',
+}))
 vi.mock('../src/data/messages.js', () => ({
   // Ticks (26 Aug 2026): the receipts map is injected per test; receiptState
   // mirrors the real pure function so tick states are exercised for real.
@@ -117,7 +120,7 @@ beforeEach(() => {
   m.removeMessage.mockResolvedValue(undefined)
   m.deleteConversation.mockResolvedValue(undefined)
   m.listMessageReceipts.mockResolvedValue(new Map())
-  onlineMock.mockReturnValue(new Set())
+  onlineMock.mockReturnValue(new Map())
 })
 
 // ── Ticks and online status (26 Aug 2026) ──────────────────────────────────
@@ -145,11 +148,19 @@ describe('ticks and online status', () => {
     expect(within(theirs).queryByTestId('message-ticks')).toBeNull()
   })
 
-  it('the header says Online while they are, and falls back to the private line when not', async () => {
-    onlineMock.mockReturnValue(new Set([OTHER]))
+  it("the avatar's dot carries their presence, and the private line stays put", async () => {
+    // 26 Aug 2026: the subtitle's 'Online' word retired — the dot on the
+    // header avatar says it at a glance instead, in all three states.
+    onlineMock.mockReturnValue(new Map([[OTHER, 'away']]))
     renderAt('/chat/dm/c1')
-    expect(await screen.findByText('Online')).toBeInTheDocument()
-    expect(screen.queryByText(/Private · you and/)).toBeNull()
+    expect(await screen.findByRole('img', { name: 'Away' })).toBeInTheDocument()
+    expect(screen.getByText(/Private · you and/)).toBeInTheDocument()
+    expect(screen.queryByText('Online')).toBeNull()
+  })
+
+  it('nobody connected reads as an explicit grey Offline dot, never a missing one', async () => {
+    renderAt('/chat/dm/c1')
+    expect(await screen.findByRole('img', { name: 'Offline' })).toBeInTheDocument()
   })
 })
 
