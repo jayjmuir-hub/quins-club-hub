@@ -6312,3 +6312,29 @@ $function$
 REVOKE ALL ON FUNCTION public.touch_last_seen() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.touch_last_seen() FROM anon;
 GRANT EXECUTE ON FUNCTION public.touch_last_seen() TO authenticated;
+-- ---------------------------------------------------------------------
+-- public.member_identity(uuid)   (26 Aug 2026)
+-- APPLIED to production 26 Aug 2026 (function measured present after
+-- apply; db/tests/member-identity.sql green against live, rolled back).
+-- One row per ACTIVE membership — role, title, is_super, squad, sort —
+-- for any active member of the same club. Identity only: no contact
+-- column exists here. claude/plans/2026-08-26-dm-identity-rows.md.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.member_identity(_profile uuid)
+ RETURNS TABLE(role text, title text, is_super boolean, squad text, squad_sort integer)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select m.role, m.title, coalesce(m.is_super, false), t.name, t.sort_order
+    from memberships m
+    left join teams t on t.id = m.team_id
+   where m.profile_id = _profile
+     and m.status = 'active'
+     and exists (
+       select 1 from memberships me
+        where me.profile_id = auth.uid()
+          and me.status = 'active'
+          and me.club_id = m.club_id
+     )
+$function$

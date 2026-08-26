@@ -30,6 +30,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   retired) and dock; groups and pickers get nothing. Everything ephemeral —
   the no-stored-presence ruling intact, last_seen_at its deliberate
   admin-only exception. The NEXT pull request cites this entry's squash SHA.
+- `b739099` — 🎖️ **DM identity rows: every hat, always visible** — Jay,
+  over a live DM with a multi-hat account: the header must say ALL of it
+  ("Club Hub admin, U16B Assistant Coach, U18B Assistant Coach"), parents
+  and players get badges with their squads, and the badges must not scroll
+  away. New `public.member_identity` returns one row per active membership
+  to any same-club member (identity only — the function has NO contact
+  column; phone/email keep member_contact_card's gate), APPLIED to
+  production with `db/tests/member-identity.sql` green and rolled back
+  (five asserts incl. the multi-hat discriminator and a cross-club zero).
+  Ordering lives in pure `src/lib/identity.js`; one `IdentityBadges`
+  component serves the DM screen's sticky header AND the dock's pinned
+  strip (no-drift rule). The screen's ChatHeader was ALREADY sticky —
+  the badge strip below it was not, which was the exact scroll-away Jay
+  saw; both now ride one sticky wrapper. Replaces #437's single best-role
+  pill the day it shipped. Spec:
+  `claude/plans/2026-08-26-dm-identity-rows.md`.
+
 - `16c67ff` — 💬 **Two chat courtesies from Jay's live afternoon** —
   (1) *An unused DM stays out of the list*: the person card's Chat button
   creates the conversation on tap, so a look without a message littered

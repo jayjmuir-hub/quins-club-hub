@@ -49,6 +49,9 @@ vi.mock('../src/lib/presence.js', () => ({
 // same server ruling the tap-a-name card uses, injected per test.
 const getPersonCardMock = vi.fn(async () => null)
 vi.mock('../src/data/personCard.js', () => ({ getPersonCard: (...a) => getPersonCardMock(...a) }))
+// The identity badge rows — every hat, injected per test.
+const getMemberIdentityMock = vi.fn(async () => [])
+vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: (...a) => getMemberIdentityMock(...a) }))
 vi.mock('../src/data/messages.js', () => ({
   // Ticks (26 Aug 2026): the receipts map is injected per test; receiptState
   // mirrors the real pure function so tick states are exercised for real.
@@ -181,32 +184,55 @@ describe('DirectMessages — /chat/dm', () => {
 // ruling the tap-a-name person card reads. The database decides who may see
 // what; a null card renders exactly what rendered before.
 describe('the DM identity line', () => {
-  it('shows a coach’s title and squads under the header', async () => {
-    getPersonCardMock.mockResolvedValue({
-      profileId: OTHER,
-      name: 'Zz Manager Probe',
-      role: 'coach',
-      title: 'Head Coach',
-      isSuper: false,
-      squads: ['U14B'],
-      phone: null,
-      email: null,
-      photoUrl: null,
-      focus: null,
-    })
+  // Reshaped hours after it shipped (claude/plans/2026-08-26-dm-identity-rows.md,
+  // Jay over a live multi-hat DM): EVERY active membership renders, in order —
+  // admin, per-squad staff titles, parent, player — from member_identity rows,
+  // not member_contact_card's best-role summary.
+  it('⚠️ the multi-hat: admin badge AND both per-squad titles, in age order', async () => {
+    getMemberIdentityMock.mockResolvedValue([
+      { role: 'coach', title: 'Assistant Coach', is_super: false, squad: 'ZZ U18 Probe', squad_sort: 12 },
+      { role: 'admin', title: null, is_super: true, squad: null, squad_sort: null },
+      { role: 'coach', title: 'Assistant Coach', is_super: false, squad: 'ZZ U16 Probe', squad_sort: 10 },
+    ])
     renderAt('/chat/dm/c1')
     const line = await screen.findByTestId('dm-identity')
-    expect(within(line).getByText('Head Coach')).toBeInTheDocument()
-    expect(within(line).getByText(/U14B/)).toBeInTheDocument()
+    const labels = [...line.querySelectorAll('span > span:first-child')].map((n) => n.textContent)
+    expect(labels).toEqual(['Club Hub admin', 'ZZ U16 Probe Assistant Coach', 'ZZ U18 Probe Assistant Coach'])
   })
 
-  it('a null card falls back to the plain role pill, nothing invented', async () => {
-    getPersonCardMock.mockResolvedValue(null)
+  it('a parent shows their badge with their squads', async () => {
+    getMemberIdentityMock.mockResolvedValue([
+      { role: 'parent', title: null, is_super: false, squad: 'ZZ U10 Probe', squad_sort: 3 },
+      { role: 'parent', title: null, is_super: false, squad: 'ZZ U12 Probe', squad_sort: 5 },
+    ])
+    renderAt('/chat/dm/c1')
+    const line = await screen.findByTestId('dm-identity')
+    expect(within(line).getByText('Parent')).toBeInTheDocument()
+    expect(within(line).getByText('ZZ U10 Probe, ZZ U12 Probe')).toBeInTheDocument()
+  })
+
+  it('no identity rows: no badge strip, no invention, no crash', async () => {
+    getMemberIdentityMock.mockResolvedValue([])
     renderAt('/chat/dm/c1')
     await screen.findByTestId('dm-composer')
     expect(screen.queryByTestId('dm-identity')).toBeNull()
-    // The pre-existing pill from the inbox row's role still renders.
-    expect(screen.getByText('Team Manager')).toBeInTheDocument()
+  })
+
+  // 26 Aug 2026, Jay: the badges "scroll off the screen in longer chats…
+  // they should always be visible". jsdom applies no CSS — the class tokens
+  // ARE the statement, same convention as the roster's layout tests.
+  it('⚠️ the header block is sticky, badges inside it', async () => {
+    getMemberIdentityMock.mockResolvedValue([
+      { role: 'coach', title: 'Head Coach', is_super: false, squad: 'ZZ U16 Probe', squad_sort: 10 },
+    ])
+    renderAt('/chat/dm/c1')
+    const header = await screen.findByTestId('dm-header')
+    const tokens = header.className.split(/\s+/)
+    expect(tokens).toContain('sticky')
+    expect(tokens).toContain('top-0')
+    // ⚠️ INSIDE the sticky wrapper — the pre-existing bug was precisely that
+    // ChatHeader was already sticky while the badge strip below it was not.
+    expect(await within(header).findByTestId('dm-identity')).toBeInTheDocument()
   })
 })
 
