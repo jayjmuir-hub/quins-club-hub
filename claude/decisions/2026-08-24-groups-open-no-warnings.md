@@ -39,3 +39,14 @@ consenting when they allow they players to create accounts in the app"*.
   read it; groups say only "N people". The transparency argument lost to
   Jay's judgment that warning copy on an open parents' group reads as
   distrust of the very people the feature is for.
+
+## Addendum — 26 Aug 2026: the DM notice is gone for members too
+
+Jay, pointing at the floating dock (which never showed it): "remove the club
+admins can review notice that is appearing in left side chat and app chat".
+This reverses the 23 Aug permanent-notice ruling for MEMBERS: a DM thread now
+renders no banner at all, matching the dock and this file's groups ruling.
+The REVIEWING banner stays — it is about the admin in the room ("this open
+has been recorded"), not a warning to members, and the review itself is
+still logged to welfare_access_log exactly as before. Nothing about WHO may
+read a DM changed — only the standing on-screen restatement of it.

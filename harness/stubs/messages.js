@@ -96,7 +96,11 @@ const DM_CONV = {
   profile_a: DM_SELF < DM_OTHER ? DM_SELF : DM_OTHER,
   profile_b: DM_SELF < DM_OTHER ? DM_OTHER : DM_SELF,
 }
-const DM_ROWS = Array.from({ length: 16 }, (_, i) => {
+// ?dmCount=N shortens the thread — the wallpaper-fills-the-screen checks
+// (26 Aug 2026) need a thread SHORTER than the viewport, which 16 never is.
+const DM_COUNT = Math.min(16, Math.max(1,
+  Number(new URLSearchParams(globalThis.location?.search ?? '').get('dmCount')) || 16))
+const DM_ROWS = Array.from({ length: DM_COUNT }, (_, i) => {
   const mine = i % 3 === 2
   return {
     id: `hz-dm-${i + 1}`,
