@@ -696,7 +696,16 @@ export default function AppShell({ children }) {
         // 25 Aug screenshots show the composer marooned mid-screen over a
         // void. Bottom-anchoring the thread means "document bottom" and "the
         // composer" are the same place, however few messages there are.
-        className={`mx-auto w-full max-w-[1120px] flex-1 px-4 ${conversationScreen ? 'flex flex-col pb-2' : 'pb-[calc(108px+env(safe-area-inset-bottom))]'} pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 desktop:pb-16 wide:max-w-none focus:outline-none`}
+        // ⚠️ desktop:pb-16 LIVES IN THE NON-CONVERSATION BRANCH, NOT THE SHARED
+        // TAIL (26 Aug 2026). Applied to a thread it opened 64px of slack
+        // under the sticky composer, so the composer pinned to the viewport
+        // edge mid-scroll and then came to rest 64px HIGHER at full scroll —
+        // Jay: the input box "moves up and down depending on where i scroll".
+        // No pb AT ALL on a conversation: the composer carries its own bottom
+        // padding (safe-area included), and any padding under it here is the
+        // same jitter at a smaller size — pinned flush mid-scroll, resting
+        // N px higher at the end.
+        className={`mx-auto w-full max-w-[1120px] flex-1 px-4 ${conversationScreen ? 'flex flex-col' : 'pb-[calc(108px+env(safe-area-inset-bottom))] desktop:pb-16'} pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 wide:max-w-none focus:outline-none`}
       >
         {/* ⚠️ ABOVE THE loading/error/ready SPLIT, DELIBERATELY. Installing is
             not gated on having a membership: a parent who has just signed up

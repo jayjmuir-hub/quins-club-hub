@@ -859,6 +859,12 @@ describe('chrome-free conversations (Jay, 25 Aug 2026)', () => {
     expect(hasClassToken(screen.getByTestId('masthead-wrapper'), 'desktop:flex')).toBe(false)
     // The 108px tab-bar clearance would be a dead band under the composer.
     expect(document.getElementById('main-content').className).not.toContain('108px')
+    // And so would ANY bottom padding (26 Aug 2026): desktop:pb-16 under a
+    // thread made the sticky composer pin flush mid-scroll and rest 64px
+    // higher at full scroll — Jay: it "moves up and down depending on where
+    // i scroll". Conversations get no main padding at all; the composer
+    // carries its own.
+    expect(document.getElementById('main-content').className).not.toMatch(/pb-/)
   })
 
   it('squad and club streams count as conversations', () => {
