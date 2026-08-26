@@ -1,6 +1,14 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+
+// The person card's fetch, mocked so this file stays network-free; the card's
+// own behaviour is covered by tests/person-card.test.jsx.
+const getPersonCardMock = vi.fn()
+vi.mock('../src/data/personCard.js', () => ({
+  getPersonCard: (...args) => getPersonCardMock(...args),
+}))
+
 import NoticeBoard from '../src/components/NoticeBoard.jsx'
 
 // The Home card. Its job is small and two of its rules are easy to "fix" back:
@@ -96,5 +104,34 @@ describe('NoticeBoard', () => {
     draw({ notices: [notice({ body: 'Line one\nLine two' })] })
     const body = screen.getByText(/Line one/)
     expect(body).toHaveClass('whitespace-pre-line')
+  })
+})
+
+// The person card (claude/plans/2026-08-26-person-card.md): the author's name
+// on a notice is a door to the card.
+describe('NoticeBoard — the author opens the person card', () => {
+  it('the author name is a button that opens the contact card', async () => {
+    getPersonCardMock.mockResolvedValue({
+      profileId: 'p-author',
+      name: 'Zz Probe Author',
+      role: 'coach',
+      title: null,
+      isSuper: false,
+      squads: [],
+      phone: null,
+      email: null,
+      photoUrl: null,
+      focus: null,
+    })
+    draw({ notices: [notice({ author_id: 'p-author', author: { full_name: 'Zz Probe Author' } })] })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zz Probe Author' }))
+    expect(await screen.findByTestId('person-card')).toBeInTheDocument()
+    expect(getPersonCardMock).toHaveBeenCalledWith('p-author')
+  })
+
+  it('⚠️ a notice with no author id keeps a plain name — nothing to open', () => {
+    draw({ notices: [notice()] })
+    expect(screen.queryByRole('button', { name: 'Jay Muir' })).toBeNull()
   })
 })
