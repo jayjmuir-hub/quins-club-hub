@@ -136,7 +136,7 @@ describe('the floating chat dock', () => {
     expect(screen.getByPlaceholderText('Message Zz')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Message'), 'Zz on my way')
     await user.click(screen.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz on my way', { attachmentPath: null }))
+    await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz on my way', { attachmentPath: null, quotedId: null }))
   })
 
   it('a 1:1 does not print their name on every incoming bubble, and own is green with no You', async () => {
@@ -210,5 +210,64 @@ describe('the floating chat dock', () => {
     expect(panel.getAttribute('data-background')).toBe('crest')
     expect(panel.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
     expect(panel.style.backgroundImage).not.toContain('data:image/svg+xml')
+  })
+})
+
+// 26 Aug 2026, Jay's screenshot: the full thread's chevron menu simply was
+// not in the dock. The dock's menu offers only what the dock can honestly
+// do — Reply where its send carries a quote, Copy where there is a body,
+// and the full view for everything richer.
+describe('the dock chevron menu', () => {
+  it('a DM bubble carries Reply, Copy and More in full view', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[1])
+    const bubbles = await screen.findAllByTestId('dock-bubble')
+    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
+    expect(screen.getByRole('menuitem', { name: 'Reply' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'More in full view' })).toBeInTheDocument()
+  })
+
+  it('Reply quotes into the composer and the send carries quotedId', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[1])
+    const bubbles = await screen.findAllByTestId('dock-bubble')
+    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Reply' }))
+    expect(screen.getByTestId('dock-quote-preview')).toHaveTextContent('Zz two seats held')
+    await user.type(screen.getByLabelText('Message'), 'Zz noted')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() =>
+      expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz noted', {
+        attachmentPath: null,
+        quotedId: 'x1',
+      }),
+    )
+    // The strip clears with the send — a second message must not re-quote.
+    expect(screen.queryByTestId('dock-quote-preview')).toBeNull()
+  })
+
+  it('More in full view expands to the real thread', async () => {
+    const user = userEvent.setup()
+    // A probe route instead of a navigate mock: the file renders a REAL
+    // MemoryRouter, so landing on the thread route is the assertion.
+    render(
+      <MemoryRouter initialEntries={['/roster']}>
+        <Routes>
+          <Route path="/chat/dm/:id" element={<div data-testid="probe-thread" />} />
+          <Route path="*" element={<FloatingChatDock badge />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[1])
+    const bubbles = await screen.findAllByTestId('dock-bubble')
+    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'More in full view' }))
+    expect(await screen.findByTestId('probe-thread')).toBeInTheDocument()
   })
 })

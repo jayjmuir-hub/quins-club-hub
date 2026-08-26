@@ -21,6 +21,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // touching src/ at all.
 export default defineConfig({
   root: __dirname,
+  // The app's public/ assets (chat wallpapers, icons). Without this the
+  // harness 404s /chat-backgrounds/*.jpg and every wallpaper scenario
+  // renders bare surface while claiming to be painted — found 26 Aug 2026
+  // when the paper-stretch screenshot came out grey.
+  publicDir: path.resolve(__dirname, '../public'),
   // ⚠️ envDir must be the REPO ROOT, because `root` above is harness/ and Vite
   // loads .env relative to `root`. Without this the harness boots to a blank
   // page: src/lib/supabase.js throws "Missing required Supabase env var(s)" at

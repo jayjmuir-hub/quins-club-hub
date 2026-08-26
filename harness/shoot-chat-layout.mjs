@@ -46,6 +46,32 @@ const measured = await page.evaluate(() => {
 
 await page.screenshot({ path: path.join(outDir, 'dm-thread-mobile.png'), fullPage: false })
 
+// ── The SHORT thread: the wallpaper is the slack-eater (26 Aug 2026) ──────
+// Jay's screenshot: three bubbles wore a small patch of paper and the empty
+// area above them was bare surface. The wallpaper wrapper is now flex-1 +
+// justify-end, so with few messages it must stretch from under the header
+// area down to the composer — measured, not eyeballed.
+const shortPage = await browser.newPage({ viewport: { width: 375, height: 812 } })
+shortPage.on('pageerror', (err) => pageErrors.push(err.message))
+// A visible paper, so the screenshot SHOWS the stretch rather than only the
+// numbers proving it — same device-level key the app reads.
+await shortPage.addInitScript(() => window.localStorage.setItem('chat-background', 'crest'))
+await shortPage.goto(`${BASE}/?scenario=dm-thread&at=thread&few=1`, { waitUntil: 'networkidle' })
+await shortPage.waitForTimeout(600)
+const paper = await shortPage.evaluate(() => {
+  const wallpaper = document.querySelector('[data-background]')
+  const form = document.querySelector('main form:has(textarea)')
+  const w = wallpaper?.getBoundingClientRect()
+  const f = form?.getBoundingClientRect()
+  return {
+    paperHeight: w ? Math.round(w.height) : null,
+    gapToComposer: w && f ? Math.round(f.top - w.bottom) : null,
+    bubbles: document.querySelectorAll('[data-testid="dm-bubble"]').length,
+  }
+})
+await shortPage.screenshot({ path: path.join(outDir, 'dm-thread-few-mobile.png'), fullPage: false })
+await shortPage.close()
+
 // ── The keyboard, simulated the way resizes-content delivers it ───────────
 // interactive-widget=resizes-content (index.html) makes the Android keyboard
 // SHRINK the layout viewport; Playwright cannot open a soft keyboard, but
@@ -73,6 +99,12 @@ const keyboard = await page.evaluate(() => {
 await page.screenshot({ path: path.join(outDir, 'dm-thread-keyboard.png'), fullPage: false })
 
 const problems = []
+if (paper.bubbles === 0 || paper.bubbles > 5)
+  problems.push(`few=1 rendered ${paper.bubbles} bubbles — the short-thread instrument is not measuring a short thread`)
+if (paper.paperHeight == null || paper.paperHeight < 350)
+  problems.push(`wallpaper is ${paper.paperHeight}px tall on a short thread — the paper patch is back`)
+if (paper.gapToComposer == null || paper.gapToComposer > 40)
+  problems.push(`wallpaper stops ${paper.gapToComposer}px above the composer`)
 if (!keyboard.visible)
   problems.push(
     `composer not visible with the keyboard open — bottom ${keyboard.composerBottom}px vs viewport ${keyboard.viewport}px`,
@@ -84,7 +116,7 @@ if (measured.overflow > 1) problems.push(`overflows by ${measured.overflow}px`)
 if (pageErrors.length) problems.push(`page errors: ${pageErrors.join(' | ')}`)
 
 console.log(
-  `${problems.length ? '✗' : '✓'} dm-thread slack=${measured.slackBelowComposer}px keyboard: composer ${keyboard.composerBottom}/${keyboard.viewport}px${problems.length ? ' — ' + problems.join('; ') : ''}`,
+  `${problems.length ? '✗' : '✓'} dm-thread slack=${measured.slackBelowComposer}px keyboard: composer ${keyboard.composerBottom}/${keyboard.viewport}px paper: ${paper.paperHeight}px over ${paper.bubbles} bubbles, gap ${paper.gapToComposer}px${problems.length ? ' — ' + problems.join('; ') : ''}`,
 )
 
 await page.close()

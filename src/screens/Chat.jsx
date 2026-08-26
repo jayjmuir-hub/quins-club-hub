@@ -487,16 +487,13 @@ export default function Chat() {
           }
         />
       )}
-      {/* The slack-eater — same fix as the DM thread, same day: bottom-anchor
-          the stream and composer so the shell's min-h-app surplus sits
-          ABOVE the messages, not below the composer where the phone keyboard
-          maroons it (AppShell's <main> comment has the mechanism). */}
-      <div className="flex-1" aria-hidden="true" />
       {/* Same paint site as the DM thread: the stream wrapper, wearing the
           device wallpaper; data-background is what the tests read. Day
           dividers and gap-1 match DirectMessages Thread so a staff chat
-          does not look like a third style. */}
-      <div className="-mx-1 flex flex-col gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
+          does not look like a third style. flex-1 + justify-end make the
+          wallpaper itself the slack-eater — see the DM thread's comment for
+          the 26 Aug screenshot that decided it. */}
+      <div className="-mx-1 flex flex-1 flex-col justify-end gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
       {messages?.map((m, index) => (
         <Fragment key={m.id}>
         {daysDiffer(messages[index - 1]?.created_at, m.created_at) && (
