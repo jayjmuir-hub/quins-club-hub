@@ -1,7 +1,9 @@
 # Last active for admins, and presence dots in chat
 
-**Status: NOT SHIPPED — design approved by Jay 26 Aug 2026 (option B for the
-admin fact; grey offline dot chosen over no-dot); implementation not started.**
+**Status: BUILT, NOT YET SHIPPED — implemented on branch
+`claude/last-active-presence` 26 Aug 2026, full suite green; the last_seen
+migration is APPLIED to production (82 rows backfilled, measured). Awaiting
+Jay's merge, then the two-device live check of the dots.**
 
 Jay, 26 Aug 2026: "admin should be able to see a last logged in item on every
 account, sort of like the account created item" — and, on learning the 25 Aug

@@ -1,7 +1,12 @@
 # Last Active + Presence Dots Implementation Plan
 
-**Status: NOT SHIPPED — plan written 26 Aug 2026, execution starting the same
-session.**
+**Status: EXECUTED on branch `claude/last-active-presence`, 26 Aug 2026 —
+all tasks done through Task 7's suite run (3,601 green); migration applied
+and verified. Remaining: the merge (Jay's yes) and the post-deploy
+two-device dot check. The harness taught one lesson worth keeping: now() is
+frozen per transaction, so a throttle assert comparing an immediate re-touch
+passed against the very fault it existed to catch — asserts about "did not
+change" need a back-dated fixture, not a same-transaction equality.**
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
