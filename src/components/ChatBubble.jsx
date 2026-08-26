@@ -31,6 +31,28 @@ import { stampLabel } from '../lib/notices.js'
  * @param extra        fixture / read-stat / "N replies in full view"
  * @param onReact      omit (or null) when this surface cannot react
  */
+// WhatsApp's vocabulary, kept exactly because every parent already reads it:
+// one tick = sent, two grey = delivered to their device, two accent = viewed.
+// Colour alone is not the signal — aria-label says the word, and the
+// second tick's presence (not only its colour) separates delivered from sent.
+function Ticks({ state }) {
+  const double = state === 'delivered' || state === 'read'
+  return (
+    <span
+      data-testid="message-ticks"
+      data-state={state}
+      role="img"
+      aria-label={state === 'read' ? 'Viewed' : state === 'delivered' ? 'Delivered' : 'Sent'}
+      className={`inline-flex ${state === 'read' ? 'text-sky-300' : 'text-white/70'}`}
+    >
+      <svg width="14" height="10" viewBox="0 0 16 11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="m1 6 3 3 5.5-7" />
+        {double && <path d="m7 6.5 2.5 2.5L15 2" />}
+      </svg>
+    </span>
+  )
+}
+
 export default function ChatBubble({
   mine,
   messageId,
@@ -63,12 +85,17 @@ export default function ChatBubble({
   selfId,
   onReact = null,
   hideTrigger = false,
+  // 'sent' | 'delivered' | 'read' | null — WhatsApp's ticks, own messages in
+  // DMs and groups only (26 Aug 2026). Null renders nothing, which is what
+  // squad channels and incoming bubbles pass.
+  receipt = null,
 }) {
   const canReact = Boolean(onReact) && !deleted
   const tallies = reactions ?? []
   const stamp = (
-    <span className={`float-right ml-2 mt-1.5 text-[10px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
+    <span className={`float-right ml-2 mt-1.5 inline-flex items-center gap-0.5 text-[10px] font-semibold leading-none ${mine ? 'text-white/70' : 'text-ink-faint'}`}>
       {stampLabel(createdAt)}
+      {mine && receipt && !deleted && <Ticks state={receipt} />}
     </span>
   )
 

@@ -29,6 +29,10 @@ vi.mock('../src/data/chatPrefs.js', () => ({
   setChatPref: (...a) => prefApi.setChatPref(...a),
 }))
 vi.mock('../src/data/messages.js', () => ({
+  // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
+  listMessageReceipts: async () => new Map(),
+  receiptState: () => null,
+  markMessagesDelivered: async () => {},
   chatPath: (row) => `/chat/${row.team_id ?? row.conversation_id ?? 'club'}`,
   listChats: (...a) => m.listChats(...a),
   listDmCandidates: (...a) => m.listDmCandidates(...a),

@@ -2366,3 +2366,23 @@ CREATE TABLE public.signup_nudges (
   CONSTRAINT signup_nudges_nudge_no_check  CHECK ((nudge_no = ANY (ARRAY[1, 2])))
 );
 ALTER TABLE public.signup_nudges ENABLE ROW LEVEL SECURITY;
+
+
+-- ---------------------------------------------------------------------
+-- public.message_deliveries  (26 Aug 2026 — WhatsApp-style ticks)
+-- Migration: db/migrations/20260826_chat_delivery_receipts.sql
+--
+-- The recipient's app has RECEIVED the message (second tick); message_reads
+-- stays the third. Written by the unread-badge fetch, not by opening the
+-- thread. Online status ships beside it with DELIBERATELY NO TABLE — it is
+-- Realtime presence, ephemeral, and a stored last_seen was rejected.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.message_deliveries (
+  message_id   uuid        NOT NULL,
+  profile_id   uuid        NOT NULL,
+  delivered_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT message_deliveries_pkey PRIMARY KEY (message_id, profile_id),
+  CONSTRAINT message_deliveries_message_id_fkey FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+  CONSTRAINT message_deliveries_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+);
+ALTER TABLE public.message_deliveries ENABLE ROW LEVEL SECURITY;

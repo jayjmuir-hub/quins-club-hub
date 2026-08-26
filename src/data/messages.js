@@ -333,7 +333,80 @@ export async function countUnreadMessages(profileId) {
   if (posts.error) throw posts.error
   if (reads.error) throw reads.error
   const read = new Set((reads.data ?? []).map((r) => r.message_id))
-  return (posts.data ?? []).filter((m) => !read.has(m.id)).length
+  const unread = (posts.data ?? []).filter((m) => !read.has(m.id))
+  // ⚠️ THE SECOND TICK RIDES ON THIS FETCH (26 Aug 2026). This function runs
+  // in every signed-in tab on mount and on every realtime message event —
+  // which is exactly what "delivered to their device" means, as opposed to
+  // "they opened the thread" (that is message_reads). Fire-and-forget: the
+  // badge count must not wait on, or fail with, the receipt write.
+  markMessagesDelivered(profileId, unread.map((m) => m.id))
+  return unread.length
+}
+
+/**
+ * Records that this device has RECEIVED these messages — WhatsApp's second
+ * tick (26 Aug 2026). Same never-throw upsert stance as markMessagesRead:
+ * a receipt must never break the screen. Callers pass only ids AUTHORED BY
+ * OTHERS; delivering your own message to yourself is meaningless and the
+ * receipts query filters self out anyway.
+ */
+export async function markMessagesDelivered(profileId, messageIds) {
+  if (!profileId || !messageIds?.length) return
+  const rows = messageIds.map((id) => ({ message_id: id, profile_id: profileId }))
+  const { error } = await supabase
+    .from('message_deliveries')
+    .upsert(rows, { onConflict: 'message_id,profile_id', ignoreDuplicates: true })
+  if (error) console.warn('Could not record messages as delivered:', error.message)
+}
+
+/**
+ * Delivery and read receipts for MESSAGES I AUTHORED — the ticks' data
+ * (26 Aug 2026). RLS is what scopes this: the author arm on both tables
+ * returns rows only for the caller's own messages, so passing somebody
+ * else's ids yields nothing rather than an error. Map of message id →
+ * { delivered: Set<profileId>, read: Set<profileId> }, with the caller's own
+ * rows filtered out — reading your own message is not a receipt.
+ */
+export async function listMessageReceipts(selfId, messageIds) {
+  const ids = [...new Set((messageIds ?? []).filter(Boolean))]
+  if (!selfId || ids.length === 0) return new Map()
+  const [deliveries, reads] = await Promise.all([
+    supabase.from('message_deliveries').select('message_id, profile_id').in('message_id', ids),
+    supabase.from('message_reads').select('message_id, profile_id').in('message_id', ids),
+  ])
+  if (deliveries.error) throw deliveries.error
+  if (reads.error) throw reads.error
+  const byId = new Map()
+  const bucket = (id) => {
+    if (!byId.has(id)) byId.set(id, { delivered: new Set(), read: new Set() })
+    return byId.get(id)
+  }
+  for (const row of deliveries.data ?? []) {
+    if (row.profile_id !== selfId) bucket(row.message_id).delivered.add(row.profile_id)
+  }
+  for (const row of reads.data ?? []) {
+    if (row.profile_id !== selfId) {
+      const b = bucket(row.message_id)
+      b.read.add(row.profile_id)
+      // A read implies the device had it, even if the delivery upsert lost
+      // a race — the ticks must never show read without delivered.
+      b.delivered.add(row.profile_id)
+    }
+  }
+  return byId
+}
+
+/**
+ * Which tick a message of mine shows. `recipients` is everyone in the chat
+ * but me; WhatsApp's rule is ALL of them: one member of a group reading it
+ * does not make the ticks accent-coloured.
+ */
+export function receiptState(receipt, recipients) {
+  const others = (recipients ?? []).filter(Boolean)
+  if (others.length === 0) return 'sent'
+  if (receipt && others.every((id) => receipt.read.has(id))) return 'read'
+  if (receipt && others.every((id) => receipt.delivered.has(id))) return 'delivered'
+  return 'sent'
 }
 
 /** Which posts this person has read. RLS returns only their own rows. */

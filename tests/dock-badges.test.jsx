@@ -6,6 +6,10 @@ const countUnreadMessagesMock = vi.fn()
 const subscribeMessagesMock = vi.fn()
 const countAdminWaitingMock = vi.fn()
 vi.mock('../src/data/messages.js', () => ({
+  // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
+  listMessageReceipts: async () => new Map(),
+  receiptState: () => null,
+  markMessagesDelivered: async () => {},
   countUnreadMessages: (...args) => countUnreadMessagesMock(...args),
   subscribeMessages: (...args) => subscribeMessagesMock(...args),
 }))

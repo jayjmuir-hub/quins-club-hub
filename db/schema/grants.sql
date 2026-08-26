@@ -895,3 +895,14 @@ REVOKE ALL ON public.message_stars FROM PUBLIC, anon;
 -- full CRUD because every verb is the owner's.
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.chat_prefs TO authenticated;
 REVOKE ALL ON public.chat_prefs FROM PUBLIC, anon;
+
+
+-- ---------------------------------------------------------------------
+-- message_deliveries  (26 Aug 2026 — the ticks' second state)
+-- Recorded with the migration (20260826_chat_delivery_receipts) and
+-- MEASURED APPLIED 26 Aug 2026: author sees receipt rows, outsider sees
+-- zero, in a rolled-back fixture — the a5c5efd lesson, closed same day.
+-- SELECT + INSERT only: a delivery receipt is never updated or revoked.
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT ON public.message_deliveries TO authenticated;
+REVOKE ALL ON public.message_deliveries FROM anon;

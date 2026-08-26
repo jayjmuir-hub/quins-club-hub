@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🖥️ **Desktop stops wasting the width** — Jay: "why can't we
+- (unmerged) — 💬 **Online status and WhatsApp ticks land in chat** — Jay:
+  "we need an online status in chat" and "delivered and viewed check marks
+  for messages like whatsapp has". ONLINE is Supabase Realtime PRESENCE
+  with deliberately NO table — ephemeral, one shared channel per tab,
+  keyed by profile so two tabs read as one person; the DM header says
+  Online while they are. TICKS: one = sent, two grey = delivered, two
+  accent = viewed, aria-labelled with the words. Viewed was already
+  message_reads; new `message_deliveries` is written by the unread-badge
+  fetch (every signed-in tab, every realtime event — genuinely "their
+  device has it"), and BOTH tables gain an author-arm SELECT policy so a
+  sender can finally see their own receipts —
+  `db/migrations/20260826_chat_delivery_receipts.sql`, APPLIED to
+  production before this merged: author sees receipts (measured 1/1), an
+  outsider sees zero, in a rolled-back fixture. WhatsApp's group rule: ALL
+  recipients, or the tick stays at the lower state. Proven in a real
+  renderer: all three states + Online in one shoot. The NEXT pull request
+  cites this entry's squash SHA.
+- `dfeee1d` — 🖥️ **Desktop stops wasting the width** — Jay: "why can't we
   have things fill the entire width of the screen?" The shell's 1120px cap
   was already gone; the screens just never used the room. Three now do:
   Schedule's table renders from the DESKTOP breakpoint (820px) instead of

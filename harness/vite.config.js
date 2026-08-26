@@ -120,6 +120,9 @@ export default defineConfig({
       // by AppShell, and src/data/staff.js imports src/lib/supabase.js at module
       // scope, which throws on import rather than on call.
       { find: /^\.\.\/data\/staff\.js$/, replacement: path.resolve(__dirname, 'stubs/staff.js') },
+      // Online presence (26 Aug 2026): src/lib/presence.js imports
+      // src/lib/supabase.js at module scope — same boot-killing shape.
+      { find: /^\.\.\/lib\/presence\.js$/, replacement: path.resolve(__dirname, 'stubs/presence.js') },
     ],
   },
   server: {

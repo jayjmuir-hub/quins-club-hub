@@ -10,7 +10,11 @@ import userEvent from '@testing-library/user-event'
 // same grep that proves BOTH host screens pass the handler.
 
 const getEventThreadMock = vi.fn()
-vi.mock('../src/data/messages.js', () => ({ getEventThread: (...a) => getEventThreadMock(...a) }))
+vi.mock('../src/data/messages.js', () => ({
+  // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
+  listMessageReceipts: async () => new Map(),
+  receiptState: () => null,
+  markMessagesDelivered: async () => {}, getEventThread: (...a) => getEventThreadMock(...a) }))
 vi.mock('../src/data/availability.js', () => ({
   listAvailability: vi.fn().mockResolvedValue([]),
   subscribeAvailability: vi.fn(() => () => {}),

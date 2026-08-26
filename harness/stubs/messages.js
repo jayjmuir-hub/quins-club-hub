@@ -229,3 +229,24 @@ export async function toggleReaction() {}
 export function subscribeReactions() {
   return () => {}
 }
+
+// ── Ticks and receipts (26 Aug 2026) ────────────────────────────────────────
+// A delivered-but-unread receipt on one stub message, so a shoot of the DM
+// thread shows the double grey tick rather than nothing.
+export async function listMessageReceipts() {
+  // Own messages in DM_ROWS are i %% 3 === 2 → hz-dm-3/6/9/12/15. The last
+  // (15) delivered-not-read (double grey), 12 read (accent), the rest fall
+  // to 'sent' — a shoot shows all three states at once.
+  return new Map([
+    ['hz-dm-15', { delivered: new Set(['hz-sam']), read: new Set() }],
+    ['hz-dm-12', { delivered: new Set(['hz-sam']), read: new Set(['hz-sam']) }],
+  ])
+}
+export async function markMessagesDelivered() {}
+export function receiptState(receipt, recipients) {
+  const others = (recipients ?? []).filter(Boolean)
+  if (others.length === 0) return 'sent'
+  if (receipt && others.every((id) => receipt.read.has(id))) return 'read'
+  if (receipt && others.every((id) => receipt.delivered.has(id))) return 'delivered'
+  return 'sent'
+}

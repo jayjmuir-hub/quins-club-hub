@@ -1701,3 +1701,31 @@ CREATE POLICY "chat media write" ON storage.objects
 CREATE POLICY "chat media remove" ON storage.objects
   AS PERMISSIVE FOR DELETE TO authenticated
   USING (((bucket_id = 'chat-media'::text) AND (private.chat_media_owner(name) = ( SELECT auth.uid() AS uid))));
+
+
+-- ---------------------------------------------------------------------
+-- message_deliveries (2), and the author arm on message_reads
+-- (26 Aug 2026 — 20260826_chat_delivery_receipts)
+--
+-- The AUTHOR of a message may read its receipt rows on BOTH tables — that
+-- is the whole ticks feature; everybody else still sees only their own.
+-- "message reads for author" is a SECOND policy beside "message read own
+-- reads": policies OR together, so the own-rows behaviour is untouched.
+-- ---------------------------------------------------------------------
+CREATE POLICY "delivery record own" ON public.message_deliveries
+  FOR INSERT
+  WITH CHECK (((profile_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM messages m
+  WHERE (m.id = message_deliveries.message_id)))));
+
+CREATE POLICY "delivery read own or author" ON public.message_deliveries
+  FOR SELECT
+  USING (((profile_id = ( SELECT auth.uid() AS uid)) OR (EXISTS ( SELECT 1
+   FROM messages m
+  WHERE ((m.id = message_deliveries.message_id) AND (m.author_id = ( SELECT auth.uid() AS uid)))))));
+
+CREATE POLICY "message reads for author" ON public.message_reads
+  FOR SELECT
+  USING ((EXISTS ( SELECT 1
+   FROM messages m
+  WHERE ((m.id = message_reads.message_id) AND (m.author_id = ( SELECT auth.uid() AS uid))))));

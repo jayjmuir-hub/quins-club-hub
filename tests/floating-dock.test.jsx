@@ -29,6 +29,8 @@ const m = {
 }
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
+// Presence is a live websocket; tests get a quiet empty room.
+vi.mock('../src/lib/presence.js', () => ({ usePresence: () => new Set() }))
 vi.mock('../src/data/messages.js', async (orig) => ({
   ...(await orig()),
   listChats: (...a) => m.listChats(...a),
