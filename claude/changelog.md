@@ -19,7 +19,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   screen-level test renders the real row shape and FAILED against the bug —
   the component-only test could not see it (its lesson is written at the
   test). The NEXT pull request cites this entry's squash SHA.
-- (unmerged) — 🖼 **Chat wallpaper no longer stretches blurry on long threads** —
 - `7b88a8a` — 🖼 **The wallpaper follows the person, not the device — and the
   doodle is the default** — Jay: "can we make it do those things? also lets set
   the club doodle now as the default background for everyone on every device in
