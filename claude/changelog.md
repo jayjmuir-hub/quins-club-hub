@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 25 Aug 2026
 
-- (unmerged) — ⌨️ **The keyboard fix, second half — the first was necessary
+- (unmerged) — 🖼️ **The wallpaper is the slack-eater, and the dock grew its
+  chevron.** Two of Jay's 26 Aug reports in one pass. (1) With few messages
+  the paper was a small patch over the bubbles and bare surface above —
+  the wallpaper wrapper is now `flex-1 justify-end` in both threads, so
+  the paper covers the whole message area and the bubbles bottom-anchor
+  (measured: 552px of paper over 3 bubbles, `harness/shoot-chat-layout.mjs`
+  `?few=1`). (2) The floating dock's bubbles had no chevron menu at all —
+  they now carry Reply (DMs/groups, quotedId through the dock's own send),
+  Copy, and "More in full view" for everything richer, which keeps the
+  dock's deliberately-thin contract navigable instead of invisible. Also:
+  the harness now serves the app's `public/` (its wallpaper scenarios were
+  404ing every paper and rendering bare surface while claiming paint).
+- `fac1ffa` — ⌨️ **The keyboard fix, second half — the first was necessary
   and not sufficient.** Jay: "composer is still acting up", after the
   slack-eater. Two missing layers: Android Chrome's keyboard only PANS the
   visual viewport unless `index.html` opts into

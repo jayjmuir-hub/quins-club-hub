@@ -126,7 +126,15 @@ export async function getConversation(conversationId) {
   return conversationId === 'hz-conv-1' ? DM_CONV : null
 }
 export async function listDirectMessages(conversationId) {
-  return conversationId === 'hz-conv-1' ? DM_ROWS : []
+  if (conversationId !== 'hz-conv-1') return []
+  // ?few=1 — the SHORT thread, for the layout instruments: Jay's 26 Aug
+  // screenshot bug (a wallpaper patch over three bubbles, bare surface
+  // above) only exists when the thread is shorter than the viewport, which
+  // the full DM_ROWS never is.
+  if (new URLSearchParams(window.location.search).get('few')) {
+    return DM_ROWS.filter((row) => !row.attachment_path).slice(0, 3)
+  }
+  return DM_ROWS
 }
 export async function sendDirectMessage() {
   throw new Error('harness: sendDirectMessage is not stubbed')

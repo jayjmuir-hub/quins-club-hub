@@ -106,6 +106,12 @@ export default function FloatingChatDock({ badge = false }) {
   const [reactions, setReactions] = useState(() => new Map())
   const [error, setError] = useState(null)
   const [draft, setDraft] = useState('')
+  // Reply-with-quote in the dock (26 Aug 2026 — Jay's screenshot: the full
+  // thread's chevron menu simply wasn't here). DMs and groups only: their
+  // send already rides sendDirectMessage's quotedId. Squad and staff
+  // channels reply in THREADS, which is full-view furniture — the dock's
+  // menu sends people there instead of half-implementing it.
+  const [replyTo, setReplyTo] = useState(null)
   const [sending, setSending] = useState(false)
   // Round 2: a photo waiting in the dock's composer, and the picker's handle.
   const [photo, setPhoto] = useState(null)
@@ -231,11 +237,12 @@ export default function FloatingChatDock({ badge = false }) {
     try {
       // Photo first, message second — same order as the full thread.
       const attachmentPath = photo ? await uploadChatPhoto(selfId, photo) : null
-      if (active.kind === 'dm' || active.kind === 'group') await sendDirectMessage(active.conversation_id, draft, { attachmentPath })
+      if (active.kind === 'dm' || active.kind === 'group') await sendDirectMessage(active.conversation_id, draft, { attachmentPath, quotedId: replyTo?.id ?? null })
       else if (active.kind === 'staff') await postStaffMessage(active.team_id, draft, { attachmentPath })
       else await postMessage(active.team_id ?? null, draft, { attachmentPath })
       setDraft('')
       clearPhoto()
+      setReplyTo(null)
       await loadThread()
       await loadList()
     } catch (err) {
@@ -293,7 +300,7 @@ export default function FloatingChatDock({ badge = false }) {
               the contrast gate. */}
           <div className="flex items-center gap-2.5 bg-accent-deep py-2.5 pl-9 pr-3.5 text-white">
             {active ? (
-              <button type="button" aria-label="Back to chats" onClick={() => { setActive(null); setThread(null); setError(null) }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
+              <button type="button" aria-label="Back to chats" onClick={() => { setActive(null); setThread(null); setError(null); setReplyTo(null) }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
               </button>
             ) : null}
@@ -327,7 +334,7 @@ export default function FloatingChatDock({ badge = false }) {
                     const unread = Number(row.unread) > 0
                     return (
                       <li key={`${row.kind}-${row.team_id ?? row.conversation_id ?? 'club'}`} className="border-b border-line last:border-b-0">
-                        <button type="button" data-testid="dock-row" onClick={() => { setActive(row); setThread(null) }} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-surface-mute">
+                        <button type="button" data-testid="dock-row" onClick={() => { setActive(row); setThread(null); setReplyTo(null) }} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-surface-mute">
                           <RowAvatar row={row} />
                           <span className="min-w-0 flex-1">
                             <span className={`block truncate text-[14px] ${unread ? 'font-extrabold' : 'font-bold'} text-ink`}>{row.label}</span>
@@ -360,6 +367,22 @@ export default function FloatingChatDock({ badge = false }) {
                   // channels still need the name on THEIRS — same rule as
                   // DirectMessages Thread / MessageRow.
                   const named = active.kind !== 'dm'
+                  // The chevron, at dock size (26 Aug 2026 — it simply
+                  // wasn't here). Only what the dock can HONESTLY do: Reply
+                  // where its send carries a quote, Copy where there is a
+                  // body, and the full view for everything richer — the
+                  // "deliberately thin" contract in the header, made
+                  // navigable instead of invisible.
+                  const canQuote = active.kind === 'dm' || active.kind === 'group'
+                  const menuItems = m.deleted_at
+                    ? []
+                    : [
+                        ...(canQuote ? [{ label: 'Reply', onClick: () => setReplyTo(m) }] : []),
+                        ...(m.body?.trim()
+                          ? [{ label: 'Copy', onClick: () => navigator.clipboard?.writeText(m.body) }]
+                          : []),
+                        { label: 'More in full view', onClick: expand },
+                      ]
                   const quote = m.quoted?.id && !m.deleted_at ? (
                     <p
                       className={`mb-0.5 truncate rounded-[6px] border-l-2 px-1.5 py-0.5 text-[11px] ${mine ? 'border-white/40 bg-white/10 text-white/70' : 'border-brand bg-surface-mute text-ink-muted'}`}
@@ -381,6 +404,7 @@ export default function FloatingChatDock({ badge = false }) {
                         mine={mine}
                         messageId={m.id}
                         testId="dock-bubble"
+                        menuItems={menuItems}
                         showAuthor={named && !mine}
                         authorLabel={authorName}
                         forwarded={Boolean(m.forwarded)}
@@ -405,6 +429,24 @@ export default function FloatingChatDock({ badge = false }) {
                 })}
               </div>
               <div className="border-t border-line bg-surface-card p-2.5">
+                {replyTo && (
+                  <div className="mb-1.5 flex items-center gap-2 rounded-[10px] border-l-2 border-brand bg-surface-mute px-2.5 py-1.5" data-testid="dock-quote-preview">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-extrabold text-brand-ink">
+                        Replying to {replyTo.author_id === selfId ? 'yourself' : (nicknames.get(replyTo.author_id) ?? replyTo.author?.full_name ?? 'Member')}
+                      </p>
+                      <p className="truncate text-[12px] text-ink-muted">{replyTo.body?.trim() ? replyTo.body : '📷 Photo'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="Cancel reply"
+                      onClick={() => setReplyTo(null)}
+                      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                    </button>
+                  </div>
+                )}
                 {photoPreview && (
                   <div className="mb-1.5 flex items-center gap-2 rounded-[10px] bg-surface-mute px-2 py-1" data-testid="photo-preview">
                     <img src={photoPreview} alt="Photo to send" className="h-9 w-9 rounded-[7px] object-cover" />

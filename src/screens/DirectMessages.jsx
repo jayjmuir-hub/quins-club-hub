@@ -704,16 +704,17 @@ function Thread({ conversationId }) {
           ))}
         </div>
       )}
-      {/* The slack-eater: with few messages the section is shorter than main,
-          and this spacer swallows the difference ABOVE the stream, so the
-          stream and composer sit at the bottom — the WhatsApp shape, and the
-          fix for the keyboard marooning the composer mid-screen (AppShell's
-          <main> comment has the mechanism). Collapses to nothing once the
-          thread is taller than the viewport. */}
-      <div className="flex-1" aria-hidden="true" />
       {/* Round 3: the wallpaper — a low-alpha overlay on the stream only,
-          so the composer and header stay on the plain surface. */}
-      <div className="-mx-1 flex flex-col gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
+          so the composer and header stay on the plain surface.
+          ⚠️ flex-1 + justify-end MAKE THE WALLPAPER THE SLACK-EATER (26 Aug
+          2026, Jay's screenshot: with few messages the paper was a small
+          patch over the bubbles and the empty area above was bare surface).
+          The wrapper grows to fill main's surplus and bottom-aligns its
+          bubbles, so the paper covers the whole message area however short
+          the thread — and the composer stays the document bottom, which is
+          what the keyboard fix relies on (AppShell's <main> comment). Both
+          classes are no-ops once the thread is taller than the viewport. */}
+      <div className="-mx-1 flex flex-1 flex-col justify-end gap-1 rounded-[12px] px-2 py-1" style={backgroundStyle(background) ?? undefined} data-background={background}>
         {messages?.map((m, index) => {
           const mine = m.author_id === selfId
           const authorName = mine ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')
