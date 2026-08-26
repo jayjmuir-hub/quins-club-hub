@@ -8,9 +8,30 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 27 Aug 2026
+
+- (unmerged) — 🏉 **Coaches build their own training plans** — Jay, overnight:
+  coaches and managers can now plan a squad's session themselves (freestyle or
+  seeded from a template), keep their own squad-private drills and templates,
+  and choose who sees each plan — draft (only me), staff (the squad's coaches),
+  or the whole squad. They may SUGGEST a drill/template to the club library;
+  only the Rugby Performance Director approves it in (which clears its squad
+  ownership) or keeps it theirs. `db/migrations/20260827_coach_training_plans.sql`
+  (APPLIED — additive; existing sessions default visibility 'squad', so nothing
+  a family sees today changed): drills/templates gain team_id (NULL = club
+  library) + submitted_at; training_sessions gain visibility + created_by; the
+  manage policies widen to the owning squad's staff, and the session read/manage
+  policies become visibility-aware. Proven both directions by
+  `db/tests/coach-training-plans.sql` (13 checks, run green pre- and
+  post-migration). The one trap: `events` has its own `created_by`, so the
+  session policy qualifies `training_sessions.*` or every draft insert refuses.
+  Rulings: `claude/decisions/2026-08-27-coach-training-plans.md`; plan:
+  `claude/plans/2026-08-27-coach-training-plans.md`. The NEXT pull request cites
+  this entry's squash SHA.
+
 ## 26 Aug 2026
 
-- (unmerged) — 📋 **Evening handoff: volunteer signup, staff view-as, the
+- `1f411d5` — 📋 **Evening handoff: volunteer signup, staff view-as, the
   Actions outage** —
   `claude/handoffs/2026-08-26-evening-volunteer-viewas-outage.md`: five
   merges, two applied migrations, the conflicted-PR-silences-CI trap and

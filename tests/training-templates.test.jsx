@@ -36,11 +36,17 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 // placeholder Supabase env vars, so the client constructs happily, the promise
 // never settles, and the screen sits in `loading` forever — with an error that
 // names nothing. The long-form reasoning is in src/test/setup.js.
+const listSubmittedTemplatesMock = vi.fn(async () => [])
+const approveTemplateToClubMock = vi.fn(async () => ({}))
+const dismissTemplateSubmissionMock = vi.fn(async () => ({}))
 vi.mock('../src/data/trainingPlans.js', () => ({
   listTemplates: (...args) => listTemplatesMock(...args),
   listDrills: (...args) => listDrillsMock(...args),
   saveTemplate: (...args) => saveTemplateMock(...args),
   setTemplateActive: (...args) => setTemplateActiveMock(...args),
+  listSubmittedTemplates: (...args) => listSubmittedTemplatesMock(...args),
+  approveTemplateToClub: (...args) => approveTemplateToClubMock(...args),
+  dismissTemplateSubmission: (...args) => dismissTemplateSubmissionMock(...args),
 }))
 
 import TrainingTemplates from '../src/screens/TrainingTemplates.jsx'
@@ -362,5 +368,27 @@ describe('TrainingTemplates', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/couldn.t save that/i)
     expect(screen.getByLabelText('Template name')).toHaveValue('Refused hour')
+  })
+})
+
+// ── The Director's template suggestion queue (27 Aug 2026) ──────────────────
+describe('TrainingTemplates — coach suggestions', () => {
+  const SUB = { id: 'tpl-sub', name: 'U10 skills night', total_minutes: 60, team_id: 'team-u10', submitted_at: '2026-08-27T00:00:00Z', blocks: [{ id: 'x', position: 1, drill_id: 'd', minutes: 60, coach_note: null }] }
+
+  it('approves a suggested template into the club library', async () => {
+    listSubmittedTemplatesMock.mockResolvedValue([SUB])
+    const { user } = renderTemplates()
+    const panel = await screen.findByTestId('template-suggestions')
+    expect(within(panel).getByText('U10 skills night')).toBeInTheDocument()
+    await user.click(within(panel).getByRole('button', { name: /add to club library/i }))
+    await waitFor(() => expect(approveTemplateToClubMock).toHaveBeenCalledWith('tpl-sub'))
+  })
+
+  it('dismisses a suggested template', async () => {
+    listSubmittedTemplatesMock.mockResolvedValue([SUB])
+    const { user } = renderTemplates()
+    const panel = await screen.findByTestId('template-suggestions')
+    await user.click(within(panel).getByRole('button', { name: /keep it theirs/i }))
+    await waitFor(() => expect(dismissTemplateSubmissionMock).toHaveBeenCalledWith('tpl-sub'))
   })
 })

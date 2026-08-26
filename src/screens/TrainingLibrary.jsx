@@ -4,7 +4,14 @@ import Card from '../components/Card.jsx'
 import Chip from '../components/Chip.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { listDrills, setDrillActive, upsertDrill } from '../data/trainingPlans.js'
+import {
+  approveDrillToClub,
+  dismissDrillSubmission,
+  listDrills,
+  listSubmittedDrills,
+  setDrillActive,
+  upsertDrill,
+} from '../data/trainingPlans.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import {
   ageDraftProblem,
@@ -129,6 +136,7 @@ function LibraryBody() {
   const clubId = teams[0]?.club_id ?? null
 
   const [drills, setDrills] = useState([])
+  const [submitted, setSubmitted] = useState([])
   const [loading, setLoading] = useState(true)
   const [settled, setSettled] = useState(false)
   const [error, setError] = useState(null)
@@ -151,15 +159,18 @@ function LibraryBody() {
     setLoading(true)
     setError(null)
 
-    listDrills({ includeRetired })
-      .then((rows) => {
+    // ⚠️ allSettled: the suggestions queue is a side panel — a failed read of it
+    // must not take the whole library down. An empty queue is the common case.
+    Promise.allSettled([listDrills({ includeRetired }), listSubmittedDrills()])
+      .then(([drillResult, submittedResult]) => {
         if (!mounted) return
-        setDrills(rows)
-      })
-      .catch((failure) => {
-        if (!mounted) return
-        setError(failure)
-        setDrills([])
+        if (drillResult.status === 'fulfilled') {
+          setDrills(drillResult.value)
+        } else {
+          setError(drillResult.reason)
+          setDrills([])
+        }
+        setSubmitted(submittedResult.status === 'fulfilled' ? submittedResult.value ?? [] : [])
       })
       .finally(() => {
         if (!mounted) return
@@ -281,6 +292,49 @@ function LibraryBody() {
 
   return (
     <div>
+      {/* ⚠️ SUGGESTIONS FROM COACHES. A squad-owned drill a coach offered to the
+          club: Add it (it becomes a club drill, team_id null) or Keep it theirs
+          (it stays the squad's own, off the queue). Only the Director sees this;
+          the coach's own picker still shows it either way. */}
+      {submitted.length > 0 && (
+        <Card className="mb-3.5 p-3.5" data-testid="drill-suggestions">
+          <h3 className="mb-2 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+            Suggested by coaches
+          </h3>
+          <ul>
+            {submitted.map((drill) => (
+              <li
+                key={drill.id}
+                className="flex flex-wrap items-center gap-2 border-b border-line py-2 last:border-b-0"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-ink">{drill.title}</span>
+                  <span className="text-[12px] text-ink-muted">
+                    {CATEGORY_LABELS[drill.category] ?? drill.category} · {bandLabel(drill.min_age, drill.max_age)}
+                    {drill.requires_contact ? ' · contact' : ''}
+                  </span>
+                </span>
+                <Button
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => run(() => approveDrillToClub(drill.id))}
+                >
+                  Add to club library
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => run(() => dismissDrillSubmission(drill.id))}
+                >
+                  Keep it theirs
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card className="mb-3.5 p-3.5">
         <div className="flex flex-wrap items-end gap-2.5">
           <label className="min-w-0">

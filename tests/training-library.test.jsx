@@ -33,10 +33,16 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 // placeholder Supabase env vars, so the client constructs happily, the promise
 // never settles, and the screen sits in `loading` forever — with an error that
 // names nothing. The long-form reasoning is in src/test/setup.js.
+const listSubmittedDrillsMock = vi.fn(async () => [])
+const approveDrillToClubMock = vi.fn(async () => ({}))
+const dismissDrillSubmissionMock = vi.fn(async () => ({}))
 vi.mock('../src/data/trainingPlans.js', () => ({
   listDrills: (...args) => listDrillsMock(...args),
   upsertDrill: (...args) => upsertDrillMock(...args),
   setDrillActive: (...args) => setDrillActiveMock(...args),
+  listSubmittedDrills: (...args) => listSubmittedDrillsMock(...args),
+  approveDrillToClub: (...args) => approveDrillToClubMock(...args),
+  dismissDrillSubmission: (...args) => dismissDrillSubmissionMock(...args),
 }))
 
 import TrainingLibrary from '../src/screens/TrainingLibrary.jsx'
@@ -272,5 +278,34 @@ describe('TrainingLibrary', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/couldn.t save that/i)
     // The typing survives, because the save did not happen.
     expect(screen.getByLabelText('Drill title')).toHaveValue('Tackle tech')
+  })
+})
+
+// ── The Director's suggestion queue (27 Aug 2026) ───────────────────────────
+describe('TrainingLibrary — coach suggestions', () => {
+  const SUB = { id: 'd-sub', title: 'Squad ruck race', category: 'game', min_age: null, max_age: null, requires_contact: false, team_id: 'team-u10', submitted_at: '2026-08-27T00:00:00Z' }
+
+  it('shows suggestions and approves one into the club library', async () => {
+    listSubmittedDrillsMock.mockResolvedValue([SUB])
+    const { user } = renderLibrary()
+    const panel = await screen.findByTestId('drill-suggestions')
+    expect(within(panel).getByText('Squad ruck race')).toBeInTheDocument()
+    await user.click(within(panel).getByRole('button', { name: /add to club library/i }))
+    await waitFor(() => expect(approveDrillToClubMock).toHaveBeenCalledWith('d-sub'))
+  })
+
+  it('dismisses a suggestion, leaving it the squad’s own', async () => {
+    listSubmittedDrillsMock.mockResolvedValue([SUB])
+    const { user } = renderLibrary()
+    const panel = await screen.findByTestId('drill-suggestions')
+    await user.click(within(panel).getByRole('button', { name: /keep it theirs/i }))
+    await waitFor(() => expect(dismissDrillSubmissionMock).toHaveBeenCalledWith('d-sub'))
+  })
+
+  it('shows no suggestions panel when the queue is empty', async () => {
+    listSubmittedDrillsMock.mockResolvedValue([])
+    renderLibrary()
+    await screen.findByRole('button', { name: /add a drill/i })
+    expect(screen.queryByTestId('drill-suggestions')).not.toBeInTheDocument()
   })
 })
