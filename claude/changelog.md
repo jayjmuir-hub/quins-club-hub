@@ -10,7 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🔒 **Four chat-era grant ceilings trimmed to what was granted**
+- (unmerged) — 📋 **Evening handoff: volunteer signup, staff view-as, the
+  Actions outage** —
+  `claude/handoffs/2026-08-26-evening-volunteer-viewas-outage.md`: five
+  merges, two applied migrations, the conflicted-PR-silences-CI trap and
+  the outage playbook. The NEXT pull request cites this entry's squash SHA.
+- `35773f4` — 🔒 **Four chat-era grant ceilings trimmed to what was granted**
   — the 25 Aug re-capture's finding, closed: notification_opt_outs carried
   UPDATE, conversation_members the full default 7 verbs, message_reactions
   and message_stars UPDATE — untrimmed birth defaults in all four (REVOKEs
