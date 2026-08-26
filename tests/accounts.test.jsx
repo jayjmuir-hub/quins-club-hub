@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+
+// The editor sheet's Chat door drives the real DM path; mocked so this file
+// stays network-free.
+const openConversationMock = vi.fn()
+vi.mock('../src/data/messages.js', () => ({
+  openConversation: (...args) => openConversationMock(...args),
+}))
 
 // Unit tests for src/screens/Accounts.jsx (design spec 2026-08-03 §2).
 // useMemberships, useAuth and src/data/members.js are all mocked, following
@@ -335,7 +343,12 @@ beforeEach(() => {
 
 function setup() {
   const user = userEvent.setup()
-  const utils = render(<Accounts />)
+  // MemoryRouter because the editor sheet's Chat door navigates to the DM.
+  const utils = render(
+    <MemoryRouter>
+      <Accounts />
+    </MemoryRouter>,
+  )
   return { user, ...utils }
 }
 
@@ -1689,7 +1702,9 @@ describe('Accounts — the edit person sheet', () => {
     const dialog = await openPerson(user, 'Sara Coach')
 
     expect(within(dialog).getByTestId('sheet-email')).toHaveTextContent('sara@example.com')
-    expect(within(dialog).queryByLabelText(/email/i)).toBeNull()
+    // No email INPUT — the contact row's "Email Sara Coach" mailto link is
+    // fine, so the guard names the role rather than any label with "email".
+    expect(within(dialog).queryByRole('textbox', { name: /email/i })).toBeNull()
   })
 
   it('refuses a blank first name rather than writing one', async () => {
@@ -2624,5 +2639,32 @@ describe('Accounts — a request naming several squads', () => {
     await screen.findByText('Sara Coach')
 
     expect(within(waiting()).getByTestId('requested-as')).toHaveTextContent(TEAM_U10.name)
+  })
+})
+
+// The editor sheet's contact row (Jay, 26 Aug 2026, over a screenshot of this
+// exact sheet: "how can i initiate a chat with this parent from their
+// profile? doesn't seem possible currently").
+describe('the Edit sheet — contact actions', () => {
+  it('Chat opens the DM from the sheet, one tap', async () => {
+    openConversationMock.mockResolvedValue('conv-9')
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+
+    const sheet = await openPerson(user, 'Sara Coach')
+    await user.click(within(sheet).getByRole('button', { name: 'Chat with Sara Coach' }))
+    await waitFor(() => expect(openConversationMock).toHaveBeenCalledWith('profile-sara'))
+  })
+
+  it('Email is a real mailto link; no phone on file means no Call button', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+
+    const sheet = await openPerson(user, 'Sara Coach')
+    expect(within(sheet).getByRole('link', { name: 'Email Sara Coach' })).toHaveAttribute(
+      'href',
+      'mailto:sara@example.com',
+    )
+    expect(within(sheet).queryByRole('link', { name: /call/i })).toBeNull()
   })
 })

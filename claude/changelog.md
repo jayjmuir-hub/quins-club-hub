@@ -10,13 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- `f7dce1c` — 👤 **Person-card follow-up: squad names dedupe; the Edit sheet
-  gets the contact row** — two findings from Jay's first live minutes with
-  the card: a person with two membership rows on one squad read
-  "U10 MIXED · U10 MIXED" (`array_agg` gains `distinct`; migration applied
-  and re-verified live), and the admin Edit sheet had no way to start a
-  chat (it gains Call/WhatsApp/Email/Chat in the standard ContactButton
-  family). Cited here by the next PR per the one-behind rule.
+- `f7dce1c` — 👤 **Person-card follow-ups from Jay's first live minutes** —
+  (1) the card said "U10 MIXED · U10 MIXED" for a person holding two
+  membership rows on one squad: `member_contact_card` now aggregates with
+  `distinct` (`db/migrations/20260826_member_contact_card_dedupe.sql`,
+  APPLIED to production and re-verified on the live card; harness assert 6
+  carries the duplicate-row fixture and failed against the old body first).
+  (2) Jay, over the Edit-person sheet: "how can i initiate a chat with this
+  parent from their profile? doesn't seem possible currently" — the sheet
+  gains the standard contact row (Call/WhatsApp/Email from the saved
+  profile, Chat straight into the DM).
 - (unmerged) — 🔗 **Needs-attention names are doors** — Jay: "i can't click on
   those names… why not?" Each name on /admin/needs-attention now links to
   `/roster?open=<player id>`, and the Roster's `?open=` handler (previously

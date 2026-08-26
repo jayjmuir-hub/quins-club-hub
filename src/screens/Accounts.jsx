@@ -9,6 +9,15 @@ import Empty from '../components/Empty.jsx'
 import PersonCard from '../components/PersonCard.jsx'
 import PersonName from '../components/PersonName.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
+import {
+  ChatIcon,
+  ContactButton,
+  MailIcon,
+  PhoneIcon,
+  WhatsAppIcon,
+} from '../components/SquadStaffCard.jsx'
+import { openConversation } from '../data/messages.js'
+import { useNavigate } from 'react-router-dom'
 import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import {
@@ -33,7 +42,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { ADMIN_RIGHTS, adminRightLabel, canApproveAnything, isAdmin, isSuperAdmin } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
-import { joinPhone, splitPhone } from '../lib/phone.js'
+import { joinPhone, splitPhone, whatsappUrl } from '../lib/phone.js'
 
 // Admin Accounts screen (design spec 2026-08-03 §2): view and edit who has
 // access to the club — display name, role, age group, and revoking access.
@@ -726,6 +735,71 @@ function PersonDetailsForm({ group, state, onChange, onSave }) {
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * The Edit sheet's contact actions — Jay, 26 Aug 2026, over a screenshot of
+ * this exact sheet: "how can i initiate a chat with this parent from their
+ * profile? doesn't seem possible currently."
+ *
+ * Same ContactButton family as the person card and the squad contacts row.
+ * Call/WhatsApp/Email draw from the SAVED profile values the admin already
+ * sees on this sheet; Chat is the existing DM door — whether a DM is allowed
+ * stays open_conversation's call, and its refusal is the database's words.
+ *
+ * ⚠️ ITS OWN COMPONENT so useNavigate runs only while the sheet is open —
+ * Accounts renders in tests without a Router, and a top-level hook would
+ * throw before anything drew.
+ */
+function EditorContactRow({ group }) {
+  const navigate = useNavigate()
+  const [chatError, setChatError] = useState(null)
+  const profile = group.memberships[0]?.profiles ?? {}
+  const phone = profile.phone ?? null
+  const wa = phone ? whatsappUrl(phone) : null
+  const name = group.name ?? 'this member'
+
+  async function chat() {
+    setChatError(null)
+    try {
+      const dm = await openConversation(group.profileId)
+      navigate(`/chat/dm/${dm}`)
+    } catch (err) {
+      setChatError(err.message || 'Could not open a chat with them.')
+    }
+  }
+
+  return (
+    <div className="mt-4">
+      <div className="flex flex-nowrap gap-2" data-testid="editor-contact-actions">
+        {phone && (
+          <ContactButton href={`tel:${phone}`} label={`Call ${name}`} tone="solid">
+            <PhoneIcon className="h-[15px] w-[15px]" aria-hidden="true" />
+          </ContactButton>
+        )}
+        {wa && (
+          <ContactButton href={wa} label={`Message ${name} on WhatsApp`}>
+            <WhatsAppIcon className="h-[16px] w-[16px]" aria-hidden="true" />
+          </ContactButton>
+        )}
+        {group.email && (
+          <ContactButton href={`mailto:${group.email}`} label={`Email ${name}`}>
+            <MailIcon className="h-[15px] w-[15px]" aria-hidden="true" />
+          </ContactButton>
+        )}
+        {group.profileId && (
+          <ContactButton onClick={chat} label={`Chat with ${name}`}>
+            <ChatIcon className="h-4 w-4" aria-hidden="true" />
+          </ContactButton>
+        )}
+      </div>
+      {chatError && (
+        <p className="mt-2 text-sm font-semibold text-danger" data-testid="editor-chat-error">
+          {chatError}
+        </p>
+      )}
     </div>
   )
 }
@@ -2322,6 +2396,8 @@ export default function Accounts() {
             }
             onSave={() => saveProfileDetails(editingGroup)}
           />
+
+          <EditorContactRow group={editingGroup} />
 
           <div className="mt-5">
             <h4 className="mb-2 text-[12.5px] font-extrabold uppercase tracking-[.4px] text-ink-muted">

@@ -1355,7 +1355,12 @@ describe('Accounts — the approval queue', () => {
   }
 
   function renderAccounts() {
-    return render(<Accounts />)
+    // MemoryRouter because the Edit sheet's contact row navigates on Chat.
+    return render(
+      <MemoryRouter>
+        <Accounts />
+      </MemoryRouter>,
+    )
   }
 
   // ⚠️ THE ACCESS CONTROLS MOVED INTO A SHEET on 9 Aug 2026: the list is a
