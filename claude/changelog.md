@@ -10,6 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
+- (unmerged) — 🧩 **Shared-chat-thread phase 3: the channel moves out of its
+  screen** — same split as phase 1, applied to `src/screens/Chat.jsx`: state
+  and behaviour extracted verbatim to `src/lib/useChannelThread.js` (which
+  also becomes `tallyByEvent`'s home, re-exported from Chat.jsx), rendering
+  to `src/components/ChannelThread.jsx`. The screen keeps chrome: header,
+  the ?thread=/?event= deep links, announce-only, clear-chat, wallpaper
+  picking. Chat-screen tests passed UNCHANGED. Also pays a phase-2 debt the
+  harness-stubs count assertion caught (its sixth catch): the two './'
+  depth-variant aliases were added to the config after that phase's
+  full-suite run, so the guard went red one commit late — both are now
+  registered, and the lesson (run `npm test` after the LAST commit) is
+  recorded in the guard itself.
 - (unmerged) — 💬 **Shared-chat-thread phase 2: the dock's DMs and groups ARE
   the main chat** — `FloatingChatDock` now mounts `useDmThread` + `DmThread`
   for `dm`/`group` rows (its hand-rolled bubble list for those kinds is
