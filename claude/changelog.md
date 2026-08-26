@@ -10,6 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
+- (unmerged) — 💬 **Two chat courtesies from Jay's live afternoon** —
+  (1) *An unused DM stays out of the list*: the person card's Chat button
+  creates the conversation on tap, so a look without a message littered
+  both people's lists with "No messages yet" rows (four in one day,
+  measured). `scopeChatRows` hides a DM whose `last_author_id` is null —
+  my_chats fills that from the newest VISIBLE message, so photo-only chats
+  stay, groups always show, and the row returns on the first message.
+  (2) *The DM header says who they really are*: "you should see their badge
+  and details" — a staff member's thread header now shows their actual
+  title (Head Coach, not just Coach) and their squads, read from the same
+  `member_contact_card` ruling the tap-a-name card uses, so the database
+  still decides who may see what; a refused or failed card falls back to
+  the old plain pill. Full-screen chrome only — the dock's header keeps its
+  one-line detail.
+
 - (unmerged) — 👤 **Person-card follow-ups from Jay's first live minutes** —
   (1) the card said "U10 MIXED · U10 MIXED" for a person holding two
   membership rows on one squad: `member_contact_card` now aggregates with
