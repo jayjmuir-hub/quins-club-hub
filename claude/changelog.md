@@ -10,6 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
+- (unmerged) — 🧩 **Shared-chat-thread phase 1: the DM thread moves out of
+  its screen** — spec `claude/plans/2026-08-26-shared-chat-thread.md` (Jay
+  approved same day: the dock should "function exactly as the main chat").
+  State and behaviour extracted verbatim to `src/lib/useDmThread.js`,
+  rendering to `src/components/DmThread.jsx`; `src/screens/DirectMessages.jsx`
+  keeps only chrome (header, rename/nickname/block/leave/delete/wallpaper
+  sheets). Behaviour-preserving by contract: the whole suite passes with
+  ZERO test edits. Phase 2 points the floating dock at the same components.
+  The NEXT pull request cites this entry's squash SHA.
 - (unmerged) — 📋 **Session handoff for the 25–26 Aug batch** —
   `claude/handoffs/2026-08-26-desktop-chat-batch.md`: six shipped PRs, the
   session's reusable traps (docs-check local-vs-CI, the harness alias
