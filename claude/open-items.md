@@ -109,11 +109,18 @@ Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
 ## Cheap (under an hour each)
 
-- **The ticks' two small gaps (26 Aug 2026, shipped with #430).** The
+- ✅ ~~**The ticks' two small gaps (26 Aug 2026, shipped with #430).** The
   floating dock renders no ticks (its bubbles pass no `receipt`), and the
   chat LIST cannot show online dots because `my_chats()` does not return the
   DM counterpart's profile id — a one-column widening of that function plus
-  a dot on `RowAvatar`. Both deliberate v1 cuts, named in the PR.
+  a dot on `RowAvatar`. Both deliberate v1 cuts, named in the PR.~~ — **BOTH
+  CLOSED the same day, by other PRs' routes rather than this line's.** The
+  dock ticks came free with chat parity (#433): the dock now renders the
+  SAME `DmThread`, whose bubbles pass `receipt` (DmThread.jsx, the
+  `receiptState` line). The list dots shipped with #438 and were fixed
+  live by #441 — paired from `listMyConversations()` (the `my_conversations`
+  RPC's `other_id`), so `my_chats()` never needed widening. Verified in
+  code 26 Aug, evening.
 
 
 - ✅ ~~**The suite passes with 5–7 "Unhandled Errors" every run — measured 23 Aug
@@ -404,7 +411,7 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
   the backfill it carries. `db/schema/triggers.sql` carries the ⛔ NOT LIVE
   marker until a measurement shows it applied.
 
-- **Four tables' grant ceilings are wider than their migrations granted —
+- ✅ ~~**Four tables' grant ceilings are wider than their migrations granted —
   measured 25 Aug 2026.** notification_opt_outs (UPDATE present despite the
   "complete vocabulary is S/I/D" ruling), conversation_members ("SELECT
   only" — live holds all 7), message_reactions and message_stars (S,I,D —
@@ -412,7 +419,13 @@ been shown what each one actually fails with. ⚠️ **Every one of them is ALSO
   never trimmed authenticated's birth defaults. Inert today through
   owner-scoped policies, but it is the exact rely-on-policies-not-grants
   shape this repo's rules warn about. One tidy migration across the four;
-  annotated in grants.sql.
+  annotated in grants.sql.~~ — **TRIMMED 26 Aug 2026**:
+  `db/migrations/20260826_trim_grant_ceilings.sql` (REVOKE ALL + re-grant
+  the intended set, so the MAINTAIN/REFERENCES/TRIGGER defaults went too);
+  `db/tests/grants.sql` §5 asserts the four ceilings and its self-test was
+  proved to fail by re-granting UPDATE on conversation_members inside the
+  rolled-back run. Measured after applying: each table's authenticated verb
+  set equals the migration's grant line exactly.
 
 - **`anon` holds full table privileges on `public`.** ⚠️ **Re-measured 14 Aug 2026:
   it is 23 of the 24 tables, not the "seven" this line used to claim** — seven was a

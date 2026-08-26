@@ -414,6 +414,68 @@ $$;
 revoke execute on function public.my_squad_staff() from anon;
 
 
+-- ── 5. The four chat-era table ceilings (26 Aug 2026) ──────────────────────
+-- 20260826_trim_grant_ceilings.sql closed the untrimmed-birth-defaults gap
+-- the 25 Aug re-capture measured: REVOKE lines had targeted PUBLIC/anon and
+-- left authenticated holding verbs no migration granted. These assert the
+-- intended ceilings hold — by GRANT, not merely by the owner-scoped policies
+-- in front of them. (Numbered 5 though it sits before part 4 — "Undo" was
+-- already the foot of this file when this arrived, and it must stay last.)
+
+create function pg_temp.check_table_ceilings() returns void language plpgsql as
+$$
+declare
+  spec record;
+  verb text;
+  held text;
+begin
+  for spec in
+    select * from (values
+      ('notification_opt_outs', 'SELECT,INSERT,DELETE'),
+      ('conversation_members',  'SELECT'),
+      ('message_reactions',     'SELECT,INSERT,DELETE'),
+      ('message_stars',         'SELECT,INSERT,DELETE')
+    ) as t(tbl, expected)
+  loop
+    held := '';
+    foreach verb in array array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'] loop
+      if has_table_privilege('authenticated', 'public.' || spec.tbl, verb) then
+        held := held || case when held = '' then '' else ',' end || verb;
+      end if;
+    end loop;
+    if held <> spec.expected then
+      raise exception
+        'TABLE CEILING: authenticated holds [%] on public.%, expected [%]. '
+        'Either 20260826_trim_grant_ceilings.sql regressed, or a new grant '
+        'arrived untrimmed — see db/schema/grants.sql.',
+        held, spec.tbl, spec.expected;
+    end if;
+  end loop;
+end
+$$;
+
+select pg_temp.check_table_ceilings();
+
+-- Self-test: re-open the exact gap the migration closed and the check must
+-- go red. Transactional, undone by the rollback below.
+grant update on public.conversation_members to authenticated;
+
+do $$
+begin
+  begin
+    perform pg_temp.check_table_ceilings();
+    raise exception 'SELF-TEST FAILED: check_table_ceilings() passed while authenticated held UPDATE on conversation_members. The assertion is vacuous.';
+  exception when others then
+    if sqlerrm like 'SELF-TEST FAILED%' then
+      raise;
+    end if;
+    raise notice 'SELF-TEST PASSED — the ceiling check caught it: %', sqlerrm;
+  end;
+end
+$$;
+
+revoke update on public.conversation_members from authenticated;
+
 -- ── 4. Undo everything ─────────────────────────────────────────────────────
 -- ⚠️ NOT OPTIONAL. Part 3 really did grant UPDATE(email) on production. GRANT
 -- is transactional in Postgres, so this removes it — but only if it runs.

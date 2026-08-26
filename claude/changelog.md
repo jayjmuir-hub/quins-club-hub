@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 👀 **Coaches and managers preview their squad as a parent** —
+- (unmerged) — 🔒 **Four chat-era grant ceilings trimmed to what was granted**
+  — the 25 Aug re-capture's finding, closed: notification_opt_outs carried
+  UPDATE, conversation_members the full default 7 verbs, message_reactions
+  and message_stars UPDATE — untrimmed birth defaults in all four (REVOKEs
+  had targeted PUBLIC/anon only). `20260826_trim_grant_ceilings.sql`
+  (APPLIED to production, measured after: each verb set equals its
+  migration's grant line exactly); `db/tests/grants.sql` §5 asserts the
+  ceilings, self-test proved to fail on a re-granted UPDATE. Same PR:
+  open-items strikes for this and for the ticks/list-dots pair, both closed
+  by #433/#438/#441's routes. The NEXT pull request cites this entry's
+  squash SHA.
+- `f523873` — 👀 **Coaches and managers preview their squad as a parent** —
   Jay: "i want them to be able to view as a parent of their own age group so
   they can see what parents will see" (he declined other squads and the
   coach persona in the same answer). `parentPreviewTeamIds()` in
