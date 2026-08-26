@@ -189,6 +189,14 @@ function setup() {
   return { user, ...utils }
 }
 
+// ?open=<player id> deep-links straight to that player's detail sheet —
+// the Needs Attention names point here (26 Aug 2026).
+function setupAt(path) {
+  const user = userEvent.setup()
+  const utils = render(<MemoryRouter initialEntries={[path]}><Roster /></MemoryRouter>)
+  return { user, ...utils }
+}
+
 async function chooseAgeGroup(user, optionName) {
   await user.click(screen.getByRole('combobox', { name: /age group/i }))
   await user.click(screen.getByRole('option', { name: new RegExp(`^${optionName}(?:$| · )`) }))
@@ -946,5 +954,20 @@ describe('Roster — ages', () => {
 
     await screen.findAllByTestId('player-row')
     await waitFor(() => expect(listPlayerPrivateMock).toHaveBeenCalled())
+  })
+})
+
+// ── ?open=<player id> ───────────────────────────────────────────────────────
+describe('the ?open= player deep link', () => {
+  it('opens that player’s detail sheet on arrival', async () => {
+    setupAt('/roster?open=p-flanker')
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByText('Tom Fletcher')).toBeInTheDocument()
+  })
+
+  it('an unknown id just shows the roster, no crash and no sheet', async () => {
+    setupAt('/roster?open=p-not-real')
+    await screen.findAllByTestId('player-row')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

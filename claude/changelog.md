@@ -24,8 +24,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   still decides who may see what; a refused or failed card falls back to
   the old plain pill. Full-screen chrome only — the dock's header keeps its
   one-line detail.
-
-- (unmerged) — 👤 **Person-card follow-ups from Jay's first live minutes** —
+- `f7dce1c` — 👤 **Person-card follow-ups from Jay's first live minutes** —
   (1) the card said "U10 MIXED · U10 MIXED" for a person holding two
   membership rows on one squad: `member_contact_card` now aggregates with
   `distinct` (`db/migrations/20260826_member_contact_card_dedupe.sql`,
@@ -34,8 +33,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   (2) Jay, over the Edit-person sheet: "how can i initiate a chat with this
   parent from their profile? doesn't seem possible currently" — the sheet
   gains the standard contact row (Call/WhatsApp/Email from the saved
-  profile, Chat straight into the DM). The NEXT pull request cites this
-  entry's squash SHA.
+  profile, Chat straight into the DM).
+- `9d321f1` — 🔗 **Needs-attention names are doors** — Jay: "i can't click on
+  those names… why not?" Each name on /admin/needs-attention now links to
+  `/roster?open=<player id>`, and the Roster's `?open=` handler (previously
+  add-player/import only) opens that player's detail sheet once the list has
+  loaded — waiting out the load so a slow fetch cannot eat the link, and
+  falling through to the plain roster on an unknown id. Navigation only: the
+  attention screen still fetches no contact detail, so its privacy shape is
+  untouched. Background, measured live the same day: the 25 Aug parent-link
+  trigger is holding (zero unlinked parent memberships); the remaining
+  "no parent on file" rows are players with PLAYER-role accounts (mostly
+  U16B) or no account at all — a data-collection gap, with a policy question
+  for Jay recorded in open-items.
+
 - `a412763` — 💬 **Shared-chat-thread phase 4: the dock's channels ARE the
   main chat, and the thin dock is gone** — `FloatingChatDock` mounts
   `useChannelThread` + `ChannelThread` for squad, staff and club rows; its
@@ -83,7 +94,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   keeps only chrome (header, rename/nickname/block/leave/delete/wallpaper
   sheets). Behaviour-preserving by contract: the whole suite passes with
   ZERO test edits. Phase 2 points the floating dock at the same components.
-  The NEXT pull request cites this entry's squash SHA.
 - `abef0d7` — 👤 **The person card: tap any name, contact the person** — Jay:
   "click on a username, see their info and start a chat, email, call … from
   anywhere in the system." Designed, approved and BUILT the same day

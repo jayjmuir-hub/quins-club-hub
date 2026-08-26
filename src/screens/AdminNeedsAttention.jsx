@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -61,9 +62,17 @@ function SquadBlock({ squad }) {
             data-testid="attention-player"
             className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5"
           >
-            <span className="text-sm font-bold text-ink">
+            {/* A door, not just a label (26 Aug 2026 — Jay: "i can't click on
+                those names… why not?"). /roster?open= lands on the player's
+                detail sheet, where the DOB and parents actually get edited.
+                Navigation only: this screen still fetches no contact detail —
+                the privacy note at the top keeps holding. */}
+            <Link
+              to={`/roster?open=${entry.player.id}`}
+              className="text-sm font-bold text-ink underline-offset-2 hover:underline"
+            >
               {entry.player.full_name || 'Unnamed player'}
-            </span>
+            </Link>
             {/* ⚠️ THE GAP IDS, NOT THE FAMILY-FACING SENTENCES. completeness.js
                 writes its labels in the parent's own words — "we don't have a
                 birthday for Ada" — and its header says the admin surface should
