@@ -8,9 +8,24 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 26 Aug 2026
+
+- (unmerged) — 💬 **The DM notice is gone for members, and the wallpaper
+  fill is PROVEN on the full thread** — Jay's screenshots, both parts. The
+  fill itself had shipped minutes earlier (`423ff1c`, 08:15; the
+  screenshots were 08:23 against the cached app) — measured now in a real
+  renderer with a 4-message thread at 1440×900 AND 375×812: paper meets
+  the composer at both widths. The notice: members see NO banner in a DM
+  (the dock never showed one), reversing the 23 Aug permanent-notice
+  ruling — addendum in
+  `claude/decisions/2026-08-24-groups-open-no-warnings.md`. The REVIEWING
+  banner stays, and the welfare log is untouched. Harness gains ?dmCount=
+  so a shorter-than-viewport thread can be reproduced. The NEXT pull
+  request cites this entry's squash SHA.
+
 ## 25 Aug 2026
 
-- (unmerged) — 🖼️ **The wallpaper is the slack-eater, and the dock grew its
+- `423ff1c` — 🖼️ **The wallpaper is the slack-eater, and the dock grew its
   chevron.** Two of Jay's 26 Aug reports in one pass. (1) With few messages
   the paper was a small patch over the bubbles and bare surface above —
   the wallpaper wrapper is now `flex-1 justify-end` in both threads, so

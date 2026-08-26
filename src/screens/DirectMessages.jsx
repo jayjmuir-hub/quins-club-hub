@@ -650,23 +650,21 @@ function Thread({ conversationId }) {
         </Card>
       )}
 
-      {/* ── The notice. Permanent on a DM; a GROUP renders none — Jay's
-             ruling, claude/decisions/2026-08-24-groups-open-no-warnings.md.
-             A reviewing admin still sees the "recorded" line: that one is
-             about them, not a warning to members. ──────────────────────── */}
-      {(!isGroup || reviewing) && (
+      {/* ── The notice is REVIEWING-ONLY since 26 Aug 2026 — Jay: "remove
+             the club admins can review notice", pointing at the dock, which
+             never showed it. The member-facing "admins can review" line was
+             the 23 Aug permanent-notice ruling; Jay reversed it (addendum in
+             claude/decisions/2026-08-24-groups-open-no-warnings.md). The
+             REVIEWING banner stays: it is about the admin in the room —
+             "this open has been recorded" — not a warning to members, and
+             removing it would hide an access that IS logged. ───────────── */}
+      {reviewing && (
       <div
         data-testid="dm-notice"
         className="mb-3 flex gap-2 rounded-[10px] bg-warn-bg px-3 py-2 text-[12.5px] leading-snug text-warn-ink"
       >
         <span aria-hidden="true">🛡</span>
-        <p>
-          {reviewing
-            ? 'You are reviewing a private conversation as a club admin. This open has been recorded.'
-            : conversation?.involves_minor
-              ? `Private between you and ${otherName ?? 'them'}. Club admins can review this conversation.`
-              : `Private between you and ${otherName ?? 'them'}. If a message is reported, club admins can review it.`}
-        </p>
+        <p>You are reviewing a private conversation as a club admin. This open has been recorded.</p>
       </div>
       )}
 

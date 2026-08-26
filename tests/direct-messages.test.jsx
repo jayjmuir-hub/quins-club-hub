@@ -111,23 +111,22 @@ describe('DirectMessages — /chat/dm', () => {
 })
 
 describe('DirectMessages — a thread', () => {
-  // ⚠️ TWO NOTICES SINCE 23 Aug 2026 (evening). Jay: "I don't think dm between
-  // adults should be visible to anyone except those people, unless a message
-  // is reported." The database decides which (conversation_involves_minor);
-  // the screen only words it.
-  it('an adults-only conversation says admins can review it only if a message is reported', async () => {
+  // ⚠️ THE MEMBER-FACING NOTICE IS GONE SINCE 26 Aug 2026 — Jay: "remove the
+  // club admins can review notice", pointing at the dock, which never showed
+  // it. This reverses the 23 Aug permanent-notice ruling; the reviewing
+  // banner (about the ADMIN, below) is the one that stays.
+  it('shows NO notice to members — adults-only or not', async () => {
     renderAt('/chat/dm/c1')
-    const notice = await screen.findByTestId('dm-notice')
-    expect(notice).toHaveTextContent('Private between you and Zz Manager Probe. If a message is reported, club admins can review it.')
+    await screen.findAllByTestId('dm-bubble')
+    expect(screen.queryByTestId('dm-notice')).toBeNull()
   })
 
-  it('shows the permanent notice naming club admins when a minor is in it, the bubbles, and sends', async () => {
+  it('shows no notice even with a minor in it — the bubbles, and sends', async () => {
     const user = userEvent.setup()
     m.getConversation.mockResolvedValue({ ...CONV, involves_minor: true })
     renderAt('/chat/dm/c1')
-    const notice = await screen.findByTestId('dm-notice')
-    expect(notice).toHaveTextContent('Private between you and Zz Manager Probe. Club admins can review this conversation.')
     const bubbles = await screen.findAllByTestId('dm-bubble')
+    expect(screen.queryByTestId('dm-notice')).toBeNull()
     expect(bubbles[0]).toHaveAttribute('data-mine', 'false')
     expect(bubbles[1]).toHaveAttribute('data-mine', 'true')
     await waitFor(() => expect(m.markMessagesRead).toHaveBeenCalledWith(ME, ['d1']))
