@@ -54,11 +54,11 @@ const PLAYED_LOSS = {
   result_us: 5, result_them: 30,
 }
 
-function setWidth({ wide }) {
+function setWidth({ desktop }) {
   window.matchMedia = vi.fn().mockImplementation((query) => ({
-    // WIDE_QUERY is 1280px; DESKTOP_QUERY is 820px. Only the wide query
-    // matters to this screen, but both are answered so the stub is honest.
-    matches: query.includes('1280') ? wide : true,
+    // DESKTOP_QUERY is 820px — the table's breakpoint since 26 Aug 2026
+    // (it was WIDE/1280 before Jay asked for the width to be used).
+    matches: query.includes('820') ? desktop : true,
     media: query,
     addEventListener: vi.fn(), removeEventListener: vi.fn(),
     addListener: vi.fn(), removeListener: vi.fn(),
@@ -67,7 +67,7 @@ function setWidth({ wide }) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  setWidth({ wide: true })
+  setWidth({ desktop: true })
   useMembershipsMock.mockReturnValue({ memberships: ADMIN, teams: TEAMS })
   listEventsMock.mockResolvedValue([FUTURE_MATCH, FUTURE_TRAINING, PLAYED_WIN, PLAYED_LOSS])
 })
@@ -88,15 +88,15 @@ function withRouter(ui) {
   )
 }
 
-describe('ScheduleTable — the wide boundary', () => {
-  it('renders the table at wide', async () => {
+describe('ScheduleTable — the desktop boundary', () => {
+  it('renders the table from the desktop breakpoint (820px) up', async () => {
     render(withRouter(<Schedule />))
     expect(await screen.findByTestId('schedule-table')).toBeInTheDocument()
     expect(screen.queryByTestId('fixture-row')).not.toBeInTheDocument()
   })
 
-  it('keeps the stacked list below 1280px, where seven columns would be cramped', async () => {
-    setWidth({ wide: false })
+  it('keeps the stacked list below 820px — the phone layout', async () => {
+    setWidth({ desktop: false })
     render(withRouter(<Schedule />))
     await screen.findByText(/Dubai Exiles/)
     expect(screen.queryByTestId('schedule-table')).not.toBeInTheDocument()

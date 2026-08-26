@@ -19,7 +19,7 @@ import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../l
 import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import { defaultEventWindow, isMonthOutsideWindow, windowCovering } from '../lib/eventWindow.js'
 import ScheduleTable from '../components/ScheduleTable.jsx'
-import { useMediaQuery, WIDE_QUERY } from '../lib/useMediaQuery.js'
+import { DESKTOP_QUERY, useMediaQuery } from '../lib/useMediaQuery.js'
 import {
   groupEventsByMonth,
   initialVisibleMonthCount,
@@ -457,7 +457,12 @@ export default function Schedule() {
   // The table is a `wide` feature, not a `desktop` one. At 820-1279px — a
   // landscape tablet or a small laptop — the stacked FixtureRow list is still
   // the better shape; seven columns there would be cramped rather than dense.
-  const isWide = useMediaQuery(WIDE_QUERY)
+  // ⚠️ DESKTOP (820px), NOT `wide` (1280px), SINCE 26 Aug 2026 — Jay: "why
+  // can't we have things fill the entire width of the screen?". The shell's
+  // main is max-w-none from 820px up, so between 820 and 1280 the phone's
+  // stacked list sat in a sea of empty surface. The table is the layout that
+  // actually uses the width, and its six columns fit at 820.
+  const isWide = useMediaQuery(DESKTOP_QUERY)
   const filterBarRef = useRef(null)
   const [filterH, setFilterH] = useState(0)
 

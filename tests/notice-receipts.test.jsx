@@ -208,3 +208,20 @@ describe('Notices — first-load skeleton', () => {
     expect(document.querySelector('.animate-spin')).toBeNull()
   })
 })
+
+// ── Desktop fills the width (26 Aug 2026) ──────────────────────────────────
+// Jay: "why can't we have things fill the entire width of the screen?" The
+// board lays its cards in CSS columns from the desktop breakpoint up. jsdom
+// applies no CSS, so the class tokens are the only statement available about
+// how this will actually be laid out — same reasoning as roster.test.jsx.
+describe('Notices — desktop board layout', () => {
+  it('lays the cards in columns on desktop, and each card refuses to split', async () => {
+    setup()
+    const row = await screen.findByTestId('notice-row')
+    const board = row.parentElement
+    const tokens = board.className.split(/\s+/)
+    expect(tokens).toContain('desktop:columns-2')
+    expect(tokens).toContain('wide:columns-3')
+    expect(row.className.split(/\s+/)).toContain('break-inside-avoid')
+  })
+})
