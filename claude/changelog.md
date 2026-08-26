@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🏅 **Club officers: titles without rights** — Jay: a super
+- (unmerged) — 🏅 **The ninth officer title: Social Media Director** — Jay,
+  minutes after the eight shipped. The closed-vocabulary design working as
+  designed: one migration widening the CHECK
+  (`db/migrations/20260826_officer_title_social_media.sql`, APPLIED to
+  production; harness assert 6 proves the title accepted, the invented-title
+  refusal still holding, and — measured — the two live officer rows
+  untouched by the harness's rolled-back drop), plus the matching
+  `OFFICER_TITLES` entry so it renders last in the dignity order.
+
+- `8b994d7` — 🏅 **Club officers: titles without rights** — Jay: a super
   admin tags people with the club's eight officer titles (President →
   Rugby Performance Director), "no special rights with those, just
   titles", appearing everywhere titles appear, and "those people should
