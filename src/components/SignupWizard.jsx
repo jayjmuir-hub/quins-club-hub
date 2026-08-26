@@ -8,6 +8,7 @@ import {
   SIGNUP_STAFF_ROLES,
   buildSignupIntent,
   needsPlayers,
+  needsSquads,
 } from '../lib/signupIntent.js'
 
 // Pre-signup roll-call. Filled BEFORE supabase.auth.signUp — originally so
@@ -246,7 +247,7 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
           {error}
         </p>
       )}
-      {teamsFailed && (
+      {teamsFailed && needsSquads(answers) && (
         <p role="alert" className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink">
           We couldn't load the club's age groups. Check your connection and try again.
         </p>
@@ -343,6 +344,11 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
         </div>
       )}
 
+      {/* A committee member has no age group — helper-only skips the squads
+          entirely (needsSquads, and the whole chain down to the INSERT
+          policy agrees). The picker comes back the moment any other box is
+          ticked. */}
+      {needsSquads(answers) && (
       <fieldset className="mb-4 border-0 p-0">
         <legend className={`${LABEL} p-0`}>Age groups</legend>
         <div className="max-h-48 overflow-y-auto rounded-[11px] border border-line">
@@ -378,8 +384,9 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
           More than one child? Tick each age group. Not sure? Pick the closest.
         </p>
       </fieldset>
+      )}
 
-      <Button type="submit" size="lg" full disabled={sortedTeams.length === 0}>
+      <Button type="submit" size="lg" full disabled={sortedTeams.length === 0 && needsSquads(answers)}>
         Continue
       </Button>
     </form>

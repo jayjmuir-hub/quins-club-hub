@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🩹 **The list dots pair from the shape my_conversations
+- (unmerged) — 🤝 **A committee member signs up without an age group** — a
+  real one hit the wizard's "Choose at least one squad" wall the day it
+  mattered, and Jay reversed his 17 Aug "keep the requirement" ruling
+  (`claude/decisions/2026-08-26-volunteer-no-squad.md`). Helper-ONLY now
+  skips the squad picker in the wizard and the roll-call
+  (`needsSquads()`, the one shape rule); the INSERT policy and
+  `private.handle_new_user` accept a squadless 'volunteer' — and only
+  'volunteer' (`db/migrations/20260826_volunteer_no_squad.sql`, proven both
+  directions by `db/tests/volunteer-no-squad.sql`; the trigger previously
+  created NO request at all for that signup, leaving the person invisible
+  to admins). The NEXT pull request cites this entry's squash SHA.
+- `3fdf8ab` — 🩹 **The list dots pair from the shape my_conversations
   actually returns** — found LIVE by Jay minutes after the dots shipped:
   thread header green, chat-list row grey. `listMyConversations()` returns
   the INBOX shape (`{ conversation_id, other_id, … }`); the pairing filtered
@@ -18,7 +29,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   list dot fell to offline. Fixed in ChatList and the dock; the new
   screen-level test renders the real row shape and FAILED against the bug —
   the component-only test could not see it (its lesson is written at the
-  test). The NEXT pull request cites this entry's squash SHA.
+  test).
 - `7b88a8a` — 🖼 **The wallpaper follows the person, not the device — and the
   doodle is the default** — Jay: "can we make it do those things? also lets set
   the club doodle now as the default background for everyone on every device in
@@ -33,7 +44,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   out of view") — extending the 25 Aug chrome-free ruling to desktop. Harness
   gains a chatPrefs stub (`?background=` override); db/tests/chat-prefs.sql
   inlines the new migration and asserts set/clear/over-long-refused.
-
 - `f21dafd` — 🖼 **Chat wallpaper no longer stretches blurry on long threads** —
   Jay, via a Grok diagnosis he verified: the photo sat on the growing stream
   wrapper with `background-size: cover`, so a long chat scaled it over

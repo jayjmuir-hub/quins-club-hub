@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   claimedRole,
   needsPlayers,
+  needsSquads,
   buildSignupIntent,
   NOTHING_TICKED,
   NO_SQUAD_CHOSEN,
@@ -39,6 +40,44 @@ describe('buildSignupIntent', () => {
 
   it('refuses no squad', () => {
     expect(buildSignupIntent({ ...base, squadIds: [] }).error).toBe(NO_SQUAD_CHOSEN)
+  })
+
+  // ⚠️ 26 Aug 2026 — a real committee member was walled out by the squad
+  // requirement the day after the wizard shipped. Jay reversed his 17 Aug
+  // "keep the requirement" ruling: helper-ONLY skips squads
+  // (claude/decisions/2026-08-26-volunteer-no-squad.md). The controls
+  // matter as much as the fix: any other tick alongside helper still
+  // demands one, or the 16 Aug who-are-you rule quietly dies for everyone.
+  it('a helper-only signup needs no squad and claims volunteer', () => {
+    const { intent, error } = buildSignupIntent({
+      ...base,
+      answers: { helper: true },
+      squadIds: [],
+    })
+    expect(error).toBeUndefined()
+    expect(intent.claimed_role).toBe('volunteer')
+    expect(intent.squad_ids).toEqual([])
+  })
+
+  it('…but helper plus any squad-shaped tick still demands one', () => {
+    expect(
+      buildSignupIntent({ ...base, answers: { helper: true, child: true }, squadIds: [] }).error,
+    ).toBe(NO_SQUAD_CHOSEN)
+    expect(
+      buildSignupIntent({
+        ...base,
+        answers: { helper: true, staff: true },
+        staffRole: 'coach',
+        squadIds: [],
+      }).error,
+    ).toBe(NO_SQUAD_CHOSEN)
+  })
+
+  it('needsSquads is false only for the sole-helper shape', () => {
+    expect(needsSquads({ helper: true })).toBe(false)
+    expect(needsSquads({})).toBe(true)
+    expect(needsSquads({ helper: true, self: true })).toBe(true)
+    expect(needsSquads({ child: true })).toBe(true)
   })
 
   it('packs a parent intent the trigger can read', () => {
