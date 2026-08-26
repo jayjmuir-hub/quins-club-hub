@@ -2803,7 +2803,7 @@ AS $function$
   )
   select p.id, p.full_name,
          best.role, best.title, coalesce(best.is_super, false),
-         coalesce((select array_agg(t.name order by t.name)
+         coalesce((select array_agg(distinct t.name order by t.name)
                      from memberships m join teams t on t.id = m.team_id
                     where m.profile_id = _profile and m.status = 'active'
                       and m.team_id is not null), '{}') as squads,

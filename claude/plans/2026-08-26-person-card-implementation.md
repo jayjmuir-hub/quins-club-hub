@@ -1,9 +1,10 @@
 # Person Card Implementation Plan
 
-**Status: EXECUTED on branch `claude/person-card`, 26 Aug 2026 — all tasks
-done except Task 2's production apply (blocked by a permission gate; needs
-Jay or an approved session) and Task 9's post-deploy live check. Full suite
-green at execution. Not merged, so NOT SHIPPED yet.**
+**Status: SHIPPED — all nine tasks done. Merged as `abef0d7` (#434); the
+Task 2 apply landed once Jay approved it, and the Task 9 live check ran on
+the deployed site the same day. The parent-privacy negative is proven by the
+harness, not by the live check — an admin login cannot demonstrate it, and
+"View as" does not change what the database answers.**
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
