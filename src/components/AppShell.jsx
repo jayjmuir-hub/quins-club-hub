@@ -234,8 +234,9 @@ export default function AppShell({ children }) {
   // shows no tab bar and no masthead island — the chat header's ← and the
   // system back gesture are the way out — so the composer can sit on the
   // bottom edge instead of floating 74px above it. The chat LIST and
-  // /chat/starred keep the chrome; desktop is untouched (its chrome is the
-  // sidebar and a top-right island that never crosses a thread). View-as
+  // /chat/starred keep the chrome; on desktop the sidebar stays but the
+  // top-right island also leaves a thread since 26 Aug 2026 — it sat exactly
+  // on the pinned ChatHeader's ⋯ menu (see the masthead wrapper). View-as
   // keeps everything: the banner is the way OUT of the preview, and an
   // admin forgetting they are previewing is the failure it exists to
   // prevent — same contract as the auto-hide's disabled flag above.
@@ -423,12 +424,17 @@ export default function AppShell({ children }) {
         data-testid="masthead-wrapper"
         data-hidden={mastheadHidden ? 'true' : undefined}
         className={[
-          'pointer-events-none sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:flex desktop:flex-col desktop:items-end desktop:px-4',
-          // Chrome-free conversations: the island leaves the phone entirely
-          // (desktop:flex restores it where it lives top-right and never
-          // crosses a thread). The view-as case never reaches here —
-          // conversationScreen is false while previewing.
-          conversationScreen ? 'hidden desktop:flex' : '',
+          'pointer-events-none sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:px-4',
+          // Chrome-free conversations: the island leaves the phone AND the
+          // desktop. Until 26 Aug 2026 this restored it on desktop ("a
+          // top-right island that never crosses a thread") — measured false
+          // that day: the thread's ChatHeader pins at top-0 z-10, slides
+          // under the z-40 island, and the island sat exactly on the ⋯ menu
+          // (Jay: "scrolls up and out of view"). Inside a thread the ← and
+          // the sidebar remain; the account menu is one tap back on the
+          // list. The view-as case never reaches here — conversationScreen
+          // is false while previewing, so the banner never hides.
+          conversationScreen ? 'hidden' : 'desktop:flex desktop:flex-col desktop:items-end',
           'transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none',
           mastheadHidden
             ? '-translate-y-[calc(100%+24px)] opacity-0 desktop:translate-y-0 desktop:opacity-100'

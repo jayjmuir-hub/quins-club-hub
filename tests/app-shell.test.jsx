@@ -853,6 +853,10 @@ describe('chrome-free conversations (Jay, 25 Aug 2026)', () => {
     renderShell('/chat/dm/c1')
     expect(screen.queryAllByRole('navigation', { name: 'Primary' })).toHaveLength(0)
     expect(hasClassToken(screen.getByTestId('masthead-wrapper'), 'hidden')).toBe(true)
+    // Desktop too, since 26 Aug 2026: `desktop:flex` used to restore the
+    // island at >=820px, where it pinned exactly over the thread header's
+    // ⋯ menu (Jay: "scrolls up and out of view"). No token, no restore.
+    expect(hasClassToken(screen.getByTestId('masthead-wrapper'), 'desktop:flex')).toBe(false)
     // The 108px tab-bar clearance would be a dead band under the composer.
     expect(document.getElementById('main-content').className).not.toContain('108px')
   })

@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 26 Aug 2026
 
-- (unmerged) — 🖼 **Chat wallpaper no longer stretches blurry on long threads** —
+- (unmerged) — 🖼 **The wallpaper follows the person, not the device — and the
+  doodle is the default** — Jay: "can we make it do those things? also lets set
+  the club doodle now as the default background for everyone on every device in
+  all chats". `chat_prefs.background`
+  (db/migrations/20260826_chat_background.sql): per-chat, per-person, owner-only
+  RLS already on the table, NULL = default so changing the default never needs a
+  migration. Both thread hooks read it and the picker writes it; the day-old
+  localStorage key is retired unread. Default preset is now `doodle` (was
+  `crest`), resolved client-side, retired keys fall back to it. Same PR: the
+  desktop top-right island leaves conversation screens — measured pinning
+  exactly over the thread header's ⋯ menu (z-40 over z-10; Jay: "scrolls up and
+  out of view") — extending the 25 Aug chrome-free ruling to desktop. Harness
+  gains a chatPrefs stub (`?background=` override); db/tests/chat-prefs.sql
+  inlines the new migration and asserts set/clear/over-long-refused.
+
+- `f21dafd` — 🖼 **Chat wallpaper no longer stretches blurry on long threads** —
   Jay, via a Grok diagnosis he verified: the photo sat on the growing stream
   wrapper with `background-size: cover`, so a long chat scaled it over
   thousands of pixels and all five papers went mushy. WhatsApp-style now: a

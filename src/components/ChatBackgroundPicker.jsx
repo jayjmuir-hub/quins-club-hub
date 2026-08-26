@@ -11,7 +11,7 @@ export default function ChatBackgroundPicker({ open, onClose, current, onPick })
   return (
     <Sheet open={open} onClose={onClose} title="Chat background">
       <div data-testid="background-picker">
-        <p className="text-[11.5px] text-ink-muted">For every chat, on this device.</p>
+        <p className="text-[11.5px] text-ink-muted">For this chat, on all your devices. Only you see it.</p>
         <div className="mt-2.5 grid grid-cols-2 gap-2">
           {BACKGROUND_PRESETS.map((p) => (
             <button

@@ -95,6 +95,9 @@ const ALIASES = [
   ['harness/stubs/lineups.js', 'src/data/lineups.js'],
   // The DM thread's late-signing photos (25 Aug 2026, the dm-thread scenario).
   ['harness/stubs/chatMedia.js', 'src/data/chatMedia.js'],
+  // Pins/archive and the per-chat wallpaper (26 Aug 2026) — ChatList and
+  // both thread hooks reach Supabase through it.
+  ['harness/stubs/chatPrefs.js', 'src/data/chatPrefs.js'],
 ]
 
 function read(relative) {

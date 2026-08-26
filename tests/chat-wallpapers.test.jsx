@@ -3,14 +3,16 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
-// Five photo papers, crest letterhead default
-// (claude/plans/2026-08-25-chat-wallpaper-papers.md). Retired stored keys
-// fall back to crest; the picker is just the five tiles.
+// Five photo papers, club-doodle default
+// (claude/plans/2026-08-25-chat-wallpaper-papers.md; per-chat and
+// cross-device via chat_prefs since 26 Aug 2026). Retired stored keys fall
+// back to the doodle; the picker is just the five tiles.
 
 import {
   BACKGROUND_PRESETS,
   backgroundStyle,
-  getChatBackground,
+  resolveBackground,
+  DEFAULT_BACKGROUND,
 } from '../src/lib/chatBackgrounds.js'
 import ChatBackgroundPicker from '../src/components/ChatBackgroundPicker.jsx'
 
@@ -18,8 +20,8 @@ const FIVE_KEYS = ['harlequin', 'dusk', 'crest', 'doodle', 'kit']
 const FIVE_LABELS = [
   'Harlequin (kit diamonds + crest bat)',
   'Dusk (Zayed dusk photo)',
-  'Crest (DEFAULT; cream paper, faded shield)',
-  'Club doodle (lighter than the others)',
+  'Crest (cream paper, faded shield)',
+  'Club doodle (DEFAULT; lighter than the others)',
   'Kit (green/red hoop fabric)',
 ]
 const RETIRED = ['plain', 'green', 'warm', 'hoops']
@@ -40,19 +42,17 @@ describe('the preset table', () => {
     }
   })
 
-  it('empty, unknown, and retired keys fall back to crest', () => {
-    window.localStorage.removeItem('chat-background')
-    expect(getChatBackground()).toBe('crest')
-    expect(backgroundStyle(undefined).backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+  it('empty, unknown, and retired keys fall back to the doodle', () => {
+    expect(DEFAULT_BACKGROUND).toBe('doodle')
+    expect(resolveBackground(undefined)).toBe('doodle')
+    expect(backgroundStyle(undefined).backgroundImage).toContain('/chat-backgrounds/doodle.jpg')
 
-    window.localStorage.setItem('chat-background', 'not-a-paper')
-    expect(getChatBackground()).toBe('crest')
-    expect(backgroundStyle('not-a-paper').backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+    expect(resolveBackground('not-a-paper')).toBe('doodle')
+    expect(backgroundStyle('not-a-paper').backgroundImage).toContain('/chat-backgrounds/doodle.jpg')
 
     for (const key of RETIRED) {
-      window.localStorage.setItem('chat-background', key)
-      expect(getChatBackground(), key).toBe('crest')
-      expect(backgroundStyle(key).backgroundImage, key).toContain('/chat-backgrounds/crest.jpg')
+      expect(resolveBackground(key), key).toBe('doodle')
+      expect(backgroundStyle(key).backgroundImage, key).toContain('/chat-backgrounds/doodle.jpg')
     }
   })
 })
@@ -139,6 +139,12 @@ vi.mock('../src/data/messages.js', () => ({
 }))
 vi.mock('../src/data/events.js', () => ({ listEvents: vi.fn(async () => []) }))
 vi.mock('../src/data/availability.js', () => ({ listAvailabilityForEvents: vi.fn(async () => []) }))
+const prefs = { getMyChatPref: vi.fn(), setChatPref: vi.fn() }
+vi.mock('../src/data/chatPrefs.js', () => ({
+  getMyChatPref: (...a) => prefs.getMyChatPref(...a),
+  setChatPref: (...a) => prefs.setChatPref(...a),
+  listMyChatPrefs: async () => new Map(),
+}))
 vi.mock('../src/screens/ChatList.jsx', () => ({
   RowAvatar: () => <span />,
   scopeChatRows: (rows) => rows,
@@ -184,14 +190,16 @@ beforeEach(() => {
   m.listMentionablesFor.mockResolvedValue([])
   m.listReactions.mockResolvedValue(new Map())
   m.listStaffMessages.mockResolvedValue([])
+  prefs.getMyChatPref.mockResolvedValue(null)
+  prefs.setChatPref.mockResolvedValue(undefined)
 })
 
 describe('the squad chat wears the wallpaper', () => {
-  it('empty storage paints crest — the default on every chat', async () => {
+  it('no stored pref paints the doodle — the default on every chat', async () => {
     renderChat()
     await waitFor(() => expect(screen.getByTestId('composer-locked')).toBeInTheDocument())
     const stream = document.querySelector('[data-background]')
-    expect(stream?.getAttribute('data-background')).toBe('crest')
+    expect(stream?.getAttribute('data-background')).toBe('doodle')
     // ⚠️ The stretch bug (26 Aug 2026): the photo used to sit on this growing
     // wrapper with background-size: cover, so a long thread scaled it to
     // thousands of pixels and it went blurry. The wrapper itself must carry
@@ -200,10 +208,41 @@ describe('the squad chat wears the wallpaper', () => {
     // The paper lives on a sticky, viewport-height layer inside the stream's
     // clip: always painted at screen size, messages scroll over it.
     const paper = document.querySelector('[data-testid="chat-wallpaper"]')
-    expect(paper?.style.backgroundImage).toContain('/chat-backgrounds/crest.jpg')
+    expect(paper?.style.backgroundImage).toContain('/chat-backgrounds/doodle.jpg')
     expect(paper?.style.backgroundImage).toContain('url(')
     expect(paper?.className).toContain('sticky')
     expect(paper?.className).toContain('h-dvh')
+  })
+
+  it('my stored pref for THIS chat paints, from the database (cross-device)', async () => {
+    prefs.getMyChatPref.mockResolvedValue({ pinned: false, archived: false, background: 'kit' })
+    renderChat()
+    await waitFor(() => expect(screen.getByTestId('composer-locked')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(document.querySelector('[data-background]')?.getAttribute('data-background')).toBe('kit'),
+    )
+    expect(prefs.getMyChatPref).toHaveBeenCalledWith('squad-team-a')
+  })
+
+  it('a retired stored key paints the doodle, not a crash', async () => {
+    prefs.getMyChatPref.mockResolvedValue({ pinned: false, archived: false, background: 'hoops' })
+    renderChat()
+    await waitFor(() => expect(screen.getByTestId('composer-locked')).toBeInTheDocument())
+    // Resolved at arrival: the stream never carries the retired key.
+    await waitFor(() => expect(prefs.getMyChatPref).toHaveBeenCalled())
+    expect(document.querySelector('[data-background]')?.getAttribute('data-background')).toBe('doodle')
+  })
+
+  it('picking persists to chat_prefs for this chat — not to this device', async () => {
+    const user = userEvent.setup()
+    renderChat()
+    await waitFor(() => expect(screen.getByTestId('composer-locked')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Chat options' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Chat background' }))
+    await user.click(within(screen.getByTestId('background-picker')).getByRole('button', { name: /^Kit\b/ }))
+    expect(prefs.setChatPref).toHaveBeenCalledWith('me-1', 'squad-team-a', { background: 'kit' })
+    expect(document.querySelector('[data-background]')?.getAttribute('data-background')).toBe('kit')
+    expect(window.localStorage.getItem('chat-background')).toBeNull()
   })
 
   it('offers Chat background in the header menu and opens the gallery', async () => {

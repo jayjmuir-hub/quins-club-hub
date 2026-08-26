@@ -26,8 +26,9 @@ import {
   toggleStar,
   listMessageReceipts,
 } from '../data/messages.js'
+import { getMyChatPref, setChatPref } from '../data/chatPrefs.js'
 import { useAuth } from './auth.jsx'
-import { getChatBackground } from './chatBackgrounds.js'
+import { DEFAULT_BACKGROUND, resolveBackground } from './chatBackgrounds.js'
 import { useMemberships } from './memberships.jsx'
 import { usePresence } from './presence.js'
 import { isAdmin } from './scope.js'
@@ -79,9 +80,10 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   const [forwardRows, setForwardRows] = useState(null)
   const [forwarding, setForwarding] = useState(false)
   // Round 3 (claude/plans/2026-08-24-chat-round-3-design.md): private
-  // nicknames, and the device-level wallpaper.
+  // nicknames, and the wallpaper — per-chat and cross-device via chat_prefs
+  // since 26 Aug 2026 (see src/lib/chatBackgrounds.js).
   const [nicknames, setNicknames] = useState(() => new Map())
-  const [background, setBackground] = useState(getChatBackground)
+  const [background, setBackground] = useState(DEFAULT_BACKGROUND)
   // Round 4 (claude/plans/2026-08-24-chat-round-4.md): my private stars.
   const [stars, setStars] = useState(() => new Set())
   // Ticks (26 Aug 2026): receipts for MY messages, message id → sets.
@@ -205,6 +207,32 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   useStayPinnedToBottom(messages, scrollRef)
 
   const isGroup = conversation?.kind === 'group'
+
+  // My wallpaper for THIS chat — chat_prefs, keyed by the list's own row key
+  // (rowKey in ChatList.jsx: 'dm-<id>' or 'group-<id>'). The kind arrives
+  // with the conversation, so the fetch waits for it. Decoration: a failure
+  // paints the default, never an error.
+  const chatKey = conversation ? `${isGroup ? 'group' : 'dm'}-${conversationId}` : null
+  useEffect(() => {
+    if (!chatKey) return undefined
+    let stale = false
+    getMyChatPref(chatKey)
+      .then((pref) => {
+        if (!stale && pref?.background) setBackground(resolveBackground(pref.background))
+      })
+      .catch(() => {})
+    return () => {
+      stale = true
+    }
+  }, [chatKey])
+
+  // The picker's landing point: paint now, persist for every device. A failed
+  // write keeps the on-screen pick for this session — decoration again.
+  function pickBackground(key) {
+    setBackground(resolveBackground(key))
+    if (selfId && chatKey) setChatPref(selfId, chatKey, { background: key }).catch(() => {})
+  }
+
   const myMemberRow = isGroup ? members?.find((p) => p.profile_id === selfId) : null
   // Everyone in the chat but me — the set the ticks answer for. WhatsApp's
   // rule: ALL of them delivered/read, or the tick stays at the lower state.
@@ -412,7 +440,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     error,
     setError,
     background,
-    setBackground,
+    pickBackground,
     isGroup,
     participant,
     owner,

@@ -2178,16 +2178,19 @@ CREATE TABLE public.availability_nudges (
 );
 ALTER TABLE public.availability_nudges ENABLE ROW LEVEL SECURITY;
 
--- chat_prefs  (24 Aug 2026 — pinned chats and archive; owner-only)
+-- chat_prefs  (24 Aug 2026 — pinned chats and archive; owner-only.
+--              26 Aug 2026 — background: the per-chat wallpaper, NULL = default)
 CREATE TABLE public.chat_prefs (
   owner_id    uuid        NOT NULL,
   chat_key    text        NOT NULL,
   pinned      boolean     NOT NULL DEFAULT false,
   archived    boolean     NOT NULL DEFAULT false,
   updated_at  timestamptz NOT NULL DEFAULT now(),
+  background  text,
   CONSTRAINT chat_prefs_pkey           PRIMARY KEY (owner_id, chat_key),
   CONSTRAINT chat_prefs_owner_id_fkey  FOREIGN KEY (owner_id) REFERENCES profiles(id) ON DELETE CASCADE,
-  CONSTRAINT chat_prefs_chat_key_check CHECK (((length(chat_key) >= 1) AND (length(chat_key) <= 80)))
+  CONSTRAINT chat_prefs_chat_key_check CHECK (((length(chat_key) >= 1) AND (length(chat_key) <= 80))),
+  CONSTRAINT chat_prefs_background_check CHECK (((background IS NULL) OR ((length(background) >= 1) AND (length(background) <= 40))))
 );
 ALTER TABLE public.chat_prefs ENABLE ROW LEVEL SECURITY;
 
