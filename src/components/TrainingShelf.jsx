@@ -98,6 +98,10 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
     }
   }, [team?.id, tonight?.id, reloadToken])
 
+  useEffect(() => {
+    setPendingChip(null)
+  }, [tonight?.id])
+
   const chips = chipHours(templates, team)
   const fromCoaches = shelfRowsForSquad(
     templates.filter((row) => row.created_by),

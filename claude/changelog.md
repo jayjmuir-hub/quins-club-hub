@@ -14,6 +14,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   selected status again), and self-service editing locks a calendar day before
   the event — 5 days for matches, 1 for training, never for socials — enforced
   in RLS. Staff are never locked. Reverses the 9-Aug staff-only-delete rule.
+- `6385a90` — 🏉 **Two-week training-date strip on Squad Training** — a
+  horizontal strip of this squad's next two weeks of training events (nights
+  they actually train, not every day of the fortnight) above the Spotify chips
+  on `/squad/:teamId/training`. Tap a date; chips apply to that night. Default
+  tonight, else the next upcoming night; empty window disables chips. Status
+  Empty / Draft / Staff from `training_sessions.visibility`; pitch booked lives
+  on the date. Shared helper `src/lib/trainingDates.js`. Spec:
+  `claude/specs/2026-08-27-training-date-strip.md`.
 - `e3ba71a` — 🏉 **Pitch diagrams on opened drill cards** — nullable
   `drills.diagram_url` and a public `training-diagrams` Storage bucket
   (schematic drawings only: cones and letters, never a child's photo).

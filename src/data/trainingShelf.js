@@ -11,7 +11,7 @@ import {
 // Spec: claude/specs/2026-08-27-training-shelf.md
 //
 // ⚠️ DOES NOT CALL publish_training. Applying a chip is createSession /
-// saveSessionBlocks on TONIGHT's event. Publish onto calendars stays the
+// saveSessionBlocks on the selected training event. Publish onto calendars stays the
 // Director's RPC.
 
 const WEEK_MS = 8 * 24 * 60 * 60 * 1000
@@ -22,7 +22,7 @@ function must(data, error) {
   return data
 }
 
-/** Apply a chip hour to tonight. Never publish_training. */
+/** Apply a chip hour to the selected training event. Never publish_training. */
 export async function applyChipHour({ eventId, session, template, confirmed = false, notes = null }) {
   if (chipNeedsConfirm(session) && !confirmed) {
     return { applied: false, needsConfirm: true }

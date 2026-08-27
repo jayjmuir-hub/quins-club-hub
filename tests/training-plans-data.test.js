@@ -74,6 +74,7 @@ import {
   listDrills,
   listTemplates,
   getSession,
+  listSessionsForEvents,
   createSession,
   setSessionVisibility,
   saveSquadTemplate,
@@ -323,6 +324,18 @@ describe('embed sort', () => {
       calls.filter((c) => c.table === table).flatMap((c) => c.ops).find((o) => o.name === 'select')
     expect(selectFor('session_templates').args[0]).toContain('diagram_url')
     expect(selectFor('training_sessions').args[0]).toContain('diagram_url')
+  })
+
+  it('listSessionsForEvents asks for visibility so the date strip can show Empty / Draft / Staff', async () => {
+    resultFor.mockImplementation(() => ({
+      data: [{ id: 's1', event_id: 'ev1', visibility: 'staff', blocks: [{ minutes: 15 }] }],
+      error: null,
+    }))
+    const map = await listSessionsForEvents(['ev1'])
+    const selectFor = (table) =>
+      calls.filter((c) => c.table === table).flatMap((c) => c.ops).find((o) => o.name === 'select')
+    expect(selectFor('training_sessions').args[0]).toMatch(/visibility/)
+    expect(map.get('ev1').visibility).toBe('staff')
   })
 
   it('getSession sorts the session’s blocks by position', async () => {
