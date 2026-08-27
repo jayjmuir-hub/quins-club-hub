@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- (unmerged) — 🏉 **Session Plan lists this squad's hours only** — START FROM A
+- `0edfaa0` — 🏉 **Session Plan lists this squad's hours only** — START FROM A
   TEMPLATE and ADD A DRILL reuse `shelfRowsForSquad` from
   `src/lib/trainingShelf.js` (age from the squad name, contact from
   `teams.requires_contact`). Freestyle stays first. A U18B coach no longer
@@ -19,8 +19,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Training mount the same `src/components/SessionPlan.jsx` — no sibling
   picker. From coaches on the shelf uses the same filter. Director
   `/admin/training` Library, Templates and Publish stay whole-club. Spec:
-  `claude/specs/2026-08-27-training-shelf.md`. The NEXT pull request cites
-  this entry's squash SHA.
+  `claude/specs/2026-08-27-training-shelf.md`.
 - `80e4f8f` — 🏉 **Squad Training chips pick one hour per focus for this
   squad** — three contact age packs with the same `chip_label`s were drawing
   as three Passing chips plus red "U18 is outside this template's U11-U14".
