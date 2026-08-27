@@ -4,7 +4,9 @@ import { CATEGORY_LABELS, bandLabel } from '../lib/trainingPlans.js'
 //
 // Title, summary, an adult coach name, likes, a personal star, category and
 // age pills. ⛔ No player names, no player photos, no FaceStack, no 1–5
-// rating. Used-this-week is a count when given, not a star average.
+// rating, no pitch-diagram thumbnail — opened cards mount DrillDiagram
+// instead (claude/specs/2026-08-27-drill-diagrams.md). Used-this-week is a
+// count when given, not a star average.
 
 function HeartIcon({ filled }) {
   return (

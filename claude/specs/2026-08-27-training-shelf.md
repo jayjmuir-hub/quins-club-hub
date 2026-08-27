@@ -66,7 +66,8 @@ star average); **My shelf** (personal favorites).
 - No 1–5 star ratings.
 - Coach names (adults) are OK on cards.
 - **No player names and no player photos** on drill cards. No FaceStack, no
-  avatar, no `img` of a person.
+  avatar, no `img` of a person. Opened cards may show `diagram_url` (a
+  schematic pitch drawing); list rows still have no photos.
 - **Default to this squad.** Browse (and the shelf list) shows drills that
   `squadFitsTemplate` accepts for the squad being held — age from the name,
   contact from `teams.requires_contact`. A **Show all ages** control reveals

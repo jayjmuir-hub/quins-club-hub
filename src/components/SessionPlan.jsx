@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from './Button.jsx'
 import Chip from './Chip.jsx'
+import DrillDiagram from './DrillDiagram.jsx'
 import {
   createSession,
   getSession,
@@ -113,7 +114,7 @@ function blockFromDrill(drill) {
 function BlockRow({ block }) {
   const drill = block.drill ?? {}
   const category = CATEGORY_LABELS[drill.category] ?? drill.category ?? null
-  const hasDetail = Boolean(drill.summary || drill.body || drill.source_url)
+  const hasDetail = Boolean(drill.summary || drill.body || drill.source_url || drill.diagram_url)
 
   return (
     <li className="border-b border-line py-2 last:border-b-0">
@@ -135,6 +136,7 @@ function BlockRow({ block }) {
           <summary className="cursor-pointer text-[12.5px] font-bold text-brand-ink">
             How it runs
           </summary>
+          <DrillDiagram url={drill.diagram_url} title={drill.title ?? 'Drill'} />
           {drill.summary && (
             <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">{drill.summary}</p>
           )}

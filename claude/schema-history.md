@@ -20,6 +20,26 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### `20260827_drill_diagram_url` — schematic pitch drawings on opened cards
+
+**STATUS: in the pull request that adds this file; not yet applied.**
+Reasoning, not a live claim. Spec: `claude/specs/2026-08-27-drill-diagrams.md`.
+Tombstone: `claude/decisions/2026-08-21-drill-body-is-just-a-text-field.md`
+(body is a text field; this is a new column, not markdown images in body).
+
+Additive: nullable `drills.diagram_url`, plus a **public** Storage bucket
+`training-diagrams`. Public is the point — an `<img src>` on a phone with no
+signed-URL dance — and it is safe because the files are cones and letters,
+never faces. A separate bucket from `player-photos` / `staff-photos` so
+nothing written here can widen those. Write RLS matches drill manage (club
+admin, or squad staff of a squad-owned drill). Key shape
+`<drill_id>/<file>`; a malformed key fails closed.
+
+Does not seed World Rugby SVGs, does not add an uploader, does not put
+images in `drills.body`, and does not put thumbnails on shelf list rows.
+
+---
+
 ### `20260827_training_shelf` — chips, likes, favorites, featured
 
 **STATUS: in the pull request that adds this file; not yet applied.** Reasoning,

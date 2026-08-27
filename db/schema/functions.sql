@@ -2691,6 +2691,61 @@ GRANT EXECUTE ON FUNCTION private.staff_photo_owner(text) TO authenticated;
 
 
 -- ══════════════════════════════════════════════════════════════════════════
+--  private.training_diagram_drill / private.can_write_training_diagram
+--  (27 Aug 2026, 20260827_drill_diagram_url.sql)
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- Pitch drawings in the PUBLIC `training-diagrams` bucket. The key shape
+-- `<drill_id>/<file>` IS the security boundary — a storage policy sees only
+-- a filename, so the first path segment is the drill. Malformed keys return
+-- NULL (fail closed), never raise.
+--
+-- WRITE matches drill manage: admin of the club, or squad staff of a
+-- squad-owned drill. The `training` right is a message, not a boundary.
+-- NOT LIVE until the migration is applied.
+CREATE OR REPLACE FUNCTION private.training_diagram_drill(_key text)
+ RETURNS uuid
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+  select case
+    when split_part(_key, '/', 1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    then split_part(_key, '/', 1)::uuid
+    else null
+  end;
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.training_diagram_drill(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.training_diagram_drill(text) FROM anon;
+GRANT EXECUTE ON FUNCTION private.training_diagram_drill(text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION private.can_write_training_diagram(_key text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1
+    from public.drills d
+    where d.id = private.training_diagram_drill(_key)
+      and (
+        private.is_admin(d.club_id)
+        or (d.team_id is not null and private.can_edit_team(d.team_id))
+      )
+  );
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.can_write_training_diagram(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.can_write_training_diagram(text) FROM anon;
+GRANT EXECUTE ON FUNCTION private.can_write_training_diagram(text) TO authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
 --  private.can_see_staff_photo  (13 Aug 2026, 20260813_staff_photos.sql)
 -- ══════════════════════════════════════════════════════════════════════════
 --

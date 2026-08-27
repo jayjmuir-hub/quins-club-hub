@@ -1730,6 +1730,27 @@ CREATE POLICY "chat media remove" ON storage.objects
 
 
 -- ---------------------------------------------------------------------
+-- storage.objects — bucket `training-diagrams` (2, 27 Aug 2026)
+--
+-- Schematic pitch drawings (cones, letters, arrows). ⚠️ A SEPARATE PUBLIC
+-- BUCKET FROM player-photos AND staff-photos: those hold faces. Public is
+-- OK because there are no children in these files. READ is open so an
+-- <img src> works. WRITE matches drill manage (admin of the club, or squad
+-- staff of a squad-owned drill). Key shape `<drill_id>/<file>` — first
+-- path segment is the drill. Malformed keys fail closed.
+-- NOT LIVE until 20260827_drill_diagram_url.sql is applied.
+-- ---------------------------------------------------------------------
+CREATE POLICY "training diagram read" ON storage.objects
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((bucket_id = 'training-diagrams'::text));
+
+CREATE POLICY "training diagram write" ON storage.objects
+  AS PERMISSIVE FOR ALL TO public
+  USING (((bucket_id = 'training-diagrams'::text) AND private.can_write_training_diagram(name)))
+  WITH CHECK (((bucket_id = 'training-diagrams'::text) AND private.can_write_training_diagram(name)));
+
+
+-- ---------------------------------------------------------------------
 -- message_deliveries (2), and the author arm on message_reads
 -- (26 Aug 2026 — 20260826_chat_delivery_receipts)
 --

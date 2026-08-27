@@ -1881,6 +1881,10 @@ CREATE TABLE public.drills (
   body             text,
   source_name      text,
   source_url       text,
+  -- 27 Aug 2026 (20260827_drill_diagram_url.sql): public URL of a schematic
+  -- pitch drawing. NULL means no diagram. Never a photograph of a person.
+  -- Body stays prose — see claude/decisions/2026-08-21-drill-body-is-just-a-text-field.md.
+  diagram_url      text,
   minutes          smallint not null default 10 check (minutes between 1 and 120),
   category         text not null check (category in ('warm_up','skill','game','conditioning','cool_down')),
   min_age          smallint check (min_age between 4 and 19),
