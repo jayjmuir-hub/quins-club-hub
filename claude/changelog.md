@@ -10,6 +10,10 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
+- Availability: a parent/player can now clear their child's RSVP (click the
+  selected status again), and self-service editing locks a calendar day before
+  the event — 5 days for matches, 1 for training, never for socials — enforced
+  in RLS. Staff are never locked. Reverses the 9-Aug staff-only-delete rule.
 - `0edfaa0` — 🏉 **Session Plan lists this squad's hours only** — START FROM A
   TEMPLATE and ADD A DRILL reuse `shelfRowsForSquad` from
   `src/lib/trainingShelf.js` (age from the squad name, contact from

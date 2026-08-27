@@ -147,6 +147,13 @@ create policy "avail write delete" on public.availability for delete using (
   private.can_edit_team((select e.team_id from public.events e where e.id = event_id))
 );
 
+-- ⚠️ SUPERSEDED 27 Aug 2026. DELETE is no longer staff-only: a parent may clear
+-- their own child's row, but only outside a self-edit lock window, and the same
+-- window now also gates their insert/update. This block's "a parent changes
+-- their answer, they do not remove the row" reasoning is preserved in
+-- claude/decisions/2026-08-27-availability-self-edit-lock.md. See
+-- db/migrations/20260827_availability_self_lock.sql for the current policy.
+
 -- ── Verify ───────────────────────────────────────────────────────────────
 -- ⚠️ A migration that reports success having changed nothing is a thing this
 -- project has already shipped once (a Postgres self-assignment `set x = x`
