@@ -188,6 +188,16 @@
 --                     the migration grants nothing on these tables. RLS keeps
 --                     anon out: every read policy requires a non-null
 --                     auth.uid() or resolves through is_attached_to_team.
+--   drill_likes       authenticated    ← SELECT, INSERT, DELETE
+--   template_likes    authenticated    ← SELECT, INSERT, DELETE
+--   drill_favorites   authenticated    ← SELECT, INSERT, DELETE
+--   template_favorites authenticated   ← SELECT, INSERT, DELETE
+--                     ⚠️ ADDED 27 Aug 2026 (training shelf). Birth defaults
+--                     trimmed the same way message_reactions was: REVOKE ALL
+--                     then GRANT the three verbs. RLS: signed-in read;
+--                     insert/delete only profile_id = auth.uid(). No UPDATE.
+--                     Cascading off the drill does not relax ON DELETE
+--                     RESTRICT on session_template_blocks.drill_id.
 --   photo_backup_runs postgres, service_role                        ALL 8
 --   photo_backup_runs authenticated    ← SELECT ONLY
 --   photo_backup_runs anon             ← NOTHING AT ALL

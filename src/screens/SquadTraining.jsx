@@ -4,6 +4,7 @@ import Card from '../components/Card.jsx'
 import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import Empty from '../components/Empty.jsx'
 import SessionPlan from '../components/SessionPlan.jsx'
+import TrainingShelf from '../components/TrainingShelf.jsx'
 import { Sheet } from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
@@ -44,6 +45,7 @@ export default function SquadTraining() {
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [planReload, setPlanReload] = useState(0)
 
   const team = teams?.find((candidate) => candidate.id === teamId)
   const mayView = canEditTeam(memberships, teamId)
@@ -84,7 +86,7 @@ export default function SquadTraining() {
     return () => {
       mounted = false
     }
-  }, [teamId, mayView])
+  }, [teamId, mayView, planReload])
 
   if (membershipsLoading) return <Spinner label="Loading…" />
   if (!mayView) {
@@ -112,6 +114,15 @@ export default function SquadTraining() {
         </p>
       )}
       {loading && <Spinner label="Loading sessions…" />}
+
+      {!loading && mayView && (
+        <TrainingShelf
+          team={team}
+          tonight={sessions[0] ?? null}
+          onOpenTonight={setSelectedEvent}
+          onApplied={() => setPlanReload((n) => n + 1)}
+        />
+      )}
 
       {!loading && !error && sessions.length === 0 && (
         <Card>

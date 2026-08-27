@@ -352,10 +352,17 @@ export async function saveSquadTemplate({ clubId, teamId, name, notes = null, bl
  * A coach's adjustment. Replaces the blocks and STAMPS coach_edited_at — the
  * column publish_training reads to leave this session alone from now on.
  */
-export async function saveSessionBlocks(sessionId, blocks, notes) {
+export async function saveSessionBlocks(sessionId, blocks, notes, extras = {}) {
   const upd = await supabase
     .from('training_sessions')
-    .update({ coach_edited_at: new Date().toISOString(), notes: notes ?? null })
+    .update({
+      coach_edited_at: new Date().toISOString(),
+      notes: notes ?? null,
+      // Chip apply is the only caller that passes templateId. SessionPlan's
+      // Adjust leaves the column alone so a coach shortening one drill does
+      // not pretend a different hour was the mould.
+      ...(extras.templateId ? { template_id: extras.templateId } : {}),
+    })
     .eq('id', sessionId)
     .select()
     .maybeSingle()

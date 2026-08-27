@@ -20,6 +20,29 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### `20260827_training_shelf` — chips, likes, favorites, featured
+
+**STATUS: in the pull request that adds this file; not yet applied.** Reasoning,
+not a live claim. Spec: `claude/specs/2026-08-27-training-shelf.md`.
+
+The shelf is a coach surface on Squad Training, not a fourth admin tab. The
+migration is additive: slugs, `chip_label`, `is_featured`, and four
+like/favorite tables that CASCADE off the drill. `session_template_blocks.drill_id`
+stays `ON DELETE RESTRICT` — deleting a like must not be a way to delete a
+drill, and a drill in a template is still 23503.
+
+Two verbs stay two verbs. `publish_training` is untouched (admin, calendars).
+Club-hour INSERT is a new policy on `session_templates` for active squad staff
+of that club; drill INSERT is **not** widened, so the 27 Aug proof that a coach
+cannot insert a club drill still holds. `is_featured` is a trigger, not a
+policy OR, because OR-ing manage policies is how a column-level rule leaks.
+Used-this-week is a query.
+
+Does not touch RLS on `events`, `memberships`, or chat, and does not touch
+`teams.requires_contact`.
+
+---
+
 ### `20260823_push_subscription_takeover` — a phone that changes hands
 
 **Found live, not in a review.** Jay signed out of the club's iPhone, his wife

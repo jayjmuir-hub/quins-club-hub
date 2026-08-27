@@ -214,6 +214,12 @@ describe('saveSessionBlocks', () => {
     const stamped = Date.parse(payload.coach_edited_at)
     expect(Number.isNaN(stamped)).toBe(false)
     expect(stamped).toBeGreaterThanOrEqual(before - 1000)
+    expect(payload.template_id).toBeUndefined()
+  })
+
+  it('writes template_id only when the chip-apply extras bag names one', async () => {
+    await saveSessionBlocks('s1', [{ drill_id: 'd1', minutes: 30 }], null, { templateId: 'tpl-tackle' })
+    expect(payloadFor('training_sessions', 'update').template_id).toBe('tpl-tackle')
   })
 
   it('replaces the blocks, delete before insert, numbered from 1', async () => {
