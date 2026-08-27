@@ -403,6 +403,22 @@ begin
   raise notice 'SELF-TEST PASSED — inverting the lock freed the frozen parent, as it must.';
 end $$;
 
+-- Restore the real (non-inverted) helper so any probe added below this point
+-- runs against the true window, not the self-test's inverted one.
+create or replace function private.availability_self_editable(p_event_id uuid)
+returns boolean language sql stable security definer set search_path = public, private
+as $$
+  select case
+    when e.starts_at is null then true
+    when e.type not in ('match','training') then true
+    else now() < (
+      date_trunc('day', (e.starts_at at time zone 'Asia/Dubai'))
+      - make_interval(days => case e.type when 'match' then 5 when 'training' then 1 end)
+    ) at time zone 'Asia/Dubai'
+  end
+  from public.events e where e.id = p_event_id
+$$;
+
 
 -- ── ⚠️ THE SELF-TEST — widen SELECT and prove the matrix notices ───────────
 --
