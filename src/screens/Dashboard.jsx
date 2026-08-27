@@ -44,7 +44,6 @@ import {
   eventTimeLabel,
   eventTitle,
   formatLongDate,
-  formatTime,
   hasResult,
   nextEventLabel,
   sortByStart,

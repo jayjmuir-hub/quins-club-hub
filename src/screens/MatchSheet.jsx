@@ -18,7 +18,7 @@ import {
 import { useMemberships } from '../lib/memberships.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import { canEditTeam } from '../lib/scope.js'
-import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { shareElementAsImage } from '../lib/shareImage.js'
 import { deadlineLabel, isOverdue, matchSheetApplies, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
@@ -536,7 +536,7 @@ export default function MatchSheet() {
   // "24 Jan 26", the form's own format, in club time.
   const formDate = kickOff
     ? kickOff.toLocaleDateString('en-GB', {
-        timeZone: 'Asia/Dubai',
+        timeZone: CLUB_TIME_ZONE,
         day: 'numeric',
         month: 'short',
         year: '2-digit',

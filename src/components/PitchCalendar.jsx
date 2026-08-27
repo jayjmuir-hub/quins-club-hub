@@ -1,6 +1,6 @@
 import Card from './Card.jsx'
 import { dayKey, dayKeyOf, monthGrid, sameDay, weekDays } from '../lib/calendarGrid.js'
-import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
+import { eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PITCH_TBD } from '../data/pitches.js'
 

@@ -17,12 +17,6 @@ import {
 
 const WEEK_MS = 8 * 24 * 60 * 60 * 1000
 
-function must(data, error) {
-  if (error) throw new Error(error.message || "We couldn't save that.")
-  if (!data) throw new Error("We couldn't save that.")
-  return data
-}
-
 /** Apply a chip hour to the selected training event. Never publish_training. */
 export async function applyChipHour({ eventId, session, template, confirmed = false, notes = null }) {
   if (chipNeedsConfirm(session) && !confirmed) {
@@ -163,5 +157,3 @@ export function likeCounts(rows, idColumn) {
 export function idsForProfile(rows, idColumn, profileId) {
   return new Set((rows ?? []).filter((row) => row.profile_id === profileId).map((row) => row[idColumn]))
 }
-
-export { must }

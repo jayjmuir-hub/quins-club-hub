@@ -4,6 +4,7 @@ import Button from './Button.jsx'
 import Chip from './Chip.jsx'
 import { SessionPlanCapture } from './SessionPlanCapture.jsx'
 import DrillDiagram from './DrillDiagram.jsx'
+import { safeHttpUrl } from '../lib/safeUrl.js'
 import {
   createSession,
   getSession,
@@ -152,10 +153,10 @@ function BlockRow({ block }) {
           {/* ⚠️ CREDITED AND OPENED AWAY FROM THE APP. The library holds other
               people's drills; the source is how a coach checks one, and
               `rel="noreferrer"` keeps the new tab from reaching back. */}
-          {drill.source_url && (
+          {safeHttpUrl(drill.source_url) && (
             <p className="mt-1 text-[12.5px]">
               <a
-                href={drill.source_url}
+                href={safeHttpUrl(drill.source_url)}
                 target="_blank"
                 rel="noreferrer"
                 className="font-bold text-brand-ink underline"

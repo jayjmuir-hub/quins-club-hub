@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Button from './Button.jsx'
 import { Sheet } from './Sheet.jsx'
 import { createNotice } from '../data/announcements.js'
@@ -72,7 +72,6 @@ export default function NoticeComposer({ open, onClose, teams, clubWide, onPoste
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  const clubWideChosen = wholeClub
   const chosenTeams = teams.filter((team) => picked.has(team.id))
   // ⚠️ NOTHING CHOSEN IS NOT THE SAME AS THE WHOLE CLUB. An empty set must
   // block the post, not quietly widen it to every family in the club — the

@@ -7,7 +7,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { clubToday, eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 
@@ -204,7 +204,7 @@ function EventSection({ title, events, squadsById, empty }) {
                   </span>
                   <span className="text-[12.5px] text-ink-muted">
                     {eventDate(event).toLocaleDateString(undefined, {
-                      timeZone: 'Asia/Dubai',
+                      timeZone: CLUB_TIME_ZONE,
                       weekday: 'short',
                       day: 'numeric',
                       month: 'short',

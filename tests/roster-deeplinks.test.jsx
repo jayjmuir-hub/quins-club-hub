@@ -17,7 +17,6 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 vi.mock('../src/lib/useMediaQuery.js', () => ({
   useMediaQuery: () => isDesktopMock(),
   DESKTOP_QUERY: '(min-width: 1280px)',
-  WIDE_QUERY: '(min-width: 820px)',
 }))
 vi.mock('../src/data/players.js', () => ({
   listPlayers: vi.fn().mockResolvedValue([]),

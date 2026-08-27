@@ -364,5 +364,13 @@ function Thread({ conversationId }) {
 
 export default function DirectMessages() {
   const { conversationId } = useParams()
-  return conversationId ? <Thread conversationId={conversationId} /> : <Navigate to="/chat" replace />
+  // key by conversationId so switching threads REMOUNTS: without it React
+  // reuses one instance across /chat/dm/:id changes and useDmThread's refs
+  // (loggedRef gating welfare-access logging, newFromRef marking new messages)
+  // never reset, so the second thread can skip its welfare-access log.
+  return conversationId ? (
+    <Thread key={conversationId} conversationId={conversationId} />
+  ) : (
+    <Navigate to="/chat" replace />
+  )
 }

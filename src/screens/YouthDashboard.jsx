@@ -8,7 +8,7 @@ import { listEvents } from '../data/events.js'
 import { listMatchSheetsFor } from '../data/matchSheets.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { clubToday, eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { deadlineLabel, isOverdue, matchSheetApplies, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
@@ -239,7 +239,7 @@ export default function YouthDashboard() {
                 </span>
                 <span className="text-[12.5px] text-ink-muted">
                   {eventDate(event).toLocaleDateString(undefined, {
-                    timeZone: 'Asia/Dubai',
+                    timeZone: CLUB_TIME_ZONE,
                     weekday: 'short',
                     day: 'numeric',
                     month: 'short',

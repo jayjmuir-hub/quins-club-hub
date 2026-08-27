@@ -12,7 +12,7 @@ import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
 import { listMatchSheetsFor } from '../data/matchSheets.js'
 import { listPlayers } from '../data/players.js'
-import { clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isMinisTeam } from '../lib/minis.js'
@@ -131,7 +131,7 @@ function HubTeamSection({ testId, title, teams, memberships, yours }) {
 function shortDate(event) {
   const date = eventDate(event)
   if (!date) return '—'
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Dubai' })
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', timeZone: CLUB_TIME_ZONE })
 }
 
 /** One cell of the grid: what they said beside what happened. Both halves are

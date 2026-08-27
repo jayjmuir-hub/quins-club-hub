@@ -57,4 +57,3 @@ export function useMediaQuery(query) {
 // "am I on a desktop" rather than repeating a pixel value that then has two
 // sources of truth. Keep these in step with theme.extend.screens.
 export const DESKTOP_QUERY = '(min-width: 820px)'
-export const WIDE_QUERY = '(min-width: 1280px)'
