@@ -29,6 +29,15 @@ the sheet mirrors it for the affordance only. Anchor:
 `db/tests/rls-availability-equivalence.sql`.
 
 ## Rejected
-UI-only lock (bypassable); rolling-hours cutoff (Jay chose calendar days);
-a stored per-event `locks_at` column (YAGNI until per-event overrides are asked
-for).
+UI-only lock (bypassable); rolling-hours cutoff (Jay chose calendar days).
+
+Per-event overrides WERE asked for, 27 Aug 2026 — the same day, later — and
+shipped as a tri-state `availability_override` column (`auto` / `open` /
+`locked`) on the event, letting a coach or manager force an event open past
+its calendar-day cutoff or lock it early, from both the event form and the
+Availability sheet, enforced in RLS. Staff are never locked regardless of the
+override. A **free-form `locks_at` timestamp was still rejected** in favour of
+the three fixed states — the same reasoning as above still holds: a bounded,
+named set of states is what the club can reason about, not an arbitrary
+date/time picker per event. Plan: `claude/plans/2026-08-27-availability-lock-override.md`.
+Migration: `db/migrations/20260827_availability_override.sql`.

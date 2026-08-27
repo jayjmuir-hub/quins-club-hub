@@ -217,6 +217,28 @@ export async function upsertEvent(event) {
   return data
 }
 
+/**
+ * Sets one event's per-event availability override ('auto' | 'open' | 'locked').
+ * A targeted UPDATE of just that column — the Availability sheet flips it live
+ * without re-sending the whole event. RLS (the events write policy) is the gate:
+ * only staff who can_edit_team may change it, so a refused write comes back as no
+ * row and is reported as REFUSED, matching upsertEvent.
+ */
+export async function setAvailabilityOverride(eventId, value) {
+  if (!eventId) throw new Error('setAvailabilityOverride needs an event id.')
+
+  const { data, error } = await supabase
+    .from('events')
+    .update({ availability_override: value })
+    .eq('id', eventId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(REFUSED)
+  return data
+}
+
 const REFUSED_BATCH =
   "We couldn't save those sessions. You may not have permission to change this squad's fixtures."
 

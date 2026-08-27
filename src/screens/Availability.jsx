@@ -3,6 +3,7 @@ import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listPlayers } from '../data/players.js'
 import { listAvailability, setAvailability, clearAvailability, subscribeAvailability } from '../data/availability.js'
+import { setAvailabilityOverride } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, childPlayerIds } from '../lib/scope.js'
 import { isAvailabilitySelfLocked } from '../lib/availabilityLock.js'
@@ -38,6 +39,18 @@ const STATUSES = [
 ]
 
 const STATUS_LABELS = { in: 'In', maybe: 'Maybe', out: 'Out' }
+
+const AVAILABILITY_OVERRIDES = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'open', label: 'Open' },
+  { value: 'locked', label: 'Locked' },
+]
+
+const OVERRIDE_HINT = {
+  auto: 'Auto — locks 5 days before a match, 1 before training.',
+  open: 'Parents can RSVP right up to the event.',
+  locked: 'Closed to parents now.',
+}
 
 // Same tones as EventDetail's AvailabilitySummary (design-system.md §4.23),
 // so a status reads the same colour whether it's seen on the summary bar or
@@ -106,6 +119,35 @@ function PlayerRow({ player, status, editable, locked, saving, onSet, onClear })
   )
 }
 
+function OverrideControl({ value, disabled, onChange }) {
+  return (
+    <div className="mb-3.5 rounded-[11px] bg-surface-mute px-3 py-2.5">
+      <p className="mb-1.5 text-[12px] font-bold text-ink-muted">Self-service availability</p>
+      <div className="flex gap-1.5" role="group" aria-label="Self-service availability">
+        {AVAILABILITY_OVERRIDES.map((option) => {
+          const active = value === option.value
+          return (
+            <button
+              key={option.value}
+              type="button"
+              disabled={disabled}
+              aria-pressed={active}
+              onClick={() => onChange(option.value)}
+              className={[
+                'rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
+                active ? 'border-brand bg-brand/10 text-ink' : 'border-line bg-surface-card text-ink-muted hover:bg-surface-mute',
+              ].join(' ')}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+      <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-muted">{OVERRIDE_HINT[value]}</p>
+    </div>
+  )
+}
+
 export default function Availability({ event, team, onClose }) {
   const { memberships } = useMemberships()
 
@@ -120,6 +162,22 @@ export default function Availability({ event, team, onClose }) {
   // a parent/player editing their own child's row, past the deadline in
   // src/lib/availabilityLock.js.
   const selfLocked = !canOverrideAll && isAvailabilitySelfLocked(event)
+
+  const [override, setOverride] = useState(event.availability_override ?? 'auto')
+  const [overrideSaving, setOverrideSaving] = useState(false)
+
+  function handleOverrideChange(value) {
+    const previous = override
+    setOverride(value)                    // optimistic
+    setOverrideSaving(true)
+    setSaveError(null)
+    setAvailabilityOverride(event.id, value)
+      .catch((err) => {
+        setOverride(previous)             // revert on refusal/failure
+        setSaveError(err)
+      })
+      .finally(() => setOverrideSaving(false))
+  }
 
   const [players, setPlayers] = useState([])
   const [rows, setRows] = useState([])
@@ -237,11 +295,21 @@ export default function Availability({ event, team, onClose }) {
         </p>
       </div>
 
+      {canOverrideAll && (
+        <OverrideControl value={override} disabled={overrideSaving} onChange={handleOverrideChange} />
+      )}
+
       {selfLocked && myPlayerIds.size > 0 && (
         <p className="mb-3.5 rounded-[11px] bg-surface-mute px-3 py-2.5 text-[13px] font-semibold text-ink-muted">
-          Availability is closed for this {event.type === 'match' ? 'match' : 'session'} —
-          changes lock {event.type === 'match' ? 'five days before a match' : 'the day before training'}.
-          Ask a coach if it needs to change.
+          {event.availability_override === 'locked' ? (
+            <>Availability is closed for this event. Ask a coach if it needs to change.</>
+          ) : (
+            <>
+              Availability is closed for this {event.type === 'match' ? 'match' : 'session'} —
+              changes lock {event.type === 'match' ? 'five days before a match' : 'the day before training'}.
+              Ask a coach if it needs to change.
+            </>
+          )}
         </p>
       )}
 

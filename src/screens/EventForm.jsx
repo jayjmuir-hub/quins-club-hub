@@ -162,6 +162,12 @@ const TYPES = [
   { value: 'social', label: 'Social' },
 ]
 
+const AVAILABILITY_OVERRIDES = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'open', label: 'Open' },
+  { value: 'locked', label: 'Locked' },
+]
+
 const DEFAULT_VENUE = 'Zayed Sports City, Abu Dhabi'
 
 function inputClasses(invalid) {
@@ -239,6 +245,7 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     const pad = (n) => String(n).padStart(2, '0')
     return {
       type: 'match',
+      availabilityOverride: 'auto',
       title: '',
       opponent: '',
       date: initialDate ?? `${today.year}-${pad(today.month + 1)}-${pad(today.day)}`,
@@ -280,6 +287,7 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
   const { time: endTime } = clubDateTimeInputs(eventEndDate(event))
   return {
     type: event.type ?? 'match',
+    availabilityOverride: event.availability_override ?? 'auto',
     title: event.title ?? '',
     opponent: event.opponent ?? '',
     // ══ DUPLICATING ═══════════════════════════════════════════════════════
@@ -873,6 +881,10 @@ export default function EventForm({
     // venue or kick-off time on one squad's copy than on another's.
     const common = {
       type: values.type,
+      // A fact about the EVENT (true of every squad in a fan-out and every week
+      // of a series), so it lives in `common`. Default 'auto' keeps the calendar
+      // lock; 'open'/'locked' override it. Enforced in RLS.
+      availability_override: values.availabilityOverride,
       title: isMatch ? null : values.title.trim(),
       opponent: isMatch ? values.opponent.trim() : null,
       home: isMatch ? values.home : null,
@@ -1084,6 +1096,19 @@ export default function EventForm({
             setInvalid({})
           }}
         />
+
+        <Segmented
+          legend="Self-service availability"
+          name="availability-override"
+          options={AVAILABILITY_OVERRIDES}
+          value={values.availabilityOverride}
+          onChange={set('availabilityOverride')}
+        />
+        <p className="mb-4 mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+          Auto locks RSVPs 5 days before a match, 1 day before training (never for a
+          social). Choose <strong>Open</strong> to keep them open right up to the event,
+          or <strong>Locked</strong> to close them to parents now.
+        </p>
 
         {isMatch ? (
           <div className={FIELD}>

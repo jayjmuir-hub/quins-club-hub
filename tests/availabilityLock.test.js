@@ -46,3 +46,26 @@ describe('isAvailabilitySelfLocked', () => {
     expect(isAvailabilitySelfLocked(social, new Date('2026-09-13T11:00:00Z'))).toBe(false)
   })
 })
+
+describe('isAvailabilitySelfLocked — per-event override', () => {
+  const inWindowMatch = { type: 'match', starts_at: '2026-09-13T12:00:00Z' } // auto-locks 2026-09-07T20:00Z
+  const distantMatch = { type: 'match', starts_at: '2026-12-01T12:00:00Z' }  // auto-locks 2026-11-26T20:00Z
+  const social = { type: 'social', starts_at: '2026-09-13T12:00:00Z' }
+  const afterAutoCut = new Date('2026-09-10T00:00:00Z')  // past inWindowMatch's auto cutoff
+  const early = new Date('2026-09-01T00:00:00Z')         // before every cutoff here
+
+  it('open is never locked, even past the auto window', () => {
+    expect(isAvailabilitySelfLocked({ ...inWindowMatch, availability_override: 'open' }, afterAutoCut)).toBe(false)
+  })
+
+  it('locked is always locked — a distant match and a social', () => {
+    expect(isAvailabilitySelfLocked({ ...distantMatch, availability_override: 'locked' }, early)).toBe(true)
+    expect(isAvailabilitySelfLocked({ ...social, availability_override: 'locked' }, early)).toBe(true)
+  })
+
+  it('auto and undefined fall through to the calendar rule', () => {
+    expect(isAvailabilitySelfLocked({ ...inWindowMatch, availability_override: 'auto' }, afterAutoCut)).toBe(true)
+    expect(isAvailabilitySelfLocked({ ...distantMatch, availability_override: 'auto' }, early)).toBe(false)
+    expect(isAvailabilitySelfLocked({ ...social }, early)).toBe(false)
+  })
+})

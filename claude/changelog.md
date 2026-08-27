@@ -10,7 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Session Plan Share photographs a share-only block tree (minutes · title,
+- Availability: coaches/managers can override the self-edit lock per event —
+  Auto (the calendar rule), Open (parents can RSVP right up to the event), or
+  Locked (closed to parents now) — from both the event form and the Availability
+  sheet, enforced in RLS. Staff are never locked.
+- `662fea3` — Session Plan Share photographs a share-only block tree (minutes · title,
   category chip on the next line, coach note, Total, session notes) instead
   of the live flex-wrap `BlockRow` plus "How it runs" `<details>`. html2canvas
   had been under-counting those rows, so the next drill's header painted over
