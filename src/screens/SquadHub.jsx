@@ -21,6 +21,7 @@ import { groupHubTeams, hubTeamLine, squadMark } from '../lib/squadHub.js'
 import { buildTracking, squadSummary } from '../lib/tracking.js'
 import Availability from './Availability.jsx'
 import EventDetail from './EventDetail.jsx'
+import EventForm from './EventForm.jsx'
 import Register from './Register.jsx'
 
 // The Squad Hub — the coach/manager dashboard, one squad at a time.
@@ -181,6 +182,10 @@ export default function SquadHub() {
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [availabilityOpen, setAvailabilityOpen] = useState(false)
   const [registerOpen, setRegisterOpen] = useState(false)
+  // Same shape Schedule and Dashboard use: `{ event }` opens EventForm as an
+  // edit. Duplicate is not offered on this sheet (calendar copy stays on
+  // Full schedule). Delete is withheld for the same reason.
+  const [formState, setFormState] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
   const navigate = useNavigate()
 
@@ -199,11 +204,13 @@ export default function SquadHub() {
   const openEvent = (id) => {
     setAvailabilityOpen(false)
     setRegisterOpen(false)
+    setFormState(null)
     setSelectedEventId(id)
   }
   const closeEvent = () => {
     setAvailabilityOpen(false)
     setRegisterOpen(false)
+    setFormState(null)
     setSelectedEventId(null)
     // An RSVP set or a register taken in the sheets must show up in the
     // tracking grid and the chips the moment the sheet closes — re-fetch
@@ -680,27 +687,39 @@ export default function SquadHub() {
         </>
       )}
 
-      {/* The same drill-in Dashboard and Schedule use, wired identically —
-          including the "closing availability returns to the detail sheet"
-          flow. Edit/duplicate are deliberately NOT offered here: the hub is a
-          reading room; changing a fixture stays on Schedule, one place. */}
-      {selectedEvent && !availabilityOpen && !registerOpen && (
+      {/* The same drill-in Dashboard and Schedule use. Edit opens the same
+          EventForm (title, time, pitch) via the shared onEdit → setFormState
+          handler. Delete is withheld: calendar delete stays on Full schedule
+          so staff do not confuse it with clearing the training plan / hour.
+          Duplicate is not offered here either. */}
+      {selectedEvent && !formState && !availabilityOpen && !registerOpen && (
         <EventDetail
           event={selectedEvent}
           team={team}
           onClose={closeEvent}
           canEdit={mayView}
+          onEdit={(event) => setFormState({ event })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
           onOpenRegister={() => setRegisterOpen(true)}
           onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
           onOpenLineup={(fixture) => navigate(`/lineup/${fixture.id}`)}
         />
       )}
-      {selectedEvent && availabilityOpen && (
+      {selectedEvent && availabilityOpen && !formState && (
         <Availability event={selectedEvent} team={team} onClose={() => setAvailabilityOpen(false)} />
       )}
-      {selectedEvent && registerOpen && (
+      {selectedEvent && registerOpen && !formState && (
         <Register event={selectedEvent} team={team} onClose={() => setRegisterOpen(false)} />
+      )}
+      {formState && (
+        <EventForm
+          event={formState.event}
+          onClose={() => {
+            setFormState(null)
+            closeEvent()
+          }}
+          onSaved={() => setReloadToken((token) => token + 1)}
+        />
       )}
 
       {/* The phone's per-player tracking history — the grid's row, turned

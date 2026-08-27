@@ -357,3 +357,43 @@ describe('EventDetail — the Duplicate button', () => {
     expect(row.className).toMatch(/\bflex-wrap\b/)
   })
 })
+
+describe('EventDetail — Edit and Delete follow the same handler-required rule', () => {
+  // Squad Hub used to pass canEdit so both buttons drew, then omit onEdit —
+  // Edit swallowed the tap — while Delete would have deleted the calendar
+  // row. Same defect Duplicate already fixed: render only when a handler exists.
+  it('renders Edit when a handler is passed', () => {
+    render(<EventDetail {...DETAIL_PROPS} onEdit={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+  })
+
+  it('⚠️ renders no Edit when the caller forgot the handler', () => {
+    render(<EventDetail {...DETAIL_PROPS} />)
+    expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
+  })
+
+  it('hands the event back to onEdit', async () => {
+    const onEdit = vi.fn()
+    render(<EventDetail {...DETAIL_PROPS} onEdit={onEdit} />)
+    await userEvent.setup().click(screen.getByRole('button', { name: /^edit$/i }))
+    expect(onEdit).toHaveBeenCalledWith(DETAIL_PROPS.event)
+  })
+
+  it('renders Delete when a handler is passed', () => {
+    render(<EventDetail {...DETAIL_PROPS} onDeleted={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeInTheDocument()
+  })
+
+  it('⚠️ renders no Delete when the caller forgot the handler', () => {
+    render(<EventDetail {...DETAIL_PROPS} />)
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+  })
+
+  it('shows neither Edit nor Delete to someone who cannot edit the squad', () => {
+    render(
+      <EventDetail {...DETAIL_PROPS} canEdit={false} onEdit={vi.fn()} onDeleted={vi.fn()} />,
+    )
+    expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+  })
+})
