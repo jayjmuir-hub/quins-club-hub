@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { fitPopoverX } from '../lib/popoverFit.js'
 
 // Emoji reactions under a message bubble — the UI half of
 // db/migrations/20260824_message_reactions.sql. One tap adds, tapping your
@@ -10,25 +12,74 @@ import { useEffect, useRef, useState } from 'react'
 
 export const REACTION_SET = ['👍', '❤️', '😂', '😮', '👏']
 
+// Must match the picker's Tailwind: five w-8 buttons, gap-1, px-2, 1px border.
+// Used to place the tray against the viewport *before* paint; jsdom has no
+// layout, so the constant is also what the overflow tests assert against.
+export const REACTION_PICKER_WIDTH = REACTION_SET.length * 32 + (REACTION_SET.length - 1) * 4 + 16 + 2
+
 /**
  * The add-reaction button plus its five-emoji picker, on its own — round 3
  * split it out of the bar so the WhatsApp surfaces can park it BESIDE the
  * bubble (left of yours, right of theirs) while the tallies stay attached.
  *
- * @param align  'left' | 'right' — which edge the popover hugs
+ * @param align  'left' | 'right' — preferred hug; flipped/shifted if that
+ *   placement would overflow the viewport. Incoming bubbles pass 'left'
+ *   (smiley to the right of the bubble); outgoing pass 'right'.
  */
 export function ReactionTrigger({ messageId, reactions = [], selfId, onToggle, align = 'left' }) {
   const [picking, setPicking] = useState(false)
+  const [place, setPlace] = useState(null)
   const ref = useRef(null)
+  const pickerRef = useRef(null)
+
+  function measure() {
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect) return null
+    return {
+      left: fitPopoverX({
+        triggerLeft: rect.left,
+        triggerRight: rect.right,
+        popoverWidth: REACTION_PICKER_WIDTH,
+        viewportWidth: window.innerWidth,
+        preferred: align === 'right' ? 'right' : 'left',
+      }),
+      // 8px above the trigger, matching the old `bottom-8` gap minus the
+      // trigger's own height. Viewport coordinates so a padded / overflow-clipped
+      // parent cannot shove the tray off-screen.
+      bottom: window.innerHeight - rect.top + 8,
+    }
+  }
+
+  function toggle() {
+    if (picking) {
+      setPicking(false)
+      setPlace(null)
+      return
+    }
+    setPlace(measure())
+    setPicking(true)
+  }
 
   useEffect(() => {
     if (!picking) return undefined
     function close(domEvent) {
-      if (!ref.current?.contains(domEvent.target)) setPicking(false)
+      if (ref.current?.contains(domEvent.target)) return
+      if (pickerRef.current?.contains(domEvent.target)) return
+      setPicking(false)
+      setPlace(null)
+    }
+    function onResize() {
+      setPlace(measure())
     }
     document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [picking])
+    window.addEventListener('resize', onResize)
+    window.addEventListener('scroll', onResize, true)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('scroll', onResize, true)
+    }
+  }, [picking, align]) // measure reads align + the trigger rect; picking is the subscribe gate.
 
   return (
     <div ref={ref} className="relative" data-testid="reaction-trigger">
@@ -36,7 +87,7 @@ export function ReactionTrigger({ messageId, reactions = [], selfId, onToggle, a
         type="button"
         aria-label="Add reaction"
         aria-expanded={picking}
-        onClick={() => setPicking((v) => !v)}
+        onClick={toggle}
         className="grid h-6 w-6 place-items-center rounded-pill border border-line bg-surface-card text-ink-faint hover:text-ink"
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -46,27 +97,36 @@ export function ReactionTrigger({ messageId, reactions = [], selfId, onToggle, a
           <circle cx="15" cy="9.5" r="0.5" fill="currentColor" />
         </svg>
       </button>
-      {picking && (
-        <div
-          data-testid="reaction-picker"
-          className={`absolute bottom-8 z-20 flex gap-1 rounded-pill border border-line bg-surface-card px-2 py-1.5 shadow-card ${align === 'right' ? 'right-0' : 'left-0'}`}
-        >
-          {REACTION_SET.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => {
-                setPicking(false)
-                const mine = reactions.some((r) => r.emoji === emoji && r.profile_id === selfId)
-                onToggle(messageId, emoji, !mine)
-              }}
-              className="grid h-8 w-8 place-items-center rounded-full text-[17px] hover:bg-surface-mute"
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Portalled to <body> in viewport coordinates. position:absolute
+          against the trigger was the clip: a padded / overflow-hidden chat
+          row (dock panel, thread scroller) made left-0 hang off the phone. */}
+      {picking &&
+        place &&
+        createPortal(
+          <div
+            ref={pickerRef}
+            data-testid="reaction-picker"
+            className="fixed z-50 flex gap-1 rounded-pill border border-line bg-surface-card px-2 py-1.5 shadow-card"
+            style={{ left: place.left, bottom: place.bottom }}
+          >
+            {REACTION_SET.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => {
+                  setPicking(false)
+                  setPlace(null)
+                  const mine = reactions.some((r) => r.emoji === emoji && r.profile_id === selfId)
+                  onToggle(messageId, emoji, !mine)
+                }}
+                className="grid h-8 w-8 place-items-center rounded-full text-[17px] hover:bg-surface-mute"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

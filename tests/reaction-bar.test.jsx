@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 // your own reaction renders pressed (so a second tap reads as un-react), and
 // the picker offers EXACTLY the five emoji the database's check constraint
 // accepts — a sixth here would 23514 at the database and read as a bug.
-import ReactionBar, { REACTION_SET } from '../src/components/ReactionBar.jsx'
+import ReactionBar, { REACTION_SET, REACTION_PICKER_WIDTH } from '../src/components/ReactionBar.jsx'
 
 const ME = 'me-1'
 const REACTIONS = [
@@ -40,6 +40,7 @@ describe('ReactionBar', () => {
     const options = within(picker).getAllByRole('button')
     expect(options.map((o) => o.textContent)).toEqual(['👍', '❤️', '😂', '😮', '👏'])
     expect(REACTION_SET).toEqual(['👍', '❤️', '😂', '😮', '👏'])
+    expect(REACTION_PICKER_WIDTH).toBe(194)
     await user.click(options[1])
     expect(onToggle).toHaveBeenCalledWith('x1', '❤️', true)
   })

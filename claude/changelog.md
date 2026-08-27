@@ -10,7 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Squad Hub event sheet: Edit opens the same EventForm Full schedule uses
+- Chat reaction picker stays fully on-screen: incoming left bubbles (smiley
+  on the right of the row) no longer hang the tray off the phone's right
+  edge, and flipping to grow left does not clip a right-aligned outgoing
+  bubble. Shared `fitPopoverX` in `src/lib/popoverFit.js`; picker is
+  `position:fixed` portalled to `document.body` so a padded / overflow-hidden
+  thread (DM, group, channel, dock) cannot clip it. Tests:
+  `tests/popoverFit.test.js`, `tests/reaction-picker-fit.test.jsx`.
+- `725efe6` — Squad Hub event sheet: Edit opens the same EventForm Full schedule uses
   (title, time, pitch). Delete is withheld on the hub so staff do not
   confuse calendar delete with clearing the training plan; Full schedule
   and Home keep both. EventDetail Edit/Delete follow Duplicate's
