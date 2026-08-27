@@ -59,6 +59,21 @@ describe('RequireAuth', () => {
     expect(screen.queryByTestId('passed-auth-error')).not.toBeInTheDocument()
   })
 
+  it('keeps a schedule ?event= query while showing Login so sign-in continues to that hour', () => {
+    window.history.pushState({}, '', '/schedule?event=e-train-1')
+    useAuthMock.mockReturnValue({ session: null, loading: false })
+
+    render(
+      <RequireAuth>
+        <div>Protected content</div>
+      </RequireAuth>,
+    )
+
+    expect(screen.getByText('Login screen stub')).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/schedule')
+    expect(window.location.search).toBe('?event=e-train-1')
+  })
+
   it('renders children when a session is present', () => {
     useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } }, loading: false })
 

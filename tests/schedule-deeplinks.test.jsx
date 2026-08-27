@@ -35,6 +35,21 @@ vi.mock('../src/data/calendar.js', () => ({
   calendarFeedUrl: (token) => `https://example.test/calendar.ics?token=${token}`,
   calendarWebcalUrl: (token) => `webcal://example.test/calendar.ics?token=${token}`,
 }))
+const getSessionMock = vi.fn()
+vi.mock('../src/data/trainingPlans.js', () => ({
+  getSession: (...args) => getSessionMock(...args),
+  saveSessionBlocks: async () => {},
+  listFocus: async () => [],
+  listDrills: async () => [],
+  listTemplates: async () => [],
+  createSession: async () => ({ id: 's-new' }),
+  setSessionVisibility: async () => ({}),
+  saveSquadTemplate: async () => ({ id: 'tpl-new' }),
+  upsertDrill: async () => ({ id: 'd-new' }),
+  submitDrillToClub: async () => ({}),
+  submitTemplateToClub: async () => ({}),
+}))
+vi.mock('../src/components/PitchRequest.jsx', () => ({ default: () => null }))
 // The form itself is EventForm's own suite's problem; here only "did the
 // deep-link open it" matters.
 vi.mock('../src/screens/EventForm.jsx', () => ({
@@ -68,6 +83,7 @@ beforeEach(() => {
   listEventsMock.mockResolvedValue([])
   subscribeEventsMock.mockReturnValue(() => {})
   myCalendarTokenMock.mockResolvedValue('tok-123')
+  getSessionMock.mockResolvedValue(null)
 })
 
 describe('?open=subscribe', () => {
@@ -109,5 +125,71 @@ describe('?event=<id>', () => {
     await vi.waitFor(() => {
       expect(screen.getByTestId('search-probe').textContent).toBe('')
     })
+  })
+
+  it('a training ?event= opens that hour with the plan visible', async () => {
+    listEventsMock.mockResolvedValue([
+      {
+        id: 'e-train-1',
+        team_id: 't-u12',
+        type: 'training',
+        title: 'Tuesday training',
+        opponent: null,
+        home: true,
+        starts_at: '2099-08-29T15:00:00Z',
+        ends_at: null,
+        time_tbd: false,
+        series_id: null,
+      },
+    ])
+    getSessionMock.mockResolvedValue({
+      id: 's-1',
+      event_id: 'e-train-1',
+      visibility: 'squad',
+      notes: 'Wet pitch, keep it tight.',
+      blocks: [
+        {
+          id: 'b-1',
+          position: 1,
+          drill_id: 'd-grid',
+          minutes: 15,
+          coach_note: 'Keep the width',
+          drill: { id: 'd-grid', title: 'Grid passing', minutes: 15, category: 'skill' },
+        },
+      ],
+    })
+    renderAt('/schedule?event=e-train-1')
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Tuesday training')
+    expect(await screen.findByRole('heading', { name: /session plan/i })).toBeInTheDocument()
+    expect(screen.getByText('Grid passing')).toBeInTheDocument()
+    expect(screen.getByTestId('session-total')).toHaveTextContent('15 min')
+    expect(screen.getByRole('button', { name: /^share$/i })).toBeInTheDocument()
+  })
+
+  it('a parent following the link still cannot see a staff-only plan', async () => {
+    useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: TEAMS, loading: false })
+    listEventsMock.mockResolvedValue([
+      {
+        id: 'e-staff-1',
+        team_id: 't-u12',
+        type: 'training',
+        title: 'Tuesday training',
+        opponent: null,
+        home: true,
+        starts_at: '2099-08-29T15:00:00Z',
+        ends_at: null,
+        time_tbd: false,
+        series_id: null,
+      },
+    ])
+    // RLS: a staff-only row is filtered out of the parent's read.
+    getSessionMock.mockResolvedValue(null)
+    renderAt('/schedule?event=e-staff-1')
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Tuesday training')
+    await vi.waitFor(() => expect(getSessionMock).toHaveBeenCalledWith('e-staff-1'))
+    expect(screen.queryByRole('heading', { name: /session plan/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^share$/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('Grid passing')).not.toBeInTheDocument()
   })
 })

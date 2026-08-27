@@ -24,6 +24,8 @@ import {
 } from '../lib/trainingPlans.js'
 import { shelfRowsForSquad } from '../lib/trainingShelf.js'
 import { clubDateTimeInputs, eventDate } from '../lib/eventFormat.js'
+import { sessionPlanShareCopy } from '../lib/sessionPlanShare.js'
+import { shareElementAsImage } from '../lib/shareImage.js'
 
 // Who sees a coach's plan. The order is the promotion path: a coach starts a
 // plan as their own (draft), shares it with the squad's other staff, then
@@ -276,6 +278,8 @@ export default function SessionPlan({ event, team, canEdit }) {
   const [tplName, setTplName] = useState('')
   const [tplBusy, setTplBusy] = useState(false)
   const [tplSaved, setTplSaved] = useState(null) // null | { id } | 'suggested'
+  const [sharing, setSharing] = useState(false)
+  const shareRef = useRef(null)
 
   // ⚠️ A REF, NOT THE STATE, BECAUSE THE READER BELOW IS ASYNCHRONOUS. The
   // effect's `.then` runs long after the effect body captured its variables,
@@ -594,6 +598,18 @@ export default function SessionPlan({ event, team, canEdit }) {
     }
   }
 
+  async function sharePlan() {
+    setSharing(true)
+    setError(null)
+    try {
+      await shareElementAsImage(shareRef.current, sessionPlanShareCopy(event))
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setSharing(false)
+    }
+  }
+
   return (
     <div className="mt-4 border-t border-line pt-4">
       <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
@@ -629,24 +645,33 @@ export default function SessionPlan({ event, team, canEdit }) {
             )}
           </div>
 
-          <ol className="mb-2">
-            {session.blocks.map((block) => (
-              <BlockRow key={block.id} block={block} />
-            ))}
-          </ol>
+          <div ref={shareRef} data-testid="session-plan-capture">
+            <ol className="mb-2">
+              {session.blocks.map((block) => (
+                <BlockRow key={block.id} block={block} />
+              ))}
+            </ol>
 
-          <p data-testid="session-total" className="text-[12.5px] font-bold text-ink-muted">
-            Total {total} min
-          </p>
+            <p data-testid="session-total" className="text-[12.5px] font-bold text-ink-muted">
+              Total {total} min
+            </p>
 
-          {session.notes && (
-            <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">{session.notes}</p>
-          )}
+            {session.notes && (
+              <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">{session.notes}</p>
+            )}
+          </div>
 
           {canEdit && (
             <div className="mt-2.5 flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={openEdit}>
                 Adjust
+              </Button>
+              {/* Same control on EventDetail and Squad Training — this card
+                  is the one renderer. Photographs the running order, not
+                  Adjust / the event-sheet footer. Spec:
+                  claude/specs/2026-08-27-session-plan-share.md */}
+              <Button variant="secondary" size="sm" disabled={sharing} onClick={sharePlan}>
+                {sharing ? 'Sharing…' : 'Share'}
               </Button>
               {!tplSaved && (
                 <Button

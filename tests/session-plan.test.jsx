@@ -30,6 +30,7 @@ const setSessionVisibilityMock = vi.fn()
 const saveSquadTemplateMock = vi.fn()
 const upsertDrillMock = vi.fn()
 const submitTemplateToClubMock = vi.fn()
+const shareElementAsImageMock = vi.fn()
 
 // ⚠️ MOCKED BECAUSE AN UNMOCKED DATA MODULE MAKES A REAL REQUEST. CI sets
 // placeholder Supabase env vars, so the client constructs happily, the promise
@@ -45,6 +46,9 @@ vi.mock('../src/data/trainingPlans.js', () => ({
   saveSquadTemplate: (...args) => saveSquadTemplateMock(...args),
   upsertDrill: (...args) => upsertDrillMock(...args),
   submitTemplateToClub: (...args) => submitTemplateToClubMock(...args),
+}))
+vi.mock('../src/lib/shareImage.js', () => ({
+  shareElementAsImage: (...args) => shareElementAsImageMock(...args),
 }))
 
 import SessionPlan from '../src/components/SessionPlan.jsx'
@@ -200,6 +204,7 @@ beforeEach(() => {
   setSessionVisibilityMock.mockResolvedValue({})
   saveSquadTemplateMock.mockResolvedValue({ id: 'tpl-new' })
   upsertDrillMock.mockResolvedValue({ ...GRID, id: 'd-made', title: 'Made drill' })
+  shareElementAsImageMock.mockResolvedValue('shared')
 })
 
 describe('SessionPlan — when it renders at all', () => {
@@ -668,5 +673,54 @@ describe('SessionPlan — visibility on an existing plan', () => {
     expect(arg.teamId).toBe('t-u12')
     expect(arg.clubId).toBe('club-1')
     expect(arg.blocks).toHaveLength(2)
+  })
+})
+
+describe('SessionPlan — Share', () => {
+  it('offers Share next to Adjust for a coach reading a plan', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    show({ canEdit: true, event: { ...EVENT, title: 'Tuesday training' } })
+    const adjust = await screen.findByRole('button', { name: /adjust/i })
+    const share = screen.getByRole('button', { name: /^share$/i })
+    expect(adjust.parentElement).toContainElement(share)
+    expect(screen.getByRole('button', { name: /save as my template/i })).toBeInTheDocument()
+  })
+
+  it('does not offer Share to a parent reading a squad plan', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    show({ canEdit: false })
+    await screen.findByTestId('session-total')
+    expect(screen.queryByRole('button', { name: /^share$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /adjust/i })).not.toBeInTheDocument()
+  })
+
+  it('offers the same Share control on a U18B hour', async () => {
+    getSessionMock.mockResolvedValue({ ...SESSION, event_id: 'e-u18' })
+    show({ canEdit: true, event: U18_EVENT, team: U18_TEAM })
+    const adjust = await screen.findByRole('button', { name: /adjust/i })
+    expect(adjust.parentElement).toContainElement(screen.getByRole('button', { name: /^share$/i }))
+  })
+
+  it('photographs the plan card, not Adjust or Save as my template, and sends the deep link', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    const { user } = show({ canEdit: true, event: { ...EVENT, title: 'Tuesday training' } })
+    await user.click(await screen.findByRole('button', { name: /^share$/i }))
+
+    expect(shareElementAsImageMock).toHaveBeenCalledTimes(1)
+    const [element, options] = shareElementAsImageMock.mock.calls[0]
+    expect(element).toHaveAttribute('data-testid', 'session-plan-capture')
+    expect(element).toHaveTextContent('15 min')
+    expect(element).toHaveTextContent('Grid passing')
+    expect(element).toHaveTextContent('Skill')
+    expect(element).toHaveTextContent('Keep the width')
+    expect(element).toHaveTextContent('Total 35 min')
+    expect(element).toHaveTextContent('Wet pitch, keep it tight.')
+    expect(element.textContent).not.toMatch(/Adjust/)
+    expect(element.textContent).not.toMatch(/Save as my template/)
+    expect(element.textContent).not.toMatch(/Share/)
+    expect(element.querySelector('details')).not.toHaveAttribute('open')
+    expect(options.text).toMatch(/\/schedule\?event=e-1/)
+    expect(options.url).toMatch(/\/schedule\?event=e-1/)
+    expect(options.title).toBe('Tuesday training')
   })
 })
