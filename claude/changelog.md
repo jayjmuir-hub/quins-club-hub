@@ -16,7 +16,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   outstanding list, and the sheet screen itself (which shows "No RCM sheet for
   this fixture" for a non-league fixture). Removes the now-dead tournament-note
   UI. Ruling: `claude/decisions/2026-08-27-match-sheets-league-only.md`.
-- Chat reaction picker stays fully on-screen: incoming left bubbles (smiley
+- `89b38b8` — Chat reaction picker stays fully on-screen: incoming left bubbles (smiley
   on the right of the row) no longer hang the tray off the phone's right
   edge, and flipping to grow left does not clip a right-aligned outgoing
   bubble. Shared `fitPopoverX` in `src/lib/popoverFit.js`; picker is
