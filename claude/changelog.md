@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Chat reaction picker stays fully on-screen: incoming left bubbles (smiley
+- Match sheets: RCM result sheets are for LEAGUE matches only (U11+) — a single
+  `matchSheetApplies` gate now excludes tournaments and friendlies from the Club
+  Youth Manager tracker, the "Open the RCM match sheet" button, the Squad Hub
+  outstanding list, and the sheet screen itself (which shows "No RCM sheet for
+  this fixture" for a non-league fixture). Removes the now-dead tournament-note
+  UI. Ruling: `claude/decisions/2026-08-27-match-sheets-league-only.md`.
+- `89b38b8` — Chat reaction picker stays fully on-screen: incoming left bubbles (smiley
   on the right of the row) no longer hang the tray off the phone's right
   edge, and flipping to grow left does not clip a right-aligned outgoing
   bubble. Shared `fitPopoverX` in `src/lib/popoverFit.js`; picker is

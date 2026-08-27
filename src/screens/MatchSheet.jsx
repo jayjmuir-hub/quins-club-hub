@@ -21,7 +21,7 @@ import { canEditTeam } from '../lib/scope.js'
 import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { shareElementAsImage } from '../lib/shareImage.js'
-import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
+import { deadlineLabel, isOverdue, matchSheetApplies, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
 import { namesFromLineup } from '../lib/lineupSquad.js'
 import { isMinisTeam } from '../lib/minis.js'
 import {
@@ -717,6 +717,27 @@ export default function MatchSheet() {
     )
   }
 
+  // ⚠️ ONLY A LEAGUE MATCH TAKES AN RCM SHEET (27 Aug 2026). A tournament (run
+  // by its own organiser), a friendly, or a non-match reached by a stale link
+  // has no sheet — matchSheetApplies is the same gate the tracker and the
+  // Open-sheet button use, so a fixture that never offered a button cannot open
+  // one here either. The minis case is handled above with its own message; this
+  // covers everything else that is not an RCM league match.
+  if (!matchSheetApplies(event, squadName)) {
+    return (
+      <Card role="alert" data-testid="match-sheet-not-league" className="p-6 text-center">
+        <h3 className="text-base font-extrabold text-ink">No RCM sheet for this fixture</h3>
+        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+          RCM&rsquo;s result sheet is for league matches only. This fixture isn&rsquo;t a
+          league match, so there is nothing to fill in or send.
+        </p>
+        <Button onClick={() => navigate('/schedule')} className="mx-auto mt-4">
+          Back to the schedule
+        </Button>
+      </Card>
+    )
+  }
+
   const complete = sheet?.status === 'complete'
   const overdue = isOverdue(deadline, new Date())
 
@@ -817,35 +838,16 @@ export default function MatchSheet() {
             )}
           </p>
 
-          {/* ⚠️ A TOURNAMENT MAY RUN ITS OWN SCORING, so the sheet SAYS which
-              rules it applied rather than leaving a coach to assume. There is
-              deliberately no second per-fixture setting: `competition_type`
-              already answers league/tournament/neither, and a second axis is a
-              second thing that can disagree with it. */}
-          {event.competition_type === 'tournament' && (
-            <p className="mt-2 rounded-[11px] bg-surface-mute px-3 py-2 text-[12.5px] font-semibold text-ink-muted">
-              This is a tournament fixture. If it ran its own scoring, change the squad&rsquo;s
-              scoring on the Club tab before entering the score — these boxes are the squad&rsquo;s
-              rules, not the tournament&rsquo;s.
-            </p>
-          )}
-
-          {/* ⚠️ SURFACED, NOT GUESSED. A fixture marked as a tournament while
-              its name says "League" is a contradiction that has already been in
-              this data, and it is what left a fixture with no league team and a
-              wrong TEAM box. Only the coach knows which one they meant. */}
-          {event.competition_type === 'tournament' && /league/i.test(event.competition || '') && (
-            <p
-              role="alert"
-              data-testid="match-sheet-competition-clash"
-              className="mt-2 rounded-[11px] bg-warn-bg px-3 py-2 text-[12.5px] font-semibold text-warn-ink"
-            >
-              This fixture is recorded as a <strong>tournament</strong> but is named &ldquo;
-              {event.competition}&rdquo;. Check the fixture — one of the two is wrong, and only you
-              know which.
-            </p>
-          )}
-
+          {/* ⚠️ TOMBSTONE (27 Aug 2026). Two tournament-only notes lived here —
+              a "this tournament may run its own scoring" hint and a
+              "recorded as a tournament but named 'League'" clash warning
+              (data-testid match-sheet-competition-clash). Both are GONE because
+              a tournament no longer reaches this form at all: matchSheetApplies
+              gates the whole screen (see the guard above) so only a league match
+              renders it. RCM sheets are league-only (Jay, 27 Aug 2026), and a
+              note about a fixture that can never open the sheet was dead weight.
+              Do NOT re-add them without first re-opening whether tournaments get
+              a sheet — the guard, not a note, is the current answer. */}
           <div className="mt-3 grid grid-cols-[minmax(0,1fr)_58px_58px] items-center gap-x-2 gap-y-2">
             <span aria-hidden="true" />
             {/* Named columns, not "us" and "them": the coach is looking at a

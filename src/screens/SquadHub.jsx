@@ -16,6 +16,7 @@ import { clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFo
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isMinisTeam } from '../lib/minis.js'
+import { matchSheetApplies } from '../lib/matchSheetDeadline.js'
 import { canEditTeam } from '../lib/scope.js'
 import { groupHubTeams, hubTeamLine, squadMark } from '../lib/squadHub.js'
 import { buildTracking, squadSummary } from '../lib/tracking.js'
@@ -356,12 +357,14 @@ export default function SquadHub() {
     rsvpByEvent.set(row.event_id, tally)
   }
 
-  // Recent matches whose RCM sheet is missing — non-minis only; for minis the
-  // sheet list was never fetched, so this stays empty by construction.
+  // Recent LEAGUE matches whose RCM sheet is missing. matchSheetApplies is the
+  // gate (27 Aug 2026): RCM sheets are for league games, U11+ — not tournaments,
+  // not friendlies, not minis. For a minis squad the sheet list was never
+  // fetched either, so this stays empty by construction.
   const sheetsDue = past
-    .filter((event) => event.type === 'match' && !sheets.get(event.id))
+    .filter((event) => matchSheetApplies(event, team?.name) && !sheets.get(event.id))
     .sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at))
-    .slice(0, isMinisTeam(team?.name) ? 0 : 3)
+    .slice(0, 3)
 
   return (
     <div>

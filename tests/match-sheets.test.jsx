@@ -51,7 +51,7 @@ vi.mock('../src/data/events.js', () => ({
 }))
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
-  listContactsForPlayers: async () => [],
+  listContactsForPlayers: async () => [],
   // The completeness card on YourPlayers reads this (17 Aug 2026).
   listPlayerPrivate: async () => [],
 }))
@@ -89,6 +89,7 @@ const MATCH = {
   club_id: CLUB,
   team_id: 't-u14b',
   type: 'match',
+  competition_type: 'league',
   opponent: 'Dubai Exiles',
   home: true,
   venue: 'Zayed Sports City, Abu Dhabi',
@@ -299,26 +300,21 @@ describe('MatchSheet — the form', () => {
       expect(screen.getByLabelText('Tries, Dubai Exiles')).toHaveValue(null)
     })
 
-    it('⚠️ says which rules it applied on a tournament fixture', async () => {
+    it('⚠️ shows no sheet at all for a tournament — RCM sheets are league-only', async () => {
+      // A tournament is not an RCM league match (Jay, 27 Aug 2026), so the whole
+      // sheet is gone: matchSheetApplies gates the screen, and a direct link to a
+      // tournament's sheet lands on the "not a league match" card, never the form.
       getEventMock.mockResolvedValue({ ...MATCH, competition_type: 'tournament', competition: 'Dubai 7s' })
       mount(<MatchSheet />)
-      await screen.findByRole('heading', { name: /official match result sheet/i })
-      expect(screen.getByText(/if it ran its own scoring/i)).toBeInTheDocument()
-      expect(screen.queryByTestId('match-sheet-competition-clash')).not.toBeInTheDocument()
+      expect(await screen.findByTestId('match-sheet-not-league')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /official match result sheet/i })).not.toBeInTheDocument()
     })
 
-    it('⚠️ surfaces a tournament with a league-sounding name, and does not guess', async () => {
-      // Already in this data once: competition_type 'tournament' with
-      // competition 'UAE Youth League'. It left the fixture with no league team
-      // and a wrong TEAM box, and only the coach knows which half is wrong.
-      getEventMock.mockResolvedValue({
-        ...MATCH,
-        competition_type: 'tournament',
-        competition: 'UAE Youth League',
-      })
+    it('⚠️ shows no sheet for a friendly (no competition type) either', async () => {
+      getEventMock.mockResolvedValue({ ...MATCH, competition_type: null, league_team_id: null, league_team: null })
       mount(<MatchSheet />)
-      await screen.findByRole('heading', { name: /official match result sheet/i })
-      expect(screen.getByTestId('match-sheet-competition-clash')).toBeInTheDocument()
+      expect(await screen.findByTestId('match-sheet-not-league')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /official match result sheet/i })).not.toBeInTheDocument()
     })
 
     it('⚠️ writes the FIXTURE before the sheet, so a failure leaves the score right', async () => {
@@ -653,6 +649,20 @@ describe('YouthDashboard — the Club Youth Manager list', () => {
     ])
     mount(<YouthDashboard />, asYouth)
     await screen.findByTestId('youth-match-row')
+    expect(screen.getAllByTestId('youth-match-row')).toHaveLength(1)
+  })
+
+  it('⚠️ only lists LEAGUE matches — a tournament is not an RCM league match', async () => {
+    // Jay, 27 Aug 2026: three U16B tournaments sat in "Needs a sheet" for a
+    // sheet the governing body never wanted. RCM sheets are league-only.
+    listEventsMock.mockResolvedValue([
+      MATCH, // a league match — stays
+      { ...MATCH, id: 'e-tour', competition_type: 'tournament', competition: 'Dubai 7s', league_team_id: null, league_team: null },
+      { ...MATCH, id: 'e-friendly', competition_type: null, league_team_id: null, league_team: null },
+    ])
+    mount(<YouthDashboard />, asYouth)
+    await screen.findByTestId('youth-match-row')
+    // Only the league match; the tournament and the friendly are excluded.
     expect(screen.getAllByTestId('youth-match-row')).toHaveLength(1)
   })
 })

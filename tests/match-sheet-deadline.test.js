@@ -3,6 +3,7 @@
 // measurement and the rule are in vite.config.js.
 import { describe, it, expect } from 'vitest'
 import {
+  matchSheetApplies,
   matchSheetDeadline,
   deadlineLabel,
   isOverdue,
@@ -21,6 +22,40 @@ import {
 
 const KICK_OFF = new Date('2026-09-12T09:00:00.000Z')
 const hours = (n) => n * 60 * 60 * 1000
+
+describe('matchSheetApplies', () => {
+  const leagueMatch = { type: 'match', competition_type: 'league' }
+
+  it('is true for a league match at an RCM age band', () => {
+    expect(matchSheetApplies(leagueMatch, 'U16B')).toBe(true)
+  })
+
+  it('is false for a tournament — not an RCM league match', () => {
+    expect(matchSheetApplies({ type: 'match', competition_type: 'tournament' }, 'U16B')).toBe(false)
+  })
+
+  it('is false for a friendly (no competition type)', () => {
+    expect(matchSheetApplies({ type: 'match', competition_type: null }, 'U16B')).toBe(false)
+    expect(matchSheetApplies({ type: 'match' }, 'U16B')).toBe(false)
+  })
+
+  it('is false for a tbd competition type', () => {
+    expect(matchSheetApplies({ type: 'match', competition_type: 'tbd' }, 'U16B')).toBe(false)
+  })
+
+  it('is false for a non-match (training, social)', () => {
+    expect(matchSheetApplies({ type: 'training', competition_type: 'league' }, 'U16B')).toBe(false)
+    expect(matchSheetApplies({ type: 'social', competition_type: 'league' }, 'U16B')).toBe(false)
+  })
+
+  it('is false for a minis squad even when it is a league match', () => {
+    expect(matchSheetApplies(leagueMatch, 'U8 Mixed')).toBe(false)
+  })
+
+  it('is false for a null event', () => {
+    expect(matchSheetApplies(null, 'U16B')).toBe(false)
+  })
+})
 
 describe('matchSheetDeadline', () => {
   it('⚠️ returns NULL for a squad it cannot place, and null means NO DEADLINE', () => {

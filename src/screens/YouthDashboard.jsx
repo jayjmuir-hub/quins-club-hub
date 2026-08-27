@@ -11,8 +11,7 @@ import { hasAdminRight, visibleTeams } from '../lib/scope.js'
 import { clubToday, eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
-import { deadlineLabel, isOverdue, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
-import { isMinisTeam } from '../lib/minis.js'
+import { deadlineLabel, isOverdue, matchSheetApplies, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
 
 // The Club Youth Manager's dashboard — every match, and whether its RCM sheet
 // is done. Behind the `youth` admin right, which already existed in
@@ -106,23 +105,25 @@ export default function YouthDashboard() {
   const decorated = useMemo(
     () =>
       rows
-        // ⚠️ U10 AND BELOW ARE NOT ON THE RCM FORM, so their fixtures are not
-        // this screen's work — "U11 to u16 Games" is instruction 1 on the form
-        // itself. Left in, every minis friendly sat here reading "Not started"
-        // forever and then "Overdue", which is a queue that can never be
-        // emptied and a badge that teaches the Youth Manager to ignore the
-        // real ones. See src/lib/minis.js.
+        // ⚠️ ONLY RCM LEAGUE MATCHES BELONG HERE — matchSheetApplies is the
+        // gate. RCM result sheets are for LEAGUE games, U11 and up; tournaments
+        // (run by their own organiser) and friendlies are NOT RCM league
+        // matches and never take a sheet. Jay, 27 Aug 2026: three U16B
+        // tournaments sat here as "Not started" for a sheet the governing body
+        // never wanted — the same never-emptying queue the minis exclusion
+        // already guarded against for a younger age group. See
+        // src/lib/matchSheetDeadline.js.
         //
         // ⚠️ FILTERED HERE RATHER THAN IN THE QUERY, on purpose: listEvents has
-        // no notion of an age band, and teaching it one would put a UI rule
-        // into the data layer where the calendar feed and Schedule would
-        // inherit it silently.
+        // no notion of an age band or the RCM rule, and teaching it one would
+        // put a UI rule into the data layer where the calendar feed and
+        // Schedule would inherit it silently.
         //
-        // ⚠️ A FIXTURE WHOSE SQUAD DID NOT LOAD IS KEPT. isMinisTeam answers
-        // false for a blank name, so an unresolvable squad still shows up
-        // needing a sheet — the failure a Youth Manager can see and ask about,
-        // rather than a fixture that quietly vanished.
-        .filter((row) => !isMinisTeam(squadsById.get(row.team_id)?.name))
+        // ⚠️ A LEAGUE FIXTURE WHOSE SQUAD DID NOT LOAD IS KEPT. isMinisTeam
+        // answers false for a blank name, so an unresolvable squad on a league
+        // match still shows up needing a sheet — the failure a Youth Manager
+        // can see and ask about, rather than a fixture that quietly vanished.
+        .filter((row) => matchSheetApplies(row, squadsById.get(row.team_id)?.name))
         .map((row) => {
           const squad = squadsById.get(row.team_id)
           const deadline = matchSheetDeadline(squad?.name ?? '', eventDate(row))
