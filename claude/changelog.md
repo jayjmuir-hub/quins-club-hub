@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Data layer: the realtime-subscription shape that six `subscribe*` functions
+- Tidy: dropped the `export` keyword from nine symbols that were referenced only
+  inside their own file (`ArrowBadge`, `DUPLICATE_ACCESS`, `membershipKey`,
+  `LAST_ADMIN_MESSAGE`, `IDEA_BUCKET`, `PRE_MATCH_FROM_AGE`, `TIER_ORDER`,
+  `BAD_EMAIL`, `NO_ACCESS_CHOSEN`) — verified zero importers across src and
+  tests. Shrinks the public surface; no behaviour change. Last of the
+  audit's orphan findings.
+- `13f290b` — Data layer: the realtime-subscription shape that six `subscribe*` functions
   hand-wrote — per-module channel-sequence counter, debounced onChange, and an
   idempotent `removeChannel` teardown that cancels the pending fire — is now one
   helper, `src/data/subscribeToTable.js`, with a single `REALTIME_DEBOUNCE_MS`
