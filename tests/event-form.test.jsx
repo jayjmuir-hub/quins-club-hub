@@ -644,6 +644,28 @@ describe('EventForm — saving', () => {
   })
 })
 
+// --- availability override (27 Aug 2026) ----------------------------------
+
+describe('EventForm — self-service availability', () => {
+  it('defaults availability to Auto and sends the chosen override in the payload', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    const group = screen.getByRole('group', { name: /self-service availability/i })
+    expect(within(group).getByRole('radio', { name: /auto/i })).toBeChecked()
+
+    await user.click(within(group).getByRole('radio', { name: /locked/i }))
+
+    await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
+    await user.type(screen.getByLabelText('Time'), '20:00')
+    await user.type(screen.getByLabelText('End time'), '22:00')
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
+    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ availability_override: 'locked' })
+  })
+})
+
 // --- wiring ---------------------------------------------------------------
 
 describe('Schedule wiring', () => {
