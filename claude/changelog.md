@@ -10,6 +10,10 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
+- Availability: coaches/managers can override the self-edit lock per event —
+  Auto (the calendar rule), Open (parents can RSVP right up to the event), or
+  Locked (closed to parents now) — from both the event form and the Availability
+  sheet, enforced in RLS. Staff are never locked.
 - `874d238` — Share on a training Session Plan card (next to Adjust) photographs the
   running order as it reads in Club Hub and hands the PNG to the phone share
   sheet, with `/schedule?event=<id>` so a signed-in tap opens that hour.
