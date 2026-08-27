@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { subscribeToTable, REALTIME_DEBOUNCE_MS } from './subscribeToTable.js'
 // Squad chat. Migration: db/migrations/20260823_squad_chat.sql.
 // Plan: claude/plans/2026-08-23-squad-chat.md (phase 1).
 //
@@ -429,10 +430,6 @@ export async function messageReadStats(teamId) {
 
 // ── Realtime ────────────────────────────────────────────────────────────────
 
-export const MESSAGE_REALTIME_DEBOUNCE_MS = 400
-
-let messageChannelSeq = 0
-
 /**
  * Subscribes to changes on `messages`. Returns an unsubscribe function.
  *
@@ -442,27 +439,8 @@ let messageChannelSeq = 0
  * full-refetch at scale stands — one squad's stream is one bounded query,
  * and the pilot will measure it before this widens.
  */
-export function subscribeMessages(callback, { debounceMs = MESSAGE_REALTIME_DEBOUNCE_MS } = {}) {
-  let timer = null
-  function onChange() {
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = null
-      callback()
-    }, debounceMs)
-  }
-  const channel = supabase
-    .channel(`messages-changes-${++messageChannelSeq}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, onChange)
-    .subscribe()
-
-  let unsubscribed = false
-  return () => {
-    if (unsubscribed) return
-    unsubscribed = true
-    if (timer) clearTimeout(timer)
-    supabase.removeChannel(channel)
-  }
+export function subscribeMessages(callback, { debounceMs = REALTIME_DEBOUNCE_MS } = {}) {
+  return subscribeToTable('messages', callback, { debounceMs })
 }
 
 // ── Phase 3: the staff channel, direct messages, reports ───────────────────
@@ -835,26 +813,11 @@ export async function toggleReaction(messageId, profileId, emoji, on) {
 }
 
 /** Same shape as subscribeMessages, for the reactions table. */
-export function subscribeReactions(callback, { debounceMs = MESSAGE_REALTIME_DEBOUNCE_MS } = {}) {
-  let timer = null
-  function onChange() {
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = null
-      callback()
-    }, debounceMs)
-  }
-  const channel = supabase
-    .channel(`reaction-changes-${++messageChannelSeq}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, onChange)
-    .subscribe()
-  let unsubscribed = false
-  return () => {
-    if (unsubscribed) return
-    unsubscribed = true
-    if (timer) clearTimeout(timer)
-    supabase.removeChannel(channel)
-  }
+export function subscribeReactions(callback, { debounceMs = REALTIME_DEBOUNCE_MS } = {}) {
+  return subscribeToTable('message_reactions', callback, {
+    debounceMs,
+    channelPrefix: 'reaction-changes',
+  })
 }
 
 // The group picker's pool: like listDmCandidates but without the minor gate,

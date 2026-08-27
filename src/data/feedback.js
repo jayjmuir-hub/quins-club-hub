@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { subscribeToTable } from './subscribeToTable.js'
 
 // Reports and suggestions from members. Table + reasoning:
 // db/migrations/20260818_feedback.sql, claude/plans/2026-08-18-help-and-feedback.md.
@@ -125,10 +126,6 @@ export async function listFeedback({ open = false } = {}) {
   return data ?? []
 }
 
-// Distinct channel name per subscription, exactly as announcements/events do —
-// two mounts sharing a name silently get one channel between them.
-let feedbackChannelSeq = 0
-
 /**
  * Subscribes to changes on `feedback`. Returns an unsubscribe function — call
  * it from a useEffect cleanup. Safe to call more than once.
@@ -149,17 +146,7 @@ let feedbackChannelSeq = 0
  * `db/migrations/20260818_realtime_availability_and_feedback.sql`.
  */
 export function subscribeFeedback(onChange) {
-  const channel = supabase
-    .channel(`feedback-changes-${++feedbackChannelSeq}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, onChange)
-    .subscribe()
-
-  let unsubscribed = false
-  return () => {
-    if (unsubscribed) return
-    unsubscribed = true
-    supabase.removeChannel(channel)
-  }
+  return subscribeToTable('feedback', onChange)
 }
 
 /**
