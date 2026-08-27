@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- (unmerged) — 🏉 **Coaches build their own training plans** — Jay, overnight:
+- (unmerged) — 🏉 **Training shelf on Squad Training** — Spotify-style
+  chips / tonight's hour / From coaches / library browse on
+  `/squad/:teamId/training`. Focus chips apply a `session_templates` hour to
+  tonight (copy blocks, `template_id`, `coach_edited_at`) and never call
+  `publish_training`. Heart = like, star = favorite; no 1–5 ratings; no
+  player photos. One migration `db/migrations/20260827_training_shelf.sql`
+  (slugs, `chip_label`, `is_featured`, likes/favorites). Empty library is
+  the starting state — no World Rugby seed. Spec:
+  `claude/specs/2026-08-27-training-shelf.md` (building). The NEXT pull
+  request cites this entry's squash SHA.
+- `a105da7` — 🏉 **Coaches build their own training plans** — Jay, overnight:
   coaches and managers can now plan a squad's session themselves (freestyle or
   seeded from a template), keep their own squad-private drills and templates,
   and choose who sees each plan — draft (only me), staff (the squad's coaches),
@@ -26,8 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   post-migration). The one trap: `events` has its own `created_by`, so the
   session policy qualifies `training_sessions.*` or every draft insert refuses.
   Rulings: `claude/decisions/2026-08-27-coach-training-plans.md`; plan:
-  `claude/plans/2026-08-27-coach-training-plans.md`. The NEXT pull request cites
-  this entry's squash SHA.
+  `claude/plans/2026-08-27-coach-training-plans.md`.
 
 ## 26 Aug 2026
 

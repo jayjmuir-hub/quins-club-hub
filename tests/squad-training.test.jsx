@@ -37,6 +37,9 @@ vi.mock('../src/components/SessionPlan.jsx', () => ({
     </div>
   ),
 }))
+vi.mock('../src/components/TrainingShelf.jsx', () => ({
+  default: () => <div data-testid="training-shelf-stub" />,
+}))
 
 import SquadTraining from '../src/screens/SquadTraining.jsx'
 
