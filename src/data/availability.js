@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { subscribeToTable } from './subscribeToTable.js'
 import { fetchByIds } from './limits.js'
 
 // Data access for the availability table. RLS already restricts rows to
@@ -51,33 +52,18 @@ export async function listAvailabilityForEvents(eventIds) {
   })
 }
 
-// Suffixed so concurrent subscriptions to the same event (e.g. a list view
-// and a detail view both watching it) get distinct realtime channel topics
-// rather than colliding.
-let channelSeq = 0
-
 /**
  * Subscribes to realtime changes on the availability table, filtered
  * server-side to one event id (not filtered client-side in the callback).
  * Returns an unsubscribe function — call it from a useEffect cleanup. Safe
- * to call more than once.
+ * to call more than once. No debounce: an RSVP is a single row change, not a
+ * burst, so the caller re-reads on each one.
  */
 export function subscribeAvailability(eventId, callback) {
-  const channel = supabase
-    .channel(`availability-changes-${eventId}-${++channelSeq}`)
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'availability', filter: `event_id=eq.${eventId}` },
-      callback,
-    )
-    .subscribe()
-
-  let unsubscribed = false
-  return () => {
-    if (unsubscribed) return
-    unsubscribed = true
-    supabase.removeChannel(channel)
-  }
+  return subscribeToTable('availability', callback, {
+    filter: `event_id=eq.${eventId}`,
+    channelKey: eventId,
+  })
 }
 
 // A write the database refused is not an error as far as PostgREST is

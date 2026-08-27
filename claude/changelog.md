@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Data layer: the update-or-insert write shape that five `upsert*` functions
+- Data layer: the realtime-subscription shape that six `subscribe*` functions
+  hand-wrote — per-module channel-sequence counter, debounced onChange, and an
+  idempotent `removeChannel` teardown that cancels the pending fire — is now one
+  helper, `src/data/subscribeToTable.js`, with a single `REALTIME_DEBOUNCE_MS`
+  in place of the three `= 400` constants that had to stay equal. `subscribeEvents`,
+  `subscribeNotices`, `subscribeMessages`, `subscribeReactions`, `subscribeFeedback`
+  and `subscribeAvailability` delegate, keeping their differences through
+  `debounceMs` (0 = fire on every change, for feedback/availability), `filter`
+  (availability's `event_id=eq`), `channelPrefix` (reactions) and `channelKey`.
+  Pure consolidation, behaviour unchanged.
+- `9e9ced2` — Data layer: the update-or-insert write shape that five `upsert*` functions
   hand-wrote is now one helper, `src/data/upsertById.js`. The non-obvious rule
   it carries — a write RLS filters to zero rows comes back as `data === null`
   with no error, so "no row back" is a refusal not a success — was re-explained
