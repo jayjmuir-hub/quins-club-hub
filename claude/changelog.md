@@ -15,7 +15,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   confuse calendar delete with clearing the training plan; Full schedule
   and Home keep both. EventDetail Edit/Delete follow Duplicate's
   handler-required rule. Tests: `tests/squad-hub-event-sheet.test.jsx`,
-  `tests/duplicate-event.test.jsx`.
+  `tests/duplicate-event.test.jsx`, `tests/session-plan-share-hosts.test.jsx`.
 - `cbcb61b` — Session Plan Share PNG: portal QC + Club Hub card look;
   golden PNG committed so CI no longer screenshots; capture tree in
   force-light; pitch line is EventDetail's `eventPitchLabel`. Spec:

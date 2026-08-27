@@ -126,7 +126,14 @@ describe('EventDetail mounts the same Share control', () => {
   it('puts Share on the Session Plan card, not the Edit/Delete footer', async () => {
     const user = userEvent.setup()
     render(
-      <EventDetail event={TRAINING} team={TEAM} onClose={vi.fn()} canEdit onDeleted={vi.fn()} />,
+      <EventDetail
+        event={TRAINING}
+        team={TEAM}
+        onClose={vi.fn()}
+        canEdit
+        onEdit={vi.fn()}
+        onDeleted={vi.fn()}
+      />,
     )
     const share = await screen.findByRole('button', { name: /^share$/i })
     const adjust = screen.getByRole('button', { name: /adjust/i })
