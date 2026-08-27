@@ -24,7 +24,8 @@ remains a message, not a boundary. RLS is the insert rule.
 
 1. **Tap a focus chip** (a `session_templates` row whose `chip_label` is set:
    Tackle, Passing, Ruck, Attack, Defence, …) to apply that template to
-   **tonight's** training event: copy blocks in stored order, write
+   **the selected training night** (the two-week date strip on this screen;
+   default tonight, else the next upcoming night): copy blocks in stored order, write
    `template_id`, stamp `coach_edited_at`. Reuse `createSession` /
    `saveSessionBlocks`. Do **not** call `publish_training`.
    **One chip per `chip_label`.** Group the club hours by label, then pick the
@@ -117,9 +118,10 @@ Used this week is a **query**, not a column.
 - Do not change `teams.requires_contact` defaults. Never infer contact from
   a name.
 
-## Not in this work
+Not in this work
 
 Pitch-mode, WhatsApp-the-hour, a diagram table, 1–5 ratings, AI, notification
 email, letting coaches call `publish_training`, inferring contact from name,
 seeding U16/U18/U11/tag packs, any child's name or photo, rewriting
-`TrainingLibrary.jsx` / `TrainingTemplates.jsx` / `TrainingPublish.jsx`.
+`TrainingLibrary.jsx` / `TrainingTemplates.jsx` / `TrainingPublish.jsx`. The
+two-week date strip is `claude/specs/2026-08-27-training-date-strip.md`.
