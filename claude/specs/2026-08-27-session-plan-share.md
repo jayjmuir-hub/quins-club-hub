@@ -17,9 +17,21 @@ copies. Graft found no other mount.
 
 ## What it shares
 
-The picture is the plan as it **reads**: running order (minutes · title ·
-category chip · coach notes), Total N min, session notes. Collapse "How it
-runs" is fine (share the running order, not every drill body).
+The picture is the plan as it **reads**: running order (minutes · title,
+category chip, coach notes), Total N min, session notes. Same words and
+Club Hub look. It is **not** a photograph of the live `BlockRow`.
+
+Share has its own capture tree (`data-testid="session-plan-capture"`,
+`ShareBlock`): ordinary block flow html2canvas can measure. Minutes ·
+title is one line of text. The category chip sits on the next line.
+Coach notes wrap in the same block. Padding between rows so they do
+not kiss. No flex-wrap title row. No `<details>` / "How it runs". No
+Adjust / Share / Edit / Delete.
+
+The live SessionPlan card stays as coaches tap it (flex-wrap `BlockRow`
+plus a closed "How it runs"). WhatsApp gets the capture node, rendered
+off-screen the same way the lineup / match-sheet facsimile is — not
+`display:none`, not a canvas scale hack, not `foreignObjectRendering`.
 
 Do **not** photograph Adjust, Save as my template, Edit, Delete,
 availability, or the event hero.

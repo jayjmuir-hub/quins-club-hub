@@ -10,11 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Share on a training Session Plan card (next to Adjust) photographs the
-  running order as it reads in Club Hub and hands the PNG to the phone share
-  sheet, with `/schedule?event=<id>` so a signed-in tap opens that hour.
-  Staff who can edit; same control on EventDetail and Squad Training. No PDF,
-  no `publish_training`, no Clear plan. Spec:
+- Session Plan Share photographs a share-only block tree (minutes · title,
+  category chip on the next line, coach note, Total, session notes) instead
+  of the live flex-wrap `BlockRow` plus "How it runs" `<details>`. html2canvas
+  had been under-counting those rows, so the next drill's header painted over
+  the previous coach-note. Same `shareElementAsImage` path; no canvas scale
+  hack. Spec: `claude/specs/2026-08-27-session-plan-share.md`.
+- `874d238` — Share on a training Session Plan card (next to Adjust)
+  photographs the running order as it reads in Club Hub and hands the PNG to
+  the phone share sheet, with `/schedule?event=<id>` so a signed-in tap opens
+  that hour. Staff who can edit; same control on EventDetail and Squad
+  Training. No PDF, no `publish_training`, no Clear plan. Spec:
   `claude/specs/2026-08-27-session-plan-share.md`.
 - `1513012` — Applying a Squad Training focus chip (or a From-coaches / browse hour on
   the same `applyChipHour` path) writes the hour onto the selected night and

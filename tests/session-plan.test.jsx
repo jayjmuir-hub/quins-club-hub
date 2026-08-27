@@ -179,6 +179,87 @@ const SESSION = {
   ],
 }
 
+// Invented Combined Preseason hour. Shape of the live share that painted each
+// next title over the previous coach-note: long notes, category chips, and a
+// "How it runs" summary on every drill. Names are made up; no real people.
+const PIGGYBACK_NOTE =
+  'Pairs, one carries. Twenty metres out, twenty back. Swap. Then a sprint to the far cone and walk the recovery. Keep the line honest — if the carrier dumps early, restart that pair.'
+const TOUCH_NOTE =
+  'Attack two, defence two. Four touches then off. Reset from the near cone. Last two lines of this note are the ones a short next header used to sit on top of.'
+const PLUS_ONE_NOTE =
+  'Same grid, plus one defender arriving late. Catch them before the extra body lands. The header after this used to cover the last two lines.'
+
+function preseasonDrill(id, title, category, summary) {
+  return {
+    id,
+    title,
+    summary,
+    body: `${title} body — coaches tap How it runs for this, WhatsApp must not.`,
+    minutes: 10,
+    category,
+    requires_contact: false,
+    min_age: 14,
+    max_age: 18,
+    is_active: true,
+  }
+}
+
+const PRESEASON_HOUR = {
+  ...SESSION,
+  id: 's-preseason',
+  notes: 'U14/U16/U18 Combined Preseason. Water bottles at the far cone.',
+  blocks: [
+    {
+      id: 'b-act',
+      position: 1,
+      drill_id: 'd-act',
+      minutes: 5,
+      coach_note: 'Squad run it',
+      drill: preseasonDrill('d-act', 'Activate (player-led)', 'warm_up', 'Player-led pulse raiser.'),
+    },
+    {
+      id: 'b-pig',
+      position: 2,
+      drill_id: 'd-pig',
+      minutes: 10,
+      coach_note: PIGGYBACK_NOTE,
+      drill: preseasonDrill('d-pig', 'Piggyback fitness', 'conditioning', 'Carry and sprint.'),
+    },
+    {
+      id: 'b-water',
+      position: 3,
+      drill_id: 'd-water',
+      minutes: 5,
+      coach_note: null,
+      drill: preseasonDrill('d-water', 'Water and stretch', 'cool_down', 'Drink, then stretch.'),
+    },
+    {
+      id: 'b-32',
+      position: 4,
+      drill_id: 'd-32',
+      minutes: 10,
+      coach_note: TOUCH_NOTE,
+      drill: preseasonDrill('d-32', '3 v 2 touch', 'game', 'Two-on-one into two-on-two.'),
+    },
+    {
+      id: 'b-plus',
+      position: 5,
+      drill_id: 'd-plus',
+      minutes: 15,
+      coach_note: PLUS_ONE_NOTE,
+      drill: preseasonDrill('d-plus', 'Touch +1', 'game', 'Late extra defender.'),
+    },
+    {
+      id: 'b-cool',
+      position: 6,
+      drill_id: 'd-cool',
+      minutes: 15,
+      coach_note: null,
+      drill: preseasonDrill('d-cool', 'Cool down', 'cool_down', 'Walk and stretch.'),
+    },
+  ],
+}
+
 const FOCUS = {
   id: 'f-1',
   team_id: 't-u12',
@@ -718,9 +799,85 @@ describe('SessionPlan — Share', () => {
     expect(element.textContent).not.toMatch(/Adjust/)
     expect(element.textContent).not.toMatch(/Save as my template/)
     expect(element.textContent).not.toMatch(/Share/)
-    expect(element.querySelector('details')).not.toHaveAttribute('open')
+    expect(element.querySelector('details')).toBeNull()
+    expect(element.textContent).not.toMatch(/How it runs/)
     expect(options.text).toMatch(/\/schedule\?event=e-1/)
     expect(options.url).toMatch(/\/schedule\?event=e-1/)
     expect(options.title).toBe('Tuesday training')
+  })
+
+  it('photographs a share-only block tree, not the live flex-wrap How it runs rows', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByRole('button', { name: /^share$/i }))
+
+    const [element] = shareElementAsImageMock.mock.calls[0]
+    expect(element).toHaveAttribute('data-testid', 'session-plan-capture')
+    expect(element).toHaveTextContent('15 min · Grid passing')
+    expect(element).toHaveTextContent('Keep the width')
+    expect(element).toHaveTextContent('Total 35 min')
+    expect(element.querySelector('details')).toBeNull()
+    expect(element.textContent).not.toMatch(/How it runs/)
+    expect(element.textContent).not.toMatch(GRID.summary)
+    expect(element.textContent).not.toMatch(GRID.body)
+
+    // Live SessionPlan still uses BlockRow (flex-wrap + details) for reading.
+    const liveItems = screen.getAllByRole('listitem')
+    expect(within(liveItems[0]).getByText('How it runs')).toBeInTheDocument()
+    expect(liveItems[0].querySelector('.flex-wrap')).not.toBeNull()
+    expect(element.contains(liveItems[0])).toBe(false)
+
+    const shareBlocks = within(element).getAllByTestId('session-plan-share-block')
+    expect(shareBlocks).toHaveLength(2)
+    expect(shareBlocks[0].nextElementSibling).toBe(shareBlocks[1])
+    for (const block of shareBlocks) {
+      expect(block.className.split(/\s+/)).toContain('block')
+      expect(block.className.split(/\s+/)).not.toContain('flex')
+      expect(block.className.split(/\s+/)).not.toContain('flex-wrap')
+      expect(block.querySelector('.flex-wrap')).toBeNull()
+      expect(block.querySelector('details')).toBeNull()
+    }
+  })
+
+  it('on a Combined Preseason hour, capture has the running order and notes and none of How it runs', async () => {
+    getSessionMock.mockResolvedValue(PRESEASON_HOUR)
+    const { user } = show({
+      canEdit: true,
+      event: { ...EVENT, title: 'U14/U16/U18 Combined Preseason' },
+    })
+    await user.click(await screen.findByRole('button', { name: /^share$/i }))
+
+    const [element] = shareElementAsImageMock.mock.calls[0]
+    expect(element).toHaveAttribute('data-testid', 'session-plan-capture')
+    expect(element).toHaveTextContent('5 min · Activate (player-led)')
+    expect(element).toHaveTextContent('Warm-up')
+    expect(element).toHaveTextContent('Squad run it')
+    expect(element).toHaveTextContent('10 min · Piggyback fitness')
+    expect(element).toHaveTextContent('Conditioning')
+    expect(element).toHaveTextContent(PIGGYBACK_NOTE)
+    expect(element).toHaveTextContent('5 min · Water and stretch')
+    expect(element).toHaveTextContent('Cool-down')
+    expect(element).toHaveTextContent('10 min · 3 v 2 touch')
+    expect(element).toHaveTextContent(TOUCH_NOTE)
+    expect(element).toHaveTextContent('15 min · Touch +1')
+    expect(element).toHaveTextContent(PLUS_ONE_NOTE)
+    expect(element).toHaveTextContent('15 min · Cool down')
+    expect(element).toHaveTextContent('Total 60 min')
+    expect(element).toHaveTextContent('U14/U16/U18 Combined Preseason. Water bottles at the far cone.')
+    expect(element.querySelector('details')).toBeNull()
+    expect(element.textContent).not.toMatch(/How it runs/)
+    expect(element.textContent).not.toMatch(/Player-led pulse raiser/)
+    expect(element.textContent).not.toMatch(/WhatsApp must not/)
+
+    const shareBlocks = within(element).getAllByTestId('session-plan-share-block')
+    expect(shareBlocks).toHaveLength(6)
+    expect(shareBlocks[1].nextElementSibling).toBe(shareBlocks[2])
+    expect(shareBlocks[1]).toHaveTextContent(PIGGYBACK_NOTE)
+    expect(shareBlocks[2]).toHaveTextContent('Water and stretch')
+    expect(shareBlocks[2].textContent).not.toMatch(PIGGYBACK_NOTE)
+
+    const liveItems = screen.getAllByRole('listitem')
+    expect(liveItems).toHaveLength(6)
+    expect(within(liveItems[1]).getByText('How it runs')).toBeInTheDocument()
   })
 })
