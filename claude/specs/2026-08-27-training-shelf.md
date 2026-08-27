@@ -37,8 +37,13 @@ remains a message, not a boundary. RLS is the insert rule.
    (`teams.requires_contact`); a contact Tackle hour reaching them **enabled**
    is a bug. Age from the squad **name**; contact from the column — never
    inferred from the name.
-2. **Pick drills from the library** — the existing SessionPlan picker, reached
-   from tonight's card, plus Library browse on this same surface.
+2. **Pick drills from the library** — Session Plan's **ADD A DRILL** and
+   **START FROM A TEMPLATE** (EventDetail and the Squad Training sheet mount
+   the same `SessionPlan`; there is no sibling picker) reuse
+   `shelfRowsForSquad`: this squad only, omit, never a disabled `<option>`.
+   Freestyle stays first. Library browse on this same surface has **Show all
+   ages**. **From coaches** uses the same filter. `/admin/training` Library,
+   Templates and Publish stay whole-club.
 3. **Run what the Director published** — the upcoming-session list already on
    Squad Training, unchanged.
 

@@ -60,6 +60,59 @@ const EVENT = {
 
 const TEAM = { id: 't-u12', name: 'U12 Mixed', requires_contact: true, club_id: 'club-1' }
 
+const U18_TEAM = { id: 't-u18b', name: 'U18B', requires_contact: true, club_id: 'club-1' }
+const U18_EVENT = { ...EVENT, id: 'e-u18', team_id: 't-u18b' }
+const U12G_TEAM = { id: 't-u12g-qr', name: 'U12G QR', requires_contact: false, club_id: 'club-1' }
+const U12G_EVENT = { ...EVENT, id: 'e-u12g', team_id: 't-u12g-qr' }
+
+const CHIP_LABELS = ['Tackle', 'Passing', 'Ruck', 'Attack', 'Defence']
+function contactPack(min, max) {
+  return CHIP_LABELS.map((chip_label) => ({
+    id: `tpl-${chip_label}-${min}-${max}`,
+    name: `${chip_label} hour U${min}–U${max}`,
+    chip_label,
+    requires_contact: true,
+    min_age: min,
+    max_age: max,
+    team_id: null,
+    blocks: [],
+  }))
+}
+const THREE_CONTACT_PACKS = [...contactPack(9, 10), ...contactPack(11, 14), ...contactPack(16, 18)]
+
+const TOUCH_COPIES = [
+  {
+    id: 'd-touch-u16',
+    title: '4 v 2 Continuous Touch',
+    minutes: 8,
+    category: 'game',
+    min_age: 16,
+    max_age: 18,
+    requires_contact: true,
+    is_active: true,
+  },
+  {
+    id: 'd-touch-u9',
+    title: '4 v 2 Continuous Touch',
+    minutes: 8,
+    category: 'game',
+    min_age: 9,
+    max_age: 10,
+    requires_contact: true,
+    is_active: true,
+  },
+  {
+    id: 'd-touch-u11',
+    title: '4 v 2 Continuous Touch',
+    minutes: 8,
+    category: 'game',
+    min_age: 11,
+    max_age: 14,
+    requires_contact: true,
+    is_active: true,
+  },
+]
+
 /** Invented drills. The SHAPES are the real ones. */
 const GRID = {
   id: 'd-grid',
@@ -317,20 +370,19 @@ describe('SessionPlan — the coach adjusting it', () => {
     )
   })
 
-  it('offers a drill the squad cannot do, disabled and with the reason', async () => {
-    // ⚠️ REFUSED WITH THE REASON, NEVER MISSING — and here the fit is asked of
-    // the SQUAD, not of a template: this coach is adding a drill to one night's
-    // plan for U12, and a U16-and-up drill must say so rather than vanish.
+  it('omits a drill this squad cannot do — never a disabled option with the reason', async () => {
+    // ⚠️ FILTER THE LIST, never CSS-hide and never a disabled <option>.
+    // Disabled-with-reason is the chip-row rule; a dropdown option you cannot
+    // pick is worse than omitting it. Jay, 27 Aug 2026: U18B must not see
+    // U9/U11 copies, and U12 must not be offered a U16-and-up drill.
     getSessionMock.mockResolvedValue(SESSION)
     const { user } = show({ canEdit: true })
     await user.click(await screen.findByRole('button', { name: /adjust/i }))
 
     const picker = await screen.findByLabelText(/add a drill/i)
-    const refused = within(picker).getByRole('option', { name: /full-contact mauling/i })
-    expect(refused).toBeDisabled()
-    expect(refused.textContent).toMatch(/U12 is outside/)
-    // The ones that do fit are offered normally.
+    expect(within(picker).queryByRole('option', { name: /full-contact mauling/i })).not.toBeInTheDocument()
     expect(within(picker).getByRole('option', { name: /grid passing/i })).not.toBeDisabled()
+    expect(within(picker).queryByRole('option', { name: /outside/i })).not.toBeInTheDocument()
   })
 
   it('cancels back to the saved plan, writing nothing', async () => {
@@ -412,6 +464,103 @@ describe('SessionPlan — a coach builds their own plan', () => {
     const { user } = show({ canEdit: true })
     await user.click(await screen.findByTestId('build-session'))
     expect(screen.getByRole('button', { name: /save plan/i })).toBeDisabled()
+  })
+
+  it('U18B START FROM A TEMPLATE is Freestyle then 16–18 hours, never U9 or U11 packs', async () => {
+    // ⚠️ THE SCREENSHOT. Squad Hub → Training → build a session. The select
+    // used to dump every age pack. Filter is shelfRowsForSquad — same rule as
+    // the shelf chips, at the option list, not CSS. EventDetail and Squad
+    // Training mount this same SessionPlan; they have no sibling picker.
+    listTemplatesMock.mockResolvedValue(THREE_CONTACT_PACKS)
+    const { user } = show({ canEdit: true, event: U18_EVENT, team: U18_TEAM })
+    await user.click(await screen.findByTestId('build-session'))
+
+    const picker = await screen.findByLabelText(/start from a template/i)
+    const options = within(picker).getAllByRole('option')
+    expect(options[0]).toHaveTextContent('Freestyle — an empty plan')
+    expect(options.map((el) => el.textContent)).toEqual([
+      'Freestyle — an empty plan',
+      'Tackle hour U16–U18',
+      'Passing hour U16–U18',
+      'Ruck hour U16–U18',
+      'Attack hour U16–U18',
+      'Defence hour U16–U18',
+    ])
+    expect(picker.textContent).not.toMatch(/U9–U10|U11–U14/)
+    expect(options.every((el) => !el.disabled)).toBe(true)
+  })
+
+  it('U18B ADD A DRILL hides out-of-age copies of the same drill', async () => {
+    listDrillsMock.mockResolvedValue(TOUCH_COPIES)
+    const { user } = show({ canEdit: true, event: U18_EVENT, team: U18_TEAM })
+    await user.click(await screen.findByTestId('build-session'))
+
+    const picker = await screen.findByLabelText(/add a drill/i)
+    const copies = within(picker).getAllByRole('option', { name: /4 v 2 Continuous Touch/i })
+    expect(copies).toHaveLength(1)
+    expect(copies[0]).toHaveValue('d-touch-u16')
+    expect(copies[0]).not.toBeDisabled()
+  })
+
+  it('U12G QR START FROM A TEMPLATE never lists a contact Tackle hour; Freestyle stays', async () => {
+    // Contact is teams.requires_contact, never inferred from the name. A
+    // contact hour must not appear as a selectable (or disabled) option.
+    listTemplatesMock.mockResolvedValue([
+      {
+        id: 'tpl-tackle-contact',
+        name: 'Tackle hour U16–U18',
+        chip_label: 'Tackle',
+        requires_contact: true,
+        min_age: 16,
+        max_age: 18,
+        team_id: null,
+        blocks: [],
+      },
+      {
+        id: 'tpl-tag-passing',
+        name: 'Passing hour tag U11–U14',
+        chip_label: 'Passing',
+        requires_contact: false,
+        min_age: 11,
+        max_age: 14,
+        team_id: null,
+        blocks: [],
+      },
+    ])
+    listDrillsMock.mockResolvedValue([
+      {
+        id: 'd-live-tackle',
+        title: 'Live Tackle',
+        minutes: 15,
+        category: 'skill',
+        min_age: 11,
+        max_age: 14,
+        requires_contact: true,
+        is_active: true,
+      },
+      {
+        id: 'd-rip',
+        title: 'Rip and roll',
+        minutes: 10,
+        category: 'skill',
+        min_age: 11,
+        max_age: 14,
+        requires_contact: false,
+        is_active: true,
+      },
+    ])
+    const { user } = show({ canEdit: true, event: U12G_EVENT, team: U12G_TEAM })
+    await user.click(await screen.findByTestId('build-session'))
+
+    const picker = await screen.findByLabelText(/start from a template/i)
+    expect(within(picker).getByRole('option', { name: /freestyle/i })).toBeInTheDocument()
+    expect(within(picker).queryByRole('option', { name: /tackle/i })).not.toBeInTheDocument()
+    expect(within(picker).getByRole('option', { name: /passing hour tag/i })).not.toBeDisabled()
+    expect(within(picker).queryByRole('option', { name: /contact/i })).not.toBeInTheDocument()
+
+    const drills = await screen.findByLabelText(/add a drill/i)
+    expect(within(drills).queryByRole('option', { name: /live tackle/i })).not.toBeInTheDocument()
+    expect(within(drills).getByRole('option', { name: /rip and roll/i })).not.toBeDisabled()
   })
 
   it('creates a squad-owned drill inline and adds it to the plan', async () => {

@@ -138,9 +138,10 @@ export function drillFitsTemplate(drill, template) {
  * first refused every senior squad ("Senior Men" carries no band by design)
  * for every template, which left a senior coach's whole drill picker disabled.
  *
- * `subject` is the word the refusal calls the thing being fitted. SessionPlan
- * hands a DRILL in as the template, where "this template is tag" names
- * something the coach is not looking at — it passes 'session'.
+ * `subject` is the word the refusal calls the thing being fitted. Publish
+ * keeps the default ('template'). Session Plan pickers no longer surface a
+ * disabled option — they omit via shelfRowsForSquad — so they do not pass
+ * 'session' here.
  */
 export function squadFitsTemplate(team, template, subject = 'template') {
   if (template?.requires_contact && team?.requires_contact !== true) {
