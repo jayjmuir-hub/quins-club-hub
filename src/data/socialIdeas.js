@@ -16,7 +16,7 @@ import { preparePhotoUpload } from '../lib/imageResize.js'
 // policy, which sees only a filename, decides who may read or delete it.
 // Never write a key in any other shape.
 
-export const IDEA_BUCKET = 'social-ideas'
+const IDEA_BUCKET = 'social-ideas'
 
 // Type/size judgments live in preparePhotoUpload (src/lib/imageResize.js),
 // one gate for every photo path; its output fits the bucket's mime list.
