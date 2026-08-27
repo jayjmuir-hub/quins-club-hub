@@ -5,6 +5,16 @@
 --  SAFE ON PRODUCTION: everything runs inside a transaction that ROLLS BACK.
 -- ══════════════════════════════════════════════════════════════════════════
 --
+-- ⚠️ REPOINTED 27 Aug 2026. Row 3's DELETE = NO ROWS is NO LONGER the whole
+-- truth: a parent MAY now clear their own child's row (and set/change it), but
+-- only OUTSIDE the self-edit lock window (5 calendar days before a match, 1
+-- before training, never for a social — Asia/Dubai). Inside the window every
+-- self-write is frozen and reports NO ROWS / DENIED, which is what the old
+-- staff-only rule looked like from here. Staff are never locked. This harness
+-- now drives the fixture event's type/timing (pg_temp.configure) and asserts
+-- both sides of each boundary. Migration: db/migrations/20260827_availability_
+-- self_lock.sql. Decision: claude/decisions/2026-08-27-availability-self-edit-lock.md.
+--
 -- ══ ⚠️ REPOINTED 19 Aug 2026. WHAT THIS FILE USED TO BE ══════════════════
 --
 -- It was written to run against the **PRE-MERGE** schema: it recorded what
@@ -161,6 +171,66 @@ on conflict do nothing;
 grant select, insert on _m to authenticated, anon;
 grant select on fx to authenticated, anon;
 
+-- ── Install the NEW policy set inside this rolled-back transaction ─────────
+-- ⚠️ This is a deliberate copy of db/migrations/20260827_availability_self_lock.sql.
+-- The migration is the canonical source; this makes the harness assert the new
+-- world whether or not production has the migration yet, so it proves the logic
+-- BEFORE the migration is applied and stays green AFTER. All of it rolls back.
+create or replace function private.availability_self_editable(p_event_id uuid)
+returns boolean language sql stable security definer set search_path = public, private
+as $$
+  select case
+    when e.starts_at is null then true
+    when e.type not in ('match','training') then true
+    else now() < (
+      date_trunc('day', (e.starts_at at time zone 'Asia/Dubai'))
+      - make_interval(days => case e.type when 'match' then 5 when 'training' then 1 end)
+    ) at time zone 'Asia/Dubai'
+  end
+  from public.events e where e.id = p_event_id
+$$;
+-- Mirror the migration's grant state so the harness reproduces production: strip
+-- the default PUBLIC execute grant, re-grant to authenticated. Without this the
+-- harness (a fresh create) would keep the default PUBLIC grant and could never
+-- catch a missing re-grant in the real migration.
+revoke all on function private.availability_self_editable(uuid) from public;
+grant execute on function private.availability_self_editable(uuid) to authenticated;
+
+drop policy "avail write insert" on public.availability;
+drop policy "avail write update" on public.availability;
+drop policy "avail write delete" on public.availability;
+
+create policy "avail write insert" on public.availability for insert with check (
+  private.can_edit_team((select e.team_id from public.events e where e.id = event_id))
+  or (private.is_own_player(player_id) and private.availability_self_editable(event_id))
+);
+create policy "avail write update" on public.availability for update using (
+  private.can_edit_team((select e.team_id from public.events e where e.id = event_id))
+  or (private.is_own_player(player_id) and private.availability_self_editable(event_id))
+) with check (
+  private.can_edit_team((select e.team_id from public.events e where e.id = event_id))
+  or (private.is_own_player(player_id) and private.availability_self_editable(event_id))
+);
+create policy "avail write delete" on public.availability for delete using (
+  private.can_edit_team((select e.team_id from public.events e where e.id = event_id))
+  or (private.is_own_player(player_id) and private.availability_self_editable(event_id))
+);
+
+-- Point the fixture event's timing where each probe batch needs it. Runs as the
+-- connection owner (RLS-exempt), and rolls back with everything else.
+-- ⚠️ ends_at IS CLEARED, NOT RECOMPUTED. `events_ends_after_starts` requires
+-- ends_at is null or ends_at > starts_at; moving starts_at alone can leave a
+-- stale ends_at behind it and abort the whole harness on a constraint it has
+-- nothing to do with. Nulling it satisfies every variant of that constraint
+-- (including events_no_end_when_time_tbd) regardless of time_tbd, and it is
+-- gone with the rest of this on rollback.
+create function pg_temp.configure(_type text, _in interval) returns void
+language plpgsql as $fn$
+begin
+  update public.events e set type = _type, starts_at = now() + _in, ends_at = null
+    from fx where e.id = fx.event_id;
+end $fn$;
+
 -- ── The probe, once per caller ────────────────────────────────────────────
 
 create function pg_temp.probe(_label text, _who uuid) returns void
@@ -230,59 +300,124 @@ begin
 end
 $fn$;
 
-select pg_temp.probe('1_coach_active',  '0a000000-0000-4000-8000-000000000001');
-select pg_temp.probe('2_coach_pending', '0a000000-0000-4000-8000-000000000002');
-select pg_temp.probe('3_parent_active', '0a000000-0000-4000-8000-000000000003');
-select pg_temp.probe('4_parent_pending','0a000000-0000-4000-8000-000000000004');
-select pg_temp.probe('5_outsider',      '0a000000-0000-4000-8000-000000000005');
-select pg_temp.probe('6_admin',         '0a000000-0000-4000-8000-000000000006');
-select pg_temp.probe('7_anon',          null);
+-- ── Drive the matrix under timed configurations ───────────────────────────
+-- Labels are "<config>/<caller>". Margins clear the calendar-day boundary by
+-- well over a day so the pass/fail does not hinge on the hour the test runs.
+
+-- OPEN: a match 8 days out (locks ~3 days out — future).
+select pg_temp.configure('match', interval '8 days');
+select pg_temp.probe('open/3_parent_active', '0a000000-0000-4000-8000-000000000003');
+select pg_temp.probe('open/1_coach_active',  '0a000000-0000-4000-8000-000000000001');
+select pg_temp.probe('open/6_admin',         '0a000000-0000-4000-8000-000000000006');
+
+-- LOCKED: a match 2 days out (locked ~3 days ago).
+select pg_temp.configure('match', interval '2 days');
+select pg_temp.probe('locked/3_parent_active', '0a000000-0000-4000-8000-000000000003');
+select pg_temp.probe('locked/1_coach_active',  '0a000000-0000-4000-8000-000000000001');
+select pg_temp.probe('locked/6_admin',         '0a000000-0000-4000-8000-000000000006');
+
+-- LOCKED training: 4 hours out (well inside the 1-day window).
+select pg_temp.configure('training', interval '4 hours');
+select pg_temp.probe('trainlocked/3_parent_active', '0a000000-0000-4000-8000-000000000003');
+
+-- SOCIAL: 2 hours out, never locks.
+select pg_temp.configure('social', interval '2 hours');
+select pg_temp.probe('social/3_parent_active', '0a000000-0000-4000-8000-000000000003');
 
 select * from _m order by caller;
 
-
 -- ══════════════════════════════════════════════════════════════════════════
---  ⚠️ THE ASSERTION. The SELECT above is for a human to read; this is the
---  thing that fails. `npm run db:check` throws on a SQL error and on nothing
---  else, so a printed matrix nobody compares is not a check.
+--  ⚠️ THE ASSERTION. `npm run db:check` throws on a SQL error and nothing else,
+--  so this is the thing that fails when the lock is wrong.
 -- ══════════════════════════════════════════════════════════════════════════
-
 do $$
-declare _bad text; _rows int;
+declare r record;
 begin
-  select count(*) into _rows from _m;
-  if _rows <> 7 then
-    raise exception
-      'AVAILABILITY MATRIX: %, expected 7 callers. A short matrix proves '
-      'nothing about the ones that are missing.', _rows;
+  -- A parent may fully self-edit an OPEN match (set, change, and clear).
+  select * into r from _m where caller = 'open/3_parent_active';
+  if not (r.ins = 'ALLOWED' and r.upd = 'ALLOWED' and r.del = 'ALLOWED') then
+    raise exception 'LOCK: parent should self-edit an OPEN match — got ins=% upd=% del=%', r.ins, r.upd, r.del;
   end if;
 
-  select string_agg(format('%s: sel=%s ins=%s upd=%s del=%s',
-                           caller, sel, ins, upd, del), ' | ' order by caller)
-    into _bad
-  from _m
-  where (caller, least(sel,1)::text, ins, upd, del) not in (
-    ('1_coach_active',  '1', 'ALLOWED', 'ALLOWED', 'ALLOWED'),
-    ('2_coach_pending', '0', 'DENIED',  'NO ROWS', 'NO ROWS'),
-    ('3_parent_active', '1', 'ALLOWED', 'ALLOWED', 'NO ROWS'),
-    ('4_parent_pending','1', 'ALLOWED', 'ALLOWED', 'NO ROWS'),
-    ('5_outsider',      '0', 'DENIED',  'NO ROWS', 'NO ROWS'),
-    ('6_admin',         '1', 'ALLOWED', 'ALLOWED', 'ALLOWED'),
-    ('7_anon',          '0', 'DENIED',  'DENIED',  'DENIED')
-  );
-
-  if _bad is not null then
-    raise exception
-      'AVAILABILITY MATRIX moved: %. Every cell here is a deliberate decision '
-      'with a migration behind it — see the header, which names the three that '
-      'have legitimately moved since 9 Aug 2026 and why. A cell that changes '
-      'is an authorisation change, whatever the commit message called it. '
-      'Row 3 del and row 4 sel are the two most likely to be "fixed" by '
-      'somebody who has not read the header.', _bad;
+  -- Inside a match window every self-write is frozen. The clear (del) and the
+  -- change (upd) must report NO ROWS; the insert must not be ALLOWED.
+  select * into r from _m where caller = 'locked/3_parent_active';
+  if not (r.upd = 'NO ROWS' and r.del = 'NO ROWS' and r.ins <> 'ALLOWED') then
+    raise exception 'LOCK: parent should be FROZEN on a LOCKED match — got ins=% upd=% del=%', r.ins, r.upd, r.del;
   end if;
 
-  raise notice 'AVAILABILITY MATRIX: all seven callers as expected.';
+  -- Staff are never locked, in either configuration.
+  select * into r from _m where caller = 'locked/1_coach_active';
+  if not (r.ins = 'ALLOWED' and r.upd = 'ALLOWED' and r.del = 'ALLOWED') then
+    raise exception 'LOCK: coach must never be locked — got ins=% upd=% del=%', r.ins, r.upd, r.del;
+  end if;
+  select * into r from _m where caller = 'locked/6_admin';
+  if not (r.ins = 'ALLOWED' and r.upd = 'ALLOWED' and r.del = 'ALLOWED') then
+    raise exception 'LOCK: admin must never be locked — got ins=% upd=% del=%', r.ins, r.upd, r.del;
+  end if;
+
+  -- Training locks the day before, so 4 hours out is frozen.
+  select * into r from _m where caller = 'trainlocked/3_parent_active';
+  if not (r.upd = 'NO ROWS' and r.del = 'NO ROWS') then
+    raise exception 'LOCK: parent should be FROZEN on a LOCKED training — got upd=% del=%', r.upd, r.del;
+  end if;
+
+  -- A social never locks.
+  select * into r from _m where caller = 'social/3_parent_active';
+  if not (r.ins = 'ALLOWED' and r.upd = 'ALLOWED' and r.del = 'ALLOWED') then
+    raise exception 'LOCK: parent should always edit a SOCIAL — got ins=% upd=% del=%', r.ins, r.upd, r.del;
+  end if;
+
+  raise notice 'LOCK MATRIX: parent frozen inside match+training windows, free on social, staff never locked.';
 end $$;
+
+-- ── ⚠️ SELF-TEST — invert the helper and prove the matrix notices ──────────
+-- The discriminating fault: flip the comparison so the window is inverted. A
+-- LOCKED match must then read as editable. If the probe still says frozen, the
+-- assertion above is decoration.
+do $$
+declare r record;
+begin
+  create or replace function private.availability_self_editable(p_event_id uuid)
+  returns boolean language sql stable security definer set search_path = public, private
+  as $inner$
+    select case
+      when e.starts_at is null then true
+      when e.type not in ('match','training') then true
+      else now() >= (
+        date_trunc('day', (e.starts_at at time zone 'Asia/Dubai'))
+        - make_interval(days => case e.type when 'match' then 5 when 'training' then 1 end)
+      ) at time zone 'Asia/Dubai'
+    end
+    from public.events e where e.id = p_event_id
+  $inner$;
+
+  delete from _m;
+  perform pg_temp.configure('match', interval '2 days');   -- still "locked" timing
+  perform pg_temp.probe('inverted/3_parent_active', '0a000000-0000-4000-8000-000000000003');
+
+  select * into r from _m where caller = 'inverted/3_parent_active';
+  if not (r.upd = 'ALLOWED' and r.del = 'ALLOWED') then
+    raise exception 'SELF-TEST FAILED — inverting the lock did not free a frozen parent (upd=% del=%). The matrix is not testing the window.', r.upd, r.del;
+  end if;
+  raise notice 'SELF-TEST PASSED — inverting the lock freed the frozen parent, as it must.';
+end $$;
+
+-- Restore the real (non-inverted) helper so any probe added below this point
+-- runs against the true window, not the self-test's inverted one.
+create or replace function private.availability_self_editable(p_event_id uuid)
+returns boolean language sql stable security definer set search_path = public, private
+as $$
+  select case
+    when e.starts_at is null then true
+    when e.type not in ('match','training') then true
+    else now() < (
+      date_trunc('day', (e.starts_at at time zone 'Asia/Dubai'))
+      - make_interval(days => case e.type when 'match' then 5 when 'training' then 1 end)
+    ) at time zone 'Asia/Dubai'
+  end
+  from public.events e where e.id = p_event_id
+$$;
 
 
 -- ── ⚠️ THE SELF-TEST — widen SELECT and prove the matrix notices ───────────

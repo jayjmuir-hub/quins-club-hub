@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, act } from '@testing-library/react'
+import { render, screen, within, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Unit tests for src/screens/Availability.jsx (Task 16): the RSVP /
@@ -16,6 +16,7 @@ const listPlayersMock = vi.fn()
 const listAvailabilityMock = vi.fn()
 const subscribeAvailabilityMock = vi.fn()
 const setAvailabilityMock = vi.fn()
+const clearAvailabilityMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -29,6 +30,7 @@ vi.mock('../src/data/availability.js', () => ({
   listAvailability: (...args) => listAvailabilityMock(...args),
   subscribeAvailability: (...args) => subscribeAvailabilityMock(...args),
   setAvailability: (...args) => setAvailabilityMock(...args),
+  clearAvailability: (...args) => clearAvailabilityMock(...args),
 }))
 
 // Imported after vi.mock so this binds to the mocked modules.
@@ -42,10 +44,13 @@ const EVENT = {
   type: 'match',
   opponent: 'Dubai Exiles',
   home: true,
-  starts_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+  starts_at: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
   result_us: null,
   result_them: null,
 }
+
+// One day before a match: 5 days inside the lock window.
+const LOCKED_MATCH = { ...EVENT, starts_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() }
 
 const PLAYER_TOM = { id: 'p-tom', team_id: 'team-u10', full_name: 'Tom Fletcher' }
 const PLAYER_ANA = { id: 'p-ana', team_id: 'team-u10', full_name: 'Ana Silva' }
@@ -67,6 +72,7 @@ beforeEach(() => {
   listAvailabilityMock.mockResolvedValue([])
   subscribeAvailabilityMock.mockReturnValue(vi.fn())
   setAvailabilityMock.mockResolvedValue({ id: 'a-1' })
+  clearAvailabilityMock.mockResolvedValue([{ id: 'a-1' }])
 })
 
 function setup(props = {}) {
@@ -288,5 +294,71 @@ describe('Availability — realtime', () => {
     unmount()
 
     expect(unsubscribe).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Availability — clear and lock', () => {
+  it('clears a status when its already-selected button is clicked again', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    listAvailabilityMock.mockResolvedValue([
+      { id: 'a1', event_id: 'e-1', player_id: 'p-ana', status: 'in' },
+    ])
+    clearAvailabilityMock.mockResolvedValue([{ id: 'a1' }])
+    const { user } = setup()
+
+    await screen.findByText('Ana Silva')
+    const row = screen.getByText('Ana Silva').closest('li')
+    expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(within(row).getByRole('button', { name: /^in$/i }))
+
+    expect(clearAvailabilityMock).toHaveBeenCalledWith('e-1', 'p-ana')
+    expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('refetches instead of optimistically clearing when the delete removed nothing', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    listAvailabilityMock.mockResolvedValue([
+      { id: 'a1', event_id: 'e-1', player_id: 'p-ana', status: 'in' },
+    ])
+    clearAvailabilityMock.mockResolvedValue([])
+    const { user } = setup()
+
+    await screen.findByText('Ana Silva')
+    const row = screen.getByText('Ana Silva').closest('li')
+    const before = listAvailabilityMock.mock.calls.length
+
+    await user.click(within(row).getByRole('button', { name: /^in$/i }))
+
+    await waitFor(() => expect(listAvailabilityMock.mock.calls.length).toBeGreaterThan(before))
+  })
+
+  it('locks a parent out inside the window: disabled buttons, a notice, no write', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT_OF_TOM))
+    const { user } = setup({ event: LOCKED_MATCH })
+
+    await screen.findByText('Tom Fletcher')
+    const tomRow = screen.getByText('Tom Fletcher').closest('li')
+    const inBtn = within(tomRow).getByRole('button', { name: /^in$/i })
+
+    expect(inBtn).toBeDisabled()
+    expect(screen.getByText(/availability is closed/i)).toBeInTheDocument()
+
+    await user.click(inBtn)
+    expect(setAvailabilityMock).not.toHaveBeenCalled()
+    expect(clearAvailabilityMock).not.toHaveBeenCalled()
+  })
+
+  it('never locks a coach, even inside the window', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    const { user } = setup({ event: LOCKED_MATCH })
+
+    await screen.findByText('Ana Silva')
+    const row = screen.getByText('Ana Silva').closest('li')
+    const inBtn = within(row).getByRole('button', { name: /^in$/i })
+
+    expect(inBtn).not.toBeDisabled()
+    await user.click(inBtn)
+    expect(setAvailabilityMock).toHaveBeenCalledWith('e-1', 'p-ana', 'in')
   })
 })

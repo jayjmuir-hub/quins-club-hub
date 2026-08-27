@@ -119,3 +119,31 @@ export async function setAvailability(eventId, playerId, status) {
   if (!data) throw new Error(REFUSED_AVAILABILITY)
   return data
 }
+
+/**
+ * Clears one player's availability for one event by deleting the
+ * (event_id, player_id) row — "No response" is the absence of a row, so a
+ * delete is how a status is unset. Returns the deleted rows.
+ *
+ * A delete that matches no visible row returns [] whether RLS refused it (the
+ * self-edit lock is closed, or the caller may not edit this player) or the row
+ * was already gone. The two are indistinguishable from the row count and the
+ * desired end state — no row — holds either way, so this does not throw on []:
+ * the caller (Availability.jsx) reconciles an empty result by refetching rather
+ * than optimistically showing a removal the database may not have made.
+ */
+export async function clearAvailability(eventId, playerId) {
+  if (!eventId || !playerId) {
+    throw new Error('clearAvailability needs both an event id and a player id.')
+  }
+
+  const { data, error } = await supabase
+    .from('availability')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('player_id', playerId)
+    .select()
+
+  if (error) throw error
+  return data ?? []
+}

@@ -72,3 +72,10 @@ export async function setAvailability(eventId, playerId, status) {
   window.__writes.push({ op: 'upsert', table: 'availability', payload: { event_id: eventId, player_id: playerId, status } })
   return { id: `${eventId}-${playerId}`, event_id: eventId, player_id: playerId, status }
 }
+
+export async function clearAvailability(eventId, playerId) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'delete', table: 'availability', payload: { event_id: eventId, player_id: playerId } })
+  // A non-empty return so the sheet drops the row optimistically in the harness.
+  return [{ id: `${eventId}-${playerId}`, event_id: eventId, player_id: playerId }]
+}
