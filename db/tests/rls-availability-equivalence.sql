@@ -15,6 +15,16 @@
 -- both sides of each boundary. Migration: db/migrations/20260827_availability_
 -- self_lock.sql. Decision: claude/decisions/2026-08-27-availability-self-edit-lock.md.
 --
+-- ⚠️ EXTENDED 27 Aug 2026 for the per-event override
+-- (db/migrations/20260827_availability_override.sql): `events.availability_
+-- override` ('auto'|'open'|'locked') now wins over the calendar rule before it
+-- is even consulted. `pg_temp.configure` takes a third argument (default
+-- 'auto') and three more probes prove `open` unlocks an otherwise-locked match,
+-- `locked` freezes an otherwise-open match, and `locked` freezes a social (which
+-- the calendar rule alone never would). The harness adds the column itself
+-- inside the rolled-back transaction, so it proves the override whether or not
+-- production has the migration applied yet.
+--
 -- ══ ⚠️ REPOINTED 19 Aug 2026. WHAT THIS FILE USED TO BE ══════════════════
 --
 -- It was written to run against the **PRE-MERGE** schema: it recorded what
@@ -107,6 +117,11 @@
 
 begin;
 
+-- Ensure the override column exists inside this rolled-back tx, so the harness
+-- proves the new logic whether or not production has the migration yet.
+alter table public.events add column if not exists availability_override text
+  not null default 'auto' check (availability_override in ('auto','open','locked'));
+
 create temporary table _m(caller text, sel int, ins text, upd text, del text)
   on commit drop;
 
@@ -180,6 +195,8 @@ create or replace function private.availability_self_editable(p_event_id uuid)
 returns boolean language sql stable security definer set search_path = public, private
 as $$
   select case
+    when e.availability_override = 'open'   then true
+    when e.availability_override = 'locked' then false
     when e.starts_at is null then true
     when e.type not in ('match','training') then true
     else now() < (
@@ -224,10 +241,11 @@ create policy "avail write delete" on public.availability for delete using (
 -- nothing to do with. Nulling it satisfies every variant of that constraint
 -- (including events_no_end_when_time_tbd) regardless of time_tbd, and it is
 -- gone with the rest of this on rollback.
-create function pg_temp.configure(_type text, _in interval) returns void
+create function pg_temp.configure(_type text, _in interval, _override text default 'auto') returns void
 language plpgsql as $fn$
 begin
-  update public.events e set type = _type, starts_at = now() + _in, ends_at = null
+  update public.events e
+     set type = _type, starts_at = now() + _in, ends_at = null, availability_override = _override
     from fx where e.id = fx.event_id;
 end $fn$;
 
@@ -324,6 +342,18 @@ select pg_temp.probe('trainlocked/3_parent_active', '0a000000-0000-4000-8000-000
 select pg_temp.configure('social', interval '2 hours');
 select pg_temp.probe('social/3_parent_active', '0a000000-0000-4000-8000-000000000003');
 
+-- OVERRIDE OPEN: a match 2 days out (auto-LOCKED) but override='open' → editable.
+select pg_temp.configure('match', interval '2 days', 'open');
+select pg_temp.probe('ovopen/3_parent_active', '0a000000-0000-4000-8000-000000000003');
+
+-- OVERRIDE LOCKED: a match 8 days out (auto-OPEN) but override='locked' → frozen.
+select pg_temp.configure('match', interval '8 days', 'locked');
+select pg_temp.probe('ovlocked/3_parent_active', '0a000000-0000-4000-8000-000000000003');
+
+-- OVERRIDE LOCKED on a social (never auto-locks) → frozen.
+select pg_temp.configure('social', interval '2 hours', 'locked');
+select pg_temp.probe('ovlocked_social/3_parent_active', '0a000000-0000-4000-8000-000000000003');
+
 select * from _m order by caller;
 
 -- ══════════════════════════════════════════════════════════════════════════
@@ -366,6 +396,24 @@ begin
   select * into r from _m where caller = 'social/3_parent_active';
   if not (r.ins = 'ALLOWED' and r.upd = 'ALLOWED' and r.del = 'ALLOWED') then
     raise exception 'LOCK: parent should always edit a SOCIAL — got ins=% upd=% del=%', r.ins, r.upd, r.del;
+  end if;
+
+  -- override 'open' unlocks a parent inside the auto window
+  select * into r from _m where caller = 'ovopen/3_parent_active';
+  if not (r.ins = 'ALLOWED' and r.upd = 'ALLOWED' and r.del = 'ALLOWED') then
+    raise exception 'OVERRIDE: open should unlock an in-window match — got ins=% upd=% del=%', r.ins, r.upd, r.del;
+  end if;
+
+  -- override 'locked' freezes an otherwise-open match
+  select * into r from _m where caller = 'ovlocked/3_parent_active';
+  if not (r.upd = 'NO ROWS' and r.del = 'NO ROWS' and r.ins <> 'ALLOWED') then
+    raise exception 'OVERRIDE: locked should freeze an open-window match — got ins=% upd=% del=%', r.ins, r.upd, r.del;
+  end if;
+
+  -- override 'locked' freezes a social too
+  select * into r from _m where caller = 'ovlocked_social/3_parent_active';
+  if not (r.upd = 'NO ROWS' and r.del = 'NO ROWS') then
+    raise exception 'OVERRIDE: locked should freeze a social — got upd=% del=%', r.upd, r.del;
   end if;
 
   raise notice 'LOCK MATRIX: parent frozen inside match+training windows, free on social, staff never locked.';
