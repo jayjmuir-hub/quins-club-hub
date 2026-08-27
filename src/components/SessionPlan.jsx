@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Button from './Button.jsx'
 import Chip from './Chip.jsx'
+import { SessionPlanCapture } from './SessionPlanCapture.jsx'
 import DrillDiagram from './DrillDiagram.jsx'
 import {
   createSession,
@@ -165,33 +167,6 @@ function BlockRow({ block }) {
         </details>
       )}
     </li>
-  )
-}
-
-// Share photographs THIS tree, not BlockRow. html2canvas under-counts a
-// flex-wrap title row plus a closed <details>, so the next drill's header
-// paints over the previous coach-note. Same words as the card (minutes ·
-// title, category chip, coach note) in ordinary block flow it can measure.
-function ShareBlock({ block }) {
-  const drill = block.drill ?? {}
-  const category = CATEGORY_LABELS[drill.category] ?? drill.category ?? null
-
-  return (
-    <div data-testid="session-plan-share-block" className="block border-b border-line py-3">
-      <p className="m-0 text-sm font-extrabold text-ink">
-        {block.minutes} min · {drill.title ?? 'Drill'}
-      </p>
-      {category ? (
-        <div className="mt-1">
-          <Chip>{category}</Chip>
-        </div>
-      ) : null}
-      {block.coach_note ? (
-        <p className="mt-1.5 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink-muted">
-          {block.coach_note}
-        </p>
-      ) : null}
-    </div>
   )
 }
 
@@ -686,28 +661,29 @@ export default function SessionPlan({ event, team, canEdit }) {
             <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">{session.notes}</p>
           )}
 
-          {/* ⚠️ RENDERED, NOT display:none. html2canvas photographs zero-size
-              nodes. Off-screen is the lineup / match-sheet trick. This is a
-              SHARE-ONLY tree — the live BlockRow (flex-wrap + How it runs)
-              stays for coaches tapping through. Spec:
-              claude/specs/2026-08-27-session-plan-share.md */}
-          {canEdit && (
-            <div className="pointer-events-none fixed -left-[9999px] top-0" aria-hidden="true">
-              <div
-                ref={shareRef}
-                data-testid="session-plan-capture"
-                className="force-light w-[360px] bg-white p-4 font-sans"
-              >
-                {session.blocks.map((block) => (
-                  <ShareBlock key={block.id} block={block} />
-                ))}
-                <p className="mt-3 text-[12.5px] font-bold text-ink-muted">Total {total} min</p>
-                {session.notes && (
-                  <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">{session.notes}</p>
-                )}
-              </div>
-            </div>
-          )}
+          {/* ⚠️ PORTALED TO document.body, SAME WRAPPER AS LINEUP.
+              html2canvas photographs shareRef. Nested inside EventDetail's
+              Sheet, `position:fixed; left:-9999px` is NOT against the
+              viewport: the scrim has backdrop-filter, the panel animates
+              with transform, overflow-y-auto clips. The clone then paints
+              the on-screen BlockRow <ol> (How it runs, Chip concat,
+              overlapped notes). Lineup's capture works because that screen
+              is a full page. Portal + the same classes makes Share the
+              same trick against the viewport. Not display:none.
+              Spec: claude/specs/2026-08-27-session-plan-share.md */}
+          {canEdit &&
+            createPortal(
+              <div className="pointer-events-none fixed -left-[9999px] top-0" aria-hidden="true">
+                <SessionPlanCapture
+                  ref={shareRef}
+                  event={event}
+                  team={team}
+                  session={session}
+                  total={total}
+                />
+              </div>,
+              document.body,
+            )}
 
           {canEdit && (
             <div className="mt-2.5 flex flex-wrap gap-2">

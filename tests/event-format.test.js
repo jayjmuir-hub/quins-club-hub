@@ -23,6 +23,7 @@ import {
   resultScore,
   sortByStart,
   venueLine,
+  eventPitchLabel,
 } from '../src/lib/eventFormat.js'
 
 // Direct tests for src/lib/eventFormat.js — pure, import-free helpers, so
@@ -581,6 +582,24 @@ describe('venueLine', () => {
     expect(venueLine({ venue: '  Zayed Sports City ', pitch: ' Pitch 2 ' })).toBe(
       'Zayed Sports City · Pitch 2',
     )
+  })
+})
+
+describe('eventPitchLabel', () => {
+  it('returns the stored pitch name EventDetail shows, e.g. D1', () => {
+    expect(eventPitchLabel({ pitch: 'D1' })).toBe('D1')
+    expect(eventPitchLabel({ pitch: 'D2' })).toBe('D2')
+  })
+
+  it('returns null when empty so callers omit the line', () => {
+    expect(eventPitchLabel({})).toBeNull()
+    expect(eventPitchLabel({ pitch: null })).toBeNull()
+    expect(eventPitchLabel({ pitch: '   ' })).toBeNull()
+    expect(eventPitchLabel(null)).toBeNull()
+  })
+
+  it('trims, matching venueLine', () => {
+    expect(eventPitchLabel({ pitch: ' D1 ' })).toBe('D1')
   })
 })
 

@@ -23,6 +23,7 @@ import {
   resultLabel,
   resultOutcome,
   resultScore,
+  eventPitchLabel,
 } from '../lib/eventFormat.js'
 
 // The event detail sheet (design-system.md §5.5): a branded hero, a set of
@@ -488,6 +489,7 @@ export default function EventDetail({
   onAssignPitch,
 }) {
   const date = eventDate(event)
+  const pitch = eventPitchLabel(event)
   // Null for every event created before 8 Aug 2026, and formatTimeRange
   // renders the start alone for those — see its comment. Nothing here
   // substitutes the calendar feed's per-type duration guess.
@@ -566,7 +568,7 @@ export default function EventDetail({
             genuinely optional — a social has none, and every event created
             before this column existed has none either. A row reading
             "Pitch — " on all of them would be noise. */}
-        {event.pitch && <KeyValue label="Pitch">{event.pitch}</KeyValue>}
+        {pitch && <KeyValue label="Pitch">{pitch}</KeyValue>}
         {/* ⚠️ `competition` ALONE IS NO LONGER ENOUGH TO RENDER THIS ROW.
             Since 12 Aug 2026 it holds the TOURNAMENT'S NAME and is null for a
             league fixture, so testing it the old way made every league match

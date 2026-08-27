@@ -10,10 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Availability: coaches/managers can override the self-edit lock per event —
-  Auto (the calendar rule), Open (parents can RSVP right up to the event), or
-  Locked (closed to parents now) — from both the event form and the Availability
-  sheet, enforced in RLS. Staff are never locked.
+- Session Plan Share pitch line is EventDetail's `eventPitchLabel` (stored
+  `pitches.name`, e.g. D1 / D2). Combined Preseason golden uses D1, never
+  "Pitch 2". Spec: `claude/specs/2026-08-27-session-plan-share.md`.
+- Session Plan Share golden PNG is committed; `npm test` in CI no longer
+  spawns Chrome to re-screenshot it (GitHub's runner Chrome hung past
+  vitest's 15s). Refresh with `UPDATE_SESSION_PLAN_PNG=1`. Spec:
+  `claude/specs/2026-08-27-session-plan-share.md`.
+- Session Plan Share capture uses Club Hub Inter / ink / line / brand in
+  force-light: squad small-caps, title bold, muted Abu Dhabi when, pitch
+  if set; each block bordered with extra-bold `minutes min · title` and
+  its category as a separate rounded pill (never concatenated onto the
+  title). Coach notes stay spaced so the next header cannot overlap.
+  Layout/QC (portal to `document.body`, no live BlockRow, no How it runs)
+  is unchanged. Spec: `claude/specs/2026-08-27-session-plan-share.md`.
+- Session Plan Share portals the capture tree to
+  `document.body` with Lineup's off-screen wrapper, so html2canvas
+  photographs stacked inline block flow (squad, title, Abu Dhabi
+  date/time, pitch if set, then `minutes min · title` / category / coach
+  note) instead of the live BlockRow `<ol>` inside EventDetail's Sheet.
+  No Chip, no "How it runs". QC spies the element passed to html2canvas.
+  Spec: `claude/specs/2026-08-27-session-plan-share.md`.
+- `9c730bb` — Availability: coaches/managers can override the self-edit lock
+  per event — Auto (the calendar rule), Open (parents can RSVP right up to
+  the event), or Locked (closed to parents now) — from both the event form
+  and the Availability sheet, enforced in RLS. Staff are never locked.
 - `662fea3` — Session Plan Share photographs a share-only block tree (minutes · title,
   category chip on the next line, coach note, Total, session notes) instead
   of the live flex-wrap `BlockRow` plus "How it runs" `<details>`. html2canvas

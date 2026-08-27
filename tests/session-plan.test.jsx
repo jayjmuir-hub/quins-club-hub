@@ -831,11 +831,12 @@ describe('SessionPlan — Share', () => {
     expect(shareBlocks).toHaveLength(2)
     expect(shareBlocks[0].nextElementSibling).toBe(shareBlocks[1])
     for (const block of shareBlocks) {
-      expect(block.className.split(/\s+/)).toContain('block')
+      expect(block.getAttribute('style') ?? '').toMatch(/display:\s*block/)
       expect(block.className.split(/\s+/)).not.toContain('flex')
       expect(block.className.split(/\s+/)).not.toContain('flex-wrap')
       expect(block.querySelector('.flex-wrap')).toBeNull()
       expect(block.querySelector('details')).toBeNull()
+      expect(block.querySelector('.inline-flex')).toBeNull()
     }
   })
 

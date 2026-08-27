@@ -520,3 +520,15 @@ export function venueLine(event) {
   if (venue && pitch) return `${venue} · ${pitch}`
   return venue || pitch || ''
 }
+
+/**
+ * The pitch string EventDetail shows on the event sheet (the Pitch
+ * KeyValue). Training names are `pitches.name` values like D1 / D2 — not
+ * a second field, not "Pitch 2". EventDetail deliberately does not use
+ * venueLine here; that concatenates venue · pitch for compact rows.
+ * Returns null when empty so callers omit the line.
+ */
+export function eventPitchLabel(event) {
+  const pitch = (event?.pitch ?? '').trim()
+  return pitch || null
+}
