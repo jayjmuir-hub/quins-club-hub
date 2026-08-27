@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Session Plan Share pitch line is EventDetail's `eventPitchLabel` (stored
+- Match sheets: RCM result sheets are for LEAGUE matches only (U11+) — a single
+  `matchSheetApplies` gate now excludes tournaments and friendlies from the Club
+  Youth Manager tracker, the "Open the RCM match sheet" button, the Squad Hub
+  outstanding list, and the sheet screen itself (which shows "No RCM sheet for
+  this fixture" for a non-league fixture). Removes the now-dead tournament-note
+  UI. Ruling: `claude/decisions/2026-08-27-match-sheets-league-only.md`.
+- `cbcb61b` — Session Plan Share pitch line is EventDetail's `eventPitchLabel` (stored
   `pitches.name`, e.g. D1 / D2). Combined Preseason golden uses D1, never
   "Pitch 2". Spec: `claude/specs/2026-08-27-session-plan-share.md`.
 - Session Plan Share golden PNG is committed; `npm test` in CI no longer
