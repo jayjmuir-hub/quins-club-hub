@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { upsertById } from './upsertById.js'
 import { fetchAllPages } from './limits.js'
 
 // Data access for the events table. RLS already restricts rows to what the
@@ -205,16 +206,7 @@ const REFUSED_DELETE =
  * clubWallTimeToUtc in src/lib/eventFormat.js), never a browser-local Date.
  */
 export async function upsertEvent(event) {
-  const { id, ...fields } = event ?? {}
-
-  const query = id
-    ? supabase.from('events').update(fields).eq('id', id).select().maybeSingle()
-    : supabase.from('events').insert(fields).select().maybeSingle()
-
-  const { data, error } = await query
-  if (error) throw error
-  if (!data) throw new Error(REFUSED)
-  return data
+  return upsertById('events', event, { refusedMessage: REFUSED })
 }
 
 /**

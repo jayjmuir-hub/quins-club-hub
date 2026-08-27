@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { upsertById } from './upsertById.js'
 import { fetchAllPages, fetchByIds } from './limits.js'
 import { deletePlayerPhoto } from './photos.js'
 
@@ -143,16 +144,7 @@ const REFUSED_CONTACT =
  * membership is what writes the row: private.memberships_write_parent_row.
  */
 export async function upsertPlayer(player) {
-  const { id, ...fields } = player ?? {}
-
-  const query = id
-    ? supabase.from('players').update(fields).eq('id', id).select().maybeSingle()
-    : supabase.from('players').insert(fields).select().maybeSingle()
-
-  const { data, error } = await query
-  if (error) throw error
-  if (!data) throw new Error(REFUSED_PLAYER)
-  return data
+  return upsertById('players', player, { refusedMessage: REFUSED_PLAYER })
 }
 
 /**

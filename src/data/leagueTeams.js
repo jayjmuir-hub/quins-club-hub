@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { upsertById } from './upsertById.js'
 
 // The club's LEAGUE TEAMS — the entities that play in a division, as distinct
 // from the SQUADS they are drawn from.
@@ -97,30 +98,23 @@ export async function listAllLeagueTeams({ includeRetired = false } = {}) {
  * function's shape onto something new.
  */
 export async function upsertLeagueTeam(leagueTeam) {
-  const { id, ...fields } = leagueTeam ?? {}
-
-  const query = id
-    ? supabase.from('league_teams').update(fields).eq('id', id).select().maybeSingle()
-    : supabase.from('league_teams').insert(fields).select().maybeSingle()
-
-  const { data, error } = await query
-  if (error) {
-    if (error.code === DUPLICATE_NAME) throw new Error(duplicateNameMessage(fields.rcm_name))
-    if (error.code === NOT_PERMITTED) throw new Error(REFUSED_PERMISSION)
-    // ⚠️ THE REAL MESSAGE FOR ANYTHING ELSE, rather than a third guess. The
-    // Pitches screen already renders `saveError.message` verbatim for the same
-    // reason: an unrecognised failure that says what the database said is
-    // debuggable, and one that says "something went wrong" is not.
-    throw new Error(error.message || REFUSED_PERMISSION)
-  }
-  // ⚠️ RLS FILTERS AN UPDATE TO ZERO ROWS RATHER THAN RAISING, so a refusal
-  // arrives here as `data === null` with no error at all. Without this branch a
-  // non-admin's rename would report success and change nothing.
-  // ⚠️ THIS BRANCH IS GENUINELY ONLY EVER PERMISSION. A unique violation raises
-  // (23505) and is caught above, so unlike the old shared message this one is
-  // not hedging — there is exactly one way to arrive here.
-  if (!data) throw new Error(REFUSED_PERMISSION)
-  return data
+  // ⚠️ THE `!data` REFUSAL IS GENUINELY ONLY EVER PERMISSION here. A unique
+  // violation raises (23505 → DUPLICATE_NAME) and is caught in mapError, so the
+  // refusedMessage is not hedging — there is exactly one way to reach it: RLS
+  // filtered a non-admin's rename to zero rows, which arrives as data === null
+  // with no error at all and would otherwise report success while changing
+  // nothing.
+  return upsertById('league_teams', leagueTeam, {
+    refusedMessage: REFUSED_PERMISSION,
+    mapError: (error) => {
+      if (error.code === DUPLICATE_NAME) return new Error(duplicateNameMessage(leagueTeam?.rcm_name))
+      if (error.code === NOT_PERMITTED) return new Error(REFUSED_PERMISSION)
+      // ⚠️ THE REAL MESSAGE FOR ANYTHING ELSE, rather than a third guess: an
+      // unrecognised failure that says what the database said is debuggable,
+      // one that says "something went wrong" is not.
+      return new Error(error.message || REFUSED_PERMISSION)
+    },
+  })
 }
 
 /**

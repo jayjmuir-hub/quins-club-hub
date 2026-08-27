@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { upsertById } from './upsertById.js'
 import { fetchByIds } from './limits.js'
 
 // RCM match sheets — read and write. claude/plans/2026-08-11-match-sheets.md.
@@ -98,21 +99,20 @@ export async function listMatchSheetsFor(eventIds) {
  * while nothing changed. The same trap upsertLeagueTeam documents.
  */
 export async function saveMatchSheet(sheet) {
-  const { id, slots, cards, ...fields } = sheet ?? {}
+  // slots and cards live in sibling tables, never as columns on match_sheets —
+  // strip them so they are not sent as fields (upsertById passes the rest
+  // straight through, and treats `id` as the update/insert switch).
+  const { slots, cards, ...row } = sheet ?? {}
 
   // ⚠️ THE EMBED IS ON THE WRITE'S `select()` TOO, not only on getMatchSheet.
   // The screen renders the TEAM line from the SHEET's league team; a saved row
   // returned without the embed reads as "this sheet has no league team", so
   // hitting Save draft would blank a box that was correct a second earlier.
-  const embed = '*, league_team:league_teams(id, rcm_name, division)'
-  const query = id
-    ? supabase.from('match_sheets').update(fields).eq('id', id).select(embed).maybeSingle()
-    : supabase.from('match_sheets').insert(fields).select(embed).maybeSingle()
-
-  const { data, error } = await query
-  if (error) throw new Error(error.message || REFUSED)
-  if (!data) throw new Error(REFUSED)
-  return data
+  return upsertById('match_sheets', row, {
+    embed: '*, league_team:league_teams(id, rcm_name, division)',
+    refusedMessage: REFUSED,
+    mapError: (error) => new Error(error.message || REFUSED),
+  })
 }
 
 /**
