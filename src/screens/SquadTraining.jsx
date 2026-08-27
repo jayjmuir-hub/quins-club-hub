@@ -4,6 +4,7 @@ import Card from '../components/Card.jsx'
 import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import Empty from '../components/Empty.jsx'
 import SessionPlan from '../components/SessionPlan.jsx'
+import TrainingDateStrip from '../components/TrainingDateStrip.jsx'
 import TrainingShelf from '../components/TrainingShelf.jsx'
 import { Sheet } from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -13,6 +14,7 @@ import { clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFo
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam } from '../lib/scope.js'
+import { resolveSelectedNight, trainingNightsInWindow } from '../lib/trainingDates.js'
 
 // Training Plans, squad-level — the coach-facing READ of what the performance
 // director published (option b of the 22 Aug ideas list). Until now a plan was
@@ -41,8 +43,10 @@ export default function SquadTraining() {
   const { memberships, teams, loading: membershipsLoading } = useMemberships()
 
   const [sessions, setSessions] = useState([])
+  const [nights, setNights] = useState([])
   const [plansByEvent, setPlansByEvent] = useState(() => new Map())
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [shelfNight, setShelfNight] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [planReload, setPlanReload] = useState(0)
@@ -63,21 +67,20 @@ export default function SquadTraining() {
       const eventRows = await listEvents({ teamIds: [teamId], from, to })
       if (!mounted) return
       const now = Date.now()
-      const upcomingTraining = eventRows
-        .filter((event) => {
-          if (event.type !== 'training') return false
-          const date = eventDate(event)
-          return date && date.getTime() >= now
-        })
+      const trainingRows = eventRows
+        .filter((event) => event.type === 'training' && eventDate(event))
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
+      const upcomingTraining = trainingRows.filter((event) => eventDate(event).getTime() >= now)
+      const windowNights = trainingNightsInWindow(trainingRows, new Date(now))
       // A failed plan read costs the badges, never the session list — the
       // same degradation the match-roster picker gives its lineup badge.
-      const plans = await listSessionsForEvents(upcomingTraining.map((event) => event.id)).catch(
-        () => new Map(),
-      )
+      const planIds = [...new Set([...upcomingTraining, ...windowNights].map((event) => event.id))]
+      const plans = await listSessionsForEvents(planIds).catch(() => new Map())
       if (!mounted) return
       setSessions(upcomingTraining)
+      setNights(windowNights)
       setPlansByEvent(plans)
+      setShelfNight((previous) => resolveSelectedNight(windowNights, previous, new Date(now)))
     })().catch((cause) => {
       if (mounted) setError(cause)
     }).finally(() => {
@@ -116,12 +119,20 @@ export default function SquadTraining() {
       {loading && <Spinner label="Loading sessions…" />}
 
       {!loading && mayView && (
-        <TrainingShelf
-          team={team}
-          tonight={sessions[0] ?? null}
-          onOpenTonight={setSelectedEvent}
-          onApplied={() => setPlanReload((n) => n + 1)}
-        />
+        <>
+          <TrainingDateStrip
+            nights={nights}
+            selected={shelfNight}
+            plansByEvent={plansByEvent}
+            onSelect={setShelfNight}
+          />
+          <TrainingShelf
+            team={team}
+            tonight={shelfNight}
+            onOpenTonight={setSelectedEvent}
+            onApplied={() => setPlanReload((n) => n + 1)}
+          />
+        </>
       )}
 
       {!loading && !error && sessions.length === 0 && (

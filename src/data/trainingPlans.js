@@ -228,8 +228,8 @@ export function publish(args) {
 
 /**
  * Which of these events have a published session, and how big — a Map of
- * event_id → { id, blockCount, minutes }. One query for the Squad Training
- * screen's whole list; the full plan (drills, notes, focus) stays
+ * event_id → { id, blockCount, minutes, visibility }. One query for the Squad Training
+ * screen's list and date strip; the full plan (drills, notes, focus) stays
  * getSession's job, fetched only for the session somebody actually opens.
  */
 export async function listSessionsForEvents(eventIds) {
@@ -237,7 +237,7 @@ export async function listSessionsForEvents(eventIds) {
   if (ids.length === 0) return new Map()
   const { data, error } = await supabase
     .from('training_sessions')
-    .select('id, event_id, blocks:training_session_blocks(minutes)')
+    .select('id, event_id, visibility, blocks:training_session_blocks(minutes)')
     .in('event_id', ids)
   if (error) throw error
   const sessions = new Map()
@@ -247,6 +247,7 @@ export async function listSessionsForEvents(eventIds) {
       id: row.id,
       blockCount: blocks.length,
       minutes: totalMinutes(blocks),
+      visibility: row.visibility ?? null,
     })
   }
   return sessions
