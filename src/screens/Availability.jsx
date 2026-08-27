@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listPlayers } from '../data/players.js'
-import { listAvailability, setAvailability, subscribeAvailability } from '../data/availability.js'
+import { listAvailability, setAvailability, clearAvailability, subscribeAvailability } from '../data/availability.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, childPlayerIds } from '../lib/scope.js'
+import { isAvailabilitySelfLocked } from '../lib/availabilityLock.js'
 import { initials } from '../lib/playerFormat.js'
 import { eventDate, eventTimeLabel, eventTitle, formatLongDate } from '../lib/eventFormat.js'
 
@@ -48,34 +49,35 @@ const STATUS_ON = {
 }
 const STATUS_OFF = 'border-line bg-surface-card text-ink-muted hover:bg-surface-mute'
 
-function StatusButtons({ status, disabled, onSet }) {
+function StatusButtons({ status, disabled, onSet, onClear }) {
   return (
     <div className="flex shrink-0 gap-1.5" role="group" aria-label="Set availability">
-      {STATUSES.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          disabled={disabled}
-          aria-pressed={status === option.value}
-          onClick={() => onSet(option.value)}
-          className={[
-            // Task 22 fix: these three toggle buttons had no
-            // focus-visible ring at all — a real gap the brief's "focus
-            // rings are already everywhere" claim didn't hold for, caught
-            // by actually tabbing through the Availability sheet rather
-            // than trusting the grep. Same convention used app-wide.
-            'rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
-            status === option.value ? STATUS_ON[option.value] : STATUS_OFF,
-          ].join(' ')}
-        >
-          {option.label}
-        </button>
-      ))}
+      {STATUSES.map((option) => {
+        const pressed = status === option.value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            disabled={disabled}
+            aria-pressed={pressed}
+            onClick={() => (pressed ? onClear() : onSet(option.value))}
+            className={[
+              // Task 22 fix: these three toggle buttons had no focus-visible
+              // ring at all — a real gap the brief's "focus rings are already
+              // everywhere" claim didn't hold for. Same convention app-wide.
+              'rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
+              pressed ? STATUS_ON[option.value] : STATUS_OFF,
+            ].join(' ')}
+          >
+            {option.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
 
-function PlayerRow({ player, status, editable, saving, onSet }) {
+function PlayerRow({ player, status, editable, locked, saving, onSet, onClear }) {
   return (
     <li className="flex items-center justify-between gap-3 border-b border-line py-3 last:border-b-0">
       <div className="flex min-w-0 items-center gap-3">
@@ -89,7 +91,12 @@ function PlayerRow({ player, status, editable, saving, onSet }) {
       </div>
 
       {editable ? (
-        <StatusButtons status={status} disabled={saving} onSet={(next) => onSet(player.id, next)} />
+        <StatusButtons
+          status={status}
+          disabled={saving || locked}
+          onSet={(next) => onSet(player.id, next)}
+          onClear={() => onClear(player.id)}
+        />
       ) : (
         <span className="shrink-0 text-[13px] font-bold text-ink-muted">
           {status ? STATUS_LABELS[status] : 'No response'}
@@ -108,6 +115,11 @@ export default function Availability({ event, team, onClose }) {
   // too — same reasoning as Schedule's/Roster's canEditSelected.
   const canOverrideAll = canEditTeam(memberships, event?.team_id)
   const myPlayerIds = new Set(childPlayerIds(memberships))
+
+  // Staff (canOverrideAll) are never locked — the lock only ever applies to
+  // a parent/player editing their own child's row, past the deadline in
+  // src/lib/availabilityLock.js.
+  const selfLocked = !canOverrideAll && isAvailabilitySelfLocked(event)
 
   const [players, setPlayers] = useState([])
   const [rows, setRows] = useState([])
@@ -194,6 +206,25 @@ export default function Availability({ event, team, onClose }) {
       .finally(() => setSavingPlayerId(null))
   }
 
+  function handleClear(playerId) {
+    setSavingPlayerId(playerId)
+    setSaveError(null)
+    clearAvailability(event.id, playerId)
+      .then((removed) => {
+        if (removed.length > 0) {
+          // A genuine delete — drop the row locally, same optimism as handleSet.
+          setRows((current) => current.filter((row) => row.player_id !== playerId))
+        } else {
+          // Nothing was deleted: RLS refused (a boundary race against the lock)
+          // or the row was already gone. Refetch the truth rather than showing a
+          // removal the database may not have made.
+          setReloadToken((token) => token + 1)
+        }
+      })
+      .catch((err) => setSaveError(err))
+      .finally(() => setSavingPlayerId(null))
+  }
+
   const date = eventDate(event)
   const isFirstLoad = loading && players.length === 0 && !error
 
@@ -205,6 +236,14 @@ export default function Availability({ event, team, onClose }) {
           {team?.name ?? 'Age group not set'} · {formatLongDate(date)} · {eventTimeLabel(event)}
         </p>
       </div>
+
+      {selfLocked && myPlayerIds.size > 0 && (
+        <p className="mb-3.5 rounded-[11px] bg-surface-mute px-3 py-2.5 text-[13px] font-semibold text-ink-muted">
+          Availability is closed for this {event.type === 'match' ? 'match' : 'session'} —
+          changes lock {event.type === 'match' ? 'five days before a match' : 'the day before training'}.
+          Ask a coach if it needs to change.
+        </p>
+      )}
 
       {saveError && (
         <p
@@ -252,8 +291,10 @@ export default function Availability({ event, team, onClose }) {
                   player={player}
                   status={statusByPlayer.get(player.id) ?? null}
                   editable={canOverrideAll || myPlayerIds.has(player.id)}
+                  locked={selfLocked}
                   saving={savingPlayerId === player.id}
                   onSet={handleSet}
+                  onClear={handleClear}
                 />
               ))}
           </ul>
