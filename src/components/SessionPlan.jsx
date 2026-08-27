@@ -168,6 +168,33 @@ function BlockRow({ block }) {
   )
 }
 
+// Share photographs THIS tree, not BlockRow. html2canvas under-counts a
+// flex-wrap title row plus a closed <details>, so the next drill's header
+// paints over the previous coach-note. Same words as the card (minutes ·
+// title, category chip, coach note) in ordinary block flow it can measure.
+function ShareBlock({ block }) {
+  const drill = block.drill ?? {}
+  const category = CATEGORY_LABELS[drill.category] ?? drill.category ?? null
+
+  return (
+    <div data-testid="session-plan-share-block" className="block border-b border-line py-3">
+      <p className="m-0 text-sm font-extrabold text-ink">
+        {block.minutes} min · {drill.title ?? 'Drill'}
+      </p>
+      {category ? (
+        <div className="mt-1">
+          <Chip>{category}</Chip>
+        </div>
+      ) : null}
+      {block.coach_note ? (
+        <p className="mt-1.5 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink-muted">
+          {block.coach_note}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 /**
  * One block while a coach is ADJUSTING it.
  *
@@ -645,21 +672,42 @@ export default function SessionPlan({ event, team, canEdit }) {
             )}
           </div>
 
-          <div ref={shareRef} data-testid="session-plan-capture">
-            <ol className="mb-2">
-              {session.blocks.map((block) => (
-                <BlockRow key={block.id} block={block} />
-              ))}
-            </ol>
+          <ol className="mb-2">
+            {session.blocks.map((block) => (
+              <BlockRow key={block.id} block={block} />
+            ))}
+          </ol>
 
-            <p data-testid="session-total" className="text-[12.5px] font-bold text-ink-muted">
-              Total {total} min
-            </p>
+          <p data-testid="session-total" className="text-[12.5px] font-bold text-ink-muted">
+            Total {total} min
+          </p>
 
-            {session.notes && (
-              <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">{session.notes}</p>
-            )}
-          </div>
+          {session.notes && (
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">{session.notes}</p>
+          )}
+
+          {/* ⚠️ RENDERED, NOT display:none. html2canvas photographs zero-size
+              nodes. Off-screen is the lineup / match-sheet trick. This is a
+              SHARE-ONLY tree — the live BlockRow (flex-wrap + How it runs)
+              stays for coaches tapping through. Spec:
+              claude/specs/2026-08-27-session-plan-share.md */}
+          {canEdit && (
+            <div className="pointer-events-none fixed -left-[9999px] top-0" aria-hidden="true">
+              <div
+                ref={shareRef}
+                data-testid="session-plan-capture"
+                className="force-light w-[360px] bg-white p-4 font-sans"
+              >
+                {session.blocks.map((block) => (
+                  <ShareBlock key={block.id} block={block} />
+                ))}
+                <p className="mt-3 text-[12.5px] font-bold text-ink-muted">Total {total} min</p>
+                {session.notes && (
+                  <p className="mt-2 text-[13px] leading-relaxed text-ink-muted">{session.notes}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {canEdit && (
             <div className="mt-2.5 flex flex-wrap gap-2">
