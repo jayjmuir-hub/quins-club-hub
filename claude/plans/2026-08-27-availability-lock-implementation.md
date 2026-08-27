@@ -654,6 +654,12 @@ as $$
 $$;
 
 revoke all on function private.availability_self_editable(uuid) from public;
+-- ⚠️ RE-GRANT to authenticated — mandatory. `revoke all from public` strips the
+-- default PUBLIC execute grant, and every private helper used inside an RLS
+-- policy re-grants execute to authenticated or the policy raises "permission
+-- denied for function" for a parent/coach. `anon` needs nothing (no USAGE on
+-- private). Same pattern as can_edit_team / is_own_player.
+grant execute on function private.availability_self_editable(uuid) to authenticated;
 
 -- ── The three write policies. Staff arm unchanged; the self arm is now
 --    lock-gated, and DELETE gains the self arm it never had. ────────────────
@@ -759,6 +765,12 @@ as $$
   end
   from public.events e where e.id = p_event_id
 $$;
+-- Mirror the migration's grant state so the harness reproduces production: strip
+-- the default PUBLIC execute grant, re-grant to authenticated. Without this the
+-- harness (a fresh create) would keep the default PUBLIC grant and could never
+-- catch a missing re-grant in the real migration.
+revoke all on function private.availability_self_editable(uuid) from public;
+grant execute on function private.availability_self_editable(uuid) to authenticated;
 
 drop policy "avail write insert" on public.availability;
 drop policy "avail write update" on public.availability;
