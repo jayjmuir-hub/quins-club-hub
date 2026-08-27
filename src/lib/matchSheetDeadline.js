@@ -1,5 +1,5 @@
 import { ageBandFromTeamName } from './ageGroup.js'
-import { isMinisBand } from './minis.js'
+import { isMinisBand, isMinisTeam } from './minis.js'
 
 // When an RCM match sheet is due, derived from the squad's age band.
 //
@@ -77,6 +77,35 @@ export const PRE_MATCH_FROM_AGE = 18
  * thing (show nothing, never flag it late), which is why they share a return
  * value rather than getting a third state nobody would handle.
  */
+/**
+ * Whether a fixture takes an RCM match sheet at all.
+ *
+ * RCM result sheets are for LEAGUE matches, U11 and up — NOT tournaments (run
+ * by their own organiser and not RCM league games), NOT friendlies (no
+ * competition), NOT minis. Jay, 27 Aug 2026: "tournaments are not RCM league
+ * matches." This is the SINGLE gate every screen asks before listing a fixture
+ * in the Youth Manager tracker, showing a "Match sheet" button, or opening the
+ * sheet editor — so a tournament or friendly never appears in any of them.
+ *
+ * ⚠️ THIS REPLACES THE OLDER, LOOSER RULE (`type === 'match'` and not-minis)
+ * that the tracker and the Open-sheet button used until 27 Aug 2026. That rule
+ * put every tournament and friendly in the RCM queue as "Not started" forever
+ * — a queue that could never be emptied, exactly the failure the minis
+ * exclusion already guarded against for a younger age group.
+ *
+ * ⚠️ ASKED OF THE EVENT AND THE SQUAD, NOT OFF matchSheetDeadline. The deadline
+ * is null for the Women's XV too (WXV is on the form), so gating on the
+ * deadline would wrongly drop a squad the form covers. Minis is the one age
+ * exclusion, and it is asked directly.
+ */
+export function matchSheetApplies(event, squadName) {
+  return (
+    event?.type === 'match' &&
+    event?.competition_type === 'league' &&
+    !isMinisTeam(squadName)
+  )
+}
+
 export function matchSheetDeadline(teamName, kickOff) {
   const band = ageBandFromTeamName(teamName)
   if (band === null) return null

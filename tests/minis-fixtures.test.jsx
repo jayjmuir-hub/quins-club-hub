@@ -62,7 +62,7 @@ vi.mock('../src/data/lineups.js', () => ({
 }))
 vi.mock('../src/data/players.js', () => ({
   listPlayers: (...a) => listPlayersMock(...a),
-  listContactsForPlayers: async () => [],
+  listContactsForPlayers: async () => [],
   // The completeness card on YourPlayers reads this (17 Aug 2026).
   listPlayerPrivate: async () => [],
 }))
@@ -124,6 +124,11 @@ function fixture(team, extra = {}) {
     club_id: CLUB,
     team_id: team.id,
     type: 'match',
+    // A LEAGUE match: the U14 control is exactly the fixture that DOES take an
+    // RCM sheet, and matchSheetApplies now requires competition_type 'league'
+    // (tournaments/friendlies don't). The minis squads are excluded by age
+    // regardless, which is what these tests prove.
+    competition_type: 'league',
     opponent: 'Dubai Exiles',
     home: true,
     venue: 'Zayed Sports City, Abu Dhabi',

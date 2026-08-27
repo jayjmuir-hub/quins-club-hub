@@ -11,7 +11,8 @@ import { listAvailability, subscribeAvailability } from '../data/availability.js
 import { getEventThread } from '../data/messages.js'
 import { countSeriesFrom, deleteEvent, deleteSeriesFrom } from '../data/events.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
-import { isMinisTeam, squadFormat } from '../lib/minis.js'
+import { squadFormat } from '../lib/minis.js'
+import { matchSheetApplies } from '../lib/matchSheetDeadline.js'
 import { FEATURES } from '../lib/features.js'
 import {
   eventDate,
@@ -500,10 +501,6 @@ export default function EventDetail({
   // loaded — squadFormat fails open the same way isMinisTeam does, so a missing
   // `team` prop shows nothing rather than the wrong age group's format.
   const format = event.type === 'match' ? squadFormat(team?.name) : null
-  // U10 and below are not on the RCM form at all (src/lib/minis.js). Asked as a
-  // question about the SQUAD rather than derived from matchSheetDeadline being
-  // null — that is also null for the Women's XV, which IS on the form.
-  const minis = isMinisTeam(team?.name)
   // ⚠️ THE RESULT BLOCK NEEDS NO AGE RULE, AND ADDING ONE WOULD BE A TAUTOLOGY.
   // It already renders on `played` — hasResult(), i.e. a score is present — so a
   // U7 fixture with no score has never shown it, and one that somehow HAS a
@@ -766,14 +763,14 @@ export default function EventDetail({
         </div>
       )}
 
-      {/* ⚠️ AND NOT FOR THE MINIS (15 Aug 2026). The RCM form's own instructions
-          start at U11 — "U11 to u16 Games" — so U6-U10 have no sheet to file,
-          and offering one invites a coach to spend an evening on a form the
-          governing body will not take. matchSheetDeadline returns null for these
-          squads for the same reason, but this is asked of the SQUAD rather than
-          read off the deadline: that is also null for the Women's XV, which is
-          on the form ("WXV") and must keep its button. */}
-      {canEdit && event.type === 'match' && !minis && onOpenMatchSheet && (
+      {/* ⚠️ ONLY FOR AN RCM LEAGUE MATCH — matchSheetApplies is the single gate
+          (27 Aug 2026). RCM sheets are for LEAGUE games, U11 and up: not
+          tournaments (run by their own organiser and not RCM league games), not
+          friendlies, not minis. This replaces the older `type==='match' && !minis`
+          condition, which offered the button on tournaments the governing body
+          never wanted a sheet for. The minis exclusion is inside the gate; the
+          Women's XV keeps its button because WXV is a league match. */}
+      {canEdit && matchSheetApplies(event, team?.name) && onOpenMatchSheet && (
         <div className="mt-4">
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">
             Match sheet

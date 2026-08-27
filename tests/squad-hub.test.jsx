@@ -91,6 +91,7 @@ const PAST_MATCH = {
   id: 'e-past',
   team_id: 't-u12',
   type: 'match',
+  competition_type: 'league',
   opponent: 'Sharjah',
   starts_at: '2026-08-10T08:00:00Z',
 }
