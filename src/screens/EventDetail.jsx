@@ -33,9 +33,12 @@ import {
 // event is selected — Schedule renders it conditionally — so there is no
 // `open` prop to thread through and no hidden-but-present DOM.
 //
-// Footer actions (design-system.md §5.5): Edit + Delete for a user who can
-// edit this event's squad, and NOTHING for everyone else. Delete
-// is two-step — the confirm replaces the buttons in place rather than using
+// Footer actions (design-system.md §5.5): Edit / Duplicate / Delete for a
+// user who can edit this event's squad, and NOTHING for everyone else.
+// Each button renders only when its handler exists — the Duplicate rule,
+// applied to Edit and Delete too, so a screen that withholds a handler
+// (Squad Hub hides calendar Delete) shows no lying button. Delete is
+// two-step — the confirm replaces the buttons in place rather than using
 // a native confirm(), which is unstyled, unannounced and untestable in the
 // browser check. `canEdit` is passed in rather than computed here: this
 // component stays presentational and the screen already holds memberships
@@ -256,6 +259,9 @@ function FooterActions({ event, canEdit, onEdit, onDuplicate, onDeleted }) {
   // Not being able to change a fixture is the ordinary state for most people
   // opening this sheet, not an exception worth a banner every time.
   if (!canEdit) return null
+  // canEdit with no handlers used to draw a lying Edit/Delete row. An empty
+  // bordered footer is the same class of defect; skip the chrome entirely.
+  if (!onEdit && !onDuplicate && !onDeleted) return null
 
   function handleDelete() {
     setDeleting('one')
@@ -406,9 +412,15 @@ function FooterActions({ event, canEdit, onEdit, onDuplicate, onDeleted }) {
         // buttons below their min-content width. It must NOT be described as
         // the thing preventing an overflow.
         <div className="flex flex-wrap gap-2.5">
-          <Button onClick={() => onEdit?.(event)} className={FOOTER_BUTTON}>
-            Edit
-          </Button>
+          {/* Same handler-required rule as Duplicate below: Squad Hub used to
+              pass canEdit so Edit drew, then omit onEdit, so the tap was
+              swallowed. Full schedule and Home pass onEdit; the hub does too
+              once it mounts EventForm. */}
+          {onEdit && (
+            <Button onClick={() => onEdit(event)} className={FOOTER_BUTTON}>
+              Edit
+            </Button>
+          )}
           {/* ⚠️ RENDERED ONLY WHEN A HANDLER EXISTS, and this is not defensive
               styling — it is the fix for a defect this exact component has
               already shipped. "Set my availability" rendered unconditionally
@@ -428,13 +440,18 @@ function FooterActions({ event, canEdit, onEdit, onDuplicate, onDeleted }) {
               Duplicate
             </Button>
           )}
-          <Button
-            variant="dangerQuiet"
-            onClick={() => setConfirming(true)}
-            className={FOOTER_BUTTON}
-          >
-            Delete
-          </Button>
+          {/* Calendar delete is withheld on Squad Hub on purpose — staff
+              confuse it with clearing the training plan / hour. Full schedule
+              and Home pass onDeleted; the hub does not. */}
+          {onDeleted && (
+            <Button
+              variant="dangerQuiet"
+              onClick={() => setConfirming(true)}
+              className={FOOTER_BUTTON}
+            >
+              Delete
+            </Button>
+          )}
         </div>
       )}
     </div>

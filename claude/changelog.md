@@ -16,7 +16,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   outstanding list, and the sheet screen itself (which shows "No RCM sheet for
   this fixture" for a non-league fixture). Removes the now-dead tournament-note
   UI. Ruling: `claude/decisions/2026-08-27-match-sheets-league-only.md`.
-- `cbcb61b` — Session Plan Share pitch line is EventDetail's `eventPitchLabel` (stored
+- Chat reaction picker stays fully on-screen: incoming left bubbles (smiley
+  on the right of the row) no longer hang the tray off the phone's right
+  edge, and flipping to grow left does not clip a right-aligned outgoing
+  bubble. Shared `fitPopoverX` in `src/lib/popoverFit.js`; picker is
+  `position:fixed` portalled to `document.body` so a padded / overflow-hidden
+  thread (DM, group, channel, dock) cannot clip it. Tests:
+  `tests/popoverFit.test.js`, `tests/reaction-picker-fit.test.jsx`.
+- `725efe6` — Squad Hub event sheet: Edit opens the same EventForm Full schedule uses
+  (title, time, pitch). Delete is withheld on the hub so staff do not
+  confuse calendar delete with clearing the training plan; Full schedule
+  and Home keep both. EventDetail Edit/Delete follow Duplicate's
+  handler-required rule. Tests: `tests/squad-hub-event-sheet.test.jsx`,
+  `tests/duplicate-event.test.jsx`, `tests/session-plan-share-hosts.test.jsx`.
+- `cbcb61b` — Session Plan Share PNG: portal QC + Club Hub card look;
+  golden PNG committed so CI no longer screenshots; capture tree in
+  force-light; pitch line is EventDetail's `eventPitchLabel`. Spec:
+  `claude/specs/2026-08-27-session-plan-share.md`.
+- Session Plan Share pitch line is EventDetail's `eventPitchLabel` (stored
   `pitches.name`, e.g. D1 / D2). Combined Preseason golden uses D1, never
   "Pitch 2". Spec: `claude/specs/2026-08-27-session-plan-share.md`.
 - Session Plan Share golden PNG is committed; `npm test` in CI no longer
