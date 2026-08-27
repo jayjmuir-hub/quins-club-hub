@@ -33,6 +33,11 @@ vi.mock('../src/data/availability.js', () => ({
   clearAvailability: (...args) => clearAvailabilityMock(...args),
 }))
 
+const setAvailabilityOverrideMock = vi.fn()
+vi.mock('../src/data/events.js', () => ({
+  setAvailabilityOverride: (...args) => setAvailabilityOverrideMock(...args),
+}))
+
 // Imported after vi.mock so this binds to the mocked modules.
 import Availability from '../src/screens/Availability.jsx'
 
@@ -51,6 +56,13 @@ const EVENT = {
 
 // One day before a match: 5 days inside the lock window.
 const LOCKED_MATCH = { ...EVENT, starts_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() }
+
+const OVERRIDE_LOCKED = { ...EVENT, availability_override: 'locked' }
+const OVERRIDE_OPEN_INWINDOW = {
+  ...EVENT,
+  availability_override: 'open',
+  starts_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 1 day out: auto would lock a match
+}
 
 const PLAYER_TOM = { id: 'p-tom', team_id: 'team-u10', full_name: 'Tom Fletcher' }
 const PLAYER_ANA = { id: 'p-ana', team_id: 'team-u10', full_name: 'Ana Silva' }
@@ -73,6 +85,7 @@ beforeEach(() => {
   subscribeAvailabilityMock.mockReturnValue(vi.fn())
   setAvailabilityMock.mockResolvedValue({ id: 'a-1' })
   clearAvailabilityMock.mockResolvedValue([{ id: 'a-1' }])
+  setAvailabilityOverrideMock.mockResolvedValue({ id: 'e-1', availability_override: 'open' })
 })
 
 function setup(props = {}) {
@@ -360,5 +373,48 @@ describe('Availability — clear and lock', () => {
     expect(inBtn).not.toBeDisabled()
     await user.click(inBtn)
     expect(setAvailabilityMock).toHaveBeenCalledWith('e-1', 'p-ana', 'in')
+  })
+})
+
+describe('Availability — per-event override', () => {
+  it('shows the staff override control and writes on change', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    const { user } = setup()
+
+    await screen.findByText('Ana Silva')
+    const group = screen.getByRole('group', { name: /self-service availability/i })
+    await user.click(within(group).getByRole('button', { name: /^open$/i }))
+
+    expect(setAvailabilityOverrideMock).toHaveBeenCalledWith('e-1', 'open')
+  })
+
+  it('does not show the override control to a parent', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT_OF_TOM))
+    setup()
+    await screen.findByText('Tom Fletcher')
+    expect(screen.queryByRole('group', { name: /self-service availability/i })).not.toBeInTheDocument()
+  })
+
+  it('a parent on a manually-locked event sees disabled buttons and the manual notice', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT_OF_TOM))
+    const { user } = setup({ event: OVERRIDE_LOCKED })
+    await screen.findByText('Tom Fletcher')
+    const tomRow = screen.getByText('Tom Fletcher').closest('li')
+    expect(within(tomRow).getByRole('button', { name: /^in$/i })).toBeDisabled()
+    expect(screen.getByText(/availability is closed for this event/i)).toBeInTheDocument()
+    await user.click(within(tomRow).getByRole('button', { name: /^in$/i }))
+    expect(setAvailabilityMock).not.toHaveBeenCalled()
+  })
+
+  it('a parent on an open override inside the auto window can still RSVP', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT_OF_TOM))
+    const { user } = setup({ event: OVERRIDE_OPEN_INWINDOW })
+    await screen.findByText('Tom Fletcher')
+    const tomRow = screen.getByText('Tom Fletcher').closest('li')
+    const inBtn = within(tomRow).getByRole('button', { name: /^in$/i })
+    expect(inBtn).not.toBeDisabled()
+    expect(screen.queryByText(/availability is closed/i)).not.toBeInTheDocument()
+    await user.click(inBtn)
+    expect(setAvailabilityMock).toHaveBeenCalledWith('e-1', 'p-tom', 'in')
   })
 })
