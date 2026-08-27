@@ -1,5 +1,6 @@
 import ChatPhoto from './ChatPhoto.jsx'
 import MessageMenu from './MessageMenu.jsx'
+import PollBubble from './PollBubble.jsx'
 import ReactionBar, { ReactionTrigger } from './ReactionBar.jsx'
 import { stampLabel } from '../lib/notices.js'
 
@@ -89,6 +90,12 @@ export default function ChatBubble({
   // DMs and groups only (26 Aug 2026). Null renders nothing, which is what
   // squad channels and incoming bubbles pass.
   receipt = null,
+  // A poll (src/data/polls.js shape), or null. The question is the body above;
+  // this renders the options + voting. onVote(optionId, nextOn) casts/removes;
+  // onViewVotes opens the who-voted sheet. Null onVote makes it read-only.
+  poll = null,
+  onVote = null,
+  onViewVotes = null,
 }) {
   const canReact = Boolean(onReact) && !deleted
   const tallies = reactions ?? []
@@ -172,6 +179,9 @@ export default function ChatBubble({
               <p className="text-right leading-none">{stamp}</p>
             )}
           </>
+        )}
+        {!deleted && poll && (
+          <PollBubble poll={poll} selfId={selfId} mine={mine} onVote={onVote} onViewVotes={onViewVotes} />
         )}
         {extra}
         {!deleted && tallies.length > 0 && (

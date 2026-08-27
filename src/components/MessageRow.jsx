@@ -86,6 +86,11 @@ export default function MessageRow({
   onRemove,
   onPin,
   onReport,
+  // 27 Aug 2026: polls. `poll` is this message's poll (or null); vote/viewVotes
+  // are the bubble's handlers. Replies are never polls (top-level only).
+  poll = null,
+  onVote = null,
+  onViewVotes = null,
   // 25 Aug 2026: the squad channel grows the group-DM courtesies — a
   // private reply from the chevron menu, and a tappable author name. Both
   // optional; the screen supplies them only where a DM makes sense.
@@ -196,6 +201,9 @@ export default function MessageRow({
         reactions={tallies}
         selfId={selfId}
         onReact={onReact}
+        poll={poll}
+        onVote={poll ? onVote : null}
+        onViewVotes={poll ? onViewVotes : null}
       />
 
       {reporting && (

@@ -59,6 +59,12 @@ vi.mock('../src/data/personCard.js', () => ({ getPersonCard: (...a) => getPerson
 // The identity badge rows — every hat, injected per test.
 const getMemberIdentityMock = vi.fn(async () => [])
 vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: (...a) => getMemberIdentityMock(...a) }))
+vi.mock('../src/data/polls.js', () => ({
+  createPoll: vi.fn(),
+  listPollsFor: vi.fn(async () => new Map()),
+  setPollVote: vi.fn(),
+  subscribePollVotes: vi.fn(() => () => {}),
+}))
 vi.mock('../src/data/messages.js', () => ({
   // Ticks (26 Aug 2026): the receipts map is injected per test; receiptState
   // mirrors the real pure function so tick states are exercised for real.
