@@ -185,6 +185,32 @@ describe('two-week date strip on Squad Training', () => {
     expect(applyChipHourMock.mock.calls[0][0].eventId).toBe('e-sat-5')
   })
 
+  it('after applying a chip and reloading, Tuesday reads Staff not Draft', async () => {
+    const user = userEvent.setup()
+    listSessionsForEventsMock.mockResolvedValue(new Map())
+    applyChipHourMock.mockImplementation(async () => {
+      listSessionsForEventsMock.mockResolvedValue(
+        new Map([
+          ['e-tue-1', { id: 's-tue', blockCount: 4, minutes: 60, visibility: 'staff' }],
+        ]),
+      )
+      return { applied: true, needsConfirm: false }
+    })
+    renderTraining()
+    const strip = await screen.findByTestId('training-date-strip')
+    expect(within(strip).getByRole('button', { name: /Tue 1 Sep/i })).toHaveAccessibleName(/Empty/)
+    await user.click(await screen.findByRole('button', { name: /^Passing$/i }))
+    await waitFor(() => expect(applyChipHourMock).toHaveBeenCalled())
+    await waitFor(() => {
+      expect(
+        within(screen.getByTestId('training-date-strip')).getByRole('button', { name: /Tue 1 Sep/i }),
+      ).toHaveAccessibleName(/Staff/)
+    })
+    expect(
+      within(screen.getByTestId('training-date-strip')).getByRole('button', { name: /Tue 1 Sep/i }).textContent,
+    ).not.toMatch(/Draft/)
+  })
+
   it('an empty window shows an empty strip and leaves chips disabled', async () => {
     listEventsMock.mockResolvedValue([FAR])
     listSessionsForEventsMock.mockResolvedValue(new Map())

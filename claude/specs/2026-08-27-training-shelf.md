@@ -27,7 +27,11 @@ remains a message, not a boundary. RLS is the insert rule.
    **the selected training night** (the two-week date strip on this screen;
    default tonight, else the next upcoming night): copy blocks in stored order, write
    `template_id`, stamp `coach_edited_at`. Reuse `createSession` /
-   `saveSessionBlocks`. Do **not** call `publish_training`.
+   `saveSessionBlocks`, then `setSessionVisibility` to **staff** (Jay,
+   27 Aug 2026, option 2) unless the night is already `squad`. Do **not**
+   call `publish_training`. After apply and reload the date strip reads
+   Staff, not Draft. From-scratch Session Plan still chooses its own
+   visibility; library "add drills to tonight" is not this path.
    **One chip per `chip_label`.** Group the club hours by label, then pick the
    template `squadFitsTemplate` accepts for this squad. If several fit, pick
    the tightest age band. If none fit, show **one** disabled chip with the

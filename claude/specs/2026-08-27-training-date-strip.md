@@ -32,7 +32,8 @@ Each date chip:
 - Weekday + date (e.g. Tue 8 Sep)
 - Club time (24-hour), or Time TBD
 - Status from that night's `training_sessions` row if any: **Empty** / **Draft**
-  / **Staff** (`visibility`). No session → Empty.
+  / **Staff** / **Squad** (`visibility`). No session → Empty. Applying a focus
+  chip leaves the night **Staff** (unless it was already Squad).
 - Pitch booked lives **on the date**, not on the focus chips. A real pitch
   name (not `Pitch TBD`) renders as "D1 booked" on the selected chip and in
   the summary line.

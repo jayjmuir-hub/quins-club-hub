@@ -76,6 +76,20 @@ function payloadFor(table, op) {
   return chain?.ops.find((o) => o.name === op)?.args[0]
 }
 
+/** setSessionVisibility writes only `{ visibility }` — not saveSessionBlocks. */
+function visibilityWrites() {
+  return calls
+    .filter((c) => c.table === 'training_sessions')
+    .map((c) => {
+      const upd = c.ops.find((o) => o.name === 'update')
+      const payload = upd?.args[0]
+      if (!payload || !Object.prototype.hasOwnProperty.call(payload, 'visibility')) return null
+      const idEq = c.ops.find((o) => o.name === 'eq' && o.args[0] === 'id')
+      return { id: idEq?.args[1], visibility: payload.visibility, keys: Object.keys(payload) }
+    })
+    .filter(Boolean)
+}
+
 describe('applyChipHour', () => {
   it('copies blocks in order, writes template_id, stamps coach_edited_at, does not call publish_training', async () => {
     const result = await applyChipHour({ eventId: 'e-tue', session: null, template: TACKLE })
@@ -118,6 +132,75 @@ describe('applyChipHour', () => {
     expect(payload.template_id).toBe('tpl-tackle')
     expect(typeof payload.coach_edited_at).toBe('string')
     expect(payload.notes).toBe('keep')
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('an empty night ends as staff, never publish_training', async () => {
+    const result = await applyChipHour({ eventId: 'e-tue', session: null, template: TACKLE })
+    expect(result.applied).toBe(true)
+    expect(visibilityWrites()).toEqual([{ id: 's-new', visibility: 'staff', keys: ['visibility'] }])
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('replace-confirm on a draft ends as staff', async () => {
+    resultFor.mockImplementation((chain) =>
+      chain.table === 'training_sessions' ? { data: { id: 's-draft' }, error: null } : { data: null, error: null },
+    )
+    const result = await applyChipHour({
+      eventId: 'e-tue',
+      session: {
+        id: 's-draft',
+        visibility: 'draft',
+        coach_edited_at: '2026-08-21T05:00:00.000Z',
+        notes: null,
+      },
+      template: TACKLE,
+      confirmed: true,
+    })
+    expect(result.applied).toBe(true)
+    expect(visibilityWrites()).toEqual([{ id: 's-draft', visibility: 'staff', keys: ['visibility'] }])
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('replace-confirm on staff stays staff', async () => {
+    resultFor.mockImplementation((chain) =>
+      chain.table === 'training_sessions' ? { data: { id: 's-staff' }, error: null } : { data: null, error: null },
+    )
+    const result = await applyChipHour({
+      eventId: 'e-tue',
+      session: {
+        id: 's-staff',
+        visibility: 'staff',
+        coach_edited_at: '2026-08-21T05:00:00.000Z',
+        notes: null,
+      },
+      template: TACKLE,
+      confirmed: true,
+    })
+    expect(result.applied).toBe(true)
+    const vis = visibilityWrites()
+    expect(vis.every((row) => row.visibility === 'staff')).toBe(true)
+    expect(vis.some((row) => row.visibility === 'draft' || row.visibility === 'squad')).toBe(false)
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('already-squad stays squad — chip apply does not downgrade', async () => {
+    resultFor.mockImplementation((chain) =>
+      chain.table === 'training_sessions' ? { data: { id: 's-squad' }, error: null } : { data: null, error: null },
+    )
+    const result = await applyChipHour({
+      eventId: 'e-tue',
+      session: {
+        id: 's-squad',
+        visibility: 'squad',
+        coach_edited_at: '2026-08-21T05:00:00.000Z',
+        notes: null,
+      },
+      template: TACKLE,
+      confirmed: true,
+    })
+    expect(result.applied).toBe(true)
+    expect(visibilityWrites()).toEqual([])
     expect(rpcMock).not.toHaveBeenCalled()
   })
 })
