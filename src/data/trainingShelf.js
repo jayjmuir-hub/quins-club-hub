@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { createSession, saveSessionBlocks } from './trainingPlans.js'
+import { createSession, saveSessionBlocks, setSessionVisibility } from './trainingPlans.js'
 import {
   blocksFromTemplate,
   chipNeedsConfirm,
@@ -11,8 +11,9 @@ import {
 // Spec: claude/specs/2026-08-27-training-shelf.md
 //
 // ⚠️ DOES NOT CALL publish_training. Applying a chip is createSession /
-// saveSessionBlocks on the selected training event. Publish onto calendars stays the
-// Director's RPC.
+// saveSessionBlocks on the selected training event, then setSessionVisibility
+// to staff (Jay, 27 Aug 2026, option 2 — unless the night is already squad).
+// Publish onto calendars stays the Director's RPC.
 
 const WEEK_MS = 8 * 24 * 60 * 60 * 1000
 
@@ -28,8 +29,9 @@ export async function applyChipHour({ eventId, session, template, confirmed = fa
     return { applied: false, needsConfirm: true }
   }
   const blocks = blocksFromTemplate(template)
+  let saved = session
   if (!session) {
-    await createSession({
+    saved = await createSession({
       eventId,
       templateId: template.id,
       blocks,
@@ -39,6 +41,11 @@ export async function applyChipHour({ eventId, session, template, confirmed = fa
     await saveSessionBlocks(session.id, blocks, notes ?? session.notes ?? null, {
       templateId: template.id,
     })
+  }
+  // Chip apply is staff. From-scratch Session Plan still chooses its own
+  // visibility; appendDrillsToSession is not this path. Never downgrade squad.
+  if (saved?.visibility !== 'squad') {
+    await setSessionVisibility(saved.id, 'staff')
   }
   return { applied: true, needsConfirm: false }
 }

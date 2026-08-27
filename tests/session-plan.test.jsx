@@ -487,6 +487,17 @@ describe('SessionPlan — a coach builds their own plan', () => {
     expect(arg.blocks).toEqual([{ drill_id: 'd-grid', minutes: 15, coach_note: null }])
   })
 
+  it('from-scratch Only me still creates a draft — chip apply does not own this path', async () => {
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByTestId('build-session'))
+    await user.selectOptions(screen.getByLabelText(/add a drill/i), 'd-grid')
+    await user.click(within(screen.getByRole('radiogroup', { name: /who can see this plan/i })).getByRole('radio', { name: /only me/i }))
+    await user.click(screen.getByRole('button', { name: /save plan/i }))
+
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalled())
+    expect(createSessionMock.mock.calls[0][0].visibility).toBe('draft')
+  })
+
   it('seeds the running order from a chosen template', async () => {
     listTemplatesMock.mockResolvedValue([
       { id: 'tpl-a', name: 'Skills night', team_id: null, notes: null, blocks: [

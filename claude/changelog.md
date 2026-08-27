@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Availability: a parent/player can now clear their child's RSVP (click the
+- Applying a Squad Training focus chip (or a From-coaches / browse hour on
+  the same `applyChipHour` path) writes the hour onto the selected night and
+  leaves visibility at `staff` — Empty / Draft become Staff on the date
+  strip after reload; already-`squad` is not downgraded. Never
+  `publish_training`. From-scratch Session Plan still chooses draft / staff /
+  squad; library add-drills-to-tonight is not a chip apply. Ruling:
+  `claude/decisions/2026-08-27-chip-apply-is-staff.md`. Spec:
+  `claude/specs/2026-08-27-training-shelf.md`.
+- `e7e0cfe` — Availability: a parent/player can now clear their child's RSVP (click the
   selected status again), and self-service editing locks a calendar day before
   the event — 5 days for matches, 1 for training, never for socials — enforced
   in RLS. Staff are never locked. Reverses the 9-Aug staff-only-delete rule.
