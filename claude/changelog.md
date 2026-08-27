@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Applying a Squad Training focus chip (or a From-coaches / browse hour on
+- Share on a training Session Plan card (next to Adjust) photographs the
+  running order as it reads in Club Hub and hands the PNG to the phone share
+  sheet, with `/schedule?event=<id>` so a signed-in tap opens that hour.
+  Staff who can edit; same control on EventDetail and Squad Training. No PDF,
+  no `publish_training`, no Clear plan. Spec:
+  `claude/specs/2026-08-27-session-plan-share.md`.
+- `1513012` — Applying a Squad Training focus chip (or a From-coaches / browse hour on
   the same `applyChipHour` path) writes the hour onto the selected night and
   leaves visibility at `staff` — Empty / Draft become Staff on the date
   strip after reload; already-`squad` is not downgraded. Never
