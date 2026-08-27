@@ -199,115 +199,116 @@ create trigger session_templates_guard_featured
 
 
 -- ── Fixture: throwaway club, tag + contact squads, coach / parent / admin ──
+-- UUIDs are hex (`e1000000-…`). A letter like `s` is not a UUID and 22P02s.
 insert into public.clubs (id, name) values
-  ('s0000000-0000-4000-8000-000000000001', 'Harness Shelf Club');
+  ('e1000000-0000-4000-8000-000000000001', 'Harness Shelf Club');
 insert into public.teams (id, club_id, name, requires_contact) values
-  ('s0000000-0000-4000-8000-000000000010', 's0000000-0000-4000-8000-000000000001', 'ZZ Shelf U12G QR', false),
-  ('s0000000-0000-4000-8000-000000000011', 's0000000-0000-4000-8000-000000000001', 'ZZ Shelf U16B', true);
+  ('e1000000-0000-4000-8000-000000000010', 'e1000000-0000-4000-8000-000000000001', 'ZZ Shelf U12G QR', false),
+  ('e1000000-0000-4000-8000-000000000011', 'e1000000-0000-4000-8000-000000000001', 'ZZ Shelf U16B', true);
 insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at) values
-  ('s0000000-0000-4000-8000-000000000021','00000000-0000-0000-0000-000000000000','authenticated','authenticated','s.coach@example.invalid', now(), now()),
-  ('s0000000-0000-4000-8000-000000000022','00000000-0000-0000-0000-000000000000','authenticated','authenticated','s.coach2@example.invalid', now(), now()),
-  ('s0000000-0000-4000-8000-000000000023','00000000-0000-0000-0000-000000000000','authenticated','authenticated','s.parent@example.invalid', now(), now()),
-  ('s0000000-0000-4000-8000-000000000024','00000000-0000-0000-0000-000000000000','authenticated','authenticated','s.admin@example.invalid', now(), now());
+  ('e1000000-0000-4000-8000-000000000021','00000000-0000-0000-0000-000000000000','authenticated','authenticated','s.coach@example.invalid', now(), now()),
+  ('e1000000-0000-4000-8000-000000000022','00000000-0000-0000-0000-000000000000','authenticated','authenticated','s.coach2@example.invalid', now(), now()),
+  ('e1000000-0000-4000-8000-000000000023','00000000-0000-0000-0000-000000000000','authenticated','authenticated','s.parent@example.invalid', now(), now()),
+  ('e1000000-0000-4000-8000-000000000024','00000000-0000-0000-0000-000000000000','authenticated','authenticated','s.admin@example.invalid', now(), now());
 insert into public.profiles (id, full_name, email) values
-  ('s0000000-0000-4000-8000-000000000021','S Coach','s.coach@example.invalid'),
-  ('s0000000-0000-4000-8000-000000000022','S Coach Two','s.coach2@example.invalid'),
-  ('s0000000-0000-4000-8000-000000000023','S Parent','s.parent@example.invalid'),
-  ('s0000000-0000-4000-8000-000000000024','S Admin','s.admin@example.invalid')
+  ('e1000000-0000-4000-8000-000000000021','S Coach','s.coach@example.invalid'),
+  ('e1000000-0000-4000-8000-000000000022','S Coach Two','s.coach2@example.invalid'),
+  ('e1000000-0000-4000-8000-000000000023','S Parent','s.parent@example.invalid'),
+  ('e1000000-0000-4000-8000-000000000024','S Admin','s.admin@example.invalid')
 on conflict (id) do nothing;
 insert into public.players (id, club_id, team_id, full_name) values
-  ('s0000000-0000-4000-8000-000000000061','s0000000-0000-4000-8000-000000000001','s0000000-0000-4000-8000-000000000010','S Child');
+  ('e1000000-0000-4000-8000-000000000061','e1000000-0000-4000-8000-000000000001','e1000000-0000-4000-8000-000000000010','S Child');
 insert into public.memberships (profile_id, club_id, team_id, role, status, player_id) values
-  ('s0000000-0000-4000-8000-000000000021','s0000000-0000-4000-8000-000000000001','s0000000-0000-4000-8000-000000000010','coach','active',null),
-  ('s0000000-0000-4000-8000-000000000022','s0000000-0000-4000-8000-000000000001','s0000000-0000-4000-8000-000000000011','coach','active',null),
-  ('s0000000-0000-4000-8000-000000000023','s0000000-0000-4000-8000-000000000001','s0000000-0000-4000-8000-000000000010','parent','active','s0000000-0000-4000-8000-000000000061'),
-  ('s0000000-0000-4000-8000-000000000024','s0000000-0000-4000-8000-000000000001',null,'admin','active',null);
+  ('e1000000-0000-4000-8000-000000000021','e1000000-0000-4000-8000-000000000001','e1000000-0000-4000-8000-000000000010','coach','active',null),
+  ('e1000000-0000-4000-8000-000000000022','e1000000-0000-4000-8000-000000000001','e1000000-0000-4000-8000-000000000011','coach','active',null),
+  ('e1000000-0000-4000-8000-000000000023','e1000000-0000-4000-8000-000000000001','e1000000-0000-4000-8000-000000000010','parent','active','e1000000-0000-4000-8000-000000000061'),
+  ('e1000000-0000-4000-8000-000000000024','e1000000-0000-4000-8000-000000000001',null,'admin','active',null);
 
 -- A drill in a template, for the restrict-FK proof.
 insert into public.drills (id, club_id, title, category) values
-  ('s0000000-0000-4000-8000-000000000041','s0000000-0000-4000-8000-000000000001','S shelf drill','skill');
+  ('e1000000-0000-4000-8000-000000000041','e1000000-0000-4000-8000-000000000001','S shelf drill','skill');
 insert into public.session_templates (id, club_id, name, total_minutes, created_by) values
-  ('s0000000-0000-4000-8000-000000000051','s0000000-0000-4000-8000-000000000001','S other hour', 10, 's0000000-0000-4000-8000-000000000022');
+  ('e1000000-0000-4000-8000-000000000051','e1000000-0000-4000-8000-000000000001','S other hour', 10, 'e1000000-0000-4000-8000-000000000022');
 insert into public.session_template_blocks (template_id, position, drill_id, minutes)
-values ('s0000000-0000-4000-8000-000000000051', 1, 's0000000-0000-4000-8000-000000000041', 10);
+values ('e1000000-0000-4000-8000-000000000051', 1, 'e1000000-0000-4000-8000-000000000041', 10);
 
 -- 1. squad-staff insert of a club template succeeds
-select set_config('request.jwt.claims','{"sub":"s0000000-0000-4000-8000-000000000021","role":"authenticated"}', true);
+select set_config('request.jwt.claims','{"sub":"e1000000-0000-4000-8000-000000000021","role":"authenticated"}', true);
 set local role authenticated;
 do $$ begin
   insert into public.session_templates (id, club_id, name, team_id, is_featured)
-  values ('s0000000-0000-4000-8000-000000000052','s0000000-0000-4000-8000-000000000001','S coach hour', null, false);
+  values ('e1000000-0000-4000-8000-000000000052','e1000000-0000-4000-8000-000000000001','S coach hour', null, false);
   insert into _r values (1, 'allowed');
 exception when others then insert into _r values (1, 'refused ('||sqlstate||')'); end $$;
 
 -- 2. parent insert refused
 reset role;
-select set_config('request.jwt.claims','{"sub":"s0000000-0000-4000-8000-000000000023","role":"authenticated"}', true);
+select set_config('request.jwt.claims','{"sub":"e1000000-0000-4000-8000-000000000023","role":"authenticated"}', true);
 set local role authenticated;
 do $$ begin
   insert into public.session_templates (id, club_id, name, team_id)
-  values ('s0000000-0000-4000-8000-000000000053','s0000000-0000-4000-8000-000000000001','S parent hour', null);
+  values ('e1000000-0000-4000-8000-000000000053','e1000000-0000-4000-8000-000000000001','S parent hour', null);
   insert into _r values (2, 'allowed');
 exception when others then insert into _r values (2, 'refused ('||sqlstate||')'); end $$;
 
 -- 3. coach may update own template
 reset role;
-select set_config('request.jwt.claims','{"sub":"s0000000-0000-4000-8000-000000000021","role":"authenticated"}', true);
+select set_config('request.jwt.claims','{"sub":"e1000000-0000-4000-8000-000000000021","role":"authenticated"}', true);
 set local role authenticated;
 do $$ declare n int; begin
-  update public.session_templates set notes = 'mine' where id = 's0000000-0000-4000-8000-000000000052';
+  update public.session_templates set notes = 'mine' where id = 'e1000000-0000-4000-8000-000000000052';
   get diagnostics n = row_count;
   insert into _r values (3, case when n = 1 then 'allowed' else 'refused (0 rows)' end);
 exception when others then insert into _r values (3, 'refused ('||sqlstate||')'); end $$;
 
 -- 4. coach may not update someone else's
 do $$ declare n int; begin
-  update public.session_templates set notes = 'hijack' where id = 's0000000-0000-4000-8000-000000000051';
+  update public.session_templates set notes = 'hijack' where id = 'e1000000-0000-4000-8000-000000000051';
   get diagnostics n = row_count;
   insert into _r values (4, case when n = 0 then 'refused (0 rows)' else 'allowed' end);
 exception when others then insert into _r values (4, 'refused ('||sqlstate||')'); end $$;
 
 -- 5. admin may update either
 reset role;
-select set_config('request.jwt.claims','{"sub":"s0000000-0000-4000-8000-000000000024","role":"authenticated"}', true);
+select set_config('request.jwt.claims','{"sub":"e1000000-0000-4000-8000-000000000024","role":"authenticated"}', true);
 set local role authenticated;
 do $$ declare n int; begin
-  update public.session_templates set notes = 'admin' where id in ('s0000000-0000-4000-8000-000000000051','s0000000-0000-4000-8000-000000000052');
+  update public.session_templates set notes = 'admin' where id in ('e1000000-0000-4000-8000-000000000051','e1000000-0000-4000-8000-000000000052');
   get diagnostics n = row_count;
   insert into _r values (5, case when n = 2 then 'allowed' else 'refused n='||n end);
 exception when others then insert into _r values (5, 'refused ('||sqlstate||')'); end $$;
 
 -- 6. non-admin setting is_featured refused
 reset role;
-select set_config('request.jwt.claims','{"sub":"s0000000-0000-4000-8000-000000000021","role":"authenticated"}', true);
+select set_config('request.jwt.claims','{"sub":"e1000000-0000-4000-8000-000000000021","role":"authenticated"}', true);
 set local role authenticated;
 do $$ begin
-  update public.session_templates set is_featured = true where id = 's0000000-0000-4000-8000-000000000052';
+  update public.session_templates set is_featured = true where id = 'e1000000-0000-4000-8000-000000000052';
   insert into _r values (6, 'allowed');
 exception when insufficient_privilege then insert into _r values (6, 'refused 42501');
 when others then insert into _r values (6, 'refused ('||sqlstate||')'); end $$;
 
 -- 7. like unique (drill_id, profile_id)
 do $$ begin
-  insert into public.drill_likes (drill_id, profile_id) values ('s0000000-0000-4000-8000-000000000041','s0000000-0000-4000-8000-000000000021');
-  insert into public.drill_likes (drill_id, profile_id) values ('s0000000-0000-4000-8000-000000000041','s0000000-0000-4000-8000-000000000021');
+  insert into public.drill_likes (drill_id, profile_id) values ('e1000000-0000-4000-8000-000000000041','e1000000-0000-4000-8000-000000000021');
+  insert into public.drill_likes (drill_id, profile_id) values ('e1000000-0000-4000-8000-000000000041','e1000000-0000-4000-8000-000000000021');
   insert into _r values (7, 'allowed duplicate');
 exception when unique_violation then insert into _r values (7, 'refused 23505');
 when others then insert into _r values (7, 'refused ('||sqlstate||')'); end $$;
 
 -- 8. deleting the like does not touch the drill; favorite is a separate row
 do $$ declare n int; f int; begin
-  delete from public.drill_likes where drill_id = 's0000000-0000-4000-8000-000000000041' and profile_id = 's0000000-0000-4000-8000-000000000021';
-  insert into public.drill_favorites (drill_id, profile_id) values ('s0000000-0000-4000-8000-000000000041','s0000000-0000-4000-8000-000000000021');
-  select count(*) into n from public.drills where id = 's0000000-0000-4000-8000-000000000041';
-  select count(*) into f from public.drill_favorites where drill_id = 's0000000-0000-4000-8000-000000000041';
+  delete from public.drill_likes where drill_id = 'e1000000-0000-4000-8000-000000000041' and profile_id = 'e1000000-0000-4000-8000-000000000021';
+  insert into public.drill_favorites (drill_id, profile_id) values ('e1000000-0000-4000-8000-000000000041','e1000000-0000-4000-8000-000000000021');
+  select count(*) into n from public.drills where id = 'e1000000-0000-4000-8000-000000000041';
+  select count(*) into f from public.drill_favorites where drill_id = 'e1000000-0000-4000-8000-000000000041';
   insert into _r values (8, case when n = 1 and f = 1 then 'allowed' else 'fail n='||n||' f='||f end);
 exception when others then insert into _r values (8, 'refused ('||sqlstate||')'); end $$;
 
 -- 9. deleting a drill that is in a template is still 23503
 reset role;
 do $$ begin
-  delete from public.drills where id = 's0000000-0000-4000-8000-000000000041';
+  delete from public.drills where id = 'e1000000-0000-4000-8000-000000000041';
   insert into _r values (9, 'allowed');
 exception when foreign_key_violation then insert into _r values (9, 'refused 23503');
 when others then insert into _r values (9, 'refused ('||sqlstate||')'); end $$;
