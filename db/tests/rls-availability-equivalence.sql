@@ -457,6 +457,8 @@ create or replace function private.availability_self_editable(p_event_id uuid)
 returns boolean language sql stable security definer set search_path = public, private
 as $$
   select case
+    when e.availability_override = 'open'   then true
+    when e.availability_override = 'locked' then false
     when e.starts_at is null then true
     when e.type not in ('match','training') then true
     else now() < (
