@@ -121,6 +121,7 @@ const GRID = {
   body: 'Set a fifteen-metre grid. Two lines, ball starts at opposite corners.',
   source_name: 'Coaching notebook',
   source_url: 'https://example.org/grid-passing',
+  diagram_url: 'https://example.org/diagrams/grid-passing.svg',
   minutes: 15,
   category: 'skill',
   requires_contact: false,
@@ -281,6 +282,49 @@ describe('SessionPlan — reading the plan', () => {
     expect(link).toHaveAttribute('href', 'https://example.org/grid-passing')
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noreferrer')
+
+    // Pitch drawing sits above the body once the card is opened. The closed
+    // list row is title / minutes / category only — no thumbnail.
+    const diagram = within(detail).getByRole('img', { name: 'Grid passing pitch diagram' })
+    expect(diagram).toHaveAttribute('src', GRID.diagram_url)
+    expect(diagram.compareDocumentPosition(within(detail).getByText(GRID.body)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(items[1]).queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  it('opens How it runs for a diagram-only drill', async () => {
+    getSessionMock.mockResolvedValue({
+      ...SESSION,
+      blocks: [
+        {
+          id: 'b-angle',
+          position: 1,
+          drill_id: 'd-angle',
+          minutes: 10,
+          coach_note: null,
+          drill: {
+            id: 'd-angle',
+            title: 'Angle Track Drill',
+            summary: null,
+            body: null,
+            source_url: null,
+            diagram_url: 'https://example.org/diagrams/angle-track.svg',
+            minutes: 10,
+            category: 'skill',
+            is_active: true,
+          },
+        },
+      ],
+    })
+    const { user } = show()
+    const item = await screen.findByRole('listitem')
+    const detail = within(item).getByText('How it runs').closest('details')
+    expect(detail).not.toHaveAttribute('open')
+    await user.click(within(item).getByText('How it runs'))
+    expect(detail).toHaveAttribute('open')
+    expect(within(item).getByRole('img', { name: 'Angle Track Drill pitch diagram' })).toHaveAttribute(
+      'src',
+      'https://example.org/diagrams/angle-track.svg',
+    )
   })
 
   it('says "Edited by the coach" when coach_edited_at is set', async () => {

@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- (unmerged) — 🏉 **Session Plan lists this squad's hours only** — START FROM A
+- (unmerged) — 🏉 **Pitch diagrams on opened drill cards** — nullable
+  `drills.diagram_url` and a public `training-diagrams` Storage bucket
+  (schematic drawings only: cones and letters, never a child's photo).
+  Opened Session Plan / admin library editor show the image above the body
+  via `src/components/DrillDiagram.jsx`; shelf and library list rows still
+  have no thumbnails. Body stays prose
+  (`claude/decisions/2026-08-21-drill-body-is-just-a-text-field.md`). Spec:
+  `claude/specs/2026-08-27-drill-diagrams.md`. The NEXT pull request cites
+  this entry's squash SHA.
+- `0edfaa0` — 🏉 **Session Plan lists this squad's hours only** — START FROM A
   TEMPLATE and ADD A DRILL reuse `shelfRowsForSquad` from
   `src/lib/trainingShelf.js` (age from the squad name, contact from
   `teams.requires_contact`). Freestyle stays first. A U18B coach no longer

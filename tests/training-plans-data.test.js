@@ -315,6 +315,16 @@ describe('embed sort', () => {
     expect(rows[1].blocks).toEqual([])
   })
 
+  it('embeds diagram_url on every drill join used for display', async () => {
+    resultFor.mockImplementation(() => ({ data: [], error: null }))
+    await listTemplates()
+    await getSession('ev1')
+    const selectFor = (table) =>
+      calls.filter((c) => c.table === table).flatMap((c) => c.ops).find((o) => o.name === 'select')
+    expect(selectFor('session_templates').args[0]).toContain('diagram_url')
+    expect(selectFor('training_sessions').args[0]).toContain('diagram_url')
+  })
+
   it('getSession sorts the session’s blocks by position', async () => {
     resultFor.mockImplementation(() => ({
       data: { id: 's1', blocks: [...SHUFFLED] },

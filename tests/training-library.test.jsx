@@ -78,6 +78,7 @@ const RUCK_RACE = {
   body: 'Split the squad into two lines…',
   source_name: null,
   source_url: null,
+  diagram_url: 'https://example.org/diagrams/ruck-race.svg',
   minutes: 10,
   category: 'game',
   requires_contact: false,
@@ -173,6 +174,27 @@ describe('TrainingLibrary', () => {
     expect(screen.getByTestId('drill-drill-2')).toBeInTheDocument()
   })
 
+  it('shows the pitch diagram on the open editor, never on the list row', async () => {
+    const { user } = renderLibrary()
+    const ruck = await screen.findByTestId('drill-drill-1')
+    expect(within(ruck).queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /pitch diagram/i })).not.toBeInTheDocument()
+
+    await user.click(ruck)
+    const panel = await screen.findByTestId('drill-panel')
+    const diagram = within(panel).getByRole('img', { name: 'Ruck race pitch diagram' })
+    expect(diagram).toHaveAttribute('src', RUCK_RACE.diagram_url)
+    expect(screen.getByLabelText('Pitch diagram URL')).toHaveValue(RUCK_RACE.diagram_url)
+  })
+
+  it('hides the diagram image when the editor row has no URL', async () => {
+    const { user } = renderLibrary()
+    await user.click(await screen.findByTestId('drill-drill-2'))
+    const panel = await screen.findByTestId('drill-panel')
+    expect(within(panel).queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Pitch diagram URL')).toHaveValue('')
+  })
+
   it('re-fetches with includeRetired when Show retired is switched on', async () => {
     const { user } = renderLibrary()
     await screen.findByTestId('drill-drill-1')
@@ -217,6 +239,7 @@ describe('TrainingLibrary', () => {
       body: 'Cheek to cheek, then drive.',
       source_name: null,
       source_url: null,
+      diagram_url: null,
       minutes: 15,
       category: 'skill',
       requires_contact: true,
