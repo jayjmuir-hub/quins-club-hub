@@ -36,6 +36,12 @@ $$;
 
 revoke all on function private.availability_self_editable(uuid) from public;
 
+-- ⚠️ RE-GRANT to authenticated — mandatory. `revoke all from public` strips the
+-- default PUBLIC execute grant, and a private helper used inside an RLS policy
+-- must re-grant execute to authenticated or the policy raises "permission denied
+-- for function" for a parent/coach. `anon` needs nothing (no USAGE on private).
+grant execute on function private.availability_self_editable(uuid) to authenticated;
+
 -- ── The three write policies. Staff arm unchanged; the self arm is now
 --    lock-gated, and DELETE gains the self arm it never had. ────────────────
 drop policy "avail write insert" on public.availability;
