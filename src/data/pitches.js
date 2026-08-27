@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { upsertById } from './upsertById.js'
 
 // The managed pitch list, and clash detection over it.
 //
@@ -60,18 +61,7 @@ const REFUSED =
  * somebody means.
  */
 export async function upsertPitch(pitch) {
-  const { id, ...fields } = pitch ?? {}
-
-  const query = id
-    ? supabase.from('pitches').update(fields).eq('id', id).select().maybeSingle()
-    : supabase.from('pitches').insert(fields).select().maybeSingle()
-
-  const { data, error } = await query
-  if (error) throw error
-  // A refused write is filtered to zero rows by RLS rather than raising, and
-  // PostgREST answers 200. No row back is a refusal, not a success.
-  if (!data) throw new Error(REFUSED)
-  return data
+  return upsertById('pitches', pitch, { refusedMessage: REFUSED })
 }
 
 /**

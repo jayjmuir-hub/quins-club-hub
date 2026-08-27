@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Codebase-audit follow-up (multi-agent review). Security: hardened a stored-XSS
+- Data layer: the update-or-insert write shape that five `upsert*` functions
+  hand-wrote is now one helper, `src/data/upsertById.js`. The non-obvious rule
+  it carries — a write RLS filters to zero rows comes back as `data === null`
+  with no error, so "no row back" is a refusal not a success — was re-explained
+  in three files and now lives in one. `upsertEvent`, `upsertPitch`,
+  `upsertPlayer`, `upsertLeagueTeam` and `saveMatchSheet` delegate to it and
+  keep their differences through `refusedMessage` / `embed` / `mapError`
+  options. Pure consolidation, behaviour unchanged (231 files still green).
+- `06124bd` — Codebase-audit follow-up (multi-agent review). Security: hardened a stored-XSS
   path — a drill's `source_url`/`diagram_url` came from a plain `<input type=url>`
   and rendered straight into an `href`/`img src`, so a `javascript:` link could
   run in another coach's session; both now pass through http(s)-only
