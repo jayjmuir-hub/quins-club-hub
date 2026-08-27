@@ -1,5 +1,5 @@
 import { clubDayParts, CLUB_TIME_ZONE } from './eventFormat.js'
-import { CATEGORIES } from './trainingPlans.js'
+import { CATEGORIES, squadFitsTemplate } from './trainingPlans.js'
 
 // Pure decisions for the Squad Training shelf.
 // Spec: claude/specs/2026-08-27-training-shelf.md
@@ -13,9 +13,62 @@ export const CHIP_ORDER = ['Tackle', 'Passing', 'Ruck', 'Attack', 'Defence']
 
 export { CATEGORIES }
 
-/** Templates the shelf draws as focus chips — `chip_label` set, never hidden. */
-export function chipHours(templates) {
-  return (templates ?? []).filter((row) => Boolean(row?.chip_label))
+/** Width of an age band. Unbounded ends are looser than a closed pack. */
+function ageSpan(template) {
+  const min = template?.min_age ?? null
+  const max = template?.max_age ?? null
+  if (min == null && max == null) return Number.POSITIVE_INFINITY
+  if (min == null) return (max ?? 19) - 4
+  if (max == null) return 19 - min
+  return max - min
+}
+
+function pickChipForSquad(candidates, team) {
+  const fitting = candidates.filter((row) => squadFitsTemplate(team, row).ok)
+  if (fitting.length === 1) return fitting[0]
+  if (fitting.length > 1) {
+    return [...fitting].sort((a, b) => ageSpan(a) - ageSpan(b))[0]
+  }
+  const contactFail = candidates.find((row) => /this squad is tag/i.test(squadFitsTemplate(team, row).reason ?? ''))
+  return contactFail ?? candidates[0]
+}
+
+/**
+ * One chip per `chip_label`. A label that fits this squad uses the tightest
+ * matching pack; a label that does not still appears once, disabled.
+ * Extra age-pack copies are not emitted — that is the picker's job, not CSS.
+ */
+export function chipHours(templates, team) {
+  const rows = (templates ?? []).filter((row) => Boolean(row?.chip_label))
+  const byLabel = new Map()
+  for (const row of rows) {
+    const label = row.chip_label
+    if (!byLabel.has(label)) byLabel.set(label, [])
+    byLabel.get(label).push(row)
+  }
+  const extras = [...byLabel.keys()].filter((label) => !CHIP_ORDER.includes(label))
+  const labels = [...CHIP_ORDER.filter((label) => byLabel.has(label)), ...extras]
+  return labels.map((label) => pickChipForSquad(byLabel.get(label), team))
+}
+
+/**
+ * Why a chip is enabled or not. Age-pack mismatch is "No hour for this age"
+ * (the picker already dropped the other copies). Contact stays the Publish-tab
+ * sentence. Contact is never inferred from the squad name.
+ */
+export function chipFit(team, template) {
+  const fit = squadFitsTemplate(team, template)
+  if (fit.ok) return fit
+  if (/outside this /.test(fit.reason ?? '')) {
+    return { ok: false, reason: 'No hour for this age' }
+  }
+  return fit
+}
+
+/** Library rows that fit this squad. Age from the name; contact from the column. */
+export function shelfRowsForSquad(rows, team, { allAges = false } = {}) {
+  if (allAges) return rows ?? []
+  return (rows ?? []).filter((row) => squadFitsTemplate(team, row).ok)
 }
 
 /**

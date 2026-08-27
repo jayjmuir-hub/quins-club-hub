@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest'
 import {
   CLUB_BUCKET,
   chipHours,
+  chipFit,
+  shelfRowsForSquad,
   blocksFromTemplate,
   chipNeedsConfirm,
   chipReplaceMessage,
@@ -13,20 +15,109 @@ import {
 
 // Pure shelf rules. Invented fixtures only — CLAUDE.md rule 9.
 
+const CHIP_LABELS = ['Tackle', 'Passing', 'Ruck', 'Attack', 'Defence']
+
+function contactPack(min, max) {
+  return CHIP_LABELS.map((chip_label) => ({
+    id: `${chip_label}-${min}-${max}`,
+    chip_label,
+    name: `${chip_label} U${min}–U${max}`,
+    requires_contact: true,
+    min_age: min,
+    max_age: max,
+  }))
+}
+
+const THREE_PACKS = [...contactPack(9, 10), ...contactPack(11, 14), ...contactPack(16, 18)]
+const U18 = { name: 'U18B', requires_contact: true }
+const U12G_QR = { name: 'U12G QR', requires_contact: false }
+
 describe('chipHours', () => {
   it('keeps templates with a chip_label and drops the rest', () => {
     expect(
-      chipHours([
-        { id: 't1', chip_label: 'Tackle' },
-        { id: 't2', chip_label: null },
-        { id: 't3', name: 'Skills night' },
-      ]).map((row) => row.id),
+      chipHours(
+        [
+          { id: 't1', chip_label: 'Tackle' },
+          { id: 't2', chip_label: null },
+          { id: 't3', name: 'Skills night' },
+        ],
+        U18,
+      ).map((row) => row.id),
     ).toEqual(['t1'])
   })
 
   it('is empty-safe — no featured hours yet is not a crash', () => {
-    expect(chipHours([])).toEqual([])
-    expect(chipHours(undefined)).toEqual([])
+    expect(chipHours([], U18)).toEqual([])
+    expect(chipHours(undefined, U18)).toEqual([])
+  })
+
+  it('emits one chip per label for a U18 contact squad, from the 16–18 pack only', () => {
+    const chips = chipHours(THREE_PACKS, U18)
+    expect(chips.map((row) => row.chip_label)).toEqual(CHIP_LABELS)
+    expect(chips.every((row) => chipFit(U18, row).ok)).toBe(true)
+    expect(chips.map((row) => row.id)).toEqual(CHIP_LABELS.map((label) => `${label}-16-18`))
+    expect(chips.every((row) => row.min_age === 16 && row.max_age === 18)).toBe(true)
+  })
+
+  it('picks the tightest fitting age band when several packs cover the squad', () => {
+    const chips = chipHours(
+      [
+        { id: 'wide', chip_label: 'Passing', requires_contact: true, min_age: 14, max_age: 18 },
+        { id: 'tight', chip_label: 'Passing', requires_contact: true, min_age: 16, max_age: 18 },
+        { id: 'any', chip_label: 'Passing', requires_contact: false, min_age: null, max_age: null },
+      ],
+      U18,
+    )
+    expect(chips).toHaveLength(1)
+    expect(chips[0].id).toBe('tight')
+  })
+
+  it('shows Tackle once, disabled for contact, on U12G QR — never an enabled U16 hour', () => {
+    const chips = chipHours(THREE_PACKS, U12G_QR)
+    const tackles = chips.filter((row) => row.chip_label === 'Tackle')
+    expect(tackles).toHaveLength(1)
+    const fit = chipFit(U12G_QR, tackles[0])
+    expect(fit.ok).toBe(false)
+    expect(fit.reason).toMatch(/tag/i)
+    expect(chips.filter((row) => chipFit(U12G_QR, row).ok)).toEqual([])
+  })
+
+  it('names age-miss as no hour for this age, not a specific pack band', () => {
+    const u7 = { name: 'U7 Mixed', requires_contact: true }
+    const chips = chipHours(contactPack(9, 10), u7)
+    expect(chips).toHaveLength(5)
+    const fit = chipFit(u7, chips[0])
+    expect(fit.ok).toBe(false)
+    expect(fit.reason).toBe('No hour for this age')
+    expect(fit.reason).not.toMatch(/U9/)
+  })
+})
+
+describe('shelfRowsForSquad', () => {
+  const copies = [
+    { id: 'd-u16', title: '4 v 2 Continuous Touch', min_age: 16, max_age: 18, requires_contact: true },
+    { id: 'd-u9', title: '4 v 2 Continuous Touch', min_age: 9, max_age: 10, requires_contact: true },
+    { id: 'd-u11', title: '4 v 2 Continuous Touch', min_age: 11, max_age: 14, requires_contact: true },
+  ]
+
+  it('defaults to drills that fit this squad — U18 hides the U9 and U11 copies', () => {
+    expect(shelfRowsForSquad(copies, U18).map((row) => row.id)).toEqual(['d-u16'])
+  })
+
+  it('hides a contact drill from a tag squad even when the age would fit', () => {
+    const u12copies = [
+      { id: 'd-contact-u12', title: 'Live Tackle', min_age: 11, max_age: 14, requires_contact: true },
+      { id: 'd-tag-u12', title: 'Rip and roll', min_age: 11, max_age: 14, requires_contact: false },
+    ]
+    expect(shelfRowsForSquad(u12copies, U12G_QR).map((row) => row.id)).toEqual(['d-tag-u12'])
+  })
+
+  it('show-all-ages returns every copy', () => {
+    expect(shelfRowsForSquad(copies, U18, { allAges: true }).map((row) => row.id)).toEqual([
+      'd-u16',
+      'd-u9',
+      'd-u11',
+    ])
   })
 })
 

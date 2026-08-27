@@ -85,6 +85,58 @@ const PASSING = {
   blocks: [],
 }
 
+const CHIP_LABELS = ['Tackle', 'Passing', 'Ruck', 'Attack', 'Defence']
+
+function contactPack(min, max) {
+  return CHIP_LABELS.map((chip_label) => ({
+    id: `tpl-${chip_label}-${min}-${max}`,
+    name: `${chip_label} hour U${min}–U${max}`,
+    chip_label,
+    requires_contact: true,
+    min_age: min,
+    max_age: max,
+    total_minutes: 60,
+    created_by: null,
+    blocks: [],
+  }))
+}
+
+const THREE_CONTACT_PACKS = [...contactPack(9, 10), ...contactPack(11, 14), ...contactPack(16, 18)]
+const U18_SQUAD = { id: 't-u18b', name: 'U18B', requires_contact: true, club_id: 'club-1' }
+
+const TOUCH_COPIES = [
+  {
+    id: 'd-touch-u16',
+    title: '4 v 2 Continuous Touch',
+    created_by: null,
+    minutes: 8,
+    category: 'game',
+    min_age: 16,
+    max_age: 18,
+    requires_contact: true,
+  },
+  {
+    id: 'd-touch-u9',
+    title: '4 v 2 Continuous Touch',
+    created_by: null,
+    minutes: 8,
+    category: 'game',
+    min_age: 9,
+    max_age: 10,
+    requires_contact: true,
+  },
+  {
+    id: 'd-touch-u11',
+    title: '4 v 2 Continuous Touch',
+    created_by: null,
+    minutes: 8,
+    category: 'game',
+    min_age: 11,
+    max_age: 14,
+    requires_contact: true,
+  },
+]
+
 const CLAMP = {
   id: 'd-clamp',
   title: 'Climb In Drill',
@@ -235,6 +287,34 @@ describe('focus chips', () => {
     expect(publishMock).not.toHaveBeenCalled()
   })
 
+  it('U18 contact squad sees one enabled chip per focus from the 16–18 pack, never U9 or U11 copies', async () => {
+    listTemplatesMock.mockResolvedValue(THREE_CONTACT_PACKS)
+    showShelf(U18_SQUAD)
+    const row = await screen.findByTestId('focus-chips')
+    const chips = within(row).getAllByRole('button')
+    expect(chips.map((el) => el.textContent)).toEqual(CHIP_LABELS)
+    expect(chips.every((el) => !el.disabled)).toBe(true)
+    expect(row.textContent).not.toMatch(/outside this template/i)
+    expect(row.textContent).not.toMatch(/U9–U10|U11–U14/)
+  })
+
+  it('U12G QR shows Tackle once, disabled for contact, and never an enabled U16 contact hour', async () => {
+    listTemplatesMock.mockResolvedValue(THREE_CONTACT_PACKS)
+    showShelf()
+    const row = await screen.findByTestId('focus-chips')
+    const tackles = within(row)
+      .getAllByRole('button')
+      .filter((el) => el.textContent === 'Tackle')
+    expect(tackles).toHaveLength(1)
+    expect(tackles[0]).toBeDisabled()
+    expect(tackles[0]).toHaveAccessibleName(/Contact template; this squad is tag/i)
+    expect(within(row).queryByText(/outside this template/i)).not.toBeInTheDocument()
+    const enabled = within(row)
+      .getAllByRole('button')
+      .filter((el) => !el.disabled)
+    expect(enabled).toHaveLength(0)
+  })
+
   it('applying a chip over an already-edited session is gated on confirm; cancel leaves blocks untouched', async () => {
     const user = userEvent.setup()
     getSessionMock.mockResolvedValue({
@@ -268,6 +348,27 @@ describe('empty library', () => {
 })
 
 describe('library browse', () => {
+  it('defaults to drills that fit this squad and hides out-of-age copies', async () => {
+    listDrillsMock.mockResolvedValue(TOUCH_COPIES)
+    showShelf(U18_SQUAD)
+    const shelf = await screen.findByTestId('library-shelf')
+    expect(within(shelf).getAllByText('4 v 2 Continuous Touch')).toHaveLength(1)
+    expect(within(shelf).getByText(/U16–U18/)).toBeInTheDocument()
+    expect(within(shelf).queryByText(/U9–U10/)).not.toBeInTheDocument()
+    expect(within(shelf).queryByText(/U11–U14/)).not.toBeInTheDocument()
+  })
+
+  it('library browse defaults to this squad; show all ages reveals the other packs', async () => {
+    const user = userEvent.setup()
+    listDrillsMock.mockResolvedValue(TOUCH_COPIES)
+    showShelf(U18_SQUAD)
+    await user.click(screen.getAllByRole('button', { name: /see all/i })[1])
+    const browse = await screen.findByTestId('library-browse')
+    expect(within(browse).getAllByText('4 v 2 Continuous Touch')).toHaveLength(1)
+    await user.click(within(browse).getByRole('button', { name: /show all ages/i }))
+    expect(within(browse).getAllByText('4 v 2 Continuous Touch')).toHaveLength(3)
+  })
+
   it('browse-by-coach groups on created_by; null is Club / World Rugby', async () => {
     const user = userEvent.setup()
     listDrillsMock.mockResolvedValue([
@@ -278,6 +379,7 @@ describe('library browse', () => {
     await screen.findByTestId('library-shelf')
     await user.click(screen.getAllByRole('button', { name: /see all/i })[1])
     const browse = await screen.findByTestId('library-browse')
+    await user.click(within(browse).getByRole('button', { name: /show all ages/i }))
     await user.click(within(browse).getByRole('button', { name: /by coach/i }))
     const groups = within(browse).getAllByTestId('coach-group')
     expect(groups.map((g) => g.querySelector('h3').textContent)).toEqual([
