@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
+- Squad Hub event sheet: Edit opens the same EventForm Full schedule uses
+  (title, time, pitch). Delete is withheld on the hub so staff do not
+  confuse calendar delete with clearing the training plan; Full schedule
+  and Home keep both. EventDetail Edit/Delete follow Duplicate's
+  handler-required rule. Tests: `tests/squad-hub-event-sheet.test.jsx`,
+  `tests/duplicate-event.test.jsx`, `tests/session-plan-share-hosts.test.jsx`.
+- `cbcb61b` — Session Plan Share PNG: portal QC + Club Hub card look;
+  golden PNG committed so CI no longer screenshots; capture tree in
+  force-light; pitch line is EventDetail's `eventPitchLabel`. Spec:
+  `claude/specs/2026-08-27-session-plan-share.md`.
 - Session Plan Share pitch line is EventDetail's `eventPitchLabel` (stored
   `pitches.name`, e.g. D1 / D2). Combined Preseason golden uses D1, never
   "Pitch 2". Spec: `claude/specs/2026-08-27-session-plan-share.md`.
