@@ -34,8 +34,16 @@ export function availabilityLockInstant(event) {
   return iso ? new Date(iso) : null
 }
 
-/** True when self-service editing is closed for this event at `now`. */
+/**
+ * True when self-service editing is closed for this event at `now`.
+ *
+ * A per-event override wins over the calendar rule: 'open' is never locked,
+ * 'locked' always is (even a social, even a distant match). 'auto', null, or a
+ * missing value fall through to availabilityLockInstant (the calendar rule).
+ */
 export function isAvailabilitySelfLocked(event, now = new Date()) {
+  if (event?.availability_override === 'open') return false
+  if (event?.availability_override === 'locked') return true
   const instant = availabilityLockInstant(event)
   return instant != null && now.getTime() >= instant.getTime()
 }
