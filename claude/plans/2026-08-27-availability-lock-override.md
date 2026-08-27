@@ -51,18 +51,18 @@ gate; no new policy.
    Default `'auto'` so every existing event keeps today's behaviour with no
    backfill.
 
-2. **Column grants.** `events` uses **column-level** grants for `authenticated`
-   (measured 27 Aug 2026: 32 SELECT and 32 UPDATE columns). A new column is NOT
-   covered by those, so it needs its own grants — the client reads it to render
-   the control and compute the UI lock, and staff write it:
-   ```sql
-   grant select (availability_override) on public.events to authenticated;
-   grant update (availability_override) on public.events to authenticated;
-   ```
-   Follow the pattern of prior events-column migrations (e.g.
-   `20260811162649_competition_type`, `20260808151251_event_end_time_and_notes`).
-   ⚠️ **`docs:check` rule 7** requires a migration granting on a table to be
-   represented in `db/schema/grants.sql` — add the two lines there too.
+2. **No column grant needed — CORRECTED 27 Aug 2026.** An earlier draft of this
+   spec claimed `events` uses column-level grants (from a legacy count of 32
+   SELECT/UPDATE column grants). That is superseded: `events` has **table-level
+   ALL 8** for `authenticated` (`db/schema/grants.sql` §1 line ~156, and
+   measured — `has_table_privilege('authenticated','public.events','UPDATE')` is
+   `true`). A new column is therefore automatically covered; prior events-column
+   migrations (`20260811162649_competition_type`,
+   `20260808151251_event_end_time_and_notes`) add no grant, and neither does
+   this one. **No `db/schema/grants.sql` change** — `docs:check` rule 7 only
+   fires when a migration writes a GRANT, and this migration writes none. RLS
+   (`can_edit_team`, the events write policy) remains the gate on *who* may
+   update the column.
 
 3. **Alter the helper** `private.availability_self_editable` to consult the
    override first, then fall through to the existing auto rule:
