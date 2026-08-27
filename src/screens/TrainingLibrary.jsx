@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Chip from '../components/Chip.jsx'
+import DrillDiagram from '../components/DrillDiagram.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import {
@@ -57,6 +58,7 @@ const BLANK = {
   body: '',
   source_name: '',
   source_url: '',
+  diagram_url: '',
   // The table's own default. Seeding the box with it means a drill nobody
   // times still saves something legal rather than tripping the 1..120 check.
   minutes: '10',
@@ -74,6 +76,7 @@ function draftFrom(drill) {
     body: drill.body ?? '',
     source_name: drill.source_name ?? '',
     source_url: drill.source_url ?? '',
+    diagram_url: drill.diagram_url ?? '',
     minutes: String(drill.minutes ?? 10),
     category: drill.category ?? CATEGORIES[0],
     requires_contact: drill.requires_contact === true,
@@ -241,6 +244,7 @@ function LibraryBody() {
       body: textOrNull(draft.body),
       source_name: textOrNull(draft.source_name),
       source_url: textOrNull(draft.source_url),
+      diagram_url: textOrNull(draft.diagram_url),
       minutes: Number(draft.minutes),
       category: draft.category,
       requires_contact: draft.requires_contact === true,
@@ -456,6 +460,8 @@ function LibraryBody() {
               />
             </label>
 
+            <DrillDiagram url={textOrNull(draft.diagram_url)} title={draft.title.trim() || 'Drill'} />
+
             <label>
               <span className={LABEL}>The drill</span>
               <textarea
@@ -565,6 +571,21 @@ function LibraryBody() {
                 />
               </label>
             </div>
+
+            <label>
+              {/* URL only — no uploader in this PR. Seeded World Rugby cards
+                  get paths in a later data pass. Body stays prose. */}
+              <span className={LABEL}>Pitch diagram URL (optional)</span>
+              <input
+                type="url"
+                aria-label="Pitch diagram URL"
+                value={draft.diagram_url}
+                disabled={saving}
+                onChange={(domEvent) => set('diagram_url', domEvent.target.value)}
+                placeholder="https://…"
+                className={INPUT}
+              />
+            </label>
 
             {/* ⚠️ A DRAFT FLAG, NOT AN IMMEDIATE WRITE — the opposite of
                 AdminClub's contact switch, and for a reason: this drill may not

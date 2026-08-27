@@ -147,6 +147,7 @@ const CLAMP = {
   min_age: 16,
   max_age: 18,
   requires_contact: true,
+  diagram_url: 'https://example.org/diagrams/climb-in.svg',
 }
 
 beforeEach(() => {
@@ -255,6 +256,20 @@ describe('DrillCard', () => {
     expect(within(card).queryByRole('img')).not.toBeInTheDocument()
     expect(card.textContent).not.toMatch(/player/i)
   })
+
+  it('does not draw a list thumbnail even when a diagram URL is passed', () => {
+    render(
+      <DrillCard
+        title="Climb In Drill"
+        summary="Finish on top"
+        diagramUrl="https://example.org/diagrams/climb-in.svg"
+        likeCount={6}
+        onLike={() => {}}
+        onFavorite={() => {}}
+      />,
+    )
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
 })
 
 function showShelf(team = TAG_SQUAD, tonight = TONIGHT) {
@@ -333,6 +348,21 @@ describe('focus chips', () => {
     expect(applyChipHourMock).not.toHaveBeenCalled()
     expect(screen.getByText(/Keep me/)).toBeInTheDocument()
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('library list has no photos', () => {
+  it('does not put a pitch diagram on a shelf or browse row', async () => {
+    const user = userEvent.setup()
+    showShelf(U18_SQUAD)
+    const shelf = await screen.findByTestId('library-shelf')
+    expect(within(shelf).getByText('Climb In Drill')).toBeInTheDocument()
+    expect(within(shelf).queryByRole('img')).not.toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: /see all/i })[1])
+    const browse = await screen.findByTestId('library-browse')
+    expect(within(browse).getByText('Climb In Drill')).toBeInTheDocument()
+    expect(within(browse).queryByRole('img')).not.toBeInTheDocument()
   })
 })
 

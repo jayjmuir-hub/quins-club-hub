@@ -8,7 +8,7 @@ import { totalMinutes } from '../lib/trainingPlans.js'
 // screen would report a save that never happened. Same guard as teams.js.
 
 const REFUSED = "We couldn't save that — you may not have the Rugby Performance Director right."
-const DRILL_EMBED = 'drill:drills(id,title,summary,body,source_name,source_url,minutes,category,requires_contact,min_age,max_age,is_active)'
+const DRILL_EMBED = 'drill:drills(id,title,summary,body,source_name,source_url,diagram_url,minutes,category,requires_contact,min_age,max_age,is_active)'
 
 function must(data, error) {
   if (error) throw new Error(error.message || REFUSED)
