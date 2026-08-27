@@ -388,6 +388,35 @@ describe('library browse', () => {
     ])
   })
 
+  it('From coaches lists only hours that fit this squad, never a U9 copy on U18B', async () => {
+    listTemplatesMock.mockResolvedValue([
+      {
+        id: 'tpl-coach-u16',
+        name: 'Rowan Passing U16–U18',
+        created_by: 'p-row',
+        requires_contact: true,
+        min_age: 16,
+        max_age: 18,
+        total_minutes: 60,
+        blocks: [],
+      },
+      {
+        id: 'tpl-coach-u9',
+        name: 'Rowan Passing U9–U10',
+        created_by: 'p-row',
+        requires_contact: true,
+        min_age: 9,
+        max_age: 10,
+        total_minutes: 60,
+        blocks: [],
+      },
+    ])
+    showShelf(U18_SQUAD)
+    const coaches = await screen.findByTestId('from-coaches')
+    expect(within(coaches).getByText('Rowan Passing U16–U18')).toBeInTheDocument()
+    expect(within(coaches).queryByText('Rowan Passing U9–U10')).not.toBeInTheDocument()
+  })
+
   it('used this week is a count, not a 1–5 control, on an hour row', async () => {
     const contactSquad = { ...TAG_SQUAD, name: 'U16B', requires_contact: true }
     listRecentTrainingUsageMock.mockResolvedValue([

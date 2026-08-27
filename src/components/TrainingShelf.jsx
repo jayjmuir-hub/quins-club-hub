@@ -99,7 +99,10 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
   }, [team?.id, tonight?.id, reloadToken])
 
   const chips = chipHours(templates, team)
-  const fromCoaches = templates.filter((row) => row.created_by)
+  const fromCoaches = shelfRowsForSquad(
+    templates.filter((row) => row.created_by),
+    team,
+  )
   const visibleDrills = shelfRowsForSquad(drills, team)
   const weekday = clubWeekday(tonight) ?? 'tonight'
 

@@ -18,10 +18,10 @@ import {
   ageOrNull,
   CATEGORIES,
   CATEGORY_LABELS,
-  squadFitsTemplate,
   textOrNull,
   totalMinutes,
 } from '../lib/trainingPlans.js'
+import { shelfRowsForSquad } from '../lib/trainingShelf.js'
 import { clubDateTimeInputs, eventDate } from '../lib/eventFormat.js'
 
 // Who sees a coach's plan. The order is the promotion path: a coach starts a
@@ -66,13 +66,13 @@ const BLANK_DRILL = {
 // them is noise on the screen a member actually reads. No session and no focus
 // covering the night means no card at all.
 //
-// ⚠️ THE FIT CHECK IN THE PICKER IS AGAINST THE SQUAD, NOT A TEMPLATE. A coach
-// adding a drill to one night's plan is adding it for THESE children, so the
-// drill's own contact flag and age band are handed to squadFitsTemplate as the
-// "template" and the answer is about this team. That carries the null-band rule
-// with it: a squad whose name cannot be parsed gets offered no age-limited
-// drill and is told why, rather than being given a default band — the fault
-// that once offered a twelve-year-old squad an adult contact form.
+// ⚠️ THE PICKERS FILTER AT THE LIST, NEVER CSS-HIDE AND NEVER A DISABLED
+// OPTION. START FROM A TEMPLATE and ADD A DRILL reuse shelfRowsForSquad —
+// age from the squad name, contact from teams.requires_contact. Disabled-
+// with-reason is the chip-row rule; a dropdown option you cannot pick is
+// worse than omitting it (Jay, 27 Aug 2026). EventDetail and Squad Training
+// mount this same card; they have no sibling picker. Director /admin/training
+// lists stay unfiltered on purpose.
 
 const INPUT =
   'w-full rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-[16px] text-ink outline-none transition focus:border-brand'
@@ -357,6 +357,10 @@ export default function SessionPlan({ event, team, canEdit }) {
   }, [event.id, event.team_id, clubDate, canEdit, reloadToken])
 
   const building = editing || creating
+  // Club + this squad's rows from the query; this squad's age/contact fit at
+  // the option list. Unbounded rows still appear (any-age Freestyle seed).
+  const visibleTemplates = shelfRowsForSquad(templates, team)
+  const visibleDrills = shelfRowsForSquad(drills, team)
 
   if (loading) return null
   // Nothing published and no theme for the fortnight. A coach still gets a card
@@ -712,8 +716,12 @@ export default function SessionPlan({ event, team, canEdit }) {
 
       {building && (
         <div>
-          {/* Seed from a template — only when building a NEW plan. The club's
-              templates and this squad's own; another squad's never appear. */}
+          {/* Seed from a template — only when building a NEW plan. Freestyle
+              first, then hours shelfRowsForSquad accepts for THIS squad.
+              Another squad's rows never appear (listTemplates's teamId);
+              another age pack's hours never appear (the filter). The select
+              stays up so Freestyle remains even when every club hour is
+              the wrong contact or age. */}
           {creating && templates.length > 0 && (
             <label className="mb-2.5 block">
               <span className={LABEL}>Start from a template</span>
@@ -725,7 +733,7 @@ export default function SessionPlan({ event, team, canEdit }) {
                 className={INPUT}
               >
                 <option value="">Freestyle — an empty plan</option>
-                {templates.map((template) => (
+                {visibleTemplates.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.name}
                     {template.team_id ? ' (your squad)' : ''}
@@ -760,28 +768,11 @@ export default function SessionPlan({ event, team, canEdit }) {
               className={INPUT}
             >
               <option value="">Choose a drill…</option>
-              {drills.map((drill) => {
-                // ⚠️ DISABLED WITH THE REASON, NOT FILTERED OUT. A coach who
-                // cannot find a tackling drill concludes the library is broken;
-                // a coach told "U12 is outside…" understands the squad.
-                // 'session' is the subject word: this is a drill being fitted
-                // to tonight's session, not a template being published.
-                const fit = squadFitsTemplate(
-                  team,
-                  {
-                    requires_contact: drill.requires_contact,
-                    min_age: drill.min_age,
-                    max_age: drill.max_age,
-                  },
-                  'session',
-                )
-                const label = `${drill.title} · ${drill.minutes} min`
-                return (
-                  <option key={drill.id} value={drill.id} disabled={!fit.ok}>
-                    {fit.ok ? label : `${label} — ${fit.reason}`}
-                  </option>
-                )
-              })}
+              {visibleDrills.map((drill) => (
+                <option key={drill.id} value={drill.id}>
+                  {`${drill.title} · ${drill.minutes} min`}
+                </option>
+              ))}
             </select>
           </label>
 

@@ -65,7 +65,9 @@ export function chipFit(team, template) {
   return fit
 }
 
-/** Library rows that fit this squad. Age from the name; contact from the column. */
+/** Library rows that fit this squad. Age from the name; contact from the column.
+ * Session Plan's template/drill <select>s and the shelf From-coaches row
+ * reuse this — omit, never a disabled option. Chips use chipHours instead. */
 export function shelfRowsForSquad(rows, team, { allAges = false } = {}) {
   if (allAges) return rows ?? []
   return (rows ?? []).filter((row) => squadFitsTemplate(team, row).ok)
