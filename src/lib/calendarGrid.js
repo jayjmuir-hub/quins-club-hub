@@ -1,4 +1,6 @@
-// Date arithmetic for the pitch calendar. Pure, no imports, no React.
+// Date arithmetic for the pitch calendar. Pure — its only import is the
+// CLUB_TIME_ZONE constant from the equally import-free eventFormat.js, so it
+// stays mountable in a jsdom test with no data layer and no React.
 //
 // ⚠️ EVERY DATE HERE IS THE CLUB'S, NOT THE READER'S. The whole app treats Abu
 // Dhabi as the calendar (CLUB_TIME_ZONE in src/lib/eventFormat.js), and a grid
@@ -11,6 +13,8 @@
 // UAE has not observed daylight saving since 1990 and has no plans to; Asia/Dubai
 // is a constant +04:00. src/screens/Allocation.jsx's dayWindow already relies on
 // this. If that ever changes, this is one of two places to fix.
+
+import { CLUB_TIME_ZONE } from './eventFormat.js'
 
 const MS_HOUR = 60 * 60 * 1000
 const MS_DAY = 24 * MS_HOUR
@@ -117,7 +121,7 @@ export function sameDay(a, b) {
  */
 export function dayKeyOf(date) {
   const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Dubai',
+    timeZone: CLUB_TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

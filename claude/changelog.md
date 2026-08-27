@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Match sheets: RCM result sheets are for LEAGUE matches only (U11+) — a single
+- Codebase-audit follow-up (multi-agent review). Security: hardened a stored-XSS
+  path — a drill's `source_url`/`diagram_url` came from a plain `<input type=url>`
+  and rendered straight into an `href`/`img src`, so a `javascript:` link could
+  run in another coach's session; both now pass through http(s)-only
+  `src/lib/safeUrl.js`. Correctness: the full-screen DM route rendered `<Thread>`
+  without a key, so `useDmThread`'s `loggedRef` never reset across conversations
+  and the second thread's welfare-access log could be skipped — now keyed by
+  `conversationId`. Duplication: 16 hardcoded `'Asia/Dubai'` literals across 10
+  files now reference the existing `CLUB_TIME_ZONE`. Dead code: removed
+  `WIDE_QUERY`, a duplicate `must()` in `trainingShelf.js`, and the unused
+  `updateSW` export binding, plus a batch of unused imports/vars.
+- `d59cb3b` — Match sheets: RCM result sheets are for LEAGUE matches only (U11+) — a single
   `matchSheetApplies` gate now excludes tournaments and friendlies from the Club
   Youth Manager tracker, the "Open the RCM match sheet" button, the Squad Hub
   outstanding list, and the sheet screen itself (which shows "No RCM sheet for

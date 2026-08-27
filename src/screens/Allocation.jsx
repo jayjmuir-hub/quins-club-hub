@@ -8,7 +8,7 @@ import { listPitchRequests, allocatePitch, declinePitch, setEventPitch } from '.
 import { Sheet } from '../components/Sheet.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { clubToday, eventDate, eventEndDate, eventTimeLabel, eventTitle, formatTime } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, clubToday, eventDate, eventEndDate, eventTimeLabel, eventTitle, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PitchMonth, PitchWeek } from '../components/PitchCalendar.jsx'
 import EventDetail from './EventDetail.jsx'
@@ -87,7 +87,7 @@ export function hourRange(events) {
 
   const hourOf = (ms) => {
     const parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Dubai',
+      timeZone: CLUB_TIME_ZONE,
       hour: '2-digit',
       hour12: false,
     }).formatToParts(new Date(ms))
@@ -105,7 +105,7 @@ function hourOfEvent(event) {
   const start = eventDate(event)
   if (!start) return null
   return Number(
-    new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dubai', hour: '2-digit', hour12: false })
+    new Intl.DateTimeFormat('en-GB', { timeZone: CLUB_TIME_ZONE, hour: '2-digit', hour12: false })
       .formatToParts(start)
       .find((part) => part.type === 'hour').value,
   )
@@ -556,7 +556,7 @@ export default function Allocation() {
                     </span>
                     <span className="text-[12.5px] text-ink-muted">
                       {start
-                        ? `${start.toLocaleDateString(undefined, { timeZone: 'Asia/Dubai', weekday: 'short', day: 'numeric', month: 'short' })} · ${formatTime(start)}`
+                        ? `${start.toLocaleDateString(undefined, { timeZone: CLUB_TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short' })} · ${formatTime(start)}`
                         : 'Date unknown'}
                     </span>
                     {request.needs_referee && (
@@ -695,7 +695,7 @@ export default function Allocation() {
                     {(() => {
                       const start = eventDate(event)
                       return start
-                        ? `${start.toLocaleDateString(undefined, { timeZone: 'Asia/Dubai', weekday: 'short', day: 'numeric', month: 'short' })} · `
+                        ? `${start.toLocaleDateString(undefined, { timeZone: CLUB_TIME_ZONE, weekday: 'short', day: 'numeric', month: 'short' })} · `
                         : ''
                     })()}
                     {eventTimeLabel(event)} · {eventTitle(event)}

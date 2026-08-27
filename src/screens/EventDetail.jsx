@@ -16,7 +16,6 @@ import { matchSheetApplies } from '../lib/matchSheetDeadline.js'
 import { FEATURES } from '../lib/features.js'
 import {
   eventDate,
-  eventEndDate,
   eventTimeRangeLabel,
   eventTitle,
   formatLongDate,
@@ -511,7 +510,6 @@ export default function EventDetail({
   // Null for every event created before 8 Aug 2026, and formatTimeRange
   // renders the start alone for those — see its comment. Nothing here
   // substitutes the calendar feed's per-type duration guess.
-  const endDate = eventEndDate(event)
   const typeLabel = TYPE_LABELS[event.type] ?? 'Event'
   const played = hasResult(event)
   // ⚠️ NULL FOR EVERY SQUAD FROM U11 UP, and for a squad whose row has not

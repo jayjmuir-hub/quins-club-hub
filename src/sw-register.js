@@ -45,7 +45,7 @@ const UPDATE_CHECK_MS = 60 * 60 * 1000
 // still costs nothing.
 const MIN_GAP_MS = 60 * 1000
 
-export const updateSW = registerSW({
+registerSW({
   // Runs once the worker is registered. `registration` is the live
   // ServiceWorkerRegistration; calling .update() on it asks the browser to
   // re-fetch the worker script and, if it changed, start the swap.

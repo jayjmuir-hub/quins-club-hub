@@ -7,7 +7,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
 import { listLineupCounts } from '../data/lineups.js'
-import { clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam } from '../lib/scope.js'
@@ -30,7 +30,7 @@ function shortDate(event) {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
-    timeZone: 'Asia/Dubai',
+    timeZone: CLUB_TIME_ZONE,
   })
 }
 

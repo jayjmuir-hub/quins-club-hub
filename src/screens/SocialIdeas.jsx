@@ -6,7 +6,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listIdeas, markIdea, removeIdea, signIdeaPhoto } from '../data/socialIdeas.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { eventDate, eventTimeLabel, formatTime } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 
 // The post-idea inbox. Any member submits; the manager marks and removes.
@@ -187,7 +187,7 @@ export default function SocialIdeas() {
                     )}
                     <span className="ml-2 text-[12px] text-ink-muted">
                       {new Date(idea.created_at).toLocaleDateString(undefined, {
-                        timeZone: 'Asia/Dubai',
+                        timeZone: CLUB_TIME_ZONE,
                         day: 'numeric',
                         month: 'short',
                       })}
@@ -214,7 +214,7 @@ export default function SocialIdeas() {
                     {idea.events.opponent ? ` v ${idea.events.opponent}` : ''}
                     {' · '}
                     {eventDate(idea.events).toLocaleDateString(undefined, {
-                      timeZone: 'Asia/Dubai',
+                      timeZone: CLUB_TIME_ZONE,
                       day: 'numeric',
                       month: 'short',
                     })}

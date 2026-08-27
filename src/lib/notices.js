@@ -1,8 +1,9 @@
 import { isSquadStaffRole, visibleTeams } from './scope.js'
+import { CLUB_TIME_ZONE } from './eventFormat.js'
 
-// Pure helpers for the noticeboard. The only import is scope.js, which is
-// itself import-free — no data module and no React, so this stays mountable in
-// a jsdom test.
+// Pure helpers for the noticeboard. Its only imports are scope.js and the
+// CLUB_TIME_ZONE constant from eventFormat.js — both themselves import-free,
+// no data module and no React, so this stays mountable in a jsdom test.
 //
 // ⚠️ THE SQUAD-STAFF ROLES COME FROM scope.js AND MUST NOT BE SPELLED OUT HERE.
 // tests/staff-roles.test.jsx fails the build on a raw `=== 'coach'` anywhere in
@@ -301,7 +302,7 @@ export function postedLabel(createdAt, now = Date.now()) {
   if (days < 7) return `${days} days ago`
 
   return then.toLocaleDateString('en-GB', {
-    timeZone: 'Asia/Dubai',
+    timeZone: CLUB_TIME_ZONE,
     day: 'numeric',
     month: 'short',
   })
@@ -317,7 +318,7 @@ export function stampLabel(createdAt, now = Date.now()) {
   if (!createdAt) return ''
   const then = new Date(createdAt)
   if (!Number.isFinite(then.getTime())) return ''
-  const tz = { timeZone: 'Asia/Dubai' }
+  const tz = { timeZone: CLUB_TIME_ZONE }
   const clock = then.toLocaleTimeString('en-GB', { ...tz, hour: '2-digit', minute: '2-digit' })
   const nowDate = new Date(now instanceof Date ? now.getTime() : now)
   const dayOf = (d) => d.toLocaleDateString('en-GB', { ...tz, year: 'numeric', month: '2-digit', day: '2-digit' })

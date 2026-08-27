@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
 
 // The fixture a chat thread hangs off, with its RSVP chips.
 //
@@ -15,7 +15,7 @@ import { eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
 function dateLine(event) {
   const date = eventDate(event)
   if (!date) return ''
-  const day = date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Dubai' })
+  const day = date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: CLUB_TIME_ZONE })
   return `${day} · ${eventTimeLabel(event)}`
 }
 
