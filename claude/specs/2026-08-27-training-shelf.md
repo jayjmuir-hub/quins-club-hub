@@ -26,10 +26,17 @@ remains a message, not a boundary. RLS is the insert rule.
    Tackle, Passing, Ruck, Attack, Defence, …) to apply that template to
    **tonight's** training event: copy blocks in stored order, write
    `template_id`, stamp `coach_edited_at`. Reuse `createSession` /
-   `saveSessionBlocks`. Do **not** call `publish_training`. A chip that fails
-   `squadFitsTemplate` is shown **disabled with the Publish-tab sentence**,
-   never hidden. U12G QR / U14G QR are tag (`teams.requires_contact`); a
-   contact Tackle hour reaching them is a bug.
+   `saveSessionBlocks`. Do **not** call `publish_training`.
+   **One chip per `chip_label`.** Group the club hours by label, then pick the
+   template `squadFitsTemplate` accepts for this squad. If several fit, pick
+   the tightest age band. If none fit, show **one** disabled chip with the
+   reason — contact mismatch (Publish-tab sentence), or "No hour for this age".
+   Never dump every age pack onto the row. The "never hidden" rule is for
+   **contact vs tag** (Tackle on U12G QR / U14G QR stays visible, disabled),
+   not for U9 / U11 / U16 copies of Passing. U12G QR / U14G QR are tag
+   (`teams.requires_contact`); a contact Tackle hour reaching them **enabled**
+   is a bug. Age from the squad **name**; contact from the column — never
+   inferred from the name.
 2. **Pick drills from the library** — the existing SessionPlan picker, reached
    from tonight's card, plus Library browse on this same surface.
 3. **Run what the Director published** — the upcoming-session list already on
@@ -55,6 +62,11 @@ star average); **My shelf** (personal favorites).
 - Coach names (adults) are OK on cards.
 - **No player names and no player photos** on drill cards. No FaceStack, no
   avatar, no `img` of a person.
+- **Default to this squad.** Browse (and the shelf list) shows drills that
+  `squadFitsTemplate` accepts for the squad being held — age from the name,
+  contact from `teams.requires_contact`. A **Show all ages** control reveals
+  the other packs. Do not list the U9 and U11 copies of a drill next to the
+  U16 one unless the coach asked.
 
 ## Who can publish (two verbs)
 

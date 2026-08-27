@@ -22,12 +22,14 @@ import { getSession, listDrills, listTemplates } from '../data/trainingPlans.js'
 import { useAuth } from '../lib/auth.jsx'
 import { CATEGORIES, CATEGORY_LABELS, squadFitsTemplate, totalMinutes } from '../lib/trainingPlans.js'
 import {
+  chipFit,
   chipHours,
   chipNeedsConfirm,
   chipReplaceMessage,
   clubWeekday,
   coachLabel,
   groupByCoach,
+  shelfRowsForSquad,
 } from '../lib/trainingShelf.js'
 
 // Spotify-style training shelf on Squad Training.
@@ -96,8 +98,9 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
     }
   }, [team?.id, tonight?.id, reloadToken])
 
-  const chips = chipHours(templates)
+  const chips = chipHours(templates, team)
   const fromCoaches = templates.filter((row) => row.created_by)
+  const visibleDrills = shelfRowsForSquad(drills, team)
   const weekday = clubWeekday(tonight) ?? 'tonight'
 
   const drillLikeCounts = useMemo(() => likeCounts(drillLikes, 'drill_id'), [drillLikes])
@@ -187,7 +190,7 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
           <p className="text-[13px] font-medium text-ink-muted">No focus hours yet.</p>
         )}
         {chips.map((template) => {
-          const fit = squadFitsTemplate(team, template)
+          const fit = chipFit(team, template)
           const name = fit.ok ? template.chip_label : `${template.chip_label}, ${fit.reason}`
           return (
             <span key={template.id} className="flex shrink-0 flex-col gap-0.5">
@@ -326,9 +329,13 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
         </div>
         {drills.length === 0 ? (
           <p className="text-[13px] font-medium text-ink-muted">The library is empty — add drills when you have them.</p>
+        ) : visibleDrills.length === 0 ? (
+          <p className="text-[13px] font-medium text-ink-muted">
+            No drills for this squad — open the library to show all ages.
+          </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {drills.slice(0, 6).map((drill) => (
+            {visibleDrills.slice(0, 6).map((drill) => (
               <li key={drill.id}>
                 <DrillCard
                   title={drill.title}
@@ -368,6 +375,7 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
 
       {browseOpen && (
         <LibraryBrowse
+          team={team}
           drills={drills}
           templates={templates}
           namesById={namesById}
@@ -412,6 +420,7 @@ function patchPair(rows, idColumn, id, profileId, on) {
 }
 
 function LibraryBrowse({
+  team,
   drills,
   templates,
   namesById,
@@ -433,9 +442,12 @@ function LibraryBrowse({
   const [category, setCategory] = useState('all')
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState(() => new Set())
+  const [allAges, setAllAges] = useState(false)
 
   const isHours = kind === 'hours'
-  const rows = isHours ? templates : drills
+  const rows = isHours
+    ? shelfRowsForSquad(templates, team, { allAges })
+    : shelfRowsForSquad(drills, team, { allAges })
   const q = query.trim().toLowerCase()
 
   let shown = rows
@@ -541,6 +553,19 @@ function LibraryBrowse({
             </button>
           ))}
         </div>
+
+        <button
+          type="button"
+          aria-pressed={allAges}
+          onClick={() => setAllAges((on) => !on)}
+          className={[
+            CHIP,
+            'mb-3',
+            allAges ? 'border-brand bg-brand text-white' : 'border-line bg-surface-card text-ink',
+          ].join(' ')}
+        >
+          Show all ages
+        </button>
 
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1" data-testid="browse-chips">
           {[

@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- (unmerged) — 🏉 **Training shelf on Squad Training** — Spotify-style
+- (unmerged) — 🏉 **Squad Training chips pick one hour per focus for this
+  squad** — three contact age packs with the same `chip_label`s were drawing
+  as three Passing chips plus red "U18 is outside this template's U11-U14".
+  The picker (`chipHours`) now groups by label and emits the tightest
+  `squadFitsTemplate` match; a label with no match appears once, disabled
+  (contact sentence, or "No hour for this age"). Library browse defaults to
+  this squad's age + `teams.requires_contact`, with Show all ages. Spec:
+  `claude/specs/2026-08-27-training-shelf.md`. The NEXT pull request cites
+  this entry's squash SHA.
+- `292392c` — 🏉 **Training shelf on Squad Training** — Spotify-style
   chips / tonight's hour / From coaches / library browse on
   `/squad/:teamId/training`. Focus chips apply a `session_templates` hour to
   tonight (copy blocks, `template_id`, `coach_edited_at`) and never call
@@ -18,8 +27,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   player photos. One migration `db/migrations/20260827_training_shelf.sql`
   (slugs, `chip_label`, `is_featured`, likes/favorites). Empty library is
   the starting state — no World Rugby seed. Spec:
-  `claude/specs/2026-08-27-training-shelf.md` (building). The NEXT pull
-  request cites this entry's squash SHA.
+  `claude/specs/2026-08-27-training-shelf.md` (building).
 - `a105da7` — 🏉 **Coaches build their own training plans** — Jay, overnight:
   coaches and managers can now plan a squad's session themselves (freestyle or
   seeded from a template), keep their own squad-private drills and templates,
