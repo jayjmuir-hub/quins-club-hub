@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { removeChatPhoto, uploadChatPhoto } from '../data/chatMedia.js'
+import { removeChatPhoto, uploadChatPhoto, uploadChatVoice } from '../data/chatMedia.js'
 import { listMyNicknames } from '../data/nicknames.js'
 import {
   forwardMessagesTo,
@@ -326,6 +326,23 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     }
   }
 
+  // A voice note is a message with an audio attachment and no words — the
+  // round-2 body constraint allows an empty body when attachment_path is set.
+  async function sendVoice(blob, ext) {
+    if (sending) return
+    setSending(true)
+    setError(null)
+    try {
+      const attachmentPath = await uploadChatVoice(selfId, blob, ext)
+      await sendDirectMessage(conversationId, '', { attachmentPath })
+      await load()
+    } catch (err) {
+      setError(err.message || 'Could not send that voice message.')
+    } finally {
+      setSending(false)
+    }
+  }
+
   // A DM/group poll — the conversation carries it, so channel is irrelevant.
   async function sendPoll({ question, options, allowMultiple }) {
     if (postingPoll) return false
@@ -505,6 +522,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     vote,
     sendPoll,
     postingPoll,
+    sendVoice,
     onRemove,
     onCopy,
     onPin,

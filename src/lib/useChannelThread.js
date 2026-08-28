@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listAvailabilityForEvents } from '../data/availability.js'
-import { removeChatPhoto, uploadChatPhoto } from '../data/chatMedia.js'
+import { removeChatPhoto, uploadChatPhoto, uploadChatVoice } from '../data/chatMedia.js'
 import { listEvents } from '../data/events.js'
 import {
   getChannelSettings,
@@ -322,6 +322,25 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     }
   }
 
+  // A voice note posts like a photo — an audio attachment, no words, into
+  // whichever channel this is (staff/squad/club), carrying a fixture if one is
+  // attached, exactly as send() does above.
+  async function sendVoice(blob, ext) {
+    if (sending) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const attachmentPath = await uploadChatVoice(selfId, blob, ext)
+      if (staffChannel) await postStaffMessage(teamId, '', { attachmentPath })
+      else await postMessage(teamId, '', { eventId: attachEventId || null, attachmentPath })
+      await load()
+    } catch (err) {
+      setSendError(err.message || 'Could not send that voice message.')
+    } finally {
+      setSending(false)
+    }
+  }
+
   // A channel poll — staff or squad/club, carrying the fixture if a thread is
   // attached, exactly as a text post here would (send() above).
   async function sendPoll({ question, options, allowMultiple }) {
@@ -452,6 +471,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     vote,
     sendPoll,
     postingPoll,
+    sendVoice,
     onRemove,
     onPin,
     onReport,

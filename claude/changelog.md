@@ -8,9 +8,26 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 28 Aug 2026
+
+- Voice messages, WhatsApp-style: tap the mic, talk, send; the note plays in a
+  bubble with a plain-bar scrubber and a 1×/1.5×/2× speed toggle. A voice note
+  is just another attachment on a message — the chat-media rail photos already
+  run on — so there are no new tables and no new RLS; the migration only widens
+  the bucket to accept audio and raises its size to 10 MB (which is also the
+  five-minute cap's teeth). Open posting like photos, five-minute cap. New
+  `src/lib/voiceRecorder.js` (MediaRecorder, format negotiation, the cap),
+  `ChatAudio` / `VoiceComposer`, wired into both thread hooks and composers.
+  ⚠️ Tap-to-record, not hold-to-record — the approved fallback; the hold gesture
+  is a later UI change on the same recorder. Migration
+  `db/migrations/20260828_chat_voice.sql`, harness `db/tests/chat-voice.sql`
+  (images-survive is the discriminating check). Spec
+  `claude/plans/2026-08-28-voice-messages.md`; ruling
+  `claude/decisions/2026-08-28-voice-notes-open.md`.
+
 ## 27 Aug 2026
 
-- Chat polls, WhatsApp-style: a question with 2–12 options, single- or
+- `59ac0f7` — Chat polls, WhatsApp-style: a question with 2–12 options, single- or
   multiple-choice, posted as a message in any chat you can already write in
   (squad, staff, club, DM, group). Everyone who can read it votes, sees live
   counts, and sees who voted — the parity ruling. New `polls` / `poll_options`

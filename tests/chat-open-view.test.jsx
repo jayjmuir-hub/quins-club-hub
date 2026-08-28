@@ -84,6 +84,8 @@ vi.mock('../src/data/chatMedia.js', () => ({
   uploadChatPhoto: vi.fn(),
   removeChatPhoto: vi.fn(),
   signChatPhotoUrl: vi.fn(async () => null),
+  isAudioAttachment: (p) => /\.(webm|m4a|mp4|aac|mp3|ogg)$/i.test(p || ''),
+  attachmentPreviewLabel: () => '📷 Photo',
 }))
 // Lazy arrows only — the factory is hoisted above `m`'s initialization.
 // Presence is a live websocket; tests get a quiet empty room.

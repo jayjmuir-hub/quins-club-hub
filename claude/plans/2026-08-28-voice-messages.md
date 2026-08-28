@@ -1,6 +1,8 @@
 # Voice messages — WhatsApp-style, on the chat-media rail
 
-**STATUS: Not shipped — spec for review (2026-08-28).** Follows the polls build
+**STATUS: Built, shipping (2026-08-28).** Implemented as specced, with the
+tap-to-record fallback in place of the hold gesture (see "The WhatsApp gesture").
+Follows the polls build
 (`claude/plans/2026-08-27-chat-polls.md`), the second half of Jay's "voice
 messages and polls, exactly like WhatsApp". Rulings that gate it —
 open posting, five-minute cap — are in

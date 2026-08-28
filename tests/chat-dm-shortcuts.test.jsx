@@ -18,6 +18,8 @@ import userEvent from '@testing-library/user-event'
 const media = { signChatPhotoUrl: vi.fn() }
 vi.mock('../src/data/chatMedia.js', () => ({
   signChatPhotoUrl: (...a) => media.signChatPhotoUrl(...a),
+  isAudioAttachment: (p) => /\.(webm|m4a|mp4|aac|mp3|ogg)$/i.test(p || ''),
+  attachmentPreviewLabel: () => '📷 Photo',
   uploadChatPhoto: vi.fn(),
   removeChatPhoto: vi.fn(),
 }))

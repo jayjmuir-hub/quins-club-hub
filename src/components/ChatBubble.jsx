@@ -1,4 +1,6 @@
+import ChatAudio from './ChatAudio.jsx'
 import ChatPhoto from './ChatPhoto.jsx'
+import { isAudioAttachment } from '../data/chatMedia.js'
 import MessageMenu from './MessageMenu.jsx'
 import PollBubble from './PollBubble.jsx'
 import ReactionBar, { ReactionTrigger } from './ReactionBar.jsx'
@@ -166,7 +168,12 @@ export default function ChatBubble({
           </p>
         ) : (
           <>
-            {photoPath && <ChatPhoto path={photoPath} compact={photoCompact} />}
+            {photoPath &&
+              (isAudioAttachment(photoPath) ? (
+                <ChatAudio path={photoPath} messageId={messageId} mine={mine} />
+              ) : (
+                <ChatPhoto path={photoPath} compact={photoCompact} />
+              ))}
             {body?.trim() ? (
               <p className={`whitespace-pre-wrap break-words text-[14.5px] leading-[1.4] ${menuItems.length ? 'pr-5' : ''}`}>
                 {body}

@@ -12,6 +12,8 @@ vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] })
 vi.mock('../src/data/personCard.js', () => ({ getPersonCard: async () => null }))
 vi.mock('../src/data/chatMedia.js', () => ({
   signChatPhotoUrl: vi.fn(),
+  isAudioAttachment: (p) => /\.(webm|m4a|mp4|aac|mp3|ogg)$/i.test(p || ''),
+  attachmentPreviewLabel: () => '📷 Photo',
   uploadChatPhoto: vi.fn(),
   removeChatPhoto: vi.fn(),
 }))
