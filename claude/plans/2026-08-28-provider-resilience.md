@@ -2,12 +2,15 @@
 
 *28 Aug 2026.*
 
-> **Status: NOT STARTED — spec only, nothing here has shipped.** Written during
-> the 27–28 Aug 2026 Supabase latency incident
+> **Status: §1–§3 BUILT (28 Aug 2026), pending merge/deploy. §4 not started.**
+> Built once the incident effectively cleared. §1 Workbox `networkTimeoutSeconds`,
+> §2 the timeout+idempotent-retry layer (`src/lib/resilientFetch.js`), and §3 the
+> "taking longer…" UI (`src/lib/useSlowLoad.js`) are done and tested; §4 (browser
+> stale-while-revalidate) remains a later pass. Written during the 27–28 Aug 2026
+> Supabase latency incident
 > (`claude/handoffs/2026-08-28-supabase-incident-and-resilience.md`). Jay asked
 > "I can't have this happen" and whether to switch providers; the agreed answer
-> is **no migration, make the app ride through blips** — reasoning in the
-> handoff. **Build AFTER the incident clears**, smallest-risk item first.
+> is **no migration, make the app ride through blips** — reasoning in the handoff.
 
 ## The principle
 

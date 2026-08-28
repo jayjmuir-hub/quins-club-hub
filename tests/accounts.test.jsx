@@ -107,6 +107,19 @@ vi.mock('../src/data/accessRequests.js', () => ({
   restoreAccessRequest: (...args) => restoreAccessRequestMock(...args),
 }))
 
+// ApprovalRecipients loads from staff.js. Left unmocked it hit the REAL network,
+// and relied on that call failing fast so its card rendered promptly. The
+// provider-resilience layer (28 Aug 2026) retries an idempotent read that throws,
+// turning a fast failure into a ~2s one that raced the card past the ordering
+// test's 1s waitFor. Mock just the two functions the card calls — everything else
+// in staff.js stays real — so the card is deterministic and no test touches the
+// network.
+vi.mock('../src/data/staff.js', async (importActual) => ({
+  ...(await importActual()),
+  listApprovalRecipients: () => Promise.resolve([]),
+  setNotifyApprovals: () => Promise.resolve({ notify_approvals: true }),
+}))
+
 // Import after vi.mock so this binds to the mocked modules.
 import Accounts from '../src/screens/Accounts.jsx'
 

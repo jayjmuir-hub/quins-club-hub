@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { markSessionExpired } from './sessionExpired.js'
 import { clearCachedApiResponses } from './apiCache.js'
+import { createResilientFetch } from './resilientFetch.js'
 
 // Single-responsibility Supabase client for the app. No auth helpers, no
 // query helpers, no retry logic — those belong to later tasks.
@@ -161,6 +162,12 @@ let nativeSignOut = null
 
 export const sessionGuard = createSessionGuard({
   anonKey: supabaseAnonKey,
+  // Underneath the guard sits the resilience layer: a timeout on idempotent
+  // reads so a stalled Supabase surfaces a retry or an honest error instead of
+  // a spinner that hangs for minutes (claude/plans/2026-08-28-provider-resilience.md).
+  // The guard runs FIRST — a downgraded (anon) request is refused before this is
+  // ever reached — so we only ever time out requests the guard has approved.
+  fetchImpl: createResilientFetch(),
   onLostSession: () => {
     // scope 'local' — clear THIS browser only, and make no network call. The
     // session is already gone; the point is to make the UI admit it, so
