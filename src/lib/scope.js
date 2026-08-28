@@ -349,6 +349,33 @@ export function hasAdminRight(memberships, right) {
   return adminRights(memberships).includes(right)
 }
 
+// ══ CHILD-CONTACT ALLOWLIST (S2, Phase 1 — 28 Aug 2026) ═══════════════════
+//
+// ⚠️ THIS IS A DATA BOUNDARY, NOT A SCREEN GATE. Unlike ADMIN_RIGHTS above,
+// these decide who may see a child's DOB and their parents' contact — enforced
+// in the DATABASE (RLS on player_contacts/player_parents/player_private, and the
+// member_contact_card RPC), db/migrations/20260828_child_contacts_allowlist.sql.
+// These client helpers ONLY decide whether the UI offers a contacts section; a
+// pitches/training admin who is not offered it is refused the rows anyway.
+//
+// ⚠️ CHANGE ONE, CHANGE BOTH — the two arrays mirror can_see_child_contacts()
+// and can_edit_child_contacts() in that migration, and the spec §5.2 matrix.
+// welfare is READ-ONLY on children (note ¹), so it is absent from the EDIT list.
+export const CHILD_CONTACTS_READ_RIGHTS = ['clubadmin', 'youth', 'media', 'welfare']
+export const CHILD_CONTACTS_EDIT_RIGHTS = ['clubadmin', 'youth', 'media']
+
+/** May this person READ a child's DOB / parent contact? (super holds it implicitly.) */
+export function canSeeChildContacts(memberships) {
+  if (isSuperAdmin(memberships)) return true
+  return adminRights(memberships).some((right) => CHILD_CONTACTS_READ_RIGHTS.includes(right))
+}
+
+/** May this person EDIT a child's DOB / parent contact? welfare is read-only, so no. */
+export function canEditChildContacts(memberships) {
+  if (isSuperAdmin(memberships)) return true
+  return adminRights(memberships).some((right) => CHILD_CONTACTS_EDIT_RIGHTS.includes(right))
+}
+
 /**
  * True when the person holds membership rows and EVERY one of them is still
  * pending approval — the self-registered parent who has added a child and is
