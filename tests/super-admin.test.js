@@ -6,6 +6,8 @@ import {
   ADMIN_RIGHTS,
   adminRightLabel,
   adminRights,
+  canEditChildContacts,
+  canSeeChildContacts,
   hasAdminRight,
   isAdmin,
   isSuperAdmin,
@@ -151,5 +153,45 @@ describe('the rights vocabulary', () => {
       'Welfare',
       'Club Hub Admin',
     ])
+  })
+})
+
+// The S2 child-contact allowlist (Phase 1). ⚠️ These MIRROR the DB helpers
+// can_see_child_contacts()/can_edit_child_contacts() — the real boundary is RLS.
+// This pins the client mirror so a screen offers the contacts section correctly.
+describe('canSeeChildContacts / canEditChildContacts', () => {
+  it('a super sees and edits (implicitly)', () => {
+    const rows = [admin({ is_super: true })]
+    expect(canSeeChildContacts(rows)).toBe(true)
+    expect(canEditChildContacts(rows)).toBe(true)
+  })
+
+  it('an allowlisted right (clubadmin/youth/media) both sees and edits', () => {
+    for (const right of ['clubadmin', 'youth', 'media']) {
+      const rows = [admin({ admin_rights: [right] })]
+      expect(canSeeChildContacts(rows)).toBe(true)
+      expect(canEditChildContacts(rows)).toBe(true)
+    }
+  })
+
+  it('⚠️ welfare READS but does NOT edit — read-only oversight (spec §5.2 note ¹)', () => {
+    const rows = [admin({ admin_rights: ['welfare'] })]
+    expect(canSeeChildContacts(rows)).toBe(true)
+    expect(canEditChildContacts(rows)).toBe(false)
+  })
+
+  it('⚠️ a narrowed admin (pitches / training) is refused BOTH — the boundary', () => {
+    for (const right of ['pitches', 'training']) {
+      const rows = [admin({ admin_rights: [right] })]
+      expect(canSeeChildContacts(rows)).toBe(false)
+      expect(canEditChildContacts(rows)).toBe(false)
+    }
+  })
+
+  it('a non-admin and empty input are refused', () => {
+    expect(canSeeChildContacts([{ role: 'coach', status: 'active' }])).toBe(false)
+    expect(canSeeChildContacts([])).toBe(false)
+    expect(canSeeChildContacts(null)).toBe(false)
+    expect(canEditChildContacts(undefined)).toBe(false)
   })
 })

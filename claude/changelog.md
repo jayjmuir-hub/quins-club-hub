@@ -10,8 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- **The actual voice-message bug: `Permissions-Policy: microphone=()` blocked
-  recording on every Chromium browser.** `netlify.toml` disabled the microphone
+- Admin-rights redesign **Phase 1** (Surface S2) — a child's DOB and their
+  parents' registered contact become a real data boundary. Read of
+  `player_contacts`, `player_parents` and `player_private` is narrowed by RLS to
+  the allowlist `{clubadmin, youth, media, welfare}` (welfare read-only), so a
+  Pitch or Training admin is refused at the database — a direct API query, not
+  just the menu; coaches keep their own squad and guardians their own child. The
+  `member_contact_card` parent arm is tightened to the same allowlist. Because of
+  Phase 0a every current admin holds `clubadmin`, so nobody loses access today —
+  it only enables narrower future grants. New helpers
+  `private.can_see_child_contacts` / `can_edit_child_contacts` / `is_team_staff`;
+  `src/lib/scope.js` mirror; migration applied to production first, both
+  directions proven in `db/tests/child-contacts-allowlist.sql`. ⚠️ Residual: the
+  adult *login* contact (`profiles.email/phone`) is not yet column-revoked —
+  Phase 1b, which needs a 4-screen read reroute.
+  (SHA follows in the next changelog-touching PR.)
+- `d034d10` — The actual voice-message bug: `Permissions-Policy: microphone=()` blocked
+  recording on every Chromium browser. `netlify.toml` disabled the microphone
   for all origins including self; Chromium enforces it (Chrome, Android, PWA all
   showed a dead mic button) while Safari/iOS ignores the policy — so the feature
   only ever recorded on iPhones. The header pre-dated voice messages, when
@@ -19,7 +34,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   error-surfacing was treating the symptom. Decision doc's camera warning
   (`claude/decisions/2026-08-06-security-headers.md`) had predicted exactly this
   failure mode.
-  (SHA follows in the next changelog-touching PR.)
 - `6647a2d` — Voice-message mic failures are no longer silent. When recording
   can't start (a blocked mic), the composer now shows an actionable reason via
   the existing send-error line instead of a dead-looking button

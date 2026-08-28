@@ -48,12 +48,17 @@ regress, and it makes the later narrowing possible.
   phase**, because every allowlist below includes `clubadmin` — if current admins
   aren't holding it yet, a default-deny policy strips them. Prove: no admin loses
   a screen or a row.
-- **0b — `can_dm` adult-reach rule.** Change `private.can_dm` so **"holds any
-  admin right → may DM any adult"** replaces its current reliance on `is_admin`
-  for adult reach, so that narrowing an admin later does not silently break their
-  ability to message other adults (spec §5.4 note ³). Minor↔ and guardian rules
-  unchanged. Prove: a would-be narrowed admin can still DM adults; nothing widens
-  minor access.
+- **0b — `can_dm` adult-reach rule. ⚠️ NOT NEEDED under Shape α — skipped
+  28 Aug 2026.** This step assumed a *narrowed* admin stops being `is_admin` — a
+  **β** premise. Under the chosen **α** (spec §4.1) `is_admin` stays true for every
+  admin; narrowing lives only in new default-deny helpers on data surfaces, never in
+  `is_admin`. So `private.can_dm`'s adult-reach arm
+  (`if private.is_admin(club) then return true`,
+  `db/migrations/20260823_squad_chat_phase3.sql`) already preserves reach for a
+  narrowed admin, and rewriting it to "any admin right" would instead *narrow* a
+  hypothetical zero-right admin's reach — the opposite of the goal. The review/reach
+  **split** is delivered entirely by **Phase 4** (narrow `admin_may_review` →
+  `welfare`); `can_dm` (reach) is left as-is. Recorded as β-only, not an α task.
 - **0c — the default-deny sensitive helpers (defined, not yet wired).** Add the
   allowlist helpers — e.g. `private.can_see_child_contacts(club)`,
   `can_see_child_photos(...)`, `can_write_child(...)`, `can_review_dm(conv)` —
