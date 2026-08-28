@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 27 Aug 2026
 
-- Tidy: dropped the `export` keyword from nine symbols that were referenced only
+- Chat polls, WhatsApp-style: a question with 2–12 options, single- or
+  multiple-choice, posted as a message in any chat you can already write in
+  (squad, staff, club, DM, group). Everyone who can read it votes, sees live
+  counts, and sees who voted — the parity ruling. New `polls` / `poll_options`
+  / `poll_votes` tables under RLS that defers to the message's own read policy;
+  votes are own-row inserts and a trigger stamps identity and does single-choice
+  replacement, while `create_poll()` re-checks the poster may post there. New
+  `src/data/polls.js`, `PollBubble` / `PollComposer` / `PollVotes`, wired into
+  both thread hooks and composers. `subscribePollVotes` uses the
+  `subscribeToTable` helper from #471. Migration
+  `db/migrations/20260827_chat_polls.sql`, harness `db/tests/chat-polls.sql`
+  (9 assertions, green against production). Spec
+  `claude/plans/2026-08-27-chat-polls.md`; ruling
+  `claude/decisions/2026-08-27-chat-polls-open-visible.md`.
+- `279073f` — Tidy: dropped the `export` keyword from nine symbols that were referenced only
   inside their own file (`ArrowBadge`, `DUPLICATE_ACCESS`, `membershipKey`,
   `LAST_ADMIN_MESSAGE`, `IDEA_BUCKET`, `PRE_MATCH_FROM_AGE`, `TIER_ORDER`,
   `BAD_EMAIL`, `NO_ACCESS_CHOSEN`) — verified zero importers across src and

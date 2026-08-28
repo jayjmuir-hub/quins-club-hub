@@ -27,6 +27,7 @@ import {
   listMessageReceipts,
 } from '../data/messages.js'
 import { getMyChatPref, setChatPref } from '../data/chatPrefs.js'
+import { createPoll, listPollsFor, setPollVote, subscribePollVotes } from '../data/polls.js'
 import { useAuth } from './auth.jsx'
 import { DEFAULT_BACKGROUND, resolveBackground } from './chatBackgrounds.js'
 import { useMemberships } from './memberships.jsx'
@@ -70,6 +71,10 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   // from conversation_members instead of the profile_a/b pair.
   const [members, setMembers] = useState(null)
   const [reactions, setReactions] = useState(() => new Map())
+  // Polls (27 Aug 2026): message id → poll, loaded like reactions. postingPoll
+  // gates the composer's Post button while create_poll is in flight.
+  const [polls, setPolls] = useState(() => new Map())
+  const [postingPoll, setPostingPoll] = useState(false)
   // Round 2 (claude/plans/2026-08-24-chat-round-2.md): reply-with-quote,
   // multi-select forwarding, and a photo waiting in the composer.
   const [replyTo, setReplyTo] = useState(null)
@@ -131,6 +136,13 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
         setReactions(await listReactions(rows.map((m) => m.id)))
       } catch {
         setReactions(new Map())
+      }
+      // Polls are decoration in the same sense: a failure leaves the question
+      // text (the message body) standing, never an error.
+      try {
+        setPolls(await listPollsFor(rows.map((m) => m.id)))
+      } catch {
+        setPolls(new Map())
       }
       // So are nicknames — a failure renders real names, never an error.
       try {
@@ -194,6 +206,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   }, [])
   useEffect(() => subscribeMessages(load), [load])
   useEffect(() => subscribeReactions(load), [load])
+  useEffect(() => subscribePollVotes(load), [load])
 
   // Mark what I can see as read — so the inbox's unread dot clears.
   useEffect(() => {
@@ -301,6 +314,32 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       await load()
     } catch (err) {
       setError(err.message || 'Could not react to that.')
+    }
+  }
+
+  async function vote(optionId, on) {
+    try {
+      await setPollVote(optionId, selfId, on)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Could not record that vote.')
+    }
+  }
+
+  // A DM/group poll — the conversation carries it, so channel is irrelevant.
+  async function sendPoll({ question, options, allowMultiple }) {
+    if (postingPoll) return false
+    setPostingPoll(true)
+    setError(null)
+    try {
+      await createPoll({ conversationId, question, options, allowMultiple })
+      await load()
+      return true
+    } catch (err) {
+      setError(err.message || 'Could not post that poll.')
+      return false
+    } finally {
+      setPostingPoll(false)
     }
   }
 
@@ -462,6 +501,10 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     draftRef,
     fileRef,
     react,
+    polls,
+    vote,
+    sendPoll,
+    postingPoll,
     onRemove,
     onCopy,
     onPin,

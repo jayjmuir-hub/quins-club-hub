@@ -25,6 +25,7 @@ import {
   toggleReaction,
 } from '../data/messages.js'
 import { getMyChatPref, setChatPref } from '../data/chatPrefs.js'
+import { createPoll, listPollsFor, setPollVote, subscribePollVotes } from '../data/polls.js'
 import { useAuth } from './auth.jsx'
 import { DEFAULT_BACKGROUND, resolveBackground } from './chatBackgrounds.js'
 import { useMemberships } from './memberships.jsx'
@@ -88,6 +89,9 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   const [sendError, setSendError] = useState(null)
   const [tallies, setTallies] = useState(() => new Map())
   const [reactions, setReactions] = useState(() => new Map())
+  // Polls (27 Aug 2026), loaded like reactions; postingPoll gates the composer.
+  const [polls, setPolls] = useState(() => new Map())
+  const [postingPoll, setPostingPoll] = useState(false)
   const [mentionables, setMentionables] = useState([])
   const [upcoming, setUpcoming] = useState([])
   // Round 2 (claude/plans/2026-08-24-chat-round-2.md): a photo waiting in
@@ -161,6 +165,13 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       } catch {
         setReactions(new Map())
       }
+      // Polls, the same way — a failure leaves the question text standing.
+      try {
+        const ids = rows.flatMap((m) => [m.id, ...(m.replies ?? []).map((r) => r.id)])
+        setPolls(await listPollsFor(ids))
+      } catch {
+        setPolls(new Map())
+      }
       // RSVP chips for every fixture thread on screen. Allowed to fail —
       // a thread without chips is still a thread.
       const eventIds = rows.filter((m) => m.event_id && !m.deleted_at).map((m) => m.event_id)
@@ -190,6 +201,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
 
   useEffect(() => (param ? subscribeMessages(load) : undefined), [param, load])
   useEffect(() => (param ? subscribeReactions(load) : undefined), [param, load])
+  useEffect(() => (param ? subscribePollVotes(load) : undefined), [param, load])
 
   // Who can be mentioned here, and which fixtures could start a thread.
   // Both allowed to fail: the composer still works without either.
@@ -301,6 +313,40 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     }
   }
 
+  async function vote(optionId, on) {
+    try {
+      await setPollVote(optionId, selfId, on)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Could not record that vote.')
+    }
+  }
+
+  // A channel poll — staff or squad/club, carrying the fixture if a thread is
+  // attached, exactly as a text post here would (send() above).
+  async function sendPoll({ question, options, allowMultiple }) {
+    if (postingPoll) return false
+    setPostingPoll(true)
+    setSendError(null)
+    try {
+      await createPoll({
+        teamId,
+        channel: staffChannel ? 'staff' : 'squad',
+        eventId: attachEventId || null,
+        question,
+        options,
+        allowMultiple,
+      })
+      await load()
+      return true
+    } catch (err) {
+      setSendError(err.message || 'Could not post that poll.')
+      return false
+    } finally {
+      setPostingPoll(false)
+    }
+  }
+
   async function onRemove(id) {
     try {
       const gone = (messages ?? []).flatMap((m) => [m, ...(m.replies ?? [])]).find((m) => m.id === id)
@@ -402,6 +448,10 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     send,
     onReply,
     onReact,
+    polls,
+    vote,
+    sendPoll,
+    postingPoll,
     onRemove,
     onPin,
     onReport,

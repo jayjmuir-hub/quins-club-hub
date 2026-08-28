@@ -65,6 +65,12 @@ vi.mock('../src/lib/presence.js', () => ({
   usePresence: () => new Map(),
   dotState: (map, id) => (id && map?.get?.(id)) || 'offline',
 }))
+vi.mock('../src/data/polls.js', () => ({
+  createPoll: vi.fn(),
+  listPollsFor: vi.fn(async () => new Map()),
+  setPollVote: vi.fn(),
+  subscribePollVotes: vi.fn(() => () => {}),
+}))
 vi.mock('../src/data/messages.js', () => ({
   // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
   listMessageReceipts: async () => new Map(),

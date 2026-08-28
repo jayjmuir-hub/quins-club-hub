@@ -1,9 +1,11 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
 import ChatBubble from './ChatBubble.jsx'
 import EmojiPicker from './EmojiPicker.jsx'
 import { Empty } from './Empty.jsx'
+import PollComposer from './PollComposer.jsx'
+import PollVotes from './PollVotes.jsx'
 import Spinner from './Spinner.jsx'
 import { receiptState } from '../data/messages.js'
 import { backgroundStyle } from '../lib/chatBackgrounds.js'
@@ -43,6 +45,9 @@ export default function DmThread({ thread, compact = false }) {
     newFromRef,
     blocked,
   } = thread
+
+  const [pollOpen, setPollOpen] = useState(false)
+  const [votesFor, setVotesFor] = useState(null)
 
   return (
     <>
@@ -218,6 +223,9 @@ export default function DmThread({ thread, compact = false }) {
                 selfId={selfId}
                 onReact={participant ? thread.react : null}
                 hideTrigger={thread.selecting}
+                poll={thread.polls?.get(m.id) ?? null}
+                onVote={participant ? thread.vote : null}
+                onViewVotes={() => setVotesFor(thread.polls?.get(m.id) ?? null)}
               />
             </Fragment>
           )
@@ -356,6 +364,17 @@ export default function DmThread({ thread, compact = false }) {
                     <path d="m21 15-4.5-4.5L7 20" />
                   </svg>
                 </button>
+                <button
+                  type="button"
+                  aria-label="Create a poll"
+                  onClick={() => setPollOpen(true)}
+                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
+                  data-testid="poll-button"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M6 20V10M12 20V4M18 20v-6" />
+                  </svg>
+                </button>
                 <label className="sr-only" htmlFor="dm-draft">
                   Message
                 </label>
@@ -387,6 +406,17 @@ export default function DmThread({ thread, compact = false }) {
           Read-only. You are not part of this conversation.
         </p>
       )}
+
+      <PollComposer
+        open={pollOpen}
+        onClose={() => setPollOpen(false)}
+        busy={thread.postingPoll}
+        onSubmit={async (fields) => {
+          const ok = await thread.sendPoll(fields)
+          if (ok) setPollOpen(false)
+        }}
+      />
+      <PollVotes open={Boolean(votesFor)} onClose={() => setVotesFor(null)} poll={votesFor} />
     </>
   )
 }

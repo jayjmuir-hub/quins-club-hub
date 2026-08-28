@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import Button from './Button.jsx'
 import Card from './Card.jsx'
 import { Empty } from './Empty.jsx'
@@ -6,6 +6,8 @@ import FixtureCard from './FixtureCard.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
 import EmojiPicker from './EmojiPicker.jsx'
 import MessageRow from './MessageRow.jsx'
+import PollComposer from './PollComposer.jsx'
+import PollVotes from './PollVotes.jsx'
 import Spinner from './Spinner.jsx'
 import { backgroundStyle } from '../lib/chatBackgrounds.js'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
@@ -49,6 +51,10 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
     mentionables,
     background,
   } = thread
+
+  // Poll create sheet, and the "View votes" sheet (which poll's votes to show).
+  const [pollOpen, setPollOpen] = useState(false)
+  const [votesFor, setVotesFor] = useState(null)
 
   return (
     <>
@@ -134,6 +140,9 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           onReport={thread.onReport}
           onReplyPrivately={thread.onReplyPrivately}
           onAuthor={thread.openDmWith}
+          poll={thread.polls?.get(m.id) ?? null}
+          onVote={thread.vote}
+          onViewVotes={() => setVotesFor(thread.polls?.get(m.id) ?? null)}
         />
         </Fragment>
       ))}
@@ -210,6 +219,19 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
                   <path d="m21 15-4.5-4.5L7 20" />
                 </svg>
               </button>
+              {mayPost && (
+                <button
+                  type="button"
+                  aria-label="Create a poll"
+                  onClick={() => setPollOpen(true)}
+                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
+                  data-testid="poll-button"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M6 20V10M12 20V4M18 20v-6" />
+                  </svg>
+                </button>
+              )}
               <label className="sr-only" htmlFor="chat-draft">
                 Message
               </label>
@@ -243,6 +265,17 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           </p>
         )}
       </div>
+
+      <PollComposer
+        open={pollOpen}
+        onClose={() => setPollOpen(false)}
+        busy={thread.postingPoll}
+        onSubmit={async (fields) => {
+          const ok = await thread.sendPoll(fields)
+          if (ok) setPollOpen(false)
+        }}
+      />
+      <PollVotes open={Boolean(votesFor)} onClose={() => setVotesFor(null)} poll={votesFor} />
     </>
   )
 }

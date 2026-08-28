@@ -76,6 +76,12 @@ vi.mock('../src/data/chatPrefs.js', () => ({
   setChatPref: async () => {},
   listMyChatPrefs: async () => new Map(),
 }))
+vi.mock('../src/data/polls.js', () => ({
+  createPoll: vi.fn(),
+  listPollsFor: vi.fn(async () => new Map()),
+  setPollVote: vi.fn(),
+  subscribePollVotes: vi.fn(() => () => {}),
+}))
 vi.mock('../src/data/messages.js', async (orig) => ({
   ...(await orig()),
   listChats: (...a) => m.listChats(...a),

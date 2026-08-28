@@ -886,6 +886,17 @@ GRANT SELECT, INSERT, DELETE ON public.message_reactions TO authenticated;
 -- UPDATE + defaults are revoked; the line above is now also the ceiling.
 REVOKE ALL ON public.message_reactions FROM PUBLIC, anon;
 
+-- 27 Aug 2026 — db/migrations/20260827_chat_polls.sql (chat polls). polls and
+-- poll_options are written ONLY by create_poll(); poll_votes is own-row
+-- INSERT/DELETE (a BEFORE INSERT trigger stamps identity and enforces
+-- single-choice). All three reads defer to the message's own read policy.
+GRANT SELECT ON public.polls        TO authenticated;
+GRANT SELECT ON public.poll_options TO authenticated;
+GRANT SELECT, INSERT, DELETE ON public.poll_votes TO authenticated;
+REVOKE ALL ON public.polls        FROM PUBLIC, anon;
+REVOKE ALL ON public.poll_options FROM PUBLIC, anon;
+REVOKE ALL ON public.poll_votes   FROM PUBLIC, anon;
+
 -- 24 Aug 2026 — db/migrations/20260824_nicknames.sql (private nicknames,
 -- chat round 3). Every policy is owner_id = auth.uid(), so the table is
 -- invisible across accounts by construction; the grant is the full CRUD
