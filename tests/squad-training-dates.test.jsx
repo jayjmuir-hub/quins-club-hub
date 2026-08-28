@@ -185,6 +185,16 @@ describe('two-week date strip on Squad Training', () => {
     expect(applyChipHourMock.mock.calls[0][0].eventId).toBe('e-sat-5')
   })
 
+  it('tapping a night opens that session’s plan (the strip shows sessions, so a tap opens one)', async () => {
+    const user = userEvent.setup()
+    renderTraining()
+    const strip = await screen.findByTestId('training-date-strip')
+    await user.click(within(strip).getByRole('button', { name: /Sat 5 Sep/i }))
+    // The sheet mounts SessionPlan for THAT session — not the mislabelled
+    // "tonight" shortcut that was the only way in before.
+    expect(await screen.findByTestId('session-plan-stub')).toHaveTextContent('plan for e-sat-5')
+  })
+
   it('after applying a chip and reloading, Tuesday reads Staff not Draft', async () => {
     const user = userEvent.setup()
     listSessionsForEventsMock.mockResolvedValue(new Map())

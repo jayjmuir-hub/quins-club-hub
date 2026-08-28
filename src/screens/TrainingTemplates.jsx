@@ -13,6 +13,8 @@ import {
   saveTemplate,
   setTemplateActive,
 } from '../data/trainingPlans.js'
+import { listCoachNames } from '../data/trainingShelf.js'
+import { coachLabel } from '../lib/trainingShelf.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import {
   ageDraftProblem,
@@ -240,6 +242,10 @@ function TemplatesBody() {
   const [templates, setTemplates] = useState([])
   const [drills, setDrills] = useState([])
   const [submitted, setSubmitted] = useState([])
+  // Adult names for who suggested each submission, and which one is expanded to
+  // show its running order (the Director could only Add/Dismiss blind before).
+  const [suggesterNames, setSuggesterNames] = useState(() => new Map())
+  const [openSubmission, setOpenSubmission] = useState(null)
   const [loading, setLoading] = useState(true)
   const [settled, setSettled] = useState(false)
   const [error, setError] = useState(null)
@@ -285,6 +291,28 @@ function TemplatesBody() {
       mounted = false
     }
   }, [reloadToken, includeRetired])
+
+  // Resolve the adult name behind each submission's created_by, so the queue
+  // can say who suggested it. A failed name read just falls back to the Club
+  // bucket via coachLabel — never blocks the Add/Dismiss decision.
+  useEffect(() => {
+    const ids = submitted.map((template) => template.created_by).filter(Boolean)
+    if (ids.length === 0) {
+      setSuggesterNames(new Map())
+      return undefined
+    }
+    let mounted = true
+    listCoachNames(ids)
+      .then((names) => {
+        if (mounted) setSuggesterNames(names)
+      })
+      .catch(() => {
+        if (mounted) setSuggesterNames(new Map())
+      })
+    return () => {
+      mounted = false
+    }
+  }, [submitted])
 
   const isFirstLoad = loading && !settled
 
@@ -480,25 +508,66 @@ function TemplatesBody() {
             Suggested by coaches
           </h3>
           <ul>
-            {submitted.map((template) => (
-              <li
-                key={template.id}
-                className="flex flex-wrap items-center gap-2 border-b border-line py-2 last:border-b-0"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-bold text-ink">{template.name}</span>
-                  <span className="text-[12px] text-ink-muted">
-                    {(template.blocks ?? []).length} blocks · {template.total_minutes ?? 0} min
-                  </span>
-                </span>
-                <Button size="sm" disabled={saving} onClick={() => run(() => approveTemplateToClub(template.id))}>
-                  Add to club library
-                </Button>
-                <Button variant="ghost" size="sm" disabled={saving} onClick={() => run(() => dismissTemplateSubmission(template.id))}>
-                  Keep it theirs
-                </Button>
-              </li>
-            ))}
+            {submitted.map((template) => {
+              const open = openSubmission === template.id
+              const blocks = template.blocks ?? []
+              return (
+                <li key={template.id} className="border-b border-line py-2 last:border-b-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* The name is a button that opens the running order — the
+                        Director could only Add or Dismiss blind before. */}
+                    <button
+                      type="button"
+                      data-testid="submission-toggle"
+                      aria-expanded={open}
+                      onClick={() => setOpenSubmission(open ? null : template.id)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <span className="block text-sm font-bold text-ink">
+                        <span aria-hidden="true" className="mr-1 text-ink-muted">{open ? '▾' : '▸'}</span>
+                        <span>{template.name}</span>
+                      </span>
+                      <span className="text-[12px] text-ink-muted">
+                        {blocks.length} blocks · {template.total_minutes ?? 0} min · suggested by{' '}
+                        {coachLabel(template.created_by, suggesterNames)}
+                      </span>
+                    </button>
+                    <Button size="sm" disabled={saving} onClick={() => run(() => approveTemplateToClub(template.id))}>
+                      Add to club library
+                    </Button>
+                    <Button variant="ghost" size="sm" disabled={saving} onClick={() => run(() => dismissTemplateSubmission(template.id))}>
+                      Keep it theirs
+                    </Button>
+                  </div>
+                  {open && (
+                    <div data-testid="submission-detail" className="mt-2 rounded-[10px] bg-surface-mute p-2.5">
+                      {blocks.length === 0 ? (
+                        <p className="text-[12.5px] text-ink-muted">No drills in this hour.</p>
+                      ) : (
+                        <ol className="divide-y divide-line/60">
+                          {blocks.map((block, index) => (
+                            <li key={block.id ?? index} className="py-1.5">
+                              <span className="flex justify-between text-[13px]">
+                                <span className="font-semibold text-ink">
+                                  {index + 1}. {block.drill?.title ?? 'Drill'}
+                                </span>
+                                <span className="shrink-0 font-medium text-ink-muted">{block.minutes} min</span>
+                              </span>
+                              {block.coach_note && (
+                                <span className="mt-0.5 block text-[12px] text-ink-muted">{block.coach_note}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                      {template.notes && (
+                        <p className="mt-2 text-[12.5px] text-ink-muted">{template.notes}</p>
+                      )}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </Card>
       )}

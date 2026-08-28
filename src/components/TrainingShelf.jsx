@@ -18,7 +18,7 @@ import {
   toggleTemplateLike,
   usedThisWeekById,
 } from '../data/trainingShelf.js'
-import { getSession, listDrills, listTemplates } from '../data/trainingPlans.js'
+import { getSession, listDrills, listTemplates, submitTemplateToClub } from '../data/trainingPlans.js'
 import { useAuth } from '../lib/auth.jsx'
 import { CATEGORIES, CATEGORY_LABELS, squadFitsTemplate, totalMinutes } from '../lib/trainingPlans.js'
 import {
@@ -123,6 +123,22 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
   function bump() {
     setReloadToken((n) => n + 1)
     onApplied?.()
+  }
+
+  // Suggest one of my OWN saved squad templates to the club, from the card
+  // itself — so a coach who saved a plan but didn't suggest it in that moment
+  // can still do it later, without re-saving (which would make a duplicate).
+  async function suggestTemplate(templateId) {
+    setApplying(true)
+    setError(null)
+    try {
+      await submitTemplateToClub(templateId)
+      bump()
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setApplying(false)
+    }
   }
 
   async function applyHour(template, confirmed) {
@@ -320,6 +336,13 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
                     })
                   }
                   onOpen={() => onChip(template)}
+                  suggested={template.created_by === profileId && !!template.submitted_at}
+                  onSuggest={
+                    template.created_by === profileId && !template.submitted_at
+                      ? () => suggestTemplate(template.id)
+                      : null
+                  }
+                  suggestBusy={applying}
                 />
               </div>
             ))}

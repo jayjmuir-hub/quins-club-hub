@@ -52,6 +52,9 @@ export default function DrillCard({
   onLike,
   onFavorite,
   onOpen,
+  onSuggest = null,
+  suggested = false,
+  suggestBusy = false,
   selected = false,
 }) {
   const age = bandLabel(minAge ?? null, maxAge ?? null)
@@ -90,6 +93,24 @@ export default function DrillCard({
             Used this week · {usedThisWeek}
           </p>
         )}
+        {/* Suggest-to-club for a coach's own saved template — reachable any
+            time from the card, not only in the moment just after saving. */}
+        {onSuggest && (
+          <button
+            type="button"
+            data-testid="suggest-template"
+            disabled={suggestBusy}
+            onClick={onSuggest}
+            className="mt-1.5 text-[12px] font-bold text-brand-ink underline-offset-2 hover:underline disabled:opacity-50"
+          >
+            Suggest to the club
+          </button>
+        )}
+        {suggested && (
+          <p data-testid="suggested-template" className="mt-1.5 text-[12px] font-bold text-accent-ink">
+            Suggested to the club ✓
+          </p>
+        )}
       </div>
 
       <div className="flex shrink-0 flex-col items-center gap-2">
@@ -98,6 +119,7 @@ export default function DrillCard({
             type="button"
             data-testid="like-button"
             aria-label={liked ? `Unlike ${title}` : `Like ${title}`}
+            title={liked ? 'Liked — a public thumbs-up other coaches can see. Tap to remove.' : 'Like — a public thumbs-up other coaches can see.'}
             aria-pressed={liked}
             onClick={onLike}
             className="flex flex-col items-center text-brand-ink"
@@ -113,6 +135,7 @@ export default function DrillCard({
             type="button"
             data-testid="favorite-button"
             aria-label={favorited ? `Unfavorite ${title}` : `Favorite ${title}`}
+            title={favorited ? 'Saved to your shortlist — only you see this. Tap to remove.' : 'Save to your shortlist — a private list, just for you.'}
             aria-pressed={favorited}
             onClick={onFavorite}
             className={favorited ? 'text-brand-ink' : 'text-ink-muted'}
