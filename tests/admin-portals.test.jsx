@@ -39,9 +39,20 @@ import { PORTALS, closedReason, portalForPath, portalHome, portalLabel } from '.
 
 const TEAMS = [{ id: 'team-u10', name: 'U10', sort_order: 5 }]
 
-/** ⚠️ `status: 'active'` is load-bearing — adminRights() skips anything else. */
+/**
+ * ⚠️ `status: 'active'` is load-bearing — adminRights() skips anything else.
+ *
+ * ⚠️ CARRIES `clubadmin` BY DEFAULT SINCE 28 Aug 2026 (Phase 0a). Every real
+ * admin holds it — existing ones were backfilled
+ * (db/migrations/20260828_clubadmin_right.sql) — so a fixture that models a
+ * normal admin must too, or the Club Hub Admin portal (now `right: 'clubadmin'`)
+ * would read as greyed for a person who in production holds it. The
+ * deliberately-narrowed admin who does NOT hold it is built explicitly, with
+ * `admin([], { admin_rights: [] })` — the `extra` spread wins over the default.
+ */
 function admin(rights = [], extra = {}) {
-  return [{ id: 'm1', role: 'admin', status: 'active', team_id: null, admin_rights: rights, ...extra }]
+  const admin_rights = rights.includes('clubadmin') ? rights : ['clubadmin', ...rights]
+  return [{ id: 'm1', role: 'admin', status: 'active', team_id: null, admin_rights, ...extra }]
 }
 
 // ⚠️ `realMemberships` IS LOAD-BEARING HERE, NOT PADDING. ViewAsSwitcher gates
@@ -151,6 +162,22 @@ describe('portals.js', () => {
     expect(closedReason(pitches, admin([]))).toBe('no-right')
     expect(closedReason(pitches, admin(['pitches']))).toBeNull()
   })
+
+  // ⚠️ THE FLIP THAT MADE THE CLUB PORTAL A REAL GATE (28 Aug 2026, Phase 0a).
+  // It was `right: null` — open to every admin by construction. It is now
+  // `right: 'clubadmin'`, so an admin who does not hold that right sees it
+  // greyed. This is the whole point of the backfill: nobody in production lacks
+  // it, but the gate is now genuine rather than a `null` that could never close.
+  it('⚠️ closes Club Hub Admin for an admin who does not hold clubadmin', () => {
+    const club = PORTALS.find((p) => p.key === 'club')
+    // The deliberately-narrowed admin — explicitly no clubadmin.
+    expect(closedReason(club, admin(['pitches'], { admin_rights: ['pitches'] }))).toBe('no-right')
+    // A backfilled admin holds it.
+    expect(closedReason(club, admin(['clubadmin']))).toBeNull()
+    // ⚠️ A SUPER OPENS IT WITHOUT A LITERAL clubadmin — implicit-holding, so a
+    // super never needs backfilling. `admin_rights: []` makes that the assertion.
+    expect(closedReason(club, admin([], { is_super: true, admin_rights: [] }))).toBeNull()
+  })
 })
 
 describe('PortalChooser', () => {
@@ -222,7 +249,10 @@ describe('PortalChooser', () => {
   // it makes is the durable one: a super admin holds every right implicitly,
   // so nothing is closed to them for want of a right.
   it('⚠️ opens every portal for a SUPER admin, who holds every right implicitly', () => {
-    useMembershipsMock.mockReturnValue(memberships(admin([], { is_super: true })))
+    // ⚠️ `admin_rights: []` on purpose — a super must open all six, clubadmin
+    // included, WITHOUT holding any right literally. That is the invariant the
+    // backfill leans on: supers are never backfilled.
+    useMembershipsMock.mockReturnValue(memberships(admin([], { is_super: true, admin_rights: [] })))
     renderAt('/admin')
 
     expect(screen.getAllByTestId('portal-card-open')).toHaveLength(6)

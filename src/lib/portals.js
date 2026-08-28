@@ -25,11 +25,23 @@ import { adminRightLabel, hasAdminRight, isSuperAdmin } from './scope.js'
 export const PORTALS = [
   {
     key: 'club',
-    // ⚠️ NO RIGHT. Every admin holds this one — it is what `admin` already
-    // means, and Accounts is where a super admin hands the other three out.
-    // Its label is a string because it is not one of the three JOBS; there is
-    // no right whose label it could borrow.
-    right: null,
+    // ⚠️ `clubadmin` SINCE 28 Aug 2026 (Phase 0a) — it was `right: null`, auto-
+    // granted to every admin. It is now its own right, held by every admin
+    // because they were backfilled (db/migrations/20260828_clubadmin_right.sql),
+    // and a super holds it implicitly (adminRights() → isSuperAdmin short-
+    // circuit). The flip makes this a REAL gate: an admin who does not hold
+    // `clubadmin` sees this card greyed, which is the granularity the admin-
+    // rights redesign needs (claude/plans/2026-08-28-admin-rights-migration.md).
+    // ⚠️ ORDER IS LOAD-BEARING: the backfill had to land in production BEFORE
+    // this flip deployed, or existing admins would lose the screen. It did.
+    // ⚠️ STILL SCREEN-GATING, NOT DATA-GATING. `is_admin` is unchanged, so a
+    // holder still sees every child (top-of-file warning). The narrowing of
+    // actual data is the redesign's later phases, in RLS, not here.
+    right: 'clubadmin',
+    // ⚠️ NO LONGER RENDERED — portalLabel() reads adminRightLabel('clubadmin')
+    // now that `right` is set. Kept as the documented fallback and so a future
+    // reader sees what the card says without resolving the right. The two are
+    // pinned equal by tests/admin-portals.test.jsx.
     label: 'Club Hub Admin',
     blurb: 'Accounts, access and the club’s squads.',
     tabs: [

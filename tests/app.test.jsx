@@ -109,7 +109,9 @@ const signedIn = {
   signOut: signOutMock,
 }
 const membershipsLoaded = {
-  memberships: [{ role: 'admin', status: 'active', team_id: null }],
+  // `clubadmin` since 28 Aug 2026 (Phase 0a): every real admin holds it (the
+  // backfill), and the Club Hub Admin portal now requires it.
+  memberships: [{ role: 'admin', status: 'active', team_id: null, admin_rights: ['clubadmin'] }],
   teams: [],
   loading: false,
   error: null,

@@ -218,6 +218,18 @@ export function parentPreviewTeamIds(memberships) {
 // right that must genuinely withhold data — finances, safeguarding notes —
 // needs an RLS policy, and hiding the menu item will not do.
 //
+// ⚠️ `clubadmin` (28 Aug 2026, Phase 0a) IS THE SIXTH, AND IT IS DIFFERENT IN
+// INTENT — it is the base "Club Hub Admin" right that every admin holds
+// (existing admins were backfilled, db/migrations/20260828_clubadmin_right.sql),
+// and it is the linchpin of the admin-rights redesign
+// (claude/plans/2026-08-28-admin-rights-migration.md). In Phase 0a it STILL
+// only gates a screen: it flips the Club Hub Admin portal from `right: null` to
+// `right: 'clubadmin'` (src/lib/portals.js). `is_admin` is unchanged, so the
+// data every admin sees is unchanged — the sentence above holds for it too.
+// The redesign's LATER phases turn specific surfaces (parent contacts/DOB,
+// photos, children write-access, DM review) into real RLS boundaries; those do
+// not live in this list, they live in the database.
+//
 // ⚠️ CHANGE ONE, CHANGE BOTH — the same arrangement SQUAD_STAFF_ROLES has with
 // private.can_edit_team. The database deliberately has NO check constraint on
 // these values (that would mean a migration per job title, for a value that
@@ -227,7 +239,7 @@ export function parentPreviewTeamIds(memberships) {
 // every DM, the reports queue. It is NOT a data permission: any admin can read
 // a DM (Jay's ruling, db/migrations/20260823_squad_chat_phase3.sql). It exists
 // so one named person sees the whole picture without holding every other job.
-export const ADMIN_RIGHTS = ['youth', 'media', 'pitches', 'training', 'welfare']
+export const ADMIN_RIGHTS = ['youth', 'media', 'pitches', 'training', 'welfare', 'clubadmin']
 
 // Job titles for squad staff — what `memberships.title` is usually set to.
 //
@@ -285,6 +297,12 @@ const ADMIN_RIGHT_LABELS = {
   training: 'Rugby Performance Director',
   // A job, not a person — the 12 Aug wording rule.
   welfare: 'Welfare',
+  // ⚠️ THE BASE ADMIN RIGHT (28 Aug 2026, Phase 0a). Its label MUST stay
+  // 'Club Hub Admin' — the Club Hub Admin portal (src/lib/portals.js) now draws
+  // its card and heading from adminRightLabel('clubadmin') rather than from a
+  // string on the portal, so the two had one home the moment the portal gained
+  // a `right`. Change this and you rename the card.
+  clubadmin: 'Club Hub Admin',
 }
 
 /** The human label for a right, or the raw value if it is one we do not know. */

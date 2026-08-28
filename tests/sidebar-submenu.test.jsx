@@ -21,7 +21,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   countAdminWaitingMock.mockResolvedValue(0)
   useMembershipsMock.mockReturnValue({
-    memberships: [{ id: 'm1', role: 'admin', team_id: null, club_id: 'c1', status: 'active', is_super: false, admin_rights: [] }],
+    // `clubadmin` since 28 Aug 2026 (Phase 0a): every real admin holds it (the
+    // backfill), and the Club Hub Admin portal now requires it.
+    memberships: [{ id: 'm1', role: 'admin', team_id: null, club_id: 'c1', status: 'active', is_super: false, admin_rights: ['clubadmin'] }],
     teams: [],
   })
 })

@@ -137,15 +137,19 @@ describe('the rights vocabulary', () => {
   // Jay chose the wording knowing that, so this test pins it — a later tidy-up
   // that "corrects" it to match the others is undoing a decision, not a typo.
   // Five since 23 Aug 2026: `welfare` (squad chat phase 3) gates the Welfare
-  // dashboard screen. Like the others, a screen-gate, not a data permission.
-  it('is the four Jay named, plus welfare', () => {
-    expect(ADMIN_RIGHTS).toEqual(['youth', 'media', 'pitches', 'training', 'welfare'])
+  // dashboard screen. Six since 28 Aug 2026: `clubadmin`, the base Club Hub
+  // Admin right (redesign Phase 0a) — still a screen-gate in 0a, gating the
+  // Club Hub Admin portal. Its label MUST read 'Club Hub Admin' because the
+  // portal card now borrows it (src/lib/portals.js).
+  it('is the four Jay named, plus welfare and clubadmin', () => {
+    expect(ADMIN_RIGHTS).toEqual(['youth', 'media', 'pitches', 'training', 'welfare', 'clubadmin'])
     expect(ADMIN_RIGHTS.map(adminRightLabel)).toEqual([
       'Club Youth Manager',
       'Social Media Management',
       'Pitch Management',
       'Rugby Performance Director',
       'Welfare',
+      'Club Hub Admin',
     ])
   })
 })
