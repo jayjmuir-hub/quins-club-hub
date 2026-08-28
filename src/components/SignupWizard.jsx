@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Button from './Button.jsx'
 import PlayerRegistrationForm from './PlayerRegistrationForm.jsx'
 import { listSignupSquads } from '../data/signupSquads.js'
+import useSlowLoad from '../lib/useSlowLoad.js'
 import { checkPassword } from '../lib/password.js'
 import {
   SIGNUP_ANSWERS,
@@ -56,6 +57,10 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  // The squads are loading while none have arrived and nothing has failed; after
+  // a few seconds say so honestly — claude/plans/2026-08-28-provider-resilience.md §3.
+  const loadingSquads = teams.length === 0 && !teamsFailed
+  const slowSquads = useSlowLoad(loadingSquads)
 
   useEffect(() => {
     let mounted = true
@@ -354,7 +359,11 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
         <div className="max-h-48 overflow-y-auto rounded-[11px] border border-line">
           {sortedTeams.length === 0 ? (
             <p className="px-3 py-2 text-sm text-ink-muted">
-              {teamsFailed ? 'Could not load squads.' : 'Loading squads…'}
+              {teamsFailed
+                ? 'Could not load squads.'
+                : slowSquads
+                  ? 'Loading squads — taking longer than usual…'
+                  : 'Loading squads…'}
             </p>
           ) : (
             sortedTeams.map((team) => (

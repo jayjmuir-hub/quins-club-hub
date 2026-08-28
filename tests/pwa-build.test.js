@@ -202,6 +202,9 @@ describe('PWA production build output', () => {
     expect(sw).toMatch(/rest\/v1/)
     expect(sw).toMatch(/NetworkFirst/)
     expect(sw).toMatch(/quins-supabase-rest-get/)
+    // Falls back to cache after a stalled network rather than hanging on it —
+    // claude/plans/2026-08-28-provider-resilience.md §1.
+    expect(sw).toMatch(/networkTimeoutSeconds/)
   })
 
   // ⚠️ ASSERTED ON THE BUILT WORKER, NOT ON THE CONFIG. tests/pwa-cache-rules.js

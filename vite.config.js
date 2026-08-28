@@ -196,6 +196,14 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'quins-supabase-rest-get',
+              // ⚠️ Fall back to the cached copy after 8s of network silence, so a
+              // stalled Supabase (the 27-28 Aug 2026 latency incident) shows the
+              // last-known data instead of a spinner that waits minutes. Without
+              // this, NetworkFirst waits for the network indefinitely and only the
+              // requests that ERROR fast fall back — which is why the installed PWA
+              // "barely noticed" the incident by luck, not design.
+              // See claude/plans/2026-08-28-provider-resilience.md §1.
+              networkTimeoutSeconds: 8,
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24, // 1 day — avoid stale data lingering once back online

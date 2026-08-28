@@ -10,17 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Chats list now previews a photo/voice-only message as "📷 Photo" / "🎤 Voice
+- Provider resilience — the app now rides through a stalled Supabase instead of
+  hanging on a spinner (`claude/plans/2026-08-28-provider-resilience.md`, §1–§3
+  built): (1) the Workbox `NetworkFirst` route falls back to cache after 8s of
+  network silence (`vite.config.js`); (2) a timeout under idempotent data reads
+  (`src/lib/resilientFetch.js`) turns a multi-minute hang into a retry — GETs via
+  postgrest-js's own idempotent retry, read-only RPCs via a bounded retry there —
+  while writes, uploads and auth are left untouched for safety; (3) an honest
+  "taking longer than usual…" message on the load gate and the signup squad
+  picker (`src/lib/useSlowLoad.js`). §4 (browser stale-while-revalidate) is a
+  later pass. (SHA follows in the next changelog-touching PR.)
+- `b83cf54` — Chats list now previews a photo/voice-only message as "📷 Photo" / "🎤 Voice
   message" instead of "No messages yet". A caption-less attachment is a legal
   message stored with an empty body (the `messages_body_check` constraint yields
   its length arm to `attachment_path`), so `my_chats` returned an empty
   `last_body` and `previewLine` read that as "no message" — a DM full of photos
   looked empty. `my_chats` now also returns `last_attachment_path`
-  (`db/migrations/20260828_my_chats_last_attachment.sql`, verified against prod in
-  a rolled-back transaction + `db/tests/my-chats-attachment.sql`) and the client
-  renders the medium via the existing `attachmentPreviewLabel`. ⚠️ Migration NOT
-  yet applied to production; re-capture `db/schema/functions.sql` after apply.
-  (SHA follows in the next changelog-touching PR.)
+  (`db/migrations/20260828_my_chats_last_attachment.sql`) and the client
+  renders the medium via the existing `attachmentPreviewLabel`. Applied to
+  production; `db/schema/functions.sql` re-capture pending.
 - `193b7ea` — Admin-rights redesign **Phase 2** (Surface S3) — a child's **photograph**
   becomes a real data boundary. The `player-photos` storage read/write policies
   are narrowed to the allowlist `{clubadmin, youth, media, welfare}` (welfare
@@ -45,7 +53,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   reads reroute through it and merge the columns back, so no screen changed shape.
   Deploy-first: fn migration → this deploy → the revoke migration. Both directions
   proven in `db/tests/profiles-contact-revoke.sql`; `grants.sql` re-captured.
-  (SHA follows in the next changelog-touching PR.)
 - `dca36b8` — Corrected a stale security-headers finding: **headers-only deploys DO reach
   installed PWAs now.** The 6 Aug decision doc said a `netlify.toml`-only change
   never self-heals in the service-worker cache (only a bundle-changing deploy

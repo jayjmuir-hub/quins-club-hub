@@ -6,6 +6,7 @@ import FloatingChatDock from './FloatingChatDock.jsx'
 import useDockBadges from '../lib/useDockBadges.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import useAutoHideOnScroll from '../lib/useAutoHideOnScroll.js'
+import useSlowLoad from '../lib/useSlowLoad.js'
 import { highestRole, isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
@@ -91,10 +92,26 @@ function SignOutControl({ signOut, className = '' }) {
   )
 }
 
-function LoadingState() {
+function LoadingState({ slow = false, reload }) {
   return (
     <div role="status" className="flex flex-1 items-center justify-center py-20">
-      <p className="text-sm font-semibold uppercase tracking-widest text-ink-faint">Loading…</p>
+      <div className="text-center">
+        <p className="text-sm font-semibold uppercase tracking-widest text-ink-faint">Loading…</p>
+        {/* An honest word when a load is riding out a slow moment, rather than a
+            spinner that looks frozen — claude/plans/2026-08-28-provider-resilience.md §3. */}
+        {slow && (
+          <>
+            <p data-testid="slow-load" className="mt-3 text-sm text-ink-muted">
+              This is taking longer than usual — hang on.
+            </p>
+            {reload && (
+              <Button onClick={reload} className="mt-3">
+                Try again
+              </Button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -247,6 +264,9 @@ export default function AppShell({ children }) {
       (/^\/chat\/[^/]+$/.test(location.pathname) &&
         !['dm', 'starred'].includes(location.pathname.split('/')[2])))
   const ready = !loading && !error && memberships.length > 0
+  // After a few seconds the load gate admits it is slow and offers a retry —
+  // claude/plans/2026-08-28-provider-resilience.md §3.
+  const slowLoading = useSlowLoad(loading)
   // ⚠️ DO NOT gate this on `viewAs` to win masthead space. Tried, reverted
   // (7 Aug 2026). tests/view-as.test.jsx reads this pill to prove the
   // EFFECTIVE membership set really is the previewed one — the anti-soft-lock
@@ -714,7 +734,7 @@ export default function AppShell({ children }) {
             `ready` branch they would never see it. It renders nothing at all
             unless there is an install route to offer — see InstallPrompt. */}
         <InstallPrompt />
-        {loading && <LoadingState />}
+        {loading && <LoadingState slow={slowLoading} reload={reload} />}
         {!loading && error && (
           <ErrorState error={error} reload={reload}>
             {/* ⚠️ The app's only sign-out control renders on /more behind the
