@@ -97,13 +97,21 @@
 # outbound request. strict-origin-when-cross-origin sends only the origin
 # off-site, so the token cannot leak that way.
 #
-# ⚠️ camera IS DELIBERATELY ABSENT from Permissions-Policy. Nothing calls
-# getUserMedia and the photo field is a plain <input type="file"> with no
-# `capture` attribute, so restricting it would buy almost nothing — while the
-# parent-adds-a-photo-from-their-phone flow has never been smoke-tested on a
-# real device. Do not add `camera=()` until that test has been done; a silent
-# break there would look like "the app won't take my photo" and nobody would
-# connect it to a header.
+# ⚠️ microphone=(self), NOT microphone=(). The voice-message recorder
+# (src/lib/voiceRecorder.js) calls getUserMedia, and Chromium ENFORCES this
+# header: `microphone=()` blocked recording on every Chrome/Android/PWA while
+# Safari/iOS ignores the policy and worked — so the original `microphone=()`
+# shipped a feature that only recorded on iPhones (found 28 Aug 2026, when the
+# mic "did nothing" everywhere but iOS). `(self)` allows this origin only; no
+# cross-origin frame is granted it.
+#
+# ⚠️ camera IS DELIBERATELY ABSENT. The photo field is a plain
+# <input type="file"> with no `capture` attribute, so restricting it would buy
+# almost nothing — while the parent-adds-a-photo-from-their-phone flow has never
+# been smoke-tested on a real device. Do not add `camera=()` until that test has
+# been done; a silent break there would look like "the app won't take my photo"
+# and nobody would connect it to a header — which is EXACTLY what `microphone=()`
+# just did to voice notes.
 [[headers]]
   for = "/*"
   [headers.values]
@@ -111,4 +119,4 @@
     Content-Security-Policy = "frame-ancestors 'none'"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "geolocation=(), microphone=(), payment=(), usb=()"
+    Permissions-Policy = "geolocation=(), microphone=(self), payment=(), usb=()"

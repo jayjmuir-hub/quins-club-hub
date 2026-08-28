@@ -45,6 +45,14 @@ while the parent-adds-a-photo-from-a-phone flow has **never been smoke-tested on
 device**. Do not add `camera=()` until it has been. A silent break there reads as "the app
 won't take my photo" and nobody would connect it to a header.
 
+> **⚠️ SUPERSEDED 28 Aug 2026 — `microphone` is now `microphone=(self)`, not `()`.**
+> The line above ("Nothing calls `getUserMedia`") stopped being true when voice messages
+> shipped (`src/lib/voiceRecorder.js`). `microphone=()` then blocked recording on every
+> Chromium browser (Chrome/Android/PWA) while Safari/iOS ignored the policy — so the mic
+> "did nothing" everywhere but iPhone. Fixed in `netlify.toml`. The camera paragraph's own
+> warning came true for the microphone: a header silently broke a feature and nobody
+> connected the two. Do not restore `microphone=()` while voice notes exist.
+
 ## ⚠️ THE FINDING: the service worker serves the app document with NO headers
 
 `curl` said every header was present on `/` and on `/schedule`. **That was true and
