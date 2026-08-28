@@ -28,6 +28,27 @@ export const CHAT_MEDIA_BUCKET = 'chat-media'
 // the resize failed on a type that is safe to store as-is.
 const EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
+// Voice notes (claude/plans/2026-08-28-voice-messages.md) ride the SAME bucket
+// and the SAME extension-agnostic storage policies as photos — an attachment is
+// audio or image purely by its key's extension, which is the one thing the
+// bubble and the chat-list preview need to tell them apart.
+const AUDIO_EXTENSIONS = new Set(['webm', 'm4a', 'mp4', 'aac', 'mp3', 'ogg'])
+
+/** True when an attachment_path is a voice note rather than a photo. */
+export function isAudioAttachment(path) {
+  if (!path) return false
+  const ext = path.split('.').pop()?.toLowerCase()
+  return AUDIO_EXTENSIONS.has(ext)
+}
+
+/**
+ * The one-line stand-in shown for a message with an attachment and no words —
+ * in pins, quotes and reply previews. WhatsApp's "🎤 Voice message" / "📷 Photo".
+ */
+export function attachmentPreviewLabel(path) {
+  return isAudioAttachment(path) ? '🎤 Voice message' : '📷 Photo'
+}
+
 /**
  * Uploads one chat photo into the caller's own folder and returns the object
  * key, for the message's attachment_path. Downscaled before upload
@@ -74,3 +95,25 @@ export async function removeChatPhoto(path) {
     // the orphan is invisible to everyone but its owner; retention is Phase 4
   }
 }
+
+/**
+ * Uploads one recorded voice note into the caller's own folder and returns the
+ * object key, for the message's attachment_path. `ext` is decided by the
+ * container MediaRecorder produced (webm on Chrome/Android, mp4 on iOS Safari —
+ * see src/lib/voiceRecorder.js). No resize: audio is small, and the recorder's
+ * five-minute cap plus the bucket's 10 MB ceiling bound it.
+ */
+export async function uploadChatVoice(profileId, blob, ext) {
+  if (!profileId) throw new Error('uploadChatVoice needs a profile id.')
+  const key = `${profileId}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage
+    .from(CHAT_MEDIA_BUCKET)
+    .upload(key, blob, { contentType: blob.type || undefined, upsert: false })
+  if (error) throw error
+  return key
+}
+
+// A voice note lives in the same private bucket, so signing and removal are the
+// photo helpers exactly — aliased for callers that read as audio, not photos.
+export const signChatVoiceUrl = signChatPhotoUrl
+export const removeChatVoice = removeChatPhoto

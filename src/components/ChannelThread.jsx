@@ -9,6 +9,7 @@ import MessageRow from './MessageRow.jsx'
 import PollComposer from './PollComposer.jsx'
 import PollVotes from './PollVotes.jsx'
 import Spinner from './Spinner.jsx'
+import VoiceComposer from './VoiceComposer.jsx'
 import { backgroundStyle } from '../lib/chatBackgrounds.js'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
@@ -197,7 +198,7 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
                 </button>
               </div>
             )}
-            <form onSubmit={thread.send} className="flex items-end gap-2" data-testid="composer">
+            <form onSubmit={thread.send} className="relative flex items-end gap-2" data-testid="composer">
               <MentionPicker
                 people={mentionables}
                 onPick={(p) => {
@@ -248,9 +249,13 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
                 className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
               />
               <EmojiPicker onPick={(emoji) => thread.setDraft(insertAtCursor(thread.draftRef.current, emoji))} />
-              <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && !thread.photo)}>
-                {attachedEvent ? 'Start thread' : 'Send'}
-              </Button>
+              {mayPost && !thread.draft.trim() && !thread.photo && !attachedEvent ? (
+                <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} />
+              ) : (
+                <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && !thread.photo)}>
+                  {attachedEvent ? 'Start thread' : 'Send'}
+                </Button>
+              )}
             </form>
           </>
         ) : (

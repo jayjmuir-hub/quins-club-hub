@@ -88,6 +88,8 @@ vi.mock('../src/data/chatMedia.js', () => ({
   uploadChatPhoto: (...a) => media.uploadChatPhoto(...a),
   removeChatPhoto: (...a) => media.removeChatPhoto(...a),
   signChatPhotoUrl: (...a) => media.signChatPhotoUrl(...a),
+  isAudioAttachment: (p) => /\.(webm|m4a|mp4|aac|mp3|ogg)$/i.test(p || ''),
+  attachmentPreviewLabel: () => '📷 Photo',
 }))
 vi.mock('../src/screens/ChatList.jsx', () => ({
   RowAvatar: () => <span data-testid="row-avatar" />,
@@ -239,12 +241,15 @@ describe('photo attachments', () => {
     const user = userEvent.setup()
     renderThread()
     await screen.findAllByTestId('dm-bubble')
-    const send = screen.getByRole('button', { name: 'Send' })
-    expect(send).toBeDisabled()
+    // Empty composer shows the mic (voice), not a Send — so there is no Send
+    // button until there is something to send. (jsdom has no MediaRecorder, so
+    // the mic itself does not render here; the point is Send is absent.)
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
 
     const file = new File(['x'], 'match.jpg', { type: 'image/jpeg' })
     await user.upload(screen.getByTestId('photo-input'), file)
     expect(screen.getByTestId('photo-preview')).toHaveTextContent('match.jpg')
+    const send = screen.getByRole('button', { name: 'Send' })
     expect(send).toBeEnabled()
 
     await user.click(send)

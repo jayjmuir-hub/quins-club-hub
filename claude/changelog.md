@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Test: de-flaked the Accounts ordering case in `tests/accounts.test.jsx`
+- Voice messages, WhatsApp-style: tap the mic, talk, send; the note plays in a
+  bubble with a plain-bar scrubber and a 1×/1.5×/2× speed toggle. A voice note
+  is just another attachment on a message — the chat-media rail photos already
+  run on — so there are no new tables and no new RLS; the migration only widens
+  the bucket to accept audio and raises its size to 10 MB (which is also the
+  five-minute cap's teeth). Open posting like photos, five-minute cap. New
+  `src/lib/voiceRecorder.js` (MediaRecorder, format negotiation, the cap),
+  `ChatAudio` / `VoiceComposer`, wired into both thread hooks and composers.
+  ⚠️ Tap-to-record, not hold-to-record — the approved fallback; the hold gesture
+  is a later UI change on the same recorder. Migration
+  `db/migrations/20260828_chat_voice.sql`, harness `db/tests/chat-voice.sql`
+  (images-survive is the discriminating check). Spec
+  `claude/plans/2026-08-28-voice-messages.md`; ruling
+  `claude/decisions/2026-08-28-voice-notes-open.md`.
+- `1419691` — Test: de-flaked the Accounts ordering case in `tests/accounts.test.jsx`
   ("sits ABOVE the Approval emails card"). It captured the `waiting-for-access`
   node after the first async read, then compared position after the second read
   had re-rendered and detached it, so `compareDocumentPosition` lost the

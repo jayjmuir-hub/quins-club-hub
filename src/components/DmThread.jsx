@@ -7,6 +7,8 @@ import { Empty } from './Empty.jsx'
 import PollComposer from './PollComposer.jsx'
 import PollVotes from './PollVotes.jsx'
 import Spinner from './Spinner.jsx'
+import VoiceComposer from './VoiceComposer.jsx'
+import { attachmentPreviewLabel } from '../data/chatMedia.js'
 import { receiptState } from '../data/messages.js'
 import { backgroundStyle } from '../lib/chatBackgrounds.js'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
@@ -97,7 +99,7 @@ export default function DmThread({ thread, compact = false }) {
               <span aria-hidden="true" className="text-[12px]">📌</span>
               <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-muted">
                 <span className="font-bold text-ink">{m.author_id === selfId ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')}: </span>
-                {m.body?.trim() ? m.body : '📷 Photo'}
+                {m.body?.trim() ? m.body : attachmentPreviewLabel(m.attachment_path)}
               </span>
             </button>
           ))}
@@ -178,7 +180,7 @@ export default function DmThread({ thread, compact = false }) {
                     {m.quoted.author_id === selfId ? 'You' : nameFor(m.quoted.author_id, m.quoted.author?.full_name ?? 'Member')}
                   </span>
                   <span className={`block truncate text-[12px] ${mine ? 'text-white/70' : 'text-ink-muted'}`}>
-                    {m.quoted.body?.trim() ? m.quoted.body : '📷 Photo'}
+                    {m.quoted.body?.trim() ? m.quoted.body : attachmentPreviewLabel(m.quoted.attachment_path)}
                   </span>
                 </button>
               ))
@@ -323,7 +325,7 @@ export default function DmThread({ thread, compact = false }) {
                     <p className="text-[11px] font-extrabold text-brand-ink">
                       Replying to {thread.replyTo.author_id === selfId ? 'yourself' : nameFor(thread.replyTo.author_id, thread.replyTo.author?.full_name ?? 'Member')}
                     </p>
-                    <p className="truncate text-[12px] text-ink-muted">{thread.replyTo.body?.trim() ? thread.replyTo.body : '📷 Photo'}</p>
+                    <p className="truncate text-[12px] text-ink-muted">{thread.replyTo.body?.trim() ? thread.replyTo.body : attachmentPreviewLabel(thread.replyTo.attachment_path)}</p>
                   </div>
                   <button
                     type="button"
@@ -349,7 +351,7 @@ export default function DmThread({ thread, compact = false }) {
                   </button>
                 </div>
               )}
-              <form onSubmit={thread.send} className="flex items-end gap-2" data-testid="dm-composer">
+              <form onSubmit={thread.send} className="relative flex items-end gap-2" data-testid="dm-composer">
                 <input ref={thread.fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
                 <button
                   type="button"
@@ -393,9 +395,13 @@ export default function DmThread({ thread, compact = false }) {
                   className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
                 />
                 <EmojiPicker onPick={(emoji) => thread.setDraft(insertAtCursor(thread.draftRef.current, emoji))} />
-                <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && !thread.photo)}>
-                  Send
-                </Button>
+                {!thread.draft.trim() && !thread.photo ? (
+                  <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} />
+                ) : (
+                  <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && !thread.photo)}>
+                    Send
+                  </Button>
+                )}
               </form>
             </>
           )}

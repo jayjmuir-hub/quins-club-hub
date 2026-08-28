@@ -25,3 +25,24 @@ export async function uploadChatPhoto() {
 }
 
 export async function removeChatPhoto() {}
+
+// Voice notes reuse the same bucket; mirror the real module's surface so the
+// harness-stubs test (tests/harness-stubs.test.js) stays satisfied.
+const AUDIO_EXTENSIONS = new Set(['webm', 'm4a', 'mp4', 'aac', 'mp3', 'ogg'])
+
+export function isAudioAttachment(path) {
+  if (!path) return false
+  return AUDIO_EXTENSIONS.has(path.split('.').pop()?.toLowerCase())
+}
+
+export function attachmentPreviewLabel(path) {
+  return isAudioAttachment(path) ? '🎤 Voice message' : '📷 Photo'
+}
+
+export const signChatVoiceUrl = signChatPhotoUrl
+
+export async function uploadChatVoice() {
+  throw new Error('harness: uploadChatVoice is not stubbed')
+}
+
+export async function removeChatVoice() {}
