@@ -74,6 +74,23 @@ revision hash of `index.html`. Changing `netlify.toml` changes no built asset, s
 sees nothing new and never re-fetches. The cached copy picks the headers up only on the
 **next deploy that actually changes the bundle**.
 
+> **⚠️ SUPERSEDED 28 Aug 2026 — headers-only deploys DO self-heal now, because EVERY deploy
+> changes the bundle.** The paragraph above was true on 6 Aug but stopped being true when
+> `__BUILD_REF__` (`vite.config.js`, added ~18 Aug for the Help sheet's version line) began
+> baking the deploy's `COMMIT_REF` into the JS bundle (`src/components/HelpSheet.jsx`). Every
+> deploy has a distinct `COMMIT_REF`, so a built chunk changes, so `index.html`'s precache
+> revision changes, so `sw.js` changes and `autoUpdate` re-fetches `index.html` — with the
+> live response headers — on the user's next visit. A `netlify.toml`-only change is a new
+> commit → new `COMMIT_REF` → new bundle, so it propagates like any other.
+>
+> **Measured 28 Aug 2026 (prove-it, not trust-the-doc):** two production builds differing
+> ONLY in `COMMIT_REF` produce different `sw.js` AND `index.html`; the SAME `COMMIT_REF`
+> twice produces byte-identical output (deterministic control, so the difference is the ref,
+> not build noise); and the live bundle carries the deployed commit SHA (`56e399a`), so
+> `COMMIT_REF` is real in production, not the `'dev'` fallback. This is why the 28 Aug
+> `microphone=()` → `microphone=(self)` fix (PR #490) reached installed PWAs on next open.
+> The clickjacking analysis below never depended on this paragraph and is unaffected.
+
 ### But the attack that matters is still blocked
 
 Framed **cross-origin from `example.com`, the real clickjacking shape — Chrome REFUSED it**
@@ -98,16 +115,25 @@ reason the finding below is recorded rather than closed.
 
 ### The durable lesson
 
-**Any future header-based protection will silently not apply to installed users.** This
-matters most for the real CSP that is still outstanding: shipping it as a Netlify header
-and confirming it with `curl` would produce a policy that is provably present and
-practically absent. **Verify security headers from inside a controlled browser, never from
-`curl` alone.**
+**~~Any future header-based protection will silently not apply to installed users.~~**
+⚠️ **No longer true since `__BUILD_REF__` (see the SUPERSEDED note above): a header change
+reaches installed users on their next visit after any deploy.** The lasting lesson is the
+verification one, which still holds: `curl` sees the network response, not the SW-served
+cached document — so **verify security headers from inside a controlled browser, never from
+`curl` alone.** (The 28 Aug microphone case cut the other way — `curl` was right and the
+cache was the victim — but the rule is the same: measure the surface the user actually gets.)
 
-The fix, if it is ever wanted, is to stop serving navigations from precache (network-first
-for the document, cache as fallback). **Not done, deliberately** — it trades the offline
-app shell, which has real value for a club used pitch-side on poor signal, for a
-same-origin hardening with no attacker path today.
+The heavier fix — stop serving navigations from precache (network-first for the document,
+cache as fallback) — is **still deliberately NOT done, and the reason is now simpler:
+`__BUILD_REF__` already delivers header changes on every deploy, so the rework buys nothing.**
+⚠️ **Do not justify keeping the precache by "offline support" — Jay, 28 Aug 2026: nobody uses
+this app offline, and stale offline data (scores, availability) would mislead, not help.**
+The precache earns its keep on *online* grounds instead: instant launches, and riding out
+flaky pitch-side signal and Supabase blips (the data cache is `NetworkFirst`, so online it is
+always fresh and only falls back to last-seen when the live fetch fails — which is what the
+provider-resilience plan leans on). So: do not migrate the SW to `injectManifest` for the
+header question — it is already answered — and weigh any future SW simplification on load
+speed and blip-resilience, not on offline use.
 
 ## HSTS left alone
 
