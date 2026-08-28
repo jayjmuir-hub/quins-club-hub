@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { subscribeToTable, REALTIME_DEBOUNCE_MS } from './subscribeToTable.js'
 
 // The noticeboard. Migration: db/migrations/20260814_announcements.sql.
 // Plan: claude/plans/2026-08-14-notices.md (phase 1 — in-app only).
@@ -276,11 +277,6 @@ export async function noticeAudience(id) {
 
 // ── Realtime ────────────────────────────────────────────────────────────────
 
-/** Coalescing window, matching REALTIME_DEBOUNCE_MS in src/data/events.js. */
-export const NOTICE_REALTIME_DEBOUNCE_MS = 400
-
-let noticeChannelSeq = 0
-
 /**
  * Subscribes to realtime changes on `announcements`. Returns an unsubscribe
  * function — call it from a useEffect cleanup.
@@ -308,33 +304,6 @@ let noticeChannelSeq = 0
  * @param callback   invoked with NO arguments, at most once per debounce window
  * @param debounceMs injectable purely so tests need not wait in real time
  */
-export function subscribeNotices(callback, { debounceMs = NOTICE_REALTIME_DEBOUNCE_MS } = {}) {
-  let timer = null
-
-  function onChange() {
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = null
-      callback()
-    }, debounceMs)
-  }
-
-  const channel = supabase
-    .channel(`announcements-changes-${++noticeChannelSeq}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, onChange)
-    .subscribe()
-
-  let unsubscribed = false
-  return () => {
-    if (unsubscribed) return
-    unsubscribed = true
-    // ⚠️ CANCEL THE PENDING FIRE, for the reason subscribeEvents gives: a change
-    // arriving just before a screen unmounts would otherwise call back
-    // afterwards, and the callback is a setState into a component that is gone.
-    if (timer) {
-      clearTimeout(timer)
-      timer = null
-    }
-    supabase.removeChannel(channel)
-  }
+export function subscribeNotices(callback, { debounceMs = REALTIME_DEBOUNCE_MS } = {}) {
+  return subscribeToTable('announcements', callback, { debounceMs })
 }

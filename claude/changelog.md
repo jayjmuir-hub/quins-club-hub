@@ -18,11 +18,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   votes are own-row inserts and a trigger stamps identity and does single-choice
   replacement, while `create_poll()` re-checks the poster may post there. New
   `src/data/polls.js`, `PollBubble` / `PollComposer` / `PollVotes`, wired into
-  both thread hooks and composers. Migration
+  both thread hooks and composers. `subscribePollVotes` uses the
+  `subscribeToTable` helper from #471. Migration
   `db/migrations/20260827_chat_polls.sql`, harness `db/tests/chat-polls.sql`
   (9 assertions, green against production). Spec
   `claude/plans/2026-08-27-chat-polls.md`; ruling
   `claude/decisions/2026-08-27-chat-polls-open-visible.md`.
+- `279073f` — Tidy: dropped the `export` keyword from nine symbols that were referenced only
+  inside their own file (`ArrowBadge`, `DUPLICATE_ACCESS`, `membershipKey`,
+  `LAST_ADMIN_MESSAGE`, `IDEA_BUCKET`, `PRE_MATCH_FROM_AGE`, `TIER_ORDER`,
+  `BAD_EMAIL`, `NO_ACCESS_CHOSEN`) — verified zero importers across src and
+  tests. Shrinks the public surface; no behaviour change. Last of the
+  audit's orphan findings.
+- `13f290b` — Data layer: the realtime-subscription shape that six `subscribe*` functions
+  hand-wrote — per-module channel-sequence counter, debounced onChange, and an
+  idempotent `removeChannel` teardown that cancels the pending fire — is now one
+  helper, `src/data/subscribeToTable.js`, with a single `REALTIME_DEBOUNCE_MS`
+  in place of the three `= 400` constants that had to stay equal. `subscribeEvents`,
+  `subscribeNotices`, `subscribeMessages`, `subscribeReactions`, `subscribeFeedback`
+  and `subscribeAvailability` delegate, keeping their differences through
+  `debounceMs` (0 = fire on every change, for feedback/availability), `filter`
+  (availability's `event_id=eq`), `channelPrefix` (reactions) and `channelKey`.
+  Pure consolidation, behaviour unchanged.
 - `9e9ced2` — Data layer: the update-or-insert write shape that five `upsert*` functions
   hand-wrote is now one helper, `src/data/upsertById.js`. The non-obvious rule
   it carries — a write RLS filters to zero rows comes back as `data === null`

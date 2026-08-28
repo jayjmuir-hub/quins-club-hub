@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { REALTIME_DEBOUNCE_MS, subscribeToTable } from './subscribeToTable.js'
 
 // Chat polls — WhatsApp-style, on the message rails. Spec:
 // claude/plans/2026-08-27-chat-polls.md. Ruling (open posting, votes visible to
@@ -106,28 +107,11 @@ export async function setPollVote(optionId, selfId, on) {
   }
 }
 
-let pollChannelSeq = 0
-const POLL_REALTIME_DEBOUNCE_MS = 250
-
-/** Same shape as subscribeReactions, for the poll_votes table. */
-export function subscribePollVotes(callback, { debounceMs = POLL_REALTIME_DEBOUNCE_MS } = {}) {
-  let timer = null
-  function onChange() {
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = null
-      callback()
-    }, debounceMs)
-  }
-  const channel = supabase
-    .channel(`poll-vote-changes-${++pollChannelSeq}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, onChange)
-    .subscribe()
-  let unsubscribed = false
-  return () => {
-    if (unsubscribed) return
-    unsubscribed = true
-    if (timer) clearTimeout(timer)
-    supabase.removeChannel(channel)
-  }
+/**
+ * Live poll-vote changes, via the shared subscribeToTable helper (#471). The
+ * callback is a full refetch, so it takes the standard debounce — the voter's
+ * own tap already calls load() for instant feedback; this is for everyone else.
+ */
+export function subscribePollVotes(callback) {
+  return subscribeToTable('poll_votes', callback, { debounceMs: REALTIME_DEBOUNCE_MS })
 }

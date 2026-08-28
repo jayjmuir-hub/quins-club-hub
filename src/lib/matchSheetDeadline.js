@@ -36,7 +36,7 @@ export const HOURS_AFTER = 24
 /** U18 and above: due BEFORE kick-off. */
 export const HOURS_BEFORE = 1
 /** The band at which the deadline flips to the other side of the match. */
-export const PRE_MATCH_FROM_AGE = 18
+const PRE_MATCH_FROM_AGE = 18
 
 // ⚠️ THERE WAS A `SHEET_FROM_AGE = 11` HERE AND IT WAS A SECOND SOURCE OF TRUTH.
 // Removed 17 Aug 2026. Its docstring — "the youngest band the form applies to at

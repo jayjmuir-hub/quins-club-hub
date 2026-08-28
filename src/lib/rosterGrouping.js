@@ -20,7 +20,7 @@ import { positionGroup } from './rosterUnit.js'
 // graded — so they get their own group at the foot rather than vanishing.
 
 /** The order tiers are shown in. Ungraded is last, deliberately. */
-export const TIER_ORDER = ['A', 'B', 'C']
+const TIER_ORDER = ['A', 'B', 'C']
 export const UNGRADED = '__ungraded__'
 
 /** Forwards before backs before the ones with neither. */

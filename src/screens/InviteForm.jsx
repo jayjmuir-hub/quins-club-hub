@@ -66,7 +66,7 @@ const WHO = 'the new member'
 // magic link sent to it.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export const BAD_EMAIL = 'Enter a valid email address before sending.'
+const BAD_EMAIL = 'Enter a valid email address before sending.'
 // The client-side half of the rule that used to be the
 // `invites_team_required_unless_admin` CHECK constraint. That constraint has
 // been DROPPED; accept_invite enforces it instead, but it does so at ACCEPT
@@ -76,7 +76,7 @@ export const BAD_EMAIL = 'Enter a valid email address before sending.'
 // own validation already makes this unreachable through the UI (every
 // non-admin role requires at least one target); it stays as the explicit,
 // tested statement of an invariant the database no longer holds for us.
-export const NO_ACCESS_CHOSEN =
+const NO_ACCESS_CHOSEN =
   "That invite has no age group, so it wouldn't give anyone access. Choose an age group first."
 
 function inputClasses(invalid) {

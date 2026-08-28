@@ -69,7 +69,7 @@ export const NEW_PLAYER_NEEDS_CLUB =
   "That age group isn't attached to a club, so a new player can't be added to it. Reload the page, and tell an admin if it happens again."
 export const CHILD_WITHOUT_TEAM =
   "That player isn't in an age group yet, so there's nothing to give access to. Put them in a squad on the roster first."
-export const DUPLICATE_ACCESS = 'They already have that access, so there is nothing to add.'
+const DUPLICATE_ACCESS = 'They already have that access, so there is nothing to add.'
 
 // 'manager' (Team Manager) and 'medic' sit next to 'coach' because they are
 // the same kind of grant: pick the person, pick one or more age groups. They
@@ -96,7 +96,7 @@ export function accessKey({ role, teamId, playerId }) {
 }
 
 /** The same key, from a memberships row as the database returns it. */
-export function membershipKey(member) {
+function membershipKey(member) {
   return accessKey({
     role: member.role,
     teamId: member.team_id ?? null,

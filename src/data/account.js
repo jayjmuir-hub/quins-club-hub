@@ -20,7 +20,7 @@ import { deleteStaffPhoto } from './photos.js'
 // P0001 is the generic "raise exception" code — it identifies nothing on its own.
 const LAST_ADMIN = /only admin/i
 
-export const LAST_ADMIN_MESSAGE =
+const LAST_ADMIN_MESSAGE =
   'You are the only admin, so you cannot delete your account yet. Make someone else an admin first — then this will work.'
 
 /**

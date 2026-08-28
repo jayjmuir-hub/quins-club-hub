@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { upsertById } from './upsertById.js'
+import { subscribeToTable, REALTIME_DEBOUNCE_MS } from './subscribeToTable.js'
 import { fetchAllPages } from './limits.js'
 
 // Data access for the events table. RLS already restricts rows to what the
@@ -107,20 +108,6 @@ export async function getEvent(id) {
   return data ?? null
 }
 
-// Suffixed so concurrent subscriptions (e.g. dashboard + schedule screens
-// both mounted) get distinct realtime channel topics rather than colliding.
-let channelSeq = 0
-
-/**
- * How long to wait for the changes to stop arriving before re-reading.
- *
- * ⚠️ THE CALLBACK IS A FULL REFETCH OF THE CALLER'S WHOLE SCHEDULE, so a coach
- * saving three fixtures in a row would otherwise cost every connected client
- * three of them. 400ms is long enough to collapse a burst of saves and short
- * enough that nobody perceives it as lag on a single change.
- */
-export const REALTIME_DEBOUNCE_MS = 400
-
 /**
  * Subscribes to realtime changes on the events table. Returns an unsubscribe
  * function — call it from a useEffect cleanup. Safe to call more than once.
@@ -153,35 +140,7 @@ export const REALTIME_DEBOUNCE_MS = 400
  * @param debounceMs injectable purely so tests need not wait in real time
  */
 export function subscribeEvents(callback, { debounceMs = REALTIME_DEBOUNCE_MS } = {}) {
-  let timer = null
-
-  function onChange() {
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = null
-      callback()
-    }, debounceMs)
-  }
-
-  const channel = supabase
-    .channel(`events-changes-${++channelSeq}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, onChange)
-    .subscribe()
-
-  let unsubscribed = false
-  return () => {
-    if (unsubscribed) return
-    unsubscribed = true
-    // ⚠️ CANCEL THE PENDING FIRE. Without this a change arriving just before a
-    // screen unmounts calls back afterwards, and the callback is a setState —
-    // so an unmounted Schedule would try to refetch and store into a component
-    // that is gone.
-    if (timer) {
-      clearTimeout(timer)
-      timer = null
-    }
-    supabase.removeChannel(channel)
-  }
+  return subscribeToTable('events', callback, { debounceMs })
 }
 
 // A write the database refused is not an error as far as PostgREST is
