@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Admin-rights redesign — architectural shape decided and migration plan sketched.
+- Admin-rights redesign — session handoff
+  (`claude/handoffs/2026-08-28-admin-rights-design.md`): design phase done and
+  merged, next work is Phase 0 of the migration (the `clubadmin` backfill
+  linchpin, on production child data). Records the settled decisions, Phase 0a's
+  traps, and what the next session must explore first (migration-application
+  machinery, current production admin state) before writing any migration.
+- `2da11be` — Admin-rights redesign — architectural shape decided and migration plan sketched.
   Chose **α + default-deny** (keep `is_admin`; add allowlist, deny-by-default helpers
   only on the four narrowed surfaces) over β (redefining the admin spine), recorded
   with the reasoning in the spec §4.1. New sketch
