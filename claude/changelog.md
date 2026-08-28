@@ -10,12 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Provider-resilience spec
+- Appointed club officers' names now render in the club green (`text-accent-ink`)
+  on the /admin/officers list, matching the badge treatment their name gets
+  elsewhere. Titles-only UI; changes nothing about access.
+  (SHA follows in the next changelog-touching PR.)
+- `4718f33` — Provider-resilience spec
   (`claude/plans/2026-08-28-provider-resilience.md`): ride-through-blips plan for
   Supabase platform incidents — Workbox `networkTimeoutSeconds`, timeout +
   bounded retry at the single fetch chokepoint, honest "taking longer…" UI, and
   broader stale-while-revalidate. Spec only; build after the incident clears.
-  (SHA follows in the next changelog-touching PR.)
 - `7e9add4` — Supabase latency incident + resilience follow-up — session handoff
   (`claude/handoffs/2026-08-28-supabase-incident-and-resilience.md`): the 27–28 Aug
   Supabase platform latency incident diagnosed as server-side (their edge logs show

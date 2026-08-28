@@ -139,7 +139,7 @@ export default function AdminOfficers() {
                 <ul>
                   {holders.map((o) => (
                     <li key={o.id} data-testid="officer-holder" className="mt-1.5 flex items-center gap-3">
-                      <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
+                      <span className="min-w-0 flex-1 truncate text-sm font-bold text-accent-ink">
                         {o.profile?.full_name ?? 'Unknown account'}
                       </span>
                       <Button size="sm" variant="ghost" onClick={() => unappoint(o.id)}>
