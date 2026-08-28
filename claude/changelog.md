@@ -10,7 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Admin-rights redesign **Phase 4** (Surface S7b) — the last, most
+- Session handoff — the **admin-rights security redesign is COMPLETE** (all six
+  data boundaries live: 0a/1/1b/2/3/4; 0b n/a under α). Records the one
+  outstanding action (grant `welfare` to re-enable DM review), the locked design
+  decisions, and the traps met — 1b deploy-first, the `profiles` SELECT
+  column-list trap, the tree-shaken `scope.js` mirrors.
+  `claude/handoffs/2026-08-28-admin-rights-complete.md`. Docs-only, no deploy.
+  (SHA follows in the next changelog-touching PR.)
+- `07367cc` — Admin-rights redesign **Phase 4** (Surface S7b) — the last, most
   safeguarding-sensitive boundary. Reviewing a child's or reported DM moves from
   EVERY admin to the explicit `welfare` grant, and even a super must tick it (an
   audited write to their own `admin_rights`): `private.admin_may_review` is
@@ -23,7 +30,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Both directions proven in `db/tests/dm-review-welfare.sql`; applied to
   production. Completes the redesign's data boundaries (0a/1/1b/2/3/4 live; 0b
   n/a under α).
-  (SHA follows in the next changelog-touching PR.)
 - `7ec17e2` — Re-captured `db/schema/functions.sql`'s `my_chats()` to match production after
   `db/migrations/20260828_my_chats_last_attachment.sql` was applied — the mirror
   now carries `last_attachment_path`. Schema mirror only, no deploy; the header's
