@@ -123,6 +123,20 @@ const NEXT_MATCH = {
   result_us: null,
   result_them: null,
 }
+// A tournament is a match with competition_type 'tournament' — it must land in
+// the Tournaments tile, never in Fixtures to play (28 Aug 2026).
+const NEXT_TOURNAMENT = {
+  id: 'e-tourn',
+  team_id: 'team-1xv',
+  type: 'match',
+  competition_type: 'tournament',
+  competition: 'Al Ain Sevens',
+  starts_at: '2026-07-25T09:00:00Z',
+  venue: 'Al Ain',
+  home: false,
+  result_us: null,
+  result_them: null,
+}
 // Sooner than the match, but training — the hero must still prefer the match.
 const SOONER_TRAINING = {
   id: 'e-training',
@@ -541,6 +555,11 @@ describe('Dashboard — stats', () => {
     // NEXT_MATCH is the only one still to come.
     expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('1')
 
+    // No upcoming tournament in this set — and NEXT_MATCH (a plain match) must
+    // count as a fixture above, NOT here. Zero is the discriminator: a
+    // tournaments tile that counted every match would read '1'.
+    expect(screen.getByTestId('stat-tournaments')).toHaveTextContent('0')
+
     // ⚠️ REPLACED "AGE GROUPS" (which asserted '2') ON 10 Aug 2026. That tile
     // counted `scopedTeams.length` — how the club is CONFIGURED — at 42px in
     // the loudest element on the screen, and it was the one number on the band
@@ -555,6 +574,20 @@ describe('Dashboard — stats', () => {
     // So a count of 2 means socials are being counted, 3 means scored matches
     // are, and 4 means it is not filtering at all.
     expect(screen.getByTestId('stat-needs-score')).toHaveTextContent('1')
+  })
+
+  it('splits a tournament out of fixtures into its own tile', async () => {
+    // NEXT_MATCH is a plain fixture; NEXT_TOURNAMENT is a match too, but a
+    // tournament. Fixtures must stay 1 (the ordinary match only) and Tournaments
+    // must be 1 — the whole point of the split. If the tile still counted every
+    // match, fixtures would read 2 and tournaments 0.
+    listEventsMock.mockResolvedValue([NEXT_MATCH, NEXT_TOURNAMENT, SOONER_TRAINING])
+
+    renderDashboard()
+    await screen.findByTestId('stat-tournaments')
+
+    expect(screen.getByTestId('stat-fixtures')).toHaveTextContent('1')
+    expect(screen.getByTestId('stat-tournaments')).toHaveTextContent('1')
   })
 
   it('counts nothing when every played match has a score', async () => {
