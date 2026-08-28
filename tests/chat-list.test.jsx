@@ -162,6 +162,15 @@ describe('ChatList', () => {
     expect(previewLine({ kind: 'dm', last_body: 'hi', last_author_id: 'x' }, ME)).toBe('hi')
     expect(previewLine({ kind: 'dm', last_body: 'hi', last_author_id: ME }, ME)).toBe('You: hi')
     expect(previewLine({ kind: 'dm', last_body: null }, ME)).toBe('No messages yet')
+    // ⚠️ A photo/voice-only message stores an EMPTY body plus an attachment, and
+    // my_chats surfaces the path as last_attachment_path. Preview the medium, not
+    // "No messages yet" — the bug where a DM full of photos read as empty.
+    expect(previewLine({ kind: 'dm', last_body: '', last_author_id: 'x', last_attachment_path: 'u/pic.jpg' }, ME)).toBe('📷 Photo')
+    expect(previewLine({ kind: 'dm', last_body: '', last_author_id: ME, last_attachment_path: 'u/pic.jpg' }, ME)).toBe('You: 📷 Photo')
+    expect(previewLine({ kind: 'dm', last_body: '', last_author_id: 'x', last_attachment_path: 'u/note.m4a' }, ME)).toBe('🎤 Voice message')
+    expect(previewLine({ kind: 'group', last_body: '', last_author_id: 'x', last_author_name: 'Alex', last_attachment_path: 'u/pic.jpg' }, ME)).toBe('Alex: 📷 Photo')
+    // a genuinely empty thread has no last message, so no author — still says so
+    expect(previewLine({ kind: 'dm', last_body: '', last_author_id: null, last_attachment_path: null }, ME)).toBe('No messages yet')
   })
 })
 
