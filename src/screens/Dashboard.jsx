@@ -181,11 +181,18 @@ function StatTile({ testId, value, label, className = '' }) {
 // removed that donor and the band ended up flush against the strip's card,
 // with the two touching. The value matches BlockTitle exactly so the band
 // lines up with every other block boundary on the screen.
+// ⚠️ FOUR CELLS IN ONE ROW SINCE 28 Aug 2026 (Jay: split tournaments out of
+// fixtures). Kept a single row rather than a 2×2 grid on purpose: the band's
+// whole point is the club website's continuous red→green sweep, and a 2×2
+// would repeat the gradient on each row and break that. The cost is tighter
+// tiles on a phone (~90px), so a two-word label wraps — accepted for the
+// signature. StatTile's own border-r + last:border-r-0 already handle any cell
+// count, so nothing else changed.
 function StatBand({ children }) {
   return (
     <div className="mt-[18px] overflow-hidden rounded-card shadow-card">
       <div className="brand-rule" />
-      <div className="grid grid-cols-3 bg-stat-band">{children}</div>
+      <div className="grid grid-cols-4 bg-stat-band">{children}</div>
     </div>
   )
 }
@@ -722,7 +729,19 @@ export default function Dashboard() {
   // ⚠️ `toPlay` ITSELF IS UNCHANGED and must stay that way — the fortnight
   // strip and the Upcoming list both want every event type, and narrowing it
   // would empty both of training.
-  const fixturesToPlay = toPlay.filter((event) => event.type === 'match')
+  //
+  // ⚠️ A TOURNAMENT IS A MATCH — `type === 'match'` with
+  // `competition_type === 'tournament'` (src/lib/eventFormat.js, EventForm) —
+  // so "Fixtures to play" USED to count it, which read a tournament weekend as
+  // an ordinary fixture. Jay, 27 Aug 2026: split them. Fixtures are now
+  // non-tournament matches; tournaments get their own tile. The other three
+  // competition_types (null / 'tbd' / 'league') are all ordinary fixtures.
+  const fixturesToPlay = toPlay.filter(
+    (event) => event.type === 'match' && event.competition_type !== 'tournament',
+  )
+  const tournamentsToPlay = toPlay.filter(
+    (event) => event.type === 'match' && event.competition_type === 'tournament',
+  )
 
   const results = sortByStart(events.filter(hasResult), 'desc')
   const lastResult = results[0] ?? null
@@ -928,10 +947,11 @@ export default function Dashboard() {
 
           What replaces it for parents is deliberately nothing, for now.
 
-          Three cells in one band at every width. The old 2-up mobile grid
-          needed the third tile to span both columns to avoid a ragged
-          half-width tile; a single 3-column band has no ragged case, so that
-          special-casing is gone. */}
+          Four cells in one band at every width since 28 Aug 2026 — Registered
+          players, Fixtures to play, Tournaments, Needs a score. Fixtures and
+          Tournaments are the split of what "Fixtures to play" used to conflate
+          (a tournament is a match, so it was counted as an ordinary fixture).
+          Still one row, not a 2×2 grid — see StatBand for why. */}
       {canEdit && (
         <StatBand>
           <StatTile
@@ -943,6 +963,11 @@ export default function Dashboard() {
             testId="stat-fixtures"
             value={fixturesToPlay.length}
             label="Fixtures to play"
+          />
+          <StatTile
+            testId="stat-tournaments"
+            value={tournamentsToPlay.length}
+            label="Tournaments"
           />
           <StatTile
             testId="stat-needs-score"

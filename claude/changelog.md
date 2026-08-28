@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Copy: the club-wide admin portal is now labelled **Club Hub Admin** (was
+- Dashboard stat band: **Tournaments** is now its own tile, split out of
+  "Fixtures to play". A tournament is a match (`competition_type` 'tournament'),
+  so it was silently counted as an ordinary fixture; Fixtures now counts
+  non-tournament matches and Tournaments counts the rest. The staff-only band
+  goes from three cells to four in one row — kept a single row, not a 2×2, to
+  preserve the website's continuous red→green sweep (`src/screens/Dashboard.jsx`,
+  `StatBand` / `fixturesToPlay` / `tournamentsToPlay`). Layout option A of the
+  two shown; flip to 2×2 is a one-line change if wanted.
+- `4cc0cfe` — Copy: the club-wide admin portal is now labelled **Club Hub Admin** (was
   "Club Admin") — one string, `PORTALS[0].label` in `src/lib/portals.js`, which
   feeds the section heading, the portal-chooser link and the sidebar submenu
   together, so all three stay in step. Matches the app's own name, Club Hub.
