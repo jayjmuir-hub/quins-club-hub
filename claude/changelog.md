@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Dashboard stat band layout: **2×2 on a phone, four across on desktop** — the
+- `db/schema/grants.sql` re-capture (comment-only): a measured banner at the head
+  of §2's table list records that `anon` holds **zero** table privileges on all 66
+  base tables (the 14 Aug schema-wide revoke landed; §2's per-table `anon` columns
+  are the 10 Aug shape, kept as history) and that `authenticated`'s "ALL 8" is
+  really seven (no TRUNCATE, 19 Aug). Measured live via `has_table_privilege`; the
+  §-further-down "overtaken" note re-measured too. Closes the trap where §2 read as
+  "anon still holds grants" and sent a reader chasing a regression that did not
+  exist. No code, no schema change — a documentation snapshot.
+- `8d7b1a7` — Dashboard stat band layout: **2×2 on a phone, four across on desktop** — the
   one-deploy-old four-across row (layout A) broke on a real phone, where the
   single long word "TOURNAMENTS" could not wrap in a ~90px tile and overflowed
   into "Needs a score" (Jay's screenshot). 2×2 gives ~180px tiles where the word
