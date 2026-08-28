@@ -181,18 +181,25 @@ function StatTile({ testId, value, label, className = '' }) {
 // removed that donor and the band ended up flush against the strip's card,
 // with the two touching. The value matches BlockTitle exactly so the band
 // lines up with every other block boundary on the screen.
-// ⚠️ FOUR CELLS IN ONE ROW SINCE 28 Aug 2026 (Jay: split tournaments out of
-// fixtures). Kept a single row rather than a 2×2 grid on purpose: the band's
-// whole point is the club website's continuous red→green sweep, and a 2×2
-// would repeat the gradient on each row and break that. The cost is tighter
-// tiles on a phone (~90px), so a two-word label wraps — accepted for the
-// signature. StatTile's own border-r + last:border-r-0 already handle any cell
-// count, so nothing else changed.
+// ⚠️ 2×2 ON A PHONE, FOUR ACROSS ON DESKTOP — SINCE 28 Aug 2026. It was a single
+// four-across row for one deploy, and Jay's phone showed why that fails: at
+// ~90px a tile, the LONG single word "TOURNAMENTS" cannot wrap, so it overflowed
+// its cell and collided with "Needs a score". A two-word label wraps and fits;
+// a one-word label of eleven characters does not, and no amount of tracking
+// saved it. 2×2 gives ~180px tiles where the word sits on one line. The known
+// cost is that the horizontal red→green gradient now repeats on each row rather
+// than sweeping once — accepted: legible beats a broken sweep. Desktop keeps the
+// single sweep at four across, where there is room.
+//
+// Borders: StatTile's own `border-r … last:border-r-0` draws the verticals (the
+// top-right tile's right border lands on the container edge and is clipped by
+// overflow-hidden). The horizontal divider between the two phone rows is a
+// `border-b` on the first two tiles, dropped at desktop where there is one row.
 function StatBand({ children }) {
   return (
     <div className="mt-[18px] overflow-hidden rounded-card shadow-card">
       <div className="brand-rule" />
-      <div className="grid grid-cols-4 bg-stat-band">{children}</div>
+      <div className="grid grid-cols-2 bg-stat-band desktop:grid-cols-4">{children}</div>
     </div>
   )
 }
@@ -947,22 +954,25 @@ export default function Dashboard() {
 
           What replaces it for parents is deliberately nothing, for now.
 
-          Four cells in one band at every width since 28 Aug 2026 — Registered
-          players, Fixtures to play, Tournaments, Needs a score. Fixtures and
-          Tournaments are the split of what "Fixtures to play" used to conflate
-          (a tournament is a match, so it was counted as an ordinary fixture).
-          Still one row, not a 2×2 grid — see StatBand for why. */}
+          Four cells since 28 Aug 2026 — Registered players, Fixtures to play,
+          Tournaments, Needs a score. Fixtures and Tournaments are the split of
+          what "Fixtures to play" used to conflate (a tournament is a match, so
+          it was counted as an ordinary fixture). 2×2 on a phone, one row on
+          desktop — see StatBand for why. The first two tiles carry the phone
+          row-divider (border-b), dropped at desktop's single row. */}
       {canEdit && (
         <StatBand>
           <StatTile
             testId="stat-players"
             value={players.length}
             label={admin ? 'Registered players' : 'Players in view'}
+            className="border-b border-white/25 desktop:border-b-0"
           />
           <StatTile
             testId="stat-fixtures"
             value={fixturesToPlay.length}
             label="Fixtures to play"
+            className="border-b border-white/25 desktop:border-b-0"
           />
           <StatTile
             testId="stat-tournaments"
