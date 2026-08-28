@@ -10,10 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Appointed club officers' names now render in the club green (`text-accent-ink`)
-  on the /admin/officers list, matching the badge treatment their name gets
-  elsewhere. Titles-only UI; changes nothing about access.
+- Admin-rights redesign **Phase 0a** — `clubadmin` becomes the base admin right:
+  added to `ADMIN_RIGHTS`, and the Club Hub Admin portal flips from `right: null`
+  to `right: 'clubadmin'` (`src/lib/portals.js`) so a right composes the portal
+  like any other and the card can genuinely close. Every active non-super admin
+  was backfilled (`db/migrations/20260828_clubadmin_right.sql`, applied to
+  production first; supers hold it implicitly), so nobody loses the screen.
+  Harness `db/tests/clubadmin-backfill.sql`. Still screen-gating, not
+  data-gating — real RLS boundaries are the redesign's later phases.
   (SHA follows in the next changelog-touching PR.)
+- `7de2191` — Appointed club officers' names now render in the club green
+  (`text-accent-ink`) on the /admin/officers list, matching the badge treatment
+  their name gets elsewhere. Titles-only UI; changes nothing about access.
 - `4718f33` — Provider-resilience spec
   (`claude/plans/2026-08-28-provider-resilience.md`): ride-through-blips plan for
   Supabase platform incidents — Workbox `networkTimeoutSeconds`, timeout +
