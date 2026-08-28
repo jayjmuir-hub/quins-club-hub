@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- `db/schema/grants.sql` re-capture (comment-only): a measured banner at the head
+- Admin-rights security redesign — first deliverable: the **access-matrix + threat-model
+  design doc** (`claude/specs/2026-08-28-admin-rights-access-matrix-and-threat-model.md`).
+  Design only, no code. The project makes a specialist admin right a **real RLS data
+  boundary** rather than a hidden menu, so a Social Media or Pitch volunteer genuinely
+  cannot read children's data. Records the current model, the three enforcement surfaces
+  (RLS boundary / UI-hint / service-role edge functions), the two design options
+  considered (portal-composition rejected, real-RLS chosen), the target right×surface
+  access matrix **with Jay's safeguarding rulings recorded** (Pitch names-only,
+  Training names+attendance, Welfare read-only + stricter DM review, Social Media /
+  Youth / Club Hub Admin full sight), and the insider-over-reach + account-takeover
+  threat model.
+- `044f5bd` — `db/schema/grants.sql` re-capture (comment-only): a measured banner at the head
   of §2's table list records that `anon` holds **zero** table privileges on all 66
   base tables (the 14 Aug schema-wide revoke landed; §2's per-table `anon` columns
   are the 10 Aug shape, kept as history) and that `authenticated`'s "ALL 8" is
