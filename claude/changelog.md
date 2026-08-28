@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Dashboard stat band: **Tournaments** is now its own tile, split out of
+- Dashboard stat band layout: **2×2 on a phone, four across on desktop** — the
+  one-deploy-old four-across row (layout A) broke on a real phone, where the
+  single long word "TOURNAMENTS" could not wrap in a ~90px tile and overflowed
+  into "Needs a score" (Jay's screenshot). 2×2 gives ~180px tiles where the word
+  fits on one line; the horizontal gradient repeats per row rather than sweeping
+  once, accepted as the price of legibility. Desktop keeps the single sweep.
+  `StatBand` grid `grid-cols-2 desktop:grid-cols-4`, plus a `border-b` on the
+  first two tiles for the phone row-divider.
+- `51f5546` — Dashboard stat band: **Tournaments** is now its own tile, split out of
   "Fixtures to play". A tournament is a match (`competition_type` 'tournament'),
   so it was silently counted as an ordinary fixture; Fixtures now counts
   non-tournament matches and Tournaments counts the rest. The staff-only band
