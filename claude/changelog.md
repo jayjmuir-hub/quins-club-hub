@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Provider resilience — the app now rides through a stalled Supabase instead of
+- Admin-rights redesign **Phase 3** (Surface S1, edit) — a Pitch, Training or
+  Welfare admin can still READ the roster's names but can no longer EDIT or
+  DELETE a child. The `player edit` policy on `public.players` is narrowed to
+  `private.can_write_child` (`{clubadmin, youth, media}` + super) OR
+  `is_team_staff`; `player read` is untouched, so everyone's view of names is
+  unchanged. Squad staff keep editing their own squad; guardians' self-service is
+  via separate SECURITY DEFINER RPCs (not a side door). Because of Phase 0a every
+  current admin holds `clubadmin`, so nobody loses write today. Both directions
+  proven in `db/tests/child-write-allowlist.sql`; applied to production.
+  (SHA follows in the next changelog-touching PR.)
+- `d107d6a` — Provider resilience — the app now rides through a stalled Supabase instead of
   hanging on a spinner (`claude/plans/2026-08-28-provider-resilience.md`, §1–§3
   built): (1) the Workbox `NetworkFirst` route falls back to cache after 8s of
   network silence (`vite.config.js`); (2) a timeout under idempotent data reads
@@ -19,7 +29,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   while writes, uploads and auth are left untouched for safety; (3) an honest
   "taking longer than usual…" message on the load gate and the signup squad
   picker (`src/lib/useSlowLoad.js`). §4 (browser stale-while-revalidate) is a
-  later pass. (SHA follows in the next changelog-touching PR.)
+  later pass.
 - `b83cf54` — Chats list now previews a photo/voice-only message as "📷 Photo" / "🎤 Voice
   message" instead of "No messages yet". A caption-less attachment is a legal
   message stored with an empty body (the `messages_body_check` constraint yields
