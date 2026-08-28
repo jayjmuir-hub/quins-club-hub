@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Training-plans UX, five fixes from Jay's feedback: (1) tapping a night in the
+- Re-captured `db/schema/functions.sql`'s `my_chats()` to match production after
+  `db/migrations/20260828_my_chats_last_attachment.sql` was applied — the mirror
+  now carries `last_attachment_path`. Schema mirror only, no deploy; the header's
+  proacl/md5 still describe the prior body (annotated inline, per the 25 Aug
+  precedent — this file is hand-captured, there is no generator to recompute it).
+  (SHA follows in the next changelog-touching PR.)
+- `677c616` — Training-plans UX, five fixes from Jay's feedback: (1) tapping a night in the
   two-week strip now OPENS that session's plan (the strip shows each session, so
   a tap should open one — not just feed the shelf's mislabelled "tonight" slot);
   (2) the heart and star carry hover tooltips — heart = a public like others
@@ -21,7 +27,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   to show its running order, so it is no longer Add/Dismiss blind. Files:
   `src/components/{TrainingShelf,DrillCard}.jsx`,
   `src/screens/{SquadTraining,TrainingTemplates}.jsx`.
-  (SHA follows in the next changelog-touching PR.)
 - `5ba8da4` — Admin-rights redesign **Phase 3** (Surface S1, edit) — a Pitch, Training or
   Welfare admin can still READ the roster's names but can no longer EDIT or
   DELETE a child. The `player edit` policy on `public.players` is narrowed to
@@ -31,7 +36,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   via separate SECURITY DEFINER RPCs (not a side door). Because of Phase 0a every
   current admin holds `clubadmin`, so nobody loses write today. Both directions
   proven in `db/tests/child-write-allowlist.sql`; applied to production.
-  (SHA follows in the next changelog-touching PR.)
 - `d107d6a` — Provider resilience — the app now rides through a stalled Supabase instead of
   hanging on a spinner (`claude/plans/2026-08-28-provider-resilience.md`, §1–§3
   built): (1) the Workbox `NetworkFirst` route falls back to cache after 8s of
@@ -50,7 +54,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   looked empty. `my_chats` now also returns `last_attachment_path`
   (`db/migrations/20260828_my_chats_last_attachment.sql`) and the client
   renders the medium via the existing `attachmentPreviewLabel`. Applied to
-  production; `db/schema/functions.sql` re-capture pending.
+  production; `db/schema/functions.sql` re-captured to match.
 - `193b7ea` — Admin-rights redesign **Phase 2** (Surface S3) — a child's **photograph**
   becomes a real data boundary. The `player-photos` storage read/write policies
   are narrowed to the allowlist `{clubadmin, youth, media, welfare}` (welfare

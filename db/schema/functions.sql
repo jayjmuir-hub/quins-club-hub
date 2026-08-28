@@ -5147,8 +5147,9 @@ $function$
 -- One row per chat the caller may read, newest first, with unread counts.
 -- ---------------------------------------------------------------------
 -- ⚠️ RE-CAPTURED FROM LIVE 25 Aug 2026 — body REPLACED by the 24 Aug group-chat work; the md5 recorded for this function described the pre-groups version.
+-- ⚠️ RE-CAPTURED FROM LIVE 28 Aug 2026 — body REPLACED by db/migrations/20260828_my_chats_last_attachment.sql (adds last_attachment_path); the proacl/md5 above still describe the prior version.
 CREATE OR REPLACE FUNCTION public.my_chats()
- RETURNS TABLE(kind text, team_id uuid, conversation_id uuid, label text, detail text, last_at timestamp with time zone, last_body text, last_author_id uuid, last_author_name text, unread bigint)
+ RETURNS TABLE(kind text, team_id uuid, conversation_id uuid, label text, detail text, last_at timestamp with time zone, last_body text, last_author_id uuid, last_attachment_path text, last_author_name text, unread bigint)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
@@ -5157,46 +5158,43 @@ AS $function$
   club as (select m.club_id as id from memberships m cross join me
             where m.profile_id = me.id and m.status = 'active' order by m.created_at limit 1),
   rows as (
-    -- squad channels
     select 'squad'::text as kind, t.id as team_id, null::uuid as conversation_id, t.name as label,
            case when private.channel_announce_only(t.id) then 'Squad · announce-only' else 'Squad · open chat' end as detail,
            lm.created_at as last_at, lm.body as last_body, lm.author_id as last_author_id,
+           lm.attachment_path as last_attachment_path,
            (select count(*) from messages x cross join me
              where x.team_id = t.id and x.channel = 'squad' and x.deleted_at is null
                and x.author_id <> me.id and x.created_at > now() - interval '14 days'
                and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id)) as unread
       from teams t cross join club
-      left join lateral (select created_at, body, author_id from messages x
+      left join lateral (select created_at, body, author_id, attachment_path from messages x
                           where x.team_id = t.id and x.channel = 'squad' and x.deleted_at is null
                           order by x.created_at desc limit 1) lm on true
      where t.club_id = club.id and private.can_see_team(t.id)
     union all
-    -- staff channels, for the squad's staff
     select 'staff', t.id, null, t.name || ' · staff', 'Staff only',
-           lm.created_at, lm.body, lm.author_id,
+           lm.created_at, lm.body, lm.author_id, lm.attachment_path,
            (select count(*) from messages x cross join me
              where x.team_id = t.id and x.channel = 'staff' and x.deleted_at is null
                and x.author_id <> me.id and x.created_at > now() - interval '14 days'
                and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
       from teams t cross join club
-      left join lateral (select created_at, body, author_id from messages x
+      left join lateral (select created_at, body, author_id, attachment_path from messages x
                           where x.team_id = t.id and x.channel = 'staff' and x.deleted_at is null
                           order by x.created_at desc limit 1) lm on true
      where t.club_id = club.id and private.can_edit_team(t.id)
     union all
-    -- the club channel
     select 'club', null, null, 'Whole club', 'Club-wide · admins post',
-           lm.created_at, lm.body, lm.author_id,
+           lm.created_at, lm.body, lm.author_id, lm.attachment_path,
            (select count(*) from messages x cross join me
              where x.club_id = club.id and x.channel = 'squad' and x.team_id is null and x.deleted_at is null
                and x.author_id <> me.id and x.created_at > now() - interval '14 days'
                and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
       from club
-      left join lateral (select created_at, body, author_id from messages x
+      left join lateral (select created_at, body, author_id, attachment_path from messages x
                           where x.club_id = club.id and x.channel = 'squad' and x.team_id is null and x.deleted_at is null
                           order by x.created_at desc limit 1) lm on true
     union all
-    -- direct messages I am in
     select 'dm', null, c.id, pr.full_name,
            coalesce((select labelled.l from (
                select case m.role when 'admin' then 'Club admin' when 'coach' then 'Coach'
@@ -5204,47 +5202,40 @@ AS $function$
                       case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2 when 'medic' then 3 else 9 end as o
                  from memberships m where m.profile_id = pr.id and m.status = 'active') labelled
                where labelled.l is not null order by labelled.o limit 1), 'Direct message'),
-           c.last_at, lm.body, lm.author_id,
+           c.last_at, lm.body, lm.author_id, lm.attachment_path,
            (select count(*) from messages x cross join me
-             where x.conversation_id = c.id and x.deleted_at is null
-               and x.author_id <> me.id
+             where x.conversation_id = c.id and x.deleted_at is null and x.author_id <> me.id
                and x.created_at > coalesce(cl.cleared_at, '-infinity'::timestamptz)
                and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
       from conversations c cross join me
       join profiles pr on pr.id = (case when c.profile_a = me.id then c.profile_b else c.profile_a end)
       left join conversation_clears cl on cl.conversation_id = c.id and cl.profile_id = me.id
-      left join lateral (select body, author_id from messages x
+      left join lateral (select body, author_id, attachment_path from messages x
                           where x.conversation_id = c.id and x.deleted_at is null
                             and x.created_at > coalesce(cl.cleared_at, '-infinity'::timestamptz)
                           order by x.created_at desc limit 1) lm on true
-     where me.id in (c.profile_a, c.profile_b)
-       and c.kind = 'dm'
-       -- cleared, and nothing since: not listed (WhatsApp's "delete chat")
+     where me.id in (c.profile_a, c.profile_b) and c.kind = 'dm'
        and (cl.cleared_at is null or c.last_at > cl.cleared_at)
     union all
-    -- groups I am in
     select 'group', null, c.id, c.title,
            (select count(*) from conversation_members gm where gm.conversation_id = c.id)::text || ' people',
-           c.last_at, lm.body, lm.author_id,
+           c.last_at, lm.body, lm.author_id, lm.attachment_path,
            (select count(*) from messages x cross join me
-             where x.conversation_id = c.id and x.deleted_at is null
-               and x.author_id <> me.id
+             where x.conversation_id = c.id and x.deleted_at is null and x.author_id <> me.id
                and x.created_at > coalesce(cl.cleared_at, '-infinity'::timestamptz)
                and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
       from conversations c cross join me
       join conversation_members my on my.conversation_id = c.id and my.profile_id = me.id
       left join conversation_clears cl on cl.conversation_id = c.id and cl.profile_id = me.id
-      left join lateral (select body, author_id from messages x
+      left join lateral (select body, author_id, attachment_path from messages x
                           where x.conversation_id = c.id and x.deleted_at is null
                             and x.created_at > coalesce(cl.cleared_at, '-infinity'::timestamptz)
                           order by x.created_at desc limit 1) lm on true
-     where c.kind = 'group'
-       and (cl.cleared_at is null or c.last_at > cl.cleared_at)
+     where c.kind = 'group' and (cl.cleared_at is null or c.last_at > cl.cleared_at)
   )
   select r.kind, r.team_id, r.conversation_id, r.label, r.detail,
-         r.last_at, r.last_body, r.last_author_id, p.full_name, r.unread
-    from rows r
-    left join profiles p on p.id = r.last_author_id
+         r.last_at, r.last_body, r.last_author_id, r.last_attachment_path, p.full_name, r.unread
+    from rows r left join profiles p on p.id = r.last_author_id
    order by r.last_at desc nulls last, r.label;
 $function$
 ;
