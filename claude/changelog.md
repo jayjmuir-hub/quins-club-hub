@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Admin-rights redesign **Phase 1b** — the adult *login* contact
+- Admin-rights redesign **Phase 2** (Surface S3) — a child's **photograph**
+  becomes a real data boundary. The `player-photos` storage read/write policies
+  are narrowed to the allowlist `{clubadmin, youth, media, welfare}` (welfare
+  read-only), so a Pitch or Training admin can no longer fetch a signed URL for a
+  child's photo — the image falls back to a monogram. Squad-attached members
+  (`is_on_team`) and guardians keep their access; every current admin holds
+  `clubadmin`, so nobody loses access today. New helpers
+  `private.can_see_child_photos` / `can_edit_child_photos` / `is_on_team`. DB-only
+  — the client degrades gracefully, so no reroute. Confirmed the
+  `backup-player-photos` edge function is not a side door (service-role, cron,
+  secret-gated, append-only to private R2). Both directions proven in
+  `db/tests/child-photos-allowlist.sql`; applied to production.
+  (SHA follows in the next changelog-touching PR.)
+- `48e247b` — Admin-rights redesign **Phase 1b** — the adult *login* contact
   (`profiles.email`/`phone`) is closed off too. Direct column SELECT is revoked
   from `authenticated` (table SELECT revoked, re-granted on the other 16 columns),
   so a narrowed admin can no longer read a parent's login email/phone with a raw
