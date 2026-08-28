@@ -10,15 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Voice-message mic failures are no longer silent. When recording can't start
-  (a blocked mic — the common Android case, where a prior "block" makes
-  getUserMedia reject with no prompt), the composer now shows an actionable
-  reason via the existing send-error line instead of a dead-looking button
+- **The actual voice-message bug: `Permissions-Policy: microphone=()` blocked
+  recording on every Chromium browser.** `netlify.toml` disabled the microphone
+  for all origins including self; Chromium enforces it (Chrome, Android, PWA all
+  showed a dead mic button) while Safari/iOS ignores the policy — so the feature
+  only ever recorded on iPhones. The header pre-dated voice messages, when
+  nothing called getUserMedia. Changed to `microphone=(self)`; the #488
+  error-surfacing was treating the symptom. Decision doc's camera warning
+  (`claude/decisions/2026-08-06-security-headers.md`) had predicted exactly this
+  failure mode.
+  (SHA follows in the next changelog-touching PR.)
+- `6647a2d` — Voice-message mic failures are no longer silent. When recording
+  can't start (a blocked mic), the composer now shows an actionable reason via
+  the existing send-error line instead of a dead-looking button
   (`src/lib/voiceRecorder.js` › `describeRecorderError`, wired through
   `VoiceComposer`'s new `onError`). Diagnosis: iPhone uploads reached storage,
   Android produced no upload request at all, so capture failed client-side and
   the error was swallowed.
-  (SHA follows in the next changelog-touching PR.)
 - `c579d96` — Admin-rights redesign **Phase 0a** — `clubadmin` becomes the base admin right:
   added to `ADMIN_RIGHTS`, and the Club Hub Admin portal flips from `right: null`
   to `right: 'clubadmin'` (`src/lib/portals.js`) so a right composes the portal
