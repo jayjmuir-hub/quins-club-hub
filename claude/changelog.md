@@ -10,12 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Re-captured `db/schema/functions.sql`'s `my_chats()` to match production after
+- Admin-rights redesign **Phase 4** (Surface S7b) — the last, most
+  safeguarding-sensitive boundary. Reviewing a child's or reported DM moves from
+  EVERY admin to the explicit `welfare` grant, and even a super must tick it (an
+  audited write to their own `admin_rights`): `private.admin_may_review` is
+  repointed off `is_admin` onto `private.can_review_dm` (no `is_super`
+  short-circuit), which narrows the ~15 chat policies keyed on it at once. The
+  who-opened-a-DM audit (`public.welfare_access_log`) already existed; its read
+  policy narrows from any admin to **super + welfare**. ⚠️ CHANGES CURRENT
+  BEHAVIOUR — 0 admins hold `welfare` today, so DM review is OFF until it is
+  granted to the club's safeguarding person (a deliberate, named, audited role).
+  Both directions proven in `db/tests/dm-review-welfare.sql`; applied to
+  production. Completes the redesign's data boundaries (0a/1/1b/2/3/4 live; 0b
+  n/a under α).
+  (SHA follows in the next changelog-touching PR.)
+- `7ec17e2` — Re-captured `db/schema/functions.sql`'s `my_chats()` to match production after
   `db/migrations/20260828_my_chats_last_attachment.sql` was applied — the mirror
   now carries `last_attachment_path`. Schema mirror only, no deploy; the header's
   proacl/md5 still describe the prior body (annotated inline, per the 25 Aug
   precedent — this file is hand-captured, there is no generator to recompute it).
-  (SHA follows in the next changelog-touching PR.)
 - `677c616` — Training-plans UX, five fixes from Jay's feedback: (1) tapping a night in the
   two-week strip now OPENS that session's plan (the strip shows each session, so
   a tap should open one — not just feed the shelf's mislabelled "tonight" slot);
