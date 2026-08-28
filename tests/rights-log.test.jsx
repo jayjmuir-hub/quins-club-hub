@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 // /admin/rights-log — who gave whom access, and when.
 //
@@ -282,6 +283,129 @@ describe('AdminRightsLog', () => {
     await waitFor(() => {
       expect(screen.queryByText(/Nothing recorded yet/i)).not.toBeInTheDocument()
     })
+  })
+})
+
+// The view controls — access-grants-only, person, date range, group-by-day.
+//
+// ⚠️ THESE ARE READ-ONLY AND CLIENT-SIDE. They choose what of the already-fetched
+// window to SHOW; they never write, never hide a row from anyone else, and never
+// remove one. The append-only contract (audit.js, and this screen's header) is
+// untouched — so the tests below assert what is DISPLAYED, never a mutation.
+//
+// ⚠️ TIMESTAMPS ARE FAR APART (August vs May) AND THE DATE BOUNDARY SITS WEEKS
+// FROM EITHER. dayKey() groups and filters on the LOCAL calendar day, so an
+// instant near midnight could fall on different days in different timezones; a
+// boundary weeks away from every fixture makes the from/to assertions hold in
+// any runner timezone. The two same-day entries share an identical timestamp,
+// which is one local day everywhere.
+describe('AdminRightsLog — filtering and grouping the window', () => {
+  const AUG = '2026-08-17T12:00:00.000Z'
+  const MAY = '2026-05-10T12:00:00.000Z'
+
+  // Newest first, as the fetch returns them. Aug: an approved staff claim
+  // (elevation) + a pending request (not). May: a revoke (not).
+  const ROWS = [
+    entry({ id: 1, at: AUG }), // pending -> active coach => elevation
+    entry({ id: 2, at: AUG, action: 'granted', new_status: 'pending', new_role: 'coach', profile_id: 'p-nameless' }),
+    entry({ id: 3, at: MAY, action: 'revoked', new_role: null, new_status: null }),
+  ]
+
+  beforeEach(() => {
+    listMembershipAuditMock.mockResolvedValue(ROWS)
+  })
+
+  async function openPanel(user) {
+    await user.click(await screen.findByTestId('audit-filter-toggle'))
+    return screen.findByTestId('audit-filters')
+  }
+
+  it('keeps the controls collapsed until asked, so the screen opens on the log', async () => {
+    const user = userEvent.setup()
+    render(<AdminRightsLog />)
+
+    await screen.findAllByTestId('audit-entry')
+    expect(screen.queryByTestId('audit-filters')).toBeNull()
+
+    await openPanel(user)
+    expect(screen.getByTestId('filter-elevations')).toBeInTheDocument()
+    expect(screen.getByTestId('filter-person')).toBeInTheDocument()
+  })
+
+  it('groups by day by default and flattens when the toggle is cleared', async () => {
+    const user = userEvent.setup()
+    render(<AdminRightsLog />)
+
+    await screen.findAllByTestId('audit-entry')
+    // Two distinct local days => two groups, Aug above May (newest first).
+    expect(screen.getAllByTestId('audit-day-group')).toHaveLength(2)
+
+    await openPanel(user)
+    await user.click(screen.getByTestId('filter-group'))
+    expect(screen.queryByTestId('audit-day-group')).toBeNull()
+    // Nothing was filtered — every row is still shown, just ungrouped.
+    expect(screen.getAllByTestId('audit-entry')).toHaveLength(3)
+  })
+
+  it('⚠️ access-grants-only hides everything that did not hand over access', async () => {
+    const user = userEvent.setup()
+    render(<AdminRightsLog />)
+
+    await screen.findAllByTestId('audit-entry')
+    await openPanel(user)
+    await user.click(screen.getByTestId('filter-elevations'))
+
+    const shown = screen.getAllByTestId('audit-entry')
+    expect(shown).toHaveLength(1)
+    expect(shown[0].dataset.elevation).toBe('yes')
+    // The count follows the filter and says so, rather than contradicting the list.
+    expect(screen.getByTestId('audit-summary')).toHaveTextContent(
+      'Showing 1 of 3 changes, 1 of which handed somebody access.',
+    )
+  })
+
+  it('narrows to one person, matching them as subject OR actor', async () => {
+    const user = userEvent.setup()
+    render(<AdminRightsLog />)
+
+    await screen.findAllByTestId('audit-entry')
+    await openPanel(user)
+    // p-nameless is the subject of exactly one row (the pending request).
+    await user.selectOptions(screen.getByTestId('filter-person'), 'p-nameless')
+
+    expect(screen.getAllByTestId('audit-entry')).toHaveLength(1)
+    expect(screen.getByTestId('audit-summary')).toHaveTextContent('Showing 1 of 3 changes')
+  })
+
+  it('restricts to a date window, keeping only the days inside it', async () => {
+    const user = userEvent.setup()
+    render(<AdminRightsLog />)
+
+    await screen.findAllByTestId('audit-entry')
+    await openPanel(user)
+    // Boundary weeks from either cluster, so timezone cannot move a row across it.
+    fireEvent.change(screen.getByTestId('filter-from'), { target: { value: '2026-07-01' } })
+
+    // Only the two August rows survive; the May revoke is before the window.
+    expect(screen.getAllByTestId('audit-entry')).toHaveLength(2)
+    expect(screen.getByTestId('audit-summary')).toHaveTextContent('Showing 2 of 3 changes')
+  })
+
+  it('⚠️ says the filters are empty, not the log, and offers a way back', async () => {
+    const user = userEvent.setup()
+    render(<AdminRightsLog />)
+
+    await screen.findAllByTestId('audit-entry')
+    await openPanel(user)
+    // A window that excludes everything.
+    fireEvent.change(screen.getByTestId('filter-from'), { target: { value: '2027-01-01' } })
+
+    expect(screen.getByTestId('audit-no-match')).toHaveTextContent(/No changes match these filters/i)
+    // ⚠️ NOT the "nothing recorded" empty state — the log is not empty.
+    expect(screen.queryByText(/since this log started/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('audit-clear-filters'))
+    expect(screen.getAllByTestId('audit-entry')).toHaveLength(3)
   })
 })
 

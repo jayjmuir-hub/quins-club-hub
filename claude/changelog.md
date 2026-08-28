@@ -10,10 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Updated `claude/state-of-play.md` with today's chat photo/voice preview fix
+- Rights log (`/admin/rights-log`) gains read-only view controls, in a
+  collapsed **Filter & group** panel: show access-grants-only, filter by
+  person (matched as subject OR actor), restrict to a date range, and group
+  entries under day headings. An active-filter badge, a **Clear filters**
+  control, and a distinct "No changes match these filters" empty state keep a
+  narrowed-to-nothing view from reading as a wiped log. ⚠️ THE LOG STAYS
+  APPEND-ONLY — these are client-side filters over the already-fetched 200-entry
+  window; nothing writes, hides a row from anyone else, or removes one.
+  `src/screens/AdminRightsLog.jsx`, `tests/rights-log.test.jsx`. (SHA follows in
+  the next changelog-touching PR.)
+- `596319e` — Updated `claude/state-of-play.md` with today's chat photo/voice preview fix
   (`my_chats` returns `last_attachment_path`) and the provider-resilience work
   (`src/lib/resilientFetch.js`, ride through a stalled Supabase). Docs-only, no
-  deploy. (SHA follows in the next changelog-touching PR.)
+  deploy.
 - `beabc2a` — Training-plans strip: each session now has a dedicated **Open** control, and a
   tap only SELECTS the night for the shelf's focus chips (follow-up to the #497
   tap-to-open, which got in the way of browsing nights). The pill is a container
