@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   MAX_MS,
+  describeRecorderError,
   extForMime,
   formatDuration,
   pickMimeType,
@@ -39,6 +40,20 @@ describe('pure helpers', () => {
 
   it('caps at five minutes', () => {
     expect(MAX_MS).toBe(300000)
+  })
+
+  it('turns a getUserMedia error into a person-facing reason', () => {
+    // The Android case: a prior block makes getUserMedia reject NotAllowedError.
+    expect(describeRecorderError({ name: 'NotAllowedError' })).toMatch(/blocked/i)
+    expect(describeRecorderError({ name: 'SecurityError' })).toMatch(/blocked/i)
+    expect(describeRecorderError({ name: 'NotFoundError' })).toMatch(/no microphone/i)
+    expect(describeRecorderError({ name: 'NotReadableError' })).toMatch(/busy|unavailable/i)
+    // The explicit "cannot record" throw keeps its own message through the default.
+    expect(describeRecorderError(new Error('This device cannot record audio.'))).toMatch(
+      /cannot record/i,
+    )
+    // A shapeless failure still yields a usable sentence, never blank.
+    expect(describeRecorderError(undefined)).toMatch(/try again/i)
   })
 })
 

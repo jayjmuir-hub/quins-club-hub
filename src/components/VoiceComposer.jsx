@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { formatDuration, startRecording, voiceSupported } from '../lib/voiceRecorder.js'
+import { describeRecorderError, formatDuration, startRecording, voiceSupported } from '../lib/voiceRecorder.js'
 
 // The record control that sits where the Send button does when the draft is
 // empty (WhatsApp). Tap the mic to record; a bar takes over the composer row
@@ -16,7 +16,7 @@ import { formatDuration, startRecording, voiceSupported } from '../lib/voiceReco
 // component owns the whole recording experience without the composer needing to
 // know its state.
 
-export default function VoiceComposer({ onSend, disabled = false }) {
+export default function VoiceComposer({ onSend, disabled = false, onError }) {
   const [recording, setRecording] = useState(false)
   const [ms, setMs] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -44,6 +44,7 @@ export default function VoiceComposer({ onSend, disabled = false }) {
 
   async function begin() {
     if (disabled || busy || recording) return
+    onError?.(null) // clear any prior "mic blocked" from an earlier attempt
     try {
       const ctrl = await startRecording({
         onTick: setMs,
@@ -52,8 +53,10 @@ export default function VoiceComposer({ onSend, disabled = false }) {
       ctrlRef.current = ctrl
       setMs(0)
       setRecording(true)
-    } catch {
-      // mic denied or unavailable — nothing to record, leave the composer as is
+    } catch (err) {
+      // Say WHY rather than leaving a dead-looking button. A blocked mic is the
+      // common Android case (voiceRecorder.js › describeRecorderError).
+      onError?.(describeRecorderError(err))
     }
   }
 

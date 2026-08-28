@@ -396,7 +396,7 @@ export default function DmThread({ thread, compact = false }) {
                 />
                 <EmojiPicker onPick={(emoji) => thread.setDraft(insertAtCursor(thread.draftRef.current, emoji))} />
                 {!thread.draft.trim() && !thread.photo ? (
-                  <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} />
+                  <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} onError={thread.setError} />
                 ) : (
                   <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && !thread.photo)}>
                     Send

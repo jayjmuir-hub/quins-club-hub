@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Admin-rights redesign **Phase 0a** — `clubadmin` becomes the base admin right:
+- Voice-message mic failures are no longer silent. When recording can't start
+  (a blocked mic — the common Android case, where a prior "block" makes
+  getUserMedia reject with no prompt), the composer now shows an actionable
+  reason via the existing send-error line instead of a dead-looking button
+  (`src/lib/voiceRecorder.js` › `describeRecorderError`, wired through
+  `VoiceComposer`'s new `onError`). Diagnosis: iPhone uploads reached storage,
+  Android produced no upload request at all, so capture failed client-side and
+  the error was swallowed.
+  (SHA follows in the next changelog-touching PR.)
+- `c579d96` — Admin-rights redesign **Phase 0a** — `clubadmin` becomes the base admin right:
   added to `ADMIN_RIGHTS`, and the Club Hub Admin portal flips from `right: null`
   to `right: 'clubadmin'` (`src/lib/portals.js`) so a right composes the portal
   like any other and the card can genuinely close. Every active non-super admin

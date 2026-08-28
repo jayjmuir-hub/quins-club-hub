@@ -250,7 +250,7 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
               />
               <EmojiPicker onPick={(emoji) => thread.setDraft(insertAtCursor(thread.draftRef.current, emoji))} />
               {mayPost && !thread.draft.trim() && !thread.photo && !attachedEvent ? (
-                <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} />
+                <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} onError={thread.setSendError} />
               ) : (
                 <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && !thread.photo)}>
                   {attachedEvent ? 'Start thread' : 'Send'}
