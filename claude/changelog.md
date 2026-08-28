@@ -24,6 +24,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   (images-survive is the discriminating check). Spec
   `claude/plans/2026-08-28-voice-messages.md`; ruling
   `claude/decisions/2026-08-28-voice-notes-open.md`.
+- `1419691` — Test: de-flaked the Accounts ordering case in `tests/accounts.test.jsx`
+  ("sits ABOVE the Approval emails card"). It captured the `waiting-for-access`
+  node after the first async read, then compared position after the second read
+  had re-rendered and detached it, so `compareDocumentPosition` lost the
+  FOLLOWING bit and failed ~1 call in 4. Now a `waitFor` re-queries both nodes
+  from the settled DOM. No app change; 15/15 in isolation.
 
 ## 27 Aug 2026
 

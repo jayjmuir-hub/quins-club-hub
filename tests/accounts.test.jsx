@@ -939,9 +939,17 @@ describe('Accounts — waiting for access', () => {
     // Jay, 24 Aug 2026: the settings card was standing in the middle of the
     // queues. DOCUMENT_POSITION_FOLLOWING (4): the card follows the section.
     setup()
-    const waiting = await screen.findByTestId('waiting-for-access')
-    const recipients = await screen.findByTestId('approval-recipients')
-    expect(waiting.compareDocumentPosition(recipients) & 4).toBeTruthy()
+    // ⚠️ RE-QUERY BOTH NODES EACH POLL, don't capture then compare. The two
+    // cards fill from separate async reads; grabbing `waiting` after the first
+    // read and comparing after the second let a re-render detach that node, so
+    // compareDocumentPosition ran against a stale element and dropped the
+    // FOLLOWING bit ~1 call in 4. waitFor re-fetches fresh nodes until the
+    // settled DOM gives the right order.
+    await waitFor(() => {
+      const waiting = screen.getByTestId('waiting-for-access')
+      const recipients = screen.getByTestId('approval-recipients')
+      expect(waiting.compareDocumentPosition(recipients) & 4).toBeTruthy()
+    })
   })
 
   it('lists only the profiles with no membership, never existing members', async () => {
