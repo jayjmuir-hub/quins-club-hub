@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Admin-rights security redesign — first deliverable: the **access-matrix + threat-model
+- Admin-rights redesign — architectural shape decided and migration plan sketched.
+  Chose **α + default-deny** (keep `is_admin`; add allowlist, deny-by-default helpers
+  only on the four narrowed surfaces) over β (redefining the admin spine), recorded
+  with the reasoning in the spec §4.1. New sketch
+  `claude/plans/2026-08-28-admin-rights-migration.md`: Phase 0 groundwork (the
+  `clubadmin` backfill linchpin, the `can_dm` adult-reach rule, the default-deny
+  helpers, the read-audit scaffolding), then four narrowing phases lowest-risk first
+  (contacts/DOB → photos → children write-access → DM review), each proven both
+  directions in a `db/tests/` rollback harness. Design only — not started.
+- `0f8a205` — Admin-rights security redesign — first deliverable: the **access-matrix + threat-model
   design doc** (`claude/specs/2026-08-28-admin-rights-access-matrix-and-threat-model.md`).
   Design only, no code. The project makes a specialist admin right a **real RLS data
   boundary** rather than a hidden menu, so a Social Media or Pitch volunteer genuinely
