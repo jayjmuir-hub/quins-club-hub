@@ -97,7 +97,7 @@ describe('portals.js', () => {
   it('labels the five jobs from scope.js, so the naming ruling has one home', () => {
     const byKey = Object.fromEntries(PORTALS.map((p) => [p.key, portalLabel(p)]))
     expect(byKey).toEqual({
-      club: 'Club Admin',
+      club: 'Club Hub Admin',
       pitches: 'Pitch Management',
       youth: 'Club Youth Manager',
       media: 'Social Media Management',
@@ -162,7 +162,7 @@ describe('PortalChooser', () => {
     const open = screen.getAllByTestId('portal-card-open')
     expect(open).toHaveLength(1)
     expect(open[0]).toHaveAttribute('href', '/admin/accounts')
-    expect(within(open[0]).getByRole('heading')).toHaveTextContent('Club Admin')
+    expect(within(open[0]).getByRole('heading')).toHaveTextContent('Club Hub Admin')
   })
 
   it('⚠️ a grey card is NOT a link and cannot be focused', () => {
@@ -286,11 +286,11 @@ describe('PortalChooser', () => {
     expect(card).toHaveTextContent(/people waiting for access/i)
     expect(countAdminWaitingMock).toHaveBeenCalledWith('admin-1')
 
-    // Club Admin's home is already Accounts (tabs[0]). The same number sits
+    // Club Hub Admin's home is already Accounts (tabs[0]). The same number sits
     // on that card so the grid is not silent about the badge you just saw.
     expect(screen.getByTestId('admin-waiting-on-club')).toHaveTextContent('2')
     expect(
-      within(screen.getByTestId('portal-chooser')).getByRole('link', { name: /Club Admin/ }),
+      within(screen.getByTestId('portal-chooser')).getByRole('link', { name: /Club Hub Admin/ }),
     ).toHaveAttribute('href', '/admin/accounts')
   })
 
@@ -361,7 +361,7 @@ describe('AdminDashboard — inside a portal', () => {
   })
 
   // ⚠️ THE FIRST TAB WHOSE AUDIENCE IS NARROWER THAN ITS PORTAL'S (17 Aug 2026).
-  //    Club Admin has no `right` — every admin holds it — but the Rights log
+  //    Club Hub Admin has no `right` — every admin holds it — but the Rights log
   //    records what admins DO, so an ordinary admin must not be among the people
   //    it is offered to. The pair below is the whole point: same portal, same
   //    URL, different row.
@@ -391,11 +391,11 @@ describe('AdminDashboard — inside a portal', () => {
   })
 
   // ⚠️ HIDING A TAB IS NOT A PERMISSION, and this is the assertion that stops
-  //    anyone reading it as one. The URL must still resolve to the Club Admin
+  //    anyone reading it as one. The URL must still resolve to the Club Hub Admin
   //    portal for an ordinary admin — they land inside it and the SCREEN
   //    explains itself, which is what every other admin route already does. The
   //    refusal that matters is membership_audit's read policy, not this row.
-  it('⚠️ still maps /admin/rights-log to Club Admin for an ordinary admin', () => {
+  it('⚠️ still maps /admin/rights-log to Club Hub Admin for an ordinary admin', () => {
     expect(portalForPath('/admin/rights-log')?.key).toBe('club')
   })
 

@@ -30,7 +30,7 @@ export const PORTALS = [
     // Its label is a string because it is not one of the three JOBS; there is
     // no right whose label it could borrow.
     right: null,
-    label: 'Club Admin',
+    label: 'Club Hub Admin',
     blurb: 'Accounts, access and the club’s squads.',
     tabs: [
       { to: '/admin/accounts', label: 'Accounts' },
@@ -54,12 +54,12 @@ export const PORTALS = [
       { to: '/admin/needs-attention', label: 'Needs attention' },
       // ⚠️ SUPER ADMINS ONLY, AND THIS IS THE FIRST TAB IN THE FILE THAT IS NOT
       // VISIBLE TO EVERY HOLDER OF ITS PORTAL. The portal gate is `right`, and
-      // Club Admin has none — every admin holds it. This log records what
+      // Club Hub Admin has none — every admin holds it. This log records what
       // ADMINS do, so its audience is one step narrower than its portal's, and
       // `right: null` cannot express that.
       //
       // ⚠️ IT STAYS IN THIS LIST RATHER THAN BEING ADDED CONDITIONALLY, so that
-      // portalForPath still recognises /admin/rights-log as Club Admin for an
+      // portalForPath still recognises /admin/rights-log as Club Hub Admin for an
       // ordinary admin who pastes the URL. They land inside the portal and the
       // screen tells them why it is not for them, which is the behaviour every
       // other admin route already has. visibleTabs is what keeps it out of the

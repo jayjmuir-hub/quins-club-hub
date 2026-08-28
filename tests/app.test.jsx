@@ -243,11 +243,11 @@ describe('App — /admin', () => {
 
     expect(window.location.pathname).toBe('/admin')
     expect(screen.getByTestId('portal-chooser')).toBeInTheDocument()
-    // Club Admin is open to every admin, and entering a portal lands on its
+    // Club Hub Admin is open to every admin, and entering a portal lands on its
     // FIRST tab. Scoped to the chooser because the sidebar's expanded Admin
-    // section (PR #357) now carries a Club Admin link of its own.
+    // section (PR #357) now carries a Club Hub Admin link of its own.
     expect(
-      within(screen.getByTestId('portal-chooser')).getByRole('link', { name: /Club Admin/ })
+      within(screen.getByTestId('portal-chooser')).getByRole('link', { name: /Club Hub Admin/ })
     ).toHaveAttribute('href', '/admin/accounts')
   })
 

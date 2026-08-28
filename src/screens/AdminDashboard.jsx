@@ -127,7 +127,7 @@ export default function AdminDashboard() {
   const portal = portalForPath(pathname)
 
   // ⚠️ THE TAB ROW IS NARROWER THAN THE PORTAL SINCE 17 Aug 2026 — the Rights
-  // log is Club Admin's, but only a super admin is offered it. Read from the
+  // log is Club Hub Admin's, but only a super admin is offered it. Read from the
   // EFFECTIVE set like the gate above, so an admin previewing as a coach loses
   // the tab along with the screen. Hiding a tab grants nothing and hides no
   // data: see visibleTabs' header, and membership_audit's read policy.

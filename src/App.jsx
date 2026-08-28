@@ -243,7 +243,7 @@ export default function App() {
             <Route path="accounts" element={<Accounts />} />
             <Route path="club" element={<AdminClub />} />
             {/* Every squad and who looks after it. ⚠️ NO ADMIN RIGHT — it sits
-                in the Club Admin portal, which every admin holds. It reads
+                in the Club Hub Admin portal, which every admin holds. It reads
                 profiles the Accounts screen has always read
                 (`profile read club admin`), so it needed no policy change and
                 grants nobody anything new. A MEMBER-facing version does need

@@ -184,10 +184,10 @@ describe('Schedule sub-menu', () => {
 // should expand like the others"). Its children are the portals the viewer
 // can ENTER — the /admin chooser's open cards, from the same registry.
 describe('Admin sub-menu', () => {
-  it('expands on /admin with the portals this admin holds — an ordinary admin gets Club Admin and Match sheets', () => {
+  it('expands on /admin with the portals this admin holds — an ordinary admin gets Club Hub Admin and Match sheets', () => {
     renderAt('/admin/accounts', { showAdmin: true })
     const menu = screen.getByTestId('submenu-admin')
-    expect(within(menu).getByRole('link', { name: 'Club Admin' })).toHaveAttribute('href', '/admin/accounts')
+    expect(within(menu).getByRole('link', { name: 'Club Hub Admin' })).toHaveAttribute('href', '/admin/accounts')
     expect(within(menu).queryByRole('link', { name: 'Pitch Management' })).toBeNull()
   })
 

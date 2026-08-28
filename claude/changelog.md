@@ -10,7 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Voice messages, WhatsApp-style: tap the mic, talk, send; the note plays in a
+- Copy: the club-wide admin portal is now labelled **Club Hub Admin** (was
+  "Club Admin") — one string, `PORTALS[0].label` in `src/lib/portals.js`, which
+  feeds the section heading, the portal-chooser link and the sidebar submenu
+  together, so all three stay in step. Matches the app's own name, Club Hub.
+- `bc41c36` — Voice messages, WhatsApp-style: tap the mic, talk, send; the note plays in a
   bubble with a plain-bar scrubber and a 1×/1.5×/2× speed toggle. A voice note
   is just another attachment on a message — the chat-media rail photos already
   run on — so there are no new tables and no new RLS; the migration only widens
