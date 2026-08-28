@@ -246,8 +246,33 @@ migration deliverable, but the design must acknowledge it):
   wide one. Cleaner conceptually, larger blast radius to build.
 
 Either way, the **access matrix in Section 5 is the input**: it says *which*
-helper sites are "sensitive" and what each right may reach. That is why the matrix
-is the first deliverable and this decision is deferred to migration planning.
+helper sites are "sensitive" and what each right may reach.
+
+**DECIDED 28 Aug 2026 — Shape α, with the sensitive surfaces written
+*default-deny*.** `is_admin` keeps meaning "any admin"; the ~274 sites that lean
+on it are left untouched. Only the four surfaces the matrix actually narrows
+(parent contacts / DOB, photos, children write-access, and DM review) get a new,
+**allowlist** helper: the data starts *denied to everyone* and is granted back
+only to the rights that should hold it. The reasoning, in full:
+
+- The matrix narrows a **small, enumerable set** of surfaces — fencing those off
+  is proportionate; redefining the whole admin spine (β) to do it is not, and on
+  a live children's-data system the regression risk of touching 274 sites is the
+  larger danger.
+- α's one weakness is that it *fails open* — a missed sensitive site leaks.
+  **Writing the sensitive helpers default-deny removes that**: a wiring mistake
+  then *hides* data (fails closed) instead of exposing it. That is the
+  professionally load-bearing property here — fail-safe defaults / allowlist, not
+  a denylist of "things we remembered to remove."
+- It matches this repo's proven instinct (the 10 Aug flag-not-a-role decision):
+  preserve the wide spine, add narrow tests only where needed, so nothing
+  existing regresses.
+
+⚠️ **The honest caveat, recorded so the trade-off is not silently inherited:** if
+the per-right data rules later multiply into a large pile of special cases, that
+is the signal to migrate to β. Today they do not, so β would be paying for a
+problem we do not have. See the migration plan,
+`claude/plans/2026-08-28-admin-rights-migration.md`.
 
 ---
 
@@ -467,19 +492,18 @@ here.
 
 ## 8. Status of the decisions
 
-**Resolved 28 Aug 2026 (5.2, 5.3):** the full right × surface matrix; the chat
-review/reach split (5.4); Club Hub Admin as its own right; and the stricter
-super/Welfare DM-review model with a sensitive-read audit.
+**Resolved 28 Aug 2026 (5.2, 5.3, 4.1):** the full right × surface matrix; the
+chat review/reach split (5.4); Club Hub Admin as its own right; the stricter
+super/Welfare DM-review model with a sensitive-read audit; and the architectural
+shape — **α + default-deny** (4.1), which the migration plan now builds on.
 
 **Still open — smaller, and not blocking the matrix:**
 
-1. **Architectural shape** — α (right-aware `is_admin`) vs β (scoped-admin as a
-   first-class thing), 4.1. Needed before migration planning, not before sign-off.
-2. **Welfare read vs edit** on children (note ¹) — defaulted to read; confirm.
-3. **Audit-log visibility** — the rights-log and the new sensitive-read audit are
+1. **Welfare read vs edit** on children (note ¹) — defaulted to read; confirm.
+2. **Audit-log visibility** — the rights-log and the new sensitive-read audit are
    super-only today; does Welfare also get to see the read-audit? (Left
    super-only for now.)
-4. **Advisor flag** (unchanged): put the data-minimisation posture — which rights
+3. **Advisor flag** (unchanged): put the data-minimisation posture — which rights
    hold which children's data, and why — to Jay's data-protection advisor. A flag
    for a professional, not legal advice from here.
 
