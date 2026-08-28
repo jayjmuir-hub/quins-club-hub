@@ -6,6 +6,7 @@ import NewChatPicker, { Avatar } from '../components/NewChatPicker.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import PresenceDot from '../components/PresenceDot.jsx'
 import Spinner from '../components/Spinner.jsx'
+import { attachmentPreviewLabel } from '../data/chatMedia.js'
 import { listMyChatPrefs, setChatPref } from '../data/chatPrefs.js'
 import {
   chatPath,
@@ -76,9 +77,18 @@ export function shortBand(name) {
 
 /** "Coach Taylor: Kick-off moved" — who said the last thing, then what. */
 export function previewLine(row, selfId) {
-  if (!row.last_body) return row.kind === 'dm' ? 'No messages yet' : 'Nothing here yet'
   const who = row.last_author_id === selfId ? 'You' : row.kind === 'dm' ? null : row.last_author_name
-  return who ? `${who}: ${row.last_body}` : row.last_body
+  const withWho = (text) => (who ? `${who}: ${text}` : text)
+  if (row.last_body) return withWho(row.last_body)
+  // A message with no words is still a message. A photo or voice note is stored
+  // with an empty body and an attachment (the messages_body_check constraint
+  // yields the ">= 1 char" arm to attachment_path), and my_chats surfaces that
+  // path as last_attachment_path — see db/migrations/20260828_my_chats_last_attachment.sql.
+  // Preview the medium ("📷 Photo" / "🎤 Voice message"), not "No messages yet",
+  // which is why this DM looked empty over a long history. Only a genuinely empty
+  // thread — no last message, so no author — says so.
+  if (row.last_attachment_path) return withWho(attachmentPreviewLabel(row.last_attachment_path))
+  return row.kind === 'dm' ? 'No messages yet' : 'Nothing here yet'
 }
 
 /**

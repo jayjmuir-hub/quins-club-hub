@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Admin-rights redesign **Phase 2** (Surface S3) — a child's **photograph**
+- Chats list now previews a photo/voice-only message as "📷 Photo" / "🎤 Voice
+  message" instead of "No messages yet". A caption-less attachment is a legal
+  message stored with an empty body (the `messages_body_check` constraint yields
+  its length arm to `attachment_path`), so `my_chats` returned an empty
+  `last_body` and `previewLine` read that as "no message" — a DM full of photos
+  looked empty. `my_chats` now also returns `last_attachment_path`
+  (`db/migrations/20260828_my_chats_last_attachment.sql`, verified against prod in
+  a rolled-back transaction + `db/tests/my-chats-attachment.sql`) and the client
+  renders the medium via the existing `attachmentPreviewLabel`. ⚠️ Migration NOT
+  yet applied to production; re-capture `db/schema/functions.sql` after apply.
+  (SHA follows in the next changelog-touching PR.)
+- `193b7ea` — Admin-rights redesign **Phase 2** (Surface S3) — a child's **photograph**
   becomes a real data boundary. The `player-photos` storage read/write policies
   are narrowed to the allowlist `{clubadmin, youth, media, welfare}` (welfare
   read-only), so a Pitch or Training admin can no longer fetch a signed URL for a
@@ -22,7 +33,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `backup-player-photos` edge function is not a side door (service-role, cron,
   secret-gated, append-only to private R2). Both directions proven in
   `db/tests/child-photos-allowlist.sql`; applied to production.
-  (SHA follows in the next changelog-touching PR.)
 - `48e247b` — Admin-rights redesign **Phase 1b** — the adult *login* contact
   (`profiles.email`/`phone`) is closed off too. Direct column SELECT is revoked
   from `authenticated` (table SELECT revoked, re-granted on the other 16 columns),
