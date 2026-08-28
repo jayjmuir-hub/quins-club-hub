@@ -10,12 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Training-plans strip: each session now has a dedicated **Open** control, and a
+- Updated `claude/state-of-play.md` with today's chat photo/voice preview fix
+  (`my_chats` returns `last_attachment_path`) and the provider-resilience work
+  (`src/lib/resilientFetch.js`, ride through a stalled Supabase). Docs-only, no
+  deploy. (SHA follows in the next changelog-touching PR.)
+- `beabc2a` — Training-plans strip: each session now has a dedicated **Open** control, and a
   tap only SELECTS the night for the shelf's focus chips (follow-up to the #497
   tap-to-open, which got in the way of browsing nights). The pill is a container
   so the select button and Open button sit side by side without nesting.
   `src/components/TrainingDateStrip.jsx`, `src/screens/SquadTraining.jsx`.
-  (SHA follows in the next changelog-touching PR.)
 - `ba0af96` — Session handoff — the **admin-rights security redesign is COMPLETE** (all six
   data boundaries live: 0a/1/1b/2/3/4; 0b n/a under α). Records the one
   outstanding action (grant `welfare` to re-enable DM review), the locked design

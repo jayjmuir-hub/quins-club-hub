@@ -112,6 +112,19 @@ shipped with round 2 (24 Aug); retention and email digests are not started
 and email was ruled low priority.
 ⚠️ **Nobody has the Welfare right yet and no real DM has been sent** — the
 first one is the first proof.
+✅ **A photo/voice-only DM previews as "📷 Photo" / "🎤 Voice message"**, not
+"No messages yet" — `my_chats` returns `last_attachment_path` and `previewLine`
+renders the medium; migration applied, verified live.
+
+🛡️ **The app rides through a stalled Supabase instead of hanging.** A timeout
+under idempotent reads (`src/lib/resilientFetch.js`) turns a multi-minute hang
+into a retry — GETs via postgrest's own retry, read-only RPCs bounded, while
+writes, uploads and auth are left untouched; the Workbox cache falls back after
+8s; the load gate and signup picker say "taking longer than usual…" rather than
+freeze. `claude/plans/2026-08-28-provider-resilience.md` §1–§3 (§4 browser
+stale-while-revalidate unbuilt). ⚠️ **No provider migration — examined and
+declined**; one bad provider week is not a reason to swap Supabase's bad days for
+someone else's. A sustained pattern would reopen it with a real plan.
 
 📋 **The importer reads columns by content, any order**, has a squad
 picker for name-only pastes, and skips players already on the roster.
