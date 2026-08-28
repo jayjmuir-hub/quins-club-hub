@@ -148,6 +148,34 @@
 -- only thing between that table and anyone holding the project URL is the
 -- `enable row level security` line in the same migration.
 --
+-- ── ⚠️ RE-CAPTURED 28 Aug 2026 — READ THE ROLE COLUMNS BELOW AS THE 10 Aug
+--    SHAPE, NOT TODAY'S. Two of the four roles in every "ALL 8" line below have
+--    moved since this list was captured, and the list is LEFT AS FOUND (this
+--    file captures and amends; it does not rewrite history). Measured today with
+--    `has_table_privilege` over every base table in `public`:
+--
+--      `anon`          — ZERO table privileges on all 66 base tables. Not
+--                        SELECT, INSERT, UPDATE, DELETE or TRUNCATE, anywhere.
+--                        So EVERY `anon` token in the list below is overtaken:
+--                        the 14 Aug schema-wide revoke did land and still holds
+--                        (20260814_revoke_anon_table_privileges.sql; fuller
+--                        record in the ✅ OVERTAKEN block further down, the
+--                        lineups capture). ⚠️ THIS LIST IS THE LINE THAT READ AS
+--                        "anon still holds grants" AND SENT A READER CHASING A
+--                        REGRESSION THAT DID NOT EXIST ON 28 Aug 2026 — which is
+--                        why this banner now sits above it. anon was never the
+--                        gate; RLS is. The revoke removed a ceiling that sat
+--                        uselessly above RLS, not a working permission.
+--      `authenticated` — "ALL 8" below is really SEVEN. TRUNCATE is gone
+--                        everywhere (19 Aug; measured today: TRUNCATE on 0 of
+--                        66). SELECT holds on 63 of 66 — the three it cannot
+--                        read are availability_nudges, signup_nudges and
+--                        photo_orphan_scans, each documented in its own block.
+--
+--    `postgres` and `service_role` are unchanged (service_role SELECT on all
+--    66). The per-table role columns below are the 10 Aug capture and are kept
+--    as the historical record; the live shape is the four bullets above.
+--
 --   access_requests   anon, authenticated, postgres, service_role   ALL 8
 --   attendance        anon, authenticated, postgres, service_role   ALL 8
 --   availability      anon, authenticated, postgres, service_role   ALL 8
@@ -538,11 +566,14 @@ REVOKE UPDATE ON public.announcement_reads FROM authenticated;
 
 -- ---------------------------------------------------------------------
 -- ✅ THE BLOCK BELOW IS OVERTAKEN AND KEPT AS THE 14 Aug RECORD — measured
--- again 25 Aug 2026: `anon` holds ZERO table privileges on ALL 57 public
--- tables (the 14 Aug schema-wide revoke migration did land; this block was
--- simply never re-annotated). TRUNCATE is likewise gone from `authenticated`
--- everywhere (19 Aug), and the default privileges now hand new tables the
--- 7 verbs without TRUNCATE and with no anon entry — see §1's amendments.
+-- again 25 Aug 2026 (57 base tables) and re-measured 28 Aug 2026 (66 base
+-- tables): `anon` holds ZERO table privileges on every base table in `public`
+-- (the 14 Aug schema-wide revoke migration did land; this block was simply
+-- never re-annotated, and §2's list carried the stale `anon` columns until the
+-- 28 Aug banner at its head). TRUNCATE is likewise gone from `authenticated`
+-- everywhere (19 Aug; measured today on 0 of 66), and the default privileges
+-- now hand new tables the 7 verbs without TRUNCATE and with no anon entry —
+-- see §1's amendments.
 --
 -- ⚠️ `anon` HOLDS FULL TABLE PRIVILEGES ON EVERY TABLE IN `public`, INCLUDING
 -- THESE TWO. MEASURED 14 Aug 2026, NOT REASONED ABOUT.
