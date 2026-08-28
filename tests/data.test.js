@@ -1381,13 +1381,13 @@ describe('listClubMembers select shape', () => {
     await listClubMembers()
 
     expect(supabase.from).toHaveBeenCalledWith('memberships')
-    // ⚠️ first_name, last_name and phone added 9 Aug 2026. They were already
-    // WRITABLE by an admin — the column grants from 8 Aug list them — but the
-    // screen had no way to READ them, so it edited the legacy `full_name` and
-    // had no phone control at all. A regression to the old embed leaves the
-    // sheet's fields blank and, worse, saving then writes those blanks back.
+    // ⚠️ first_name and last_name added 9 Aug 2026 for the Edit person sheet.
+    // ⚠️ `email`/`phone` REMOVED from the embed 28 Aug 2026 (Phase 1b) — direct
+    // SELECT of them is revoked; they are fetched via member_contacts and merged
+    // (see the merge test below). A regression that re-adds them to the embed
+    // would fail against the deployed column grant, erroring the whole screen.
     expect(builder.select).toHaveBeenCalledWith(
-      '*, profiles(full_name, first_name, last_name, email, phone, last_seen_at), teams(name), players(full_name, gender)',
+      '*, profiles(full_name, first_name, last_name, last_seen_at), teams(name), players(full_name, gender)',
     )
   })
 
@@ -1682,25 +1682,30 @@ describe('updateProfileName', () => {
 // obtained by subtracting listClubMembers()'s profile_ids in the screen.
 // These tests pin that: no filter is sent, and rows come back untouched.
 describe('listPendingProfiles', () => {
-  it('selects the profile columns the waiting-for-access list needs, newest first', async () => {
+  it('selects the profile columns the waiting-for-access list needs, then merges contacts, newest first', async () => {
     const rows = [
-      { id: 'pr-new', full_name: '', email: 'marisa@example.com', created_at: '2026-08-03T11:37:00Z' },
+      { id: 'pr-new', full_name: '', created_at: '2026-08-03T11:37:00Z', email_confirmed_at: null },
     ]
     const { builder } = createQueryBuilder({ data: rows })
     supabase.from.mockReturnValue(builder)
+    supabase.rpc.mockResolvedValue({
+      data: [{ id: 'pr-new', phone: null, email: 'marisa@example.com' }],
+      error: null,
+    })
 
     const result = await listPendingProfiles()
 
     expect(supabase.from).toHaveBeenCalledWith('profiles')
-    // ⚠️ email_confirmed_at ADDED 20 Aug 2026. This assertion pins the EXACT
-    // column list on purpose: the select is a column list, so a column that is
-    // read by the screen but missing here comes back undefined rather than
-    // failing, and the Waiting-for-access badge would silently render nothing.
-    expect(builder.select).toHaveBeenCalledWith(
-      'id, full_name, email, created_at, email_confirmed_at',
-    )
+    // ⚠️ `email` REMOVED here 28 Aug 2026 (Phase 1b) — direct SELECT is revoked;
+    // fetched via member_contacts and merged below. `email_confirmed_at` stays
+    // (a status timestamp, not the address). A column read by the screen but
+    // missing from this list comes back undefined, so the list is exact.
+    expect(builder.select).toHaveBeenCalledWith('id, full_name, created_at, email_confirmed_at')
     expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false })
-    expect(result).toEqual(rows)
+    expect(supabase.rpc).toHaveBeenCalledWith('member_contacts', { _ids: ['pr-new'] })
+    expect(result).toEqual([
+      { id: 'pr-new', full_name: '', created_at: '2026-08-03T11:37:00Z', email_confirmed_at: null, phone: null, email: 'marisa@example.com' },
+    ])
   })
 
   it('applies no filter at all — RLS decides what is readable, not this query', async () => {
@@ -1722,11 +1727,18 @@ describe('listPendingProfiles', () => {
     // them. A future "fix" that drops them here would break the contract this
     // documents.
     const rows = [
-      { id: 'pr-jay', full_name: 'Jay Muir', email: 'jay@example.com', created_at: '2026-01-05T09:00:00Z' },
-      { id: 'pr-new', full_name: '', email: 'marisa@example.com', created_at: '2026-08-03T11:37:00Z' },
+      { id: 'pr-jay', full_name: 'Jay Muir', created_at: '2026-01-05T09:00:00Z' },
+      { id: 'pr-new', full_name: '', created_at: '2026-08-03T11:37:00Z' },
     ]
     const { builder } = createQueryBuilder({ data: rows })
     supabase.from.mockReturnValue(builder)
+    supabase.rpc.mockResolvedValue({
+      data: [
+        { id: 'pr-jay', phone: null, email: 'jay@example.com' },
+        { id: 'pr-new', phone: null, email: 'marisa@example.com' },
+      ],
+      error: null,
+    })
 
     const result = await listPendingProfiles()
 
@@ -1752,17 +1764,24 @@ describe('listPendingProfiles', () => {
 // --- getMyProfile ---------------------------------------------------------
 
 describe('getMyProfile', () => {
-  it('reads the one profile row by id with maybeSingle', async () => {
-    const row = { id: 'u-1', full_name: '', email: 'jay@example.com', created_at: '2026-01-05T09:00:00Z' }
+  it('reads the one profile row by id with maybeSingle, then merges own contact', async () => {
+    const row = { id: 'u-1', full_name: '', created_at: '2026-01-05T09:00:00Z' }
     const { builder, calls } = createQueryBuilder({ data: row })
     supabase.from.mockReturnValue(builder)
+    // ⚠️ Phase 1b: phone/email are fetched via member_contacts (the self arm),
+    // not off the profiles row, so /more still reads its own phone.
+    supabase.rpc.mockResolvedValue({
+      data: [{ id: 'u-1', phone: '+971500000000', email: 'jay@example.com' }],
+      error: null,
+    })
 
     const result = await getMyProfile('u-1')
 
     expect(supabase.from).toHaveBeenCalledWith('profiles')
     expect(calls.eq).toEqual([['id', 'u-1']])
     expect(builder.maybeSingle).toHaveBeenCalled()
-    expect(result).toEqual(row)
+    expect(supabase.rpc).toHaveBeenCalledWith('member_contacts', { _ids: ['u-1'] })
+    expect(result).toEqual({ ...row, phone: '+971500000000', email: 'jay@example.com' })
   })
 
   it('returns null, not a throw, when the row is not there yet', async () => {

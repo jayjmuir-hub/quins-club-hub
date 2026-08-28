@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { fetchContacts, NO_CONTACT } from './contacts'
 
 // Data access for the memberships table. Follows the throw-on-error convention
 // set by src/lib/supabase.js and src/lib/auth.jsx — callers get a thrown Error,
@@ -109,10 +110,12 @@ export async function listClubMembers() {
     // 8 Aug list them — but the screen had no way to read them, so it edited
     // the legacy `full_name` and had no phone control at all.
     //
-    // `email` is read and never written. It is the login identity; the column
-    // grants for `authenticated` deliberately exclude it, so an update
-    // including it fails the whole statement rather than quietly desyncing the
-    // address an admin reads when deciding whether to approve a stranger.
+    // ⚠️ `email` and `phone` are NO LONGER in this embed (Phase 1b, 28 Aug 2026).
+    // Direct SELECT of those columns is revoked from `authenticated`, so a
+    // narrowed admin cannot pull a parent's login contact with a raw query. They
+    // are fetched below via member_contacts, which nulls them unless the caller
+    // is entitled, and merged back onto each row's `profiles` so this function's
+    // shape is unchanged. See src/data/contacts.js.
     .select(
       // ⚠️ `gender` ADDED 17 Aug 2026 FOR THE APPROVAL QUEUE'S "still missing"
       // LINE, and it is not decoration. Without it the queue cannot tell a
@@ -120,10 +123,17 @@ export async function listClubMembers() {
       // and completeness.js's whole rule is that an UNKNOWN is not a GAP. The
       // first version of that chip reported a missing gender for every pending
       // player in a single-gender squad, because the embed did not carry it.
-      '*, profiles(full_name, first_name, last_name, email, phone, last_seen_at), teams(name), players(full_name, gender)',
+      '*, profiles(full_name, first_name, last_name, last_seen_at), teams(name), players(full_name, gender)',
     )
   if (error) throw error
-  return data ?? []
+  const rows = data ?? []
+  const contacts = await fetchContacts(rows.map((row) => row.profile_id))
+  return rows.map((row) => ({
+    ...row,
+    profiles: row.profiles
+      ? { ...row.profiles, ...(contacts.get(row.profile_id) ?? NO_CONTACT) }
+      : row.profiles,
+  }))
 }
 
 /**
@@ -209,10 +219,15 @@ export async function listPendingProfiles() {
     // ⚠️ THAT MIGRATION MUST BE APPLIED BEFORE THIS LINE SHIPS. PostgREST
     // rejects a select naming a column that does not exist, so the failure is
     // not a blank badge — it is the whole Accounts screen erroring.
-    .select('id, full_name, email, created_at, email_confirmed_at')
+    // ⚠️ `email` removed (Phase 1b) — fetched via member_contacts below and
+    // merged back, so the row shape is unchanged. `email_confirmed_at` STAYS: it
+    // is a status timestamp, not the address, and is not revoked.
+    .select('id, full_name, created_at, email_confirmed_at')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data ?? []
+  const rows = data ?? []
+  const contacts = await fetchContacts(rows.map((row) => row.id))
+  return rows.map((row) => ({ ...row, ...(contacts.get(row.id) ?? NO_CONTACT) }))
 }
 
 /**
@@ -263,13 +278,19 @@ export async function getMyProfile(userId) {
       // club?"), and leaving it off this list has the identical silent failure:
       // the gate would read undefined as "never answered" and ask a coach who
       // has already told us, at every sign-in.
-      'id, full_name, first_name, last_name, name_confirmed_at, email, phone, photo_path, created_at, no_player_confirmed_at, no_role_confirmed_at',
+      // ⚠️ `email` and `phone` REMOVED here (Phase 1b, 28 Aug 2026) — direct
+      // SELECT of them is revoked from `authenticated`. They are fetched via
+      // member_contacts below (the caller is entitled to their OWN contact, the
+      // self arm) and merged back, so /more still reads phone off this row.
+      'id, full_name, first_name, last_name, name_confirmed_at, photo_path, created_at, no_player_confirmed_at, no_role_confirmed_at',
     )
     .eq('id', userId)
     .maybeSingle()
 
   if (error) throw error
-  return data ?? null
+  if (!data) return null
+  const contacts = await fetchContacts([userId])
+  return { ...data, ...(contacts.get(userId) ?? NO_CONTACT) }
 }
 
 // A refused invite insert is not a thrown Supabase error — the "invites
@@ -1232,12 +1253,16 @@ export async function confirmMyDetails({ profileId, firstName, lastName, phone }
     .from('profiles')
     .update(patch)
     .eq('id', profileId)
-    .select('id, first_name, last_name, full_name, phone, name_confirmed_at, no_player_confirmed_at')
+    // ⚠️ `phone` removed from RETURNING (Phase 1b) — a returning clause needs
+    // column SELECT, which is revoked. Merged back from member_contacts (self
+    // arm) below so callers that read `.phone` off the result are unchanged.
+    .select('id, first_name, last_name, full_name, name_confirmed_at, no_player_confirmed_at')
     .maybeSingle()
 
   if (error) throw error
   if (!data) throw new Error("We couldn't save that. Try again.")
-  return data
+  const contacts = await fetchContacts([profileId])
+  return { ...data, ...(contacts.get(profileId) ?? NO_CONTACT) }
 }
 
 /**

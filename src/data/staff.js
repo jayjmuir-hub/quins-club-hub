@@ -3,6 +3,7 @@ import { SQUAD_STAFF_ROLES } from '../lib/scope.js'
 import { compareSquadStaff } from '../lib/squadStaff.js'
 import { unwrapCapped, withCap } from './limits.js'
 import { signStaffPhotoUrls } from './photos.js'
+import { fetchContacts, NO_CONTACT } from './contacts'
 
 // Squad staff — who coaches, manages and doctors each age group.
 //
@@ -54,7 +55,10 @@ export async function listSquadStaff() {
       const { data, error } = await withCap(
         supabase
           .from('memberships')
-          .select('id, profile_id, team_id, role, title, is_head_coach, profiles(full_name, email, phone, photo_path, photo_focus_x, photo_focus_y)')
+          // ⚠️ `email`/`phone` removed from the embed (Phase 1b) — direct SELECT
+          // of them is revoked. Merged from member_contacts below (staff are
+          // contactable club-wide, ruling C), so toStaffMember still reads them.
+          .select('id, profile_id, team_id, role, title, is_head_coach, profiles(full_name, photo_path, photo_focus_x, photo_focus_y)')
           .in('role', SQUAD_STAFF_ROLES)
           .eq('status', 'active')
           .not('team_id', 'is', null),
@@ -63,6 +67,14 @@ export async function listSquadStaff() {
       return unwrapCapped(data, 'staff', 'Narrow this down before showing it all at once.')
     })(),
   ])
+
+  // ⚠️ CONTACTS IN ONE BATCH (Phase 1b) — member_contacts returns phone/email
+  // for staff (ruling C: contactable club-wide). Merged onto each row's profiles
+  // so toStaffMember reads them unchanged.
+  const contacts = await fetchContacts(staff.map((row) => row.profile_id))
+  for (const row of staff) {
+    if (row.profiles) row.profiles = { ...row.profiles, ...(contacts.get(row.profile_id) ?? NO_CONTACT) }
+  }
 
   // ⚠️ SIGNED IN ONE BATCH, NOT PER ROW. `staff-photos` is a private bucket, so
   // every face needs a signed URL — and this screen lists the WHOLE club, so a

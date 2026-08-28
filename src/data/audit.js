@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { fetchByIds } from './limits.js'
+import { fetchContacts, NO_CONTACT } from './contacts'
 
 // Data access for public.membership_audit — who gave whom access, and when.
 //
@@ -71,12 +72,17 @@ export async function listMembershipAudit({ limit = 200 } = {}) {
  */
 export async function listAuditProfiles(ids) {
   const wanted = [...new Set((ids ?? []).filter(Boolean))]
-  return fetchByIds(wanted, async (chunk) => {
+  const rows = await fetchByIds(wanted, async (chunk) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, email')
+      // ⚠️ `email` removed (Phase 1b) — merged from member_contacts below. The
+      // rights log falls back to email when a name is blank, and its only viewer
+      // is a super admin, who is entitled to every member's contact.
+      .select('id, full_name')
       .in('id', chunk)
     if (error) throw error
     return data ?? []
   })
+  const contacts = await fetchContacts(wanted)
+  return rows.map((row) => ({ ...row, ...(contacts.get(row.id) ?? NO_CONTACT) }))
 }

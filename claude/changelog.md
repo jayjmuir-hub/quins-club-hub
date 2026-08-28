@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Corrected a stale security-headers finding: **headers-only deploys DO reach
+- Admin-rights redesign **Phase 1b** — the adult *login* contact
+  (`profiles.email`/`phone`) is closed off too. Direct column SELECT is revoked
+  from `authenticated` (table SELECT revoked, re-granted on the other 16 columns),
+  so a narrowed admin can no longer read a parent's login email/phone with a raw
+  PostgREST query — the Phase 1 residual. The only read path is now
+  `public.member_contacts(uuid[])` (SECURITY DEFINER), which nulls them unless the
+  caller is entitled (self / a staff-or-admin target / an allowlisted admin / a
+  coach of the target's squad); it also fixes a leak in `member_contact_card`
+  whose squad arm keyed on `can_edit_team` (true for any admin). Six data-layer
+  reads reroute through it and merge the columns back, so no screen changed shape.
+  Deploy-first: fn migration → this deploy → the revoke migration. Both directions
+  proven in `db/tests/profiles-contact-revoke.sql`; `grants.sql` re-captured.
+  (SHA follows in the next changelog-touching PR.)
+- `dca36b8` — Corrected a stale security-headers finding: **headers-only deploys DO reach
   installed PWAs now.** The 6 Aug decision doc said a `netlify.toml`-only change
   never self-heals in the service-worker cache (only a bundle-changing deploy
   does) — that stopped being true when `__BUILD_REF__` (~18 Aug) began baking the
