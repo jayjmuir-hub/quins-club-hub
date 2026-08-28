@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Admin-rights redesign — session handoff
+- `466986e` — Admin-rights redesign — session handoff
   (`claude/handoffs/2026-08-28-admin-rights-design.md`): design phase done and
   merged, next work is Phase 0 of the migration (the `clubadmin` backfill
   linchpin, on production child data). Records the settled decisions, Phase 0a's
