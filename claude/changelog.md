@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Admin-rights redesign **Phase 3** (Surface S1, edit) — a Pitch, Training or
+- Training-plans UX, five fixes from Jay's feedback: (1) tapping a night in the
+  two-week strip now OPENS that session's plan (the strip shows each session, so
+  a tap should open one — not just feed the shelf's mislabelled "tonight" slot);
+  (2) the heart and star carry hover tooltips — heart = a public like others
+  can see, star = save to your own shortlist; (3) a coach can suggest their OWN
+  saved hour to the club from the shelf card, any time, without re-saving (which
+  made a duplicate), and it reads "Suggested" once it's in the queue; (4) the
+  Director's suggestion queue names WHO suggested each hour and (5) expands each
+  to show its running order, so it is no longer Add/Dismiss blind. Files:
+  `src/components/{TrainingShelf,DrillCard}.jsx`,
+  `src/screens/{SquadTraining,TrainingTemplates}.jsx`.
+  (SHA follows in the next changelog-touching PR.)
+- `5ba8da4` — Admin-rights redesign **Phase 3** (Surface S1, edit) — a Pitch, Training or
   Welfare admin can still READ the roster's names but can no longer EDIT or
   DELETE a child. The `player edit` policy on `public.players` is narrowed to
   `private.can_write_child` (`{clubadmin, youth, media}` + super) OR

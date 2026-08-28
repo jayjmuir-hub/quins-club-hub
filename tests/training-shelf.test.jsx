@@ -25,10 +25,12 @@ vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => ({ user: { id: 'p-coach' } }),
 }))
 
+const submitTemplateToClubMock = vi.fn(async () => ({}))
 vi.mock('../src/data/trainingPlans.js', () => ({
   listTemplates: (...args) => listTemplatesMock(...args),
   listDrills: (...args) => listDrillsMock(...args),
   getSession: (...args) => getSessionMock(...args),
+  submitTemplateToClub: (...args) => submitTemplateToClubMock(...args),
 }))
 
 vi.mock('../src/data/trainingShelf.js', () => ({
@@ -445,6 +447,32 @@ describe('library browse', () => {
     const coaches = await screen.findByTestId('from-coaches')
     expect(within(coaches).getByText('Rowan Passing U16–U18')).toBeInTheDocument()
     expect(within(coaches).queryByText('Rowan Passing U9–U10')).not.toBeInTheDocument()
+  })
+
+  it('lets a coach suggest their OWN saved hour to the club, any time, without re-saving', async () => {
+    const user = userEvent.setup()
+    listTemplatesMock.mockResolvedValue([
+      // Mine, not yet suggested → offers "Suggest to the club".
+      { id: 'tpl-mine', name: 'My tag hour', created_by: 'p-coach', requires_contact: false, min_age: null, max_age: null, total_minutes: 60, submitted_at: null, blocks: [] },
+      // Someone else's → no suggest control on it.
+      { id: 'tpl-theirs', name: 'Rowan hour', created_by: 'p-row', requires_contact: false, min_age: null, max_age: null, total_minutes: 60, submitted_at: null, blocks: [] },
+    ])
+    showShelf(TAG_SQUAD)
+    const coaches = await screen.findByTestId('from-coaches')
+    const suggestButtons = within(coaches).getAllByTestId('suggest-template')
+    expect(suggestButtons).toHaveLength(1) // only mine
+    await user.click(suggestButtons[0])
+    await waitFor(() => expect(submitTemplateToClubMock).toHaveBeenCalledWith('tpl-mine'))
+  })
+
+  it('shows "Suggested" on my hour already in the Director queue, with no re-suggest', async () => {
+    listTemplatesMock.mockResolvedValue([
+      { id: 'tpl-mine', name: 'My tag hour', created_by: 'p-coach', requires_contact: false, min_age: null, max_age: null, total_minutes: 60, submitted_at: '2026-08-28T00:00:00Z', blocks: [] },
+    ])
+    showShelf(TAG_SQUAD)
+    const coaches = await screen.findByTestId('from-coaches')
+    expect(within(coaches).getByTestId('suggested-template')).toBeInTheDocument()
+    expect(within(coaches).queryByTestId('suggest-template')).toBeNull()
   })
 
   it('used this week is a count, not a 1–5 control, on an hour row', async () => {

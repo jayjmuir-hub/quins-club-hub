@@ -49,6 +49,13 @@ vi.mock('../src/data/trainingPlans.js', () => ({
   dismissTemplateSubmission: (...args) => dismissTemplateSubmissionMock(...args),
 }))
 
+// listCoachNames resolves who suggested each queued template. coachLabel (the
+// pure lib fn) is left REAL so the name-resolution logic is exercised.
+const listCoachNamesMock = vi.fn(async () => new Map())
+vi.mock('../src/data/trainingShelf.js', () => ({
+  listCoachNames: (...args) => listCoachNamesMock(...args),
+}))
+
 import TrainingTemplates from '../src/screens/TrainingTemplates.jsx'
 
 const CLUB = '00000000-0000-0000-0000-0000000000ad'
@@ -390,5 +397,28 @@ describe('TrainingTemplates — coach suggestions', () => {
     const panel = await screen.findByTestId('template-suggestions')
     await user.click(within(panel).getByRole('button', { name: /keep it theirs/i }))
     await waitFor(() => expect(dismissTemplateSubmissionMock).toHaveBeenCalledWith('tpl-sub'))
+  })
+
+  it('names who suggested it, and opens the running order to read before deciding', async () => {
+    listSubmittedTemplatesMock.mockResolvedValue([
+      {
+        ...SUB,
+        created_by: 'coach-9',
+        blocks: [{ id: 'b1', position: 1, drill_id: 'd1', minutes: 60, coach_note: 'Both sides', drill: { title: 'Grid passing' } }],
+      },
+    ])
+    listCoachNamesMock.mockResolvedValue(new Map([['coach-9', 'Priya Naidoo']]))
+    const { user } = renderTemplates()
+    const panel = await screen.findByTestId('template-suggestions')
+
+    // Who suggested it — resolved through the real coachLabel.
+    await waitFor(() => expect(within(panel).getByText(/suggested by Priya Naidoo/i)).toBeInTheDocument())
+
+    // The drills are hidden until you open the suggestion (was Add/Dismiss blind).
+    expect(within(panel).queryByTestId('submission-detail')).toBeNull()
+    await user.click(within(panel).getByTestId('submission-toggle'))
+    const detail = within(panel).getByTestId('submission-detail')
+    expect(within(detail).getByText(/Grid passing/)).toBeInTheDocument()
+    expect(within(detail).getByText('Both sides')).toBeInTheDocument()
   })
 })
