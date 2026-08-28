@@ -8,9 +8,18 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 28 Aug 2026
+
+- Test: de-flaked the Accounts ordering case in `tests/accounts.test.jsx`
+  ("sits ABOVE the Approval emails card"). It captured the `waiting-for-access`
+  node after the first async read, then compared position after the second read
+  had re-rendered and detached it, so `compareDocumentPosition` lost the
+  FOLLOWING bit and failed ~1 call in 4. Now a `waitFor` re-queries both nodes
+  from the settled DOM. No app change; 15/15 in isolation.
+
 ## 27 Aug 2026
 
-- Chat polls, WhatsApp-style: a question with 2–12 options, single- or
+- `59ac0f7` — Chat polls, WhatsApp-style: a question with 2–12 options, single- or
   multiple-choice, posted as a message in any chat you can already write in
   (squad, staff, club, DM, group). Everyone who can read it votes, sees live
   counts, and sees who voted — the parity ruling. New `polls` / `poll_options`
