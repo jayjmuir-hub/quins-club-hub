@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Admin-rights redesign **Phase 1** (Surface S2) — a child's DOB and their
+- Corrected a stale security-headers finding: **headers-only deploys DO reach
+  installed PWAs now.** The 6 Aug decision doc said a `netlify.toml`-only change
+  never self-heals in the service-worker cache (only a bundle-changing deploy
+  does) — that stopped being true when `__BUILD_REF__` (~18 Aug) began baking the
+  deploy's `COMMIT_REF` into the bundle, so every deploy changes `index.html` →
+  its precache revision → `sw.js`, and `autoUpdate` re-fetches the document with
+  live headers on next visit. Measured: builds differing only in `COMMIT_REF`
+  yield different `sw.js` (same ref → byte-identical, as control), and the live
+  bundle carries the deployed SHA. So the durable SW rework (network-first
+  document) stays unbuilt — it buys nothing now that `__BUILD_REF__` propagates
+  headers per deploy. Also recorded Jay's call that offline use is a non-goal
+  (stale scores/availability would mislead), so the precache is justified on
+  online grounds — fast loads and blip-resilience — not offline. Docs-only.
+  (SHA follows in the next changelog-touching PR.)
+- `56e399a` — Admin-rights redesign **Phase 1** (Surface S2) — a child's DOB and their
   parents' registered contact become a real data boundary. Read of
   `player_contacts`, `player_parents` and `player_private` is narrowed by RLS to
   the allowlist `{clubadmin, youth, media, welfare}` (welfare read-only), so a
