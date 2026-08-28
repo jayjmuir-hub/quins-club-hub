@@ -49,6 +49,29 @@ export function extForMime(mimeType) {
   return 'webm'
 }
 
+/**
+ * A person-facing reason a recording could not START, mapped from whatever
+ * getUserMedia / MediaRecorder threw. The composer shows this instead of
+ * failing silently: a blocked mic is indistinguishable from a dead button
+ * otherwise, and on Android a prior "block" makes getUserMedia reject with no
+ * prompt at all — the single most common reason the mic "does nothing".
+ */
+export function describeRecorderError(err) {
+  switch (err?.name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return 'Microphone blocked. Allow microphone access in your browser or phone settings, then try again.'
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return 'No microphone was found on this device.'
+    case 'NotReadableError':
+    case 'AbortError':
+      return 'Your microphone is busy or unavailable — close other apps using it, then try again.'
+    default:
+      return err?.message || 'Could not start recording. Please try again.'
+  }
+}
+
 /** ms → "m:ss", for the recording timer and the playback duration. */
 export function formatDuration(ms) {
   const total = Math.max(0, Math.round((ms ?? 0) / 1000))

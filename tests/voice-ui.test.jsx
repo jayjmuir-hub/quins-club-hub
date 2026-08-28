@@ -95,4 +95,18 @@ describe('VoiceComposer', () => {
     render(<VoiceComposer onSend={vi.fn()} disabled />)
     expect(screen.getByTestId('voice-button')).toBeDisabled()
   })
+
+  it('surfaces WHY the mic failed instead of a dead button (Android block)', async () => {
+    const user = userEvent.setup()
+    // A prior block: getUserMedia rejects with no prompt — the common Android case.
+    startRecording.mockRejectedValue(Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' }))
+    const onError = vi.fn()
+    render(<VoiceComposer onSend={vi.fn()} onError={onError} />)
+
+    await user.click(screen.getByTestId('voice-button'))
+    expect(onError).toHaveBeenCalledWith(null) // cleared at the start of the attempt
+    expect(onError).toHaveBeenLastCalledWith(expect.stringMatching(/blocked/i))
+    // Nothing recorded, so the composer stays on the mic button.
+    expect(screen.queryByTestId('voice-recording')).toBeNull()
+  })
 })
