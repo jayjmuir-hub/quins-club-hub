@@ -10,13 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 28 Aug 2026
 
-- Session handoff — the **admin-rights security redesign is COMPLETE** (all six
+- Training-plans strip: each session now has a dedicated **Open** control, and a
+  tap only SELECTS the night for the shelf's focus chips (follow-up to the #497
+  tap-to-open, which got in the way of browsing nights). The pill is a container
+  so the select button and Open button sit side by side without nesting.
+  `src/components/TrainingDateStrip.jsx`, `src/screens/SquadTraining.jsx`.
+  (SHA follows in the next changelog-touching PR.)
+- `ba0af96` — Session handoff — the **admin-rights security redesign is COMPLETE** (all six
   data boundaries live: 0a/1/1b/2/3/4; 0b n/a under α). Records the one
   outstanding action (grant `welfare` to re-enable DM review), the locked design
   decisions, and the traps met — 1b deploy-first, the `profiles` SELECT
   column-list trap, the tree-shaken `scope.js` mirrors.
   `claude/handoffs/2026-08-28-admin-rights-complete.md`. Docs-only, no deploy.
-  (SHA follows in the next changelog-touching PR.)
 - `07367cc` — Admin-rights redesign **Phase 4** (Surface S7b) — the last, most
   safeguarding-sensitive boundary. Reviewing a child's or reported DM moves from
   EVERY admin to the explicit `welfare` grant, and even a super must tick it (an

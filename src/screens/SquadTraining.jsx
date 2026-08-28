@@ -124,14 +124,12 @@ export default function SquadTraining() {
             nights={nights}
             selected={shelfNight}
             plansByEvent={plansByEvent}
-            onSelect={(event) => {
-              // Tapping a night opens that session's plan (Jay: the strip
-              // shows each session, so a tap should open it — not just feed
-              // the shelf's "tonight" slot). It still keeps the shelf pointed
-              // at that night, so closing the sheet leaves it selected.
-              setShelfNight(event)
-              setSelectedEvent(event)
-            }}
+            // Tapping a night SELECTS it for the shelf (chips apply to it);
+            // each night carries its own "Open" control that opens the plan
+            // (Jay: keep select and open separate so browsing nights for the
+            // chips doesn't pop the plan open every tap).
+            onSelect={setShelfNight}
+            onOpen={setSelectedEvent}
           />
           <TrainingShelf
             team={team}

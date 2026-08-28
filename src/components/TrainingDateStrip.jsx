@@ -18,7 +18,7 @@ const STATUS_TONE = {
   squad: 'bg-accent-bg text-accent-ink',
 }
 
-export default function TrainingDateStrip({ nights = [], selected = null, plansByEvent, onSelect }) {
+export default function TrainingDateStrip({ nights = [], selected = null, plansByEvent, onSelect, onOpen }) {
   const plans = plansByEvent instanceof Map ? plansByEvent : new Map()
 
   if (nights.length === 0) {
@@ -48,31 +48,50 @@ export default function TrainingDateStrip({ nights = [], selected = null, plansB
           const pressed = selected?.id === event.id
           const pitch = pitchBookedLabel(event)
           return (
-            <button
+            // Container carries the border/selection ring so a select button
+            // and a separate Open button can live side by side without nesting
+            // (a button inside a button is invalid).
+            <div
               key={event.id}
-              type="button"
-              aria-pressed={pressed}
-              aria-label={[nightDateLabel(event), status.label, pitch].filter(Boolean).join(', ')}
-              onClick={() => onSelect?.(event)}
               className={[
-                'flex min-w-[5.75rem] shrink-0 flex-col items-start gap-1 rounded-[10px] border-[1.5px] px-2.5 py-2 text-left',
+                'flex min-w-[5.75rem] shrink-0 flex-col overflow-hidden rounded-[10px] border-[1.5px]',
                 pressed ? 'border-brand' : 'border-line bg-surface-card',
               ].join(' ')}
             >
-              <span className="text-[13px] font-bold text-ink">{nightDateLabel(event)}</span>
-              <span className="text-[12px] font-medium text-ink-muted">{nightTimeLabel(event)}</span>
-              <span
-                className={[
-                  'rounded-full px-1.5 py-0.5 text-[11px] font-bold',
-                  STATUS_TONE[status.key] ?? STATUS_TONE.empty,
-                ].join(' ')}
+              <button
+                type="button"
+                aria-pressed={pressed}
+                aria-label={[nightDateLabel(event), status.label, pitch].filter(Boolean).join(', ')}
+                onClick={() => onSelect?.(event)}
+                className="flex flex-1 flex-col items-start gap-1 px-2.5 py-2 text-left"
               >
-                {status.label}
-              </span>
-              {pressed && pitch && (
-                <span className="text-[11px] font-semibold text-ink-muted">✓ {pitch}</span>
-              )}
-            </button>
+                <span className="text-[13px] font-bold text-ink">{nightDateLabel(event)}</span>
+                <span className="text-[12px] font-medium text-ink-muted">{nightTimeLabel(event)}</span>
+                <span
+                  className={[
+                    'rounded-full px-1.5 py-0.5 text-[11px] font-bold',
+                    STATUS_TONE[status.key] ?? STATUS_TONE.empty,
+                  ].join(' ')}
+                >
+                  {status.label}
+                </span>
+                {pressed && pitch && (
+                  <span className="text-[11px] font-semibold text-ink-muted">✓ {pitch}</span>
+                )}
+              </button>
+              {/* Dedicated Open control — opens THIS session's plan. Its label
+                  is date-free so it never collides with the select button when
+                  finding by the night's date. */}
+              <button
+                type="button"
+                data-testid={`open-plan-${event.id}`}
+                aria-label="Open plan"
+                onClick={() => onOpen?.(event)}
+                className="border-t border-line/60 px-2.5 py-1.5 text-center text-[12px] font-bold text-brand-ink hover:bg-surface-mute"
+              >
+                Open
+              </button>
+            </div>
           )
         })}
       </div>
