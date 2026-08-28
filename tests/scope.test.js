@@ -472,18 +472,24 @@ describe('loadMyMemberships', () => {
 // comment for why that is safe (RLS's `memb read` policy).
 
 describe('listClubMembers', () => {
-  it('returns every membership row, joined to the profile and team', async () => {
+  it('returns every membership row, joined to the profile and team, contacts merged', async () => {
     const rows = [
-      { id: 'm-1', role: 'coach', team_id: U12.id, player_id: null, profiles: { full_name: 'Jay Muir' }, teams: { name: U12.name } },
+      { id: 'm-1', role: 'coach', team_id: U12.id, player_id: null, profile_id: 'p-1', profiles: { full_name: 'Jay Muir' }, teams: { name: U12.name } },
     ]
     const select = vi.fn().mockResolvedValue({ data: rows, error: null })
     supabase.from.mockReturnValue({ select })
+    // ⚠️ Phase 1b: email/phone are no longer embedded; fetched via member_contacts
+    // and merged onto each row's `profiles`.
+    supabase.rpc.mockResolvedValue({ data: [{ id: 'p-1', phone: null, email: 'jay@example.com' }], error: null })
 
     const result = await listClubMembers()
 
     expect(supabase.from).toHaveBeenCalledWith('memberships')
     expect(select).toHaveBeenCalled()
-    expect(result).toEqual(rows)
+    expect(supabase.rpc).toHaveBeenCalledWith('member_contacts', { _ids: ['p-1'] })
+    expect(result).toEqual([
+      { ...rows[0], profiles: { full_name: 'Jay Muir', phone: null, email: 'jay@example.com' } },
+    ])
   })
 
   it('returns an empty array, never null, when there are no rows', async () => {

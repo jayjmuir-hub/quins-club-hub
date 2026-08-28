@@ -355,13 +355,33 @@
 --   memberships.is_head_coach   authenticated   UPDATE   ← 18 Aug 2026
 --   memberships.notify_approvals authenticated  UPDATE   ← 23 Aug 2026 (who is emailed about approvals)
 --
+-- ⚠️ SELECT ON `profiles` IS NOW COLUMN-LEVEL TOO (Phase 1b, 28 Aug 2026 —
+-- 20260828_profiles_contact_revoke.sql). Table-level SELECT was REVOKED from
+-- `authenticated` and granted back on every column EXCEPT `email` and `phone`,
+-- so a narrowed admin cannot read a parent's login contact with a raw PostgREST
+-- query. The ONLY read path for those two columns is now
+-- public.member_contacts(uuid[]) (SECURITY DEFINER), which nulls them unless the
+-- caller is entitled (self / a staff-or-admin target / an allowlisted admin / a
+-- coach of the target's squad — private.can_see_member_contact).
+--   profiles  authenticated  SELECT on ALL columns EXCEPT email, phone:
+--     id, full_name, created_at, first_name, last_name, name_confirmed_at,
+--     photo_path, photo_focus_x, photo_focus_y, no_player_confirmed_at,
+--     no_role_confirmed_at, email_confirmed_at, signup_intent,
+--     signup_intent_applied_at, welcomed_at, last_seen_at
+-- ⚠️ THE COLUMN-LIST TRAP IS NOW LIVE ON SELECT: a NEW `profiles` column is
+-- UNREADABLE by `authenticated` until it is added to that grant (and here).
+-- Fail-closed and safe, but it reads app-wide as a null/absent column. The
+-- "future revoke" the belt-and-braces SELECT grants below guarded against IS
+-- THIS ONE — so those grants are now load-bearing, not belt-and-braces.
+--
 -- ⚠️ `profiles.no_player_confirmed_at` IS THE SECOND TIME THIS TRAP WAS MET AND
 -- THE FIRST TIME IT WAS SEEN COMING. Added 16 Aug 2026 for the sign-in gate,
 -- with its grant in the same migration — because `memberships.title` below had
 -- already shown what happens without one. It also needs SELECT, unlike the five
--- above it: those are covered by the table-level SELECT `authenticated` still
--- holds, and so is this one — the explicit grant is belt-and-braces against a
--- future revoke, and costs nothing.
+-- above it. ⚠️ THAT SELECT USED TO BE COVERED BY TABLE-LEVEL SELECT — no longer:
+-- Phase 1b (above) revoked it, so this explicit SELECT grant is now the reason
+-- the column is readable at all. The "belt-and-braces against a future revoke"
+-- became the whole belt on 28 Aug 2026.
 --
 -- ⚠️ `profiles.no_role_confirmed_at` IS THE MIRROR OF IT, added hours later the
 -- same day (20260816_profile_no_role_confirmed.sql) for the fourth step of the
