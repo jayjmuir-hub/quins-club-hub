@@ -181,7 +181,7 @@ describe('AdminDashboard — authorisation gate', () => {
 
 describe('AdminDashboard — tabs', () => {
   // ⚠️ FOUR SINCE 17 Aug 2026 — "Needs attention" joined Staff (13 Aug) in the
-  // Club Admin portal. The count is asserted rather than dropped: it is what
+  // Club Hub Admin portal. The count is asserted rather than dropped: it is what
   // would catch a tab silently disappearing, and "at least two" would pass
   // against exactly that bug.
   //
@@ -222,11 +222,11 @@ describe('AdminDashboard — tabs', () => {
     expect(screen.queryByText('Accounts tab marker')).not.toBeInTheDocument()
     // Still inside the dashboard shell, not a fresh page.
     // ⚠️ THE HEADING IS THE PORTAL, NOT "Admin", since 12 Aug 2026 — Accounts
-    // and Club are both inside the Club Admin portal, and "Admin" now names
+    // and Club are both inside the Club Hub Admin portal, and "Admin" now names
     // the chooser at bare /admin. The claim being made here is unchanged: the
     // shell survived a client-side tab switch.
     // claude/decisions/2026-08-12-admin-portals.md
-    expect(screen.getByRole('heading', { name: 'Club Admin' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Club Hub Admin' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Admin/ })).toHaveAttribute('href', '/admin')
   })
 
