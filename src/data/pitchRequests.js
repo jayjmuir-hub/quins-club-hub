@@ -122,10 +122,15 @@ export async function listPitchRequests({ status } = {}) {
  * RLS is the permission model: events UPDATE requires admin or that
  * squad's staff, so a refusal comes back as zero rows, worded here.
  */
-export async function setEventPitch(eventId, pitch) {
+// ⚠️ `portion` IS WRITTEN ALONGSIDE THE PITCH, null included. Allocating a
+// pitch settles how much of it the fixture uses, so the two are set together —
+// a squad answered a pitch with no portion would read as a full pitch and flag
+// every share (pitch sharing, phase 3). The caller passes null when there is no
+// real pitch to split, matching how EventForm's `common` handles it.
+export async function setEventPitch(eventId, pitch, portion = null) {
   const { data, error } = await supabase
     .from('events')
-    .update({ pitch })
+    .update({ pitch, pitch_portion: portion })
     .eq('id', eventId)
     .select()
     .maybeSingle()
@@ -134,11 +139,11 @@ export async function setEventPitch(eventId, pitch) {
   return data
 }
 
-export async function allocatePitch({ requestId, eventId, pitch }) {
+export async function allocatePitch({ requestId, eventId, pitch, portion = null }) {
   const decidedBy = await currentProfileId()
   const { data: event, error: eventError } = await supabase
     .from('events')
-    .update({ pitch })
+    .update({ pitch, pitch_portion: portion })
     .eq('id', eventId)
     .select()
     .maybeSingle()

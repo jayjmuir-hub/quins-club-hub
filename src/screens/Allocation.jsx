@@ -4,6 +4,7 @@ import Button from '../components/Button.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
 import { listPitches, findPitchClashes, PITCH_TBD } from '../data/pitches.js'
+import { PITCH_PORTIONS, defaultPitchPortion } from '../lib/pitchPortion.js'
 import { listPitchRequests, allocatePitch, declinePitch, setEventPitch } from '../data/pitchRequests.js'
 import { Sheet } from '../components/Sheet.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -147,6 +148,11 @@ export default function Allocation() {
   const [requests, setRequests] = useState([])
   const [deciding, setDeciding] = useState(null)
   const [chosenPitch, setChosenPitch] = useState('')
+  // How much of the pitch this allocation gives. Shared with chosenPitch across
+  // both entry points (queue answer and direct assign) — only one decision is
+  // ever in flight, the same reason decideBusy is shared. Defaulted from the
+  // fixture's squad when a flow opens (portionDefaultFor), then editable.
+  const [chosenPortion, setChosenPortion] = useState('full')
   const [reason, setReason] = useState('')
   const [decideBusy, setDecideBusy] = useState(false)
   const [decideError, setDecideError] = useState(null)
@@ -263,11 +269,22 @@ export default function Allocation() {
   // button inside it, not the first thing thrown at the screen.
   const [detailEvent, setDetailEvent] = useState(null)
 
+  // The portion to pre-fill for an event, from its squad's age and type — the
+  // same rule EventForm uses, so a pitch answered here lands with the split the
+  // coach would have picked (matches U6–U8 ¼, U9–U11 ½, U12+ full; training
+  // smaller). A suggestion, always editable.
+  function portionDefaultFor(event) {
+    if (!event) return 'full'
+    return defaultPitchPortion(teamsById.get(event.team_id)?.name ?? null, { type: event.type })
+  }
+
   function openAssign(event) {
     setDetailEvent(null)
     setAssigning(event)
     const current = (event.pitch ?? '').trim()
     setChosenPitch(current === PITCH_TBD ? '' : current)
+    // Keep an existing split when re-assigning; otherwise suggest by age.
+    setChosenPortion(event.pitch_portion ?? portionDefaultFor(event))
     setDecideError(null)
   }
 
@@ -277,10 +294,12 @@ export default function Allocation() {
     // — otherwise the queue says "waiting" about a fixture that has its
     // pitch, and the next admin answers it again.
     const pending = requests.find((request) => request.event_id === assigning.id)
+    // No real pitch means nothing to split — a null portion, matching EventForm.
+    const portion = chosenPitch ? chosenPortion : null
     return decide(() =>
       pending
-        ? allocatePitch({ requestId: pending.id, eventId: assigning.id, pitch: chosenPitch })
-        : setEventPitch(assigning.id, chosenPitch),
+        ? allocatePitch({ requestId: pending.id, eventId: assigning.id, pitch: chosenPitch, portion })
+        : setEventPitch(assigning.id, chosenPitch, portion),
     )
   }
 
@@ -569,6 +588,7 @@ export default function Allocation() {
                       <Button size="sm" onClick={() => {
                         setDeciding(request.id)
                         setChosenPitch('')
+                        setChosenPortion(portionDefaultFor(fixture))
                         setReason('')
                         setDecideError(null)
                       }}>
@@ -601,6 +621,28 @@ export default function Allocation() {
                         </select>
                       </label>
 
+                      {/* How much of that pitch — shown once a pitch is chosen,
+                          since a portion of nothing is meaningless. Defaulted
+                          from the squad's age when the request was opened. */}
+                      {chosenPitch && (
+                        <label className="min-w-0">
+                          <span className="mb-1 block text-[11.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+                            How much
+                          </span>
+                          <select
+                            aria-label="How much of the pitch"
+                            value={chosenPortion}
+                            disabled={decideBusy}
+                            onChange={(domEvent) => setChosenPortion(domEvent.target.value)}
+                            className="rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-sm text-ink outline-none transition focus:border-brand"
+                          >
+                            {PITCH_PORTIONS.map((portion) => (
+                              <option key={portion.value} value={portion.value}>{portion.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+
                       <Button
                         size="sm"
                         disabled={decideBusy || !chosenPitch}
@@ -609,6 +651,7 @@ export default function Allocation() {
                             requestId: request.id,
                             eventId: request.event_id,
                             pitch: chosenPitch,
+                            portion: chosenPitch ? chosenPortion : null,
                           }),
                         )}
                       >
@@ -763,6 +806,27 @@ export default function Allocation() {
                 ))}
               </select>
             </label>
+            {/* How much of the pitch — appears once a pitch is chosen, defaulted
+                from the fixture's squad, so a shared pitch is not later flagged
+                as a clash. */}
+            {chosenPitch && (
+              <label className="mb-4 block">
+                <span className="mb-1 block text-[11.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+                  How much of the pitch
+                </span>
+                <select
+                  aria-label="How much of the pitch"
+                  value={chosenPortion}
+                  disabled={decideBusy}
+                  onChange={(domEvent) => setChosenPortion(domEvent.target.value)}
+                  className="w-full rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-sm text-ink outline-none transition focus:border-brand"
+                >
+                  {PITCH_PORTIONS.map((portion) => (
+                    <option key={portion.value} value={portion.value}>{portion.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             {decideError && (
               <p role="alert" className="mb-3 text-[12.5px] font-semibold text-danger-ink">
                 {decideError.message || "That didn't save. Try again."}

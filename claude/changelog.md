@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Pitch sharing, phase 2: the portion picker and the column.** Adds
+- **Pitch sharing, phase 3: allocator-side portion.** The two assign sheets on
+  the Allocation screen (queue answer + direct assign) set only a pitch, so a
+  pitch answered from a coach's request landed with no portion — a full pitch —
+  and a shared U8 match would then flag as a clash. Now a "How much of the pitch"
+  dropdown appears once a pitch is chosen, defaulted from the fixture's squad and
+  editable, and `setEventPitch` / `allocatePitch` write `pitch_portion` alongside
+  the pitch (null when there is no real pitch to split). `src/screens/Allocation.jsx`,
+  `src/data/pitchRequests.js`, `tests/allocation.test.jsx`,
+  `tests/pitch-requests.test.js`. PitchGlance's stacked occupancy view and the
+  "sharing approved" override remain unbuilt. Plan:
+  `claude/plans/2026-08-29-pitch-portions.md`. (SHA follows in the next
+  changelog-touching PR.)
+- `a4283c7` — **Pitch sharing, phase 2: the portion picker and the column.** Adds
   `events.pitch_portion` (`db/migrations/20260829_pitch_portion.sql`, text,
   nullable, CHECK `quarter/half/full`) and a "How much of the pitch" picker on
   EventForm, shown once a real pitch is chosen — "No pitch" and `Pitch TBD` have
@@ -26,8 +38,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `tests/event-form-pitch-portion.test.jsx`, `tests/series-edit.test.js`.
   Allocator-side portion, the PitchGlance
   stacked view, and the "sharing approved" override are phase 3. Plan:
-  `claude/plans/2026-08-29-pitch-portions.md`. (SHA follows in the next
-  changelog-touching PR.)
+  `claude/plans/2026-08-29-pitch-portions.md`.
 - `238624b` — **Calendar tab shows events, not dots.** Jay: "tiny dots on days … isn't a
   premium design for users." The Calendar month view was a dot-grid at every
   width with the same month's fixtures repeated as a full list directly beneath

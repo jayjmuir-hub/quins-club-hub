@@ -304,7 +304,8 @@ describe('direct assignment', () => {
     await user.selectOptions(screen.getByLabelText('Pitch for this fixture'), 'A2')
     await user.click(screen.getByRole('button', { name: /save pitch/i }))
 
-    await waitFor(() => expect(setEventPitchMock).toHaveBeenCalledWith('x', 'A2'))
+    // U16B is a full-pitch squad for a match, so the default portion rides along.
+    await waitFor(() => expect(setEventPitchMock).toHaveBeenCalledWith('x', 'A2', 'full'))
     // No request existed, so the queue path must NOT fire — a phantom
     // allocatePitch would try to close a request that is not there.
     expect(allocatePitchMock).not.toHaveBeenCalled()
@@ -322,9 +323,28 @@ describe('direct assignment', () => {
     await user.click(screen.getByRole('button', { name: /save pitch/i }))
 
     await waitFor(() =>
-      expect(allocatePitchMock).toHaveBeenCalledWith({ requestId: 'req-9', eventId: 'x', pitch: 'A1' }),
+      expect(allocatePitchMock).toHaveBeenCalledWith({ requestId: 'req-9', eventId: 'x', pitch: 'A1', portion: 'full' }),
     )
     expect(setEventPitchMock).not.toHaveBeenCalled()
+  })
+
+  it('the portion picker appears once a pitch is chosen, and its choice is written', async () => {
+    listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD' })])
+    const user = await setup()
+
+    await user.click(await screen.findByRole('button', { name: /U16B Contact/i }))
+    await user.click(await screen.findByRole('button', { name: /assign pitch/i }))
+    // Not offered until there is a pitch to split.
+    expect(screen.queryByLabelText('How much of the pitch')).not.toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Pitch for this fixture'), 'A2')
+    // Now it is, defaulted to a full pitch for U16B — override it to a half.
+    const portion = await screen.findByLabelText('How much of the pitch')
+    expect(portion).toHaveValue('full')
+    await user.selectOptions(portion, 'half')
+    await user.click(screen.getByRole('button', { name: /save pitch/i }))
+
+    await waitFor(() => expect(setEventPitchMock).toHaveBeenCalledWith('x', 'A2', 'half'))
   })
 
   it('a booked event opens preset to its current pitch, via Change pitch', async () => {
