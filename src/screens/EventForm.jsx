@@ -994,7 +994,17 @@ export default function EventForm({
     // No polyfill: crypto.randomUUID is on every browser this app supports
     // and on the jsdom global in the test runner, and a fallback that
     // silently produced a non-unique id would defeat the point of the column.
-    const seriesId = repeating ? crypto.randomUUID() : null
+    //
+    // ⚠️ `newSeriesId`, NOT `seriesId` — IT MUST NOT SHADOW THE OUTER ONE. The
+    // component-scope `seriesId` (line ~520, = event.series_id) is what the
+    // series EDIT path below filters on. `repeating` is `!editing && …`, so a
+    // `const seriesId` here is `null` whenever you are EDITING — and it would
+    // shadow the real id inside `seriesWrite`, so `updateSeriesFrom(null, …)`
+    // sends `series_id=eq.null`, which PostgREST casts to uuid and rejects:
+    // "invalid input syntax for type uuid: null" (Jay's phone, 29 Aug 2026 —
+    // every "apply to every later session" edit failed). This id is only ever
+    // the NEW one for the create path's rows below.
+    const newSeriesId = repeating ? crypto.randomUUID() : null
     // Same rule, same reason, for the multi-squad fan-out: ONE group_id read
     // once outside the map. Per-row ids would give three one-squad "groups"
     // that look identical in the schedule and are useless to the feature the
@@ -1019,7 +1029,7 @@ export default function EventForm({
           // whole term down with it. Same trap as the offset lookup in
           // clubWallTimeToUtc: a time is only meaningful against a date.
           ends_at: timeTbd ? null : clubWallTimeToUtc(date, values.endTime),
-          series_id: seriesId,
+          series_id: newSeriesId,
         }))
       : multiSquad
         ? targetTeamIds.map((id) => ({ ...rowFor(id), group_id: groupId }))

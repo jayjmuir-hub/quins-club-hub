@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- Fixed the account menu's **Notifications / Add-to-your-calendar** deep-links
+- ⚠️ **Fixed: editing a REPEATING event with "apply to this and every later
+  session" failed with `invalid input syntax for type uuid: "null"`** (Jay's
+  phone). Inside `EventForm`'s submit, a `const seriesId` for the CREATE path —
+  `null` when editing, since `repeating` is `!editing` — shadowed the
+  component-scope `event.series_id` that the series-edit write needs, so
+  `updateSeriesFrom(null, …)` filtered `series_id=eq.null`, which PostgREST
+  casts to uuid and rejects. Every series edit was broken, not just renames.
+  Renamed the inner id to `newSeriesId` so it can no longer shadow. A form-level
+  regression test now drives the real submit and asserts the event's series_id
+  reaches the write (the data-layer `series-edit.test.js` passed an explicit id
+  and never exercised the form). `src/screens/EventForm.jsx`,
+  `tests/event-form-series-edit.test.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `0231654` — Fixed the account menu's **Notifications / Add-to-your-calendar** deep-links
   landing at the top of the Settings page instead of on the section (Jay's
   phone). The sections above the target (the You card, the photo, Your players)
   load async and push it down, so a single scroll — even after a double rAF —
