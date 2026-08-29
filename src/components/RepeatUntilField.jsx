@@ -71,7 +71,11 @@ const MONTH_NAMES = [
  */
 export default function RepeatUntilField({ startDate, value, onChange }) {
   const [mode, setMode] = useState('weeks') // 'weeks' | 'date'
-  const [weeks, setWeeks] = useState('')
+  // ⚠️ STARTS AT '0', NOT '' (Jay, 29 Aug 2026: a blank box does not say what
+  // it is for, and the spinner could not step back down to nothing). 0 weeks
+  // means "no repeat yet" — the effect below emits '' for it, so a one-off is
+  // still the default until a real number is set.
+  const [weeks, setWeeks] = useState('0')
   // The month the inline calendar is showing, 0-based parts.
   const [view, setView] = useState(() => toParts(value) || toParts(startDate) || null)
 
@@ -91,9 +95,9 @@ export default function RepeatUntilField({ startDate, value, onChange }) {
   }
 
   function goToWeeksMode() {
-    // Lossless: carry the picked date back as a week count so the field is not
-    // suddenly empty.
-    if (weeks === '' && value) setWeeks(weeksBetween(startDate, value))
+    // Lossless: carry the picked date back as a week count so switching does not
+    // silently drop it. '0' is the "none yet" default, so treat it like empty.
+    if ((weeks === '' || weeks === '0') && value) setWeeks(weeksBetween(startDate, value))
     setMode('weeks')
   }
 
@@ -115,15 +119,17 @@ export default function RepeatUntilField({ startDate, value, onChange }) {
             id="event-repeat-weeks"
             type="number"
             inputMode="numeric"
-            min={1}
+            min={0}
             max={MAX_WEEKS}
             value={weeks}
             onChange={(e) => {
               const raw = e.target.value
+              // Allow a transient empty box while retyping; blur restores 0.
               if (raw === '') return setWeeks('')
-              const n = Math.max(1, Math.min(MAX_WEEKS, Math.floor(Number(raw))))
-              setWeeks(Number.isFinite(n) ? String(n) : '')
+              const n = Math.max(0, Math.min(MAX_WEEKS, Math.floor(Number(raw))))
+              setWeeks(Number.isFinite(n) ? String(n) : '0')
             }}
+            onBlur={() => setWeeks((w) => (w === '' ? '0' : w))}
             className="w-[68px] rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none transition focus:border-brand"
           />
           <span className="text-[15px] font-semibold text-ink">weeks</span>

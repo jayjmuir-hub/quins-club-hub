@@ -20,10 +20,15 @@ function setup(props = {}) {
 }
 
 describe('RepeatUntilField', () => {
-  it('defaults to a week count and resolves it to an end date', async () => {
+  it('starts showing 0 (not blank), can step to 0, and resolves a week count', async () => {
     const { onChange, user } = setup()
+    const weeks = screen.getByLabelText('Repeat weekly for')
+    // Not a blank box — it says what it is for, and the spinner reaches 0.
+    expect(weeks).toHaveValue(0)
+    expect(weeks).toHaveAttribute('min', '0')
     // 2 weeks from Tue 11 Aug = Tue 25 Aug.
-    await user.type(screen.getByLabelText('Repeat weekly for'), '2')
+    await user.clear(weeks)
+    await user.type(weeks, '2')
     expect(onChange).toHaveBeenLastCalledWith('2026-08-25')
   })
 

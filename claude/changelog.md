@@ -10,7 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- Replaced the native **"Repeat until"** date picker entirely (Jay's phone: the
+- The **"Repeat weekly for … weeks"** field now starts showing **0** instead of
+  blank, and its stepper can go back down to 0 (Jay: a blank box does not say
+  what it is for, and `min={1}` trapped the spinner above zero). 0 weeks still
+  means "no repeat", so a one-off stays the default. `src/components/RepeatUntilField.jsx`,
+  `tests/repeat-until-field.test.jsx`. (SHA follows in the next changelog-touching PR.)
+- `dd59dfb` — Replaced the native **"Repeat until"** date picker entirely (Jay's phone: the
   OS calendar committed a date when you navigated to the next MONTH, so reaching
   a month further out was impossible — removing `min` the PR before did not fix
   it, because the commit-on-navigate is the native picker's own behaviour). New
@@ -22,8 +27,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   A test proves month navigation does not commit; `repeating-events`,
   `multi-squad-and-pitch` and `duplicate-event` moved to the new control.
   `src/components/RepeatUntilField.jsx`, `src/screens/EventForm.jsx`,
-  `tests/repeat-until-field.test.jsx`. (SHA follows in the next
-  changelog-touching PR.)
+  `tests/repeat-until-field.test.jsx`.
 - `ecafb92` — Removed the `min` from the **"Repeat until"** date field. With the field
   empty, Chrome's calendar misbehaved on month navigation (Jay's phone: each hop
   to the next month committed a date and closed the picker, so it needed
