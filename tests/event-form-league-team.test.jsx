@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDate } from './helpers/pickDate.js'
 
 // Task 6 of claude/plans/2026-08-11-league-teams-implementation.md — a match
 // can record WHICH OF THE CLUB'S TEAMS played it, and in which round.
@@ -72,11 +73,9 @@ function renderForm({ event = null } = {}) {
 /** Fills the fields a match needs, leaving the league fields alone. */
 async function fillMatch(user) {
   await user.type(screen.getByLabelText(/opponent/i), 'Dubai Exiles')
-  const date = document.getElementById('event-date')
   const time = document.getElementById('event-time')
   const end = document.getElementById('event-end-time')
-  await user.clear(date)
-  await user.type(date, '2026-09-12')
+  await pickDate(user, '2026-09-12')
   await user.clear(time)
   await user.type(time, '09:00')
   await user.clear(end)

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDate } from './helpers/pickDate.js'
 
 // Two things that ship together because they are the same form change:
 //   - "Also add for" — one session, several age groups, one INDEPENDENT
@@ -95,9 +96,7 @@ async function fillTraining(user) {
   await user.click(screen.getByRole('radio', { name: 'Training' }))
   await user.type(screen.getByLabelText('Title'), 'Pre-season')
 
-  const date = screen.getByLabelText('Date')
-  await user.clear(date)
-  await user.type(date, '2026-08-11')
+  await pickDate(user, '2026-08-11')
   await user.type(screen.getByLabelText('Time'), '18:00')
   await user.type(screen.getByLabelText('End time'), '19:30')
 }

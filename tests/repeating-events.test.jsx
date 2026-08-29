@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDate } from './helpers/pickDate.js'
 
 // Tests for the "Repeats" section of src/screens/EventForm.jsx — bulk-creating
 // a term of training from one form submission. The pure date generator has its
@@ -75,9 +76,7 @@ async function fillTuesdayThursdaySeries(user) {
   await user.click(screen.getByRole('radio', { name: 'Training' }))
   await user.type(screen.getByLabelText('Title'), 'U12 Contact')
 
-  const date = screen.getByLabelText('Date')
-  await user.clear(date)
-  await user.type(date, '2026-08-11')
+  await pickDate(user, '2026-08-11')
   await user.type(screen.getByLabelText('Time'), '18:00')
   await user.type(screen.getByLabelText('End time'), '19:30')
 
@@ -248,9 +247,7 @@ describe('one-off events are untouched', () => {
     const { user } = renderForm()
     await user.click(screen.getByRole('radio', { name: 'Training' }))
     await user.type(screen.getByLabelText('Title'), 'U12 Contact')
-    const date = screen.getByLabelText('Date')
-    await user.clear(date)
-    await user.type(date, '2026-08-11')
+    await pickDate(user, '2026-08-11')
     await user.type(screen.getByLabelText('Time'), '18:00')
   await user.type(screen.getByLabelText('End time'), '19:30')
 
@@ -267,9 +264,7 @@ describe('one-off events are untouched', () => {
     const { user } = renderForm()
     await user.click(screen.getByRole('radio', { name: 'Training' }))
     await user.type(screen.getByLabelText('Title'), 'U12 Contact')
-    const date = screen.getByLabelText('Date')
-    await user.clear(date)
-    await user.type(date, '2026-08-11')
+    await pickDate(user, '2026-08-11')
     await user.type(screen.getByLabelText('Time'), '18:00')
   await user.type(screen.getByLabelText('End time'), '19:30')
     await user.click(screen.getByRole('checkbox', { name: 'Tue' }))

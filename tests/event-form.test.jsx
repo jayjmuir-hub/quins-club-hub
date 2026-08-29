@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { pickDate } from './helpers/pickDate.js'
 
 // Unit tests for src/screens/EventForm.jsx (Task 14) plus the wiring that
 // opens it — Schedule's "Add" button and EventDetail's Edit/Delete footer.
@@ -324,8 +325,7 @@ describe('EventForm — end time', () => {
     renderForm()
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
-    await user.clear(screen.getByLabelText('Date'))
-    await user.type(screen.getByLabelText('Date'), '2026-07-30')
+    await pickDate(user, '2026-07-30')
     await user.type(screen.getByLabelText('Time'), '20:00')
     await user.type(screen.getByLabelText('End time'), '22:00')
     await user.click(screen.getByRole('button', { name: /add event/i }))
@@ -428,8 +428,7 @@ describe('EventForm — saving', () => {
     const { onSaved, onClose } = renderForm()
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
-    await user.clear(screen.getByLabelText('Date'))
-    await user.type(screen.getByLabelText('Date'), '2026-07-30')
+    await pickDate(user, '2026-07-30')
     await user.type(screen.getByLabelText('Time'), '20:00')
     await user.type(screen.getByLabelText('End time'), '22:00')
     await user.click(screen.getByRole('button', { name: /add event/i }))
@@ -523,7 +522,8 @@ describe('EventForm — saving', () => {
     renderForm({ event: EXISTING_MATCH })
 
     // 16:00Z is 20:00 in Abu Dhabi and 12:00 in New York.
-    expect(screen.getByLabelText('Date')).toHaveValue('2026-07-30')
+    // The DatePicker trigger shows the value formatted, not a raw input value.
+    expect(screen.getByLabelText('Date')).toHaveTextContent('30 Jul 2026')
     expect(screen.getByLabelText('Time')).toHaveValue('20:00')
     expect(screen.getByLabelText('Opponent')).toHaveValue('Dubai Exiles')
     // ⚠️ Competition became a SELECT on 12 Aug 2026. This fixture predates
