@@ -144,38 +144,44 @@ export default function DatePicker({
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        id={id}
-        data-testid={testId}
-        disabled={disabled}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-invalid={invalid ? 'true' : undefined}
-        onClick={() => setOpen((was) => !was)}
-        className={[TRIGGER_BASE, invalid ? 'border-danger-ink' : 'border-line', value ? 'text-ink' : 'text-ink-faint'].join(' ')}
-      >
-        <span>{value ? displayDate(value) : placeholder}</span>
-        <CalendarIcon className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
-      </button>
-
-      {/* Clear — a sibling of the trigger, not nested inside it (a button in a
-          button is invalid), positioned just left of the calendar icon. Keeps
-          the native input's "you can empty it" behaviour, which a required
-          field's own validation still leans on. */}
-      {value && !disabled && (
+      {/* Trigger + Clear share their own positioning context, so the
+          absolutely-positioned × anchors to the trigger's height alone. If it
+          anchored to the root instead, opening the calendar would grow the root
+          and `top-1/2` would drop the × down into the grid. */}
+      <div className="relative">
         <button
+          ref={triggerRef}
           type="button"
-          aria-label="Clear date"
-          onClick={() => onChange('')}
-          className="absolute right-9 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-ink-muted hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          id={id}
+          data-testid={testId}
+          disabled={disabled}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-invalid={invalid ? 'true' : undefined}
+          onClick={() => setOpen((was) => !was)}
+          className={[TRIGGER_BASE, invalid ? 'border-danger-ink' : 'border-line', value ? 'text-ink' : 'text-ink-faint'].join(' ')}
         >
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
+          <span>{value ? displayDate(value) : placeholder}</span>
+          <CalendarIcon className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
         </button>
-      )}
+
+        {/* Clear — a sibling of the trigger, not nested inside it (a button in a
+            button is invalid), positioned just left of the calendar icon. Keeps
+            the native input's "you can empty it" behaviour, which a required
+            field's own validation still leans on. */}
+        {value && !disabled && (
+          <button
+            type="button"
+            aria-label="Clear date"
+            onClick={() => onChange('')}
+            className="absolute right-9 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-ink-muted hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        )}
+      </div>
 
       {open && view && (
         <div

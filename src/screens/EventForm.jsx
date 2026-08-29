@@ -1647,11 +1647,19 @@ export default function EventForm({
             group_id; nothing here makes one event belong to several teams.
             Same chip styling as the Repeats weekdays, so the two
             row-multiplying controls on this form look like each other.
-            ⚠️ NOT IN TOURNAMENT MODE — a tournament is one squad's entry, and
-            "Also add for" fans out via group_id, which is exclusive of the
-            container relationship (see the schema note on tournament_id). Each
-            squad enters its own tournament. */}
-        {otherTeams.length > 0 && !tournamentMode && (
+            ⚠️ IN TOURNAMENT MODE THIS FANS OUT CONTAINERS — one independent
+            tournament per squad (Jay, 30 Aug 2026), reversing the phase-3 rule
+            that hid it here. Each row is a container: tournament_id stays null
+            (it is never in `common`) and its games are added underneath later
+            per squad. The shared group_id links the sibling CONTAINERS, never a
+            container to a game — that bond is tournament_id. The only readers of
+            group_id are pitch-clash detection (siblings at one festival
+            correctly do NOT clash) and pitch occupancy (they collapse to one
+            booking), both of which are what you want for a festival several of
+            our squads enter. Deleting one squad's tournament removes only that
+            container and its games; neither series nor group deletes cascade on
+            group_id. */}
+        {otherTeams.length > 0 && (
           <fieldset className={FIELD}>
             <legend className={LABEL}>Also add for</legend>
             <div className="flex flex-wrap gap-2">
@@ -1679,8 +1687,8 @@ export default function EventForm({
             </div>
             <p className="mt-2 text-[12.5px] text-ink-muted">
               {multiSquad
-                ? `Each age group gets its own event — ${targetTeamIds.length} in total. Change one later and the others stay as they are.`
-                : 'Tick any other age groups joining this session. Each gets its own event.'}
+                ? `Each age group gets its own ${tournamentMode ? 'tournament' : 'event'} — ${targetTeamIds.length} in total. Change one later and the others stay as they are.`
+                : `Tick any other age groups joining this ${tournamentMode ? 'tournament' : 'session'}. Each gets its own ${tournamentMode ? 'tournament' : 'event'}.`}
             </p>
           </fieldset>
         )}
@@ -2179,9 +2187,13 @@ export default function EventForm({
               ? 'Save changes'
               : tournamentMode
                 ? // The container is what's being added; its games come after.
-                  // Repeats and multi-squad are hidden in this mode, so none of
-                  // the count-naming branches below can apply here.
-                  'Add tournament'
+                  // Repeats stays hidden here, but multi-squad now fans the
+                  // container out — one tournament per ticked age group — so the
+                  // count is named on the button, the same last-chance check as
+                  // the series and multi-squad branches below.
+                  multiSquad
+                  ? `Add ${targetTeamIds.length} tournaments`
+                  : 'Add tournament'
                 : blockedByRowGuard
                 ? // ⚠️ MUST come before the series branch. That branch counts
                   // the series and would promise "Add 14 events" for a
