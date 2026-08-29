@@ -54,9 +54,11 @@
 
 -- ---------------------------------------------------------------------
 -- auth.users → on_auth_user_created
--- Creates the public.profiles row for a brand-new signup, carrying the
--- full_name from raw_user_meta_data and the email across. Upserts, so a
--- re-fire on an existing id refreshes the email rather than failing.
+-- Creates the public.profiles row for a brand-new signup and, when the signup
+-- carried a signup_intent, writes the pending access_requests row and applies
+-- the intent once the email is confirmed. Upserts the profile, so a re-fire on
+-- an existing id refreshes email/confirmation rather than failing. Full body in
+-- functions.sql — re-captured 2026-08-29 after it had drifted well behind live.
 -- ---------------------------------------------------------------------
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users

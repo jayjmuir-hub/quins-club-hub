@@ -699,6 +699,18 @@ GRANT EXECUTE ON FUNCTION private.can_see_team(uuid) TO anon;  -- inert: anon ha
 -- private.handle_new_user()  — trigger fn for on_auth_user_created
 -- proacl: {postgres=X/postgres}   (no anon/authenticated grant, by design:
 --   it is only ever invoked by the trigger, which runs as the fn owner)
+--
+-- ⚠️ RE-CAPTURED 2026-08-29 from pg_get_functiondef — verbatim. The copy here
+-- had drifted a long way behind live: it showed only the profile insert
+-- (id/full_name/email), while the deployed function — grown by the 25 Aug
+-- "signup before confirm" work (claude/decisions/2026-08-25-signup-before-confirm.md)
+-- and the 26 Aug volunteer change — also derives first/last/full name, records
+-- name_confirmed_at and the signup_intent on the profile, WRITES the
+-- access_requests row from the intent, and calls apply_signup_intent once the
+-- email is confirmed. The drift was found 29 Aug while adding hold_bare_signup;
+-- a migration had updated the live function without this capture being refreshed.
+-- The migrations are authoritative; this file is a mirror — trust
+-- pg_get_functiondef over it if they ever disagree again.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.handle_new_user()
  RETURNS trigger
@@ -706,10 +718,69 @@ CREATE OR REPLACE FUNCTION private.handle_new_user()
  SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
+declare
+  intent     jsonb;
+  first_n    text;
+  last_n     text;
+  full_n     text;
+  role_claim text;
+  team_ids   uuid[];
+  first_team uuid;
 begin
-  insert into public.profiles (id, full_name, email)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name',''), new.email)
-  on conflict (id) do update set email = excluded.email;
+  intent := new.raw_user_meta_data->'signup_intent';
+  first_n := nullif(btrim(coalesce(intent->>'first_name', new.raw_user_meta_data->>'first_name', '')), '');
+  last_n  := nullif(btrim(coalesce(intent->>'last_name', new.raw_user_meta_data->>'last_name', '')), '');
+  full_n  := nullif(btrim(coalesce(
+               new.raw_user_meta_data->>'full_name',
+               concat_ws(' ', first_n, last_n)
+             )), '');
+
+  insert into public.profiles (
+    id, full_name, first_name, last_name, email, email_confirmed_at,
+    name_confirmed_at, signup_intent
+  )
+  values (
+    new.id,
+    coalesce(full_n, ''),
+    first_n,
+    last_n,
+    new.email,
+    new.email_confirmed_at,
+    case when first_n is not null then now() else null end,
+    intent
+  )
+  on conflict (id) do update
+    set email = excluded.email,
+        email_confirmed_at = excluded.email_confirmed_at,
+        signup_intent = coalesce(public.profiles.signup_intent, excluded.signup_intent);
+
+  if intent is not null then
+    role_claim := nullif(intent->>'claimed_role', '');
+    select coalesce(array_agg(x::uuid), '{}')
+      into team_ids
+      from jsonb_array_elements_text(coalesce(intent->'squad_ids', '[]'::jsonb)) as x;
+    first_team := team_ids[1];
+
+    -- 'volunteer' may have no squad — the 26 Aug 2026 change. Everything
+    -- else still requires one, matching the INSERT policy above.
+    if role_claim is not null
+       and (first_team is not null or role_claim = 'volunteer') then
+      insert into public.access_requests (
+        profile_id, status, requested_role, requested_team_id, requested_team_ids
+      )
+      values (new.id, 'pending', role_claim, first_team, nullif(team_ids, '{}'))
+      on conflict (profile_id) do nothing;
+    end if;
+  end if;
+
+  if new.email_confirmed_at is not null then
+    begin
+      perform private.apply_signup_intent(new.id);
+    exception when others then
+      raise warning 'apply_signup_intent (at signup) failed for %: %', new.id, sqlerrm;
+    end;
+  end if;
+
   return new;
 end;
 $function$
