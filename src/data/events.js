@@ -399,6 +399,10 @@ export const SERIES_EDITABLE_FIELDS = [
   'venue',
   'competition',
   'pitch',
+  // Rides with `pitch`: a recurring session on the same pitch shares the same
+  // split of it, so editing the pitch for the rest of a term carries how much
+  // of it the booking uses. Kept adjacent so the two are never edited apart.
+  'pitch_portion',
   'notes',
 ]
 

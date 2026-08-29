@@ -128,6 +128,9 @@ describe('updateSeriesFrom', () => {
       'venue',
       'competition',
       'pitch',
+      // Rides with `pitch`: editing a term's pitch carries how much of it the
+      // recurring booking uses (pitch sharing, phase 2).
+      'pitch_portion',
       'notes',
     ])
   })

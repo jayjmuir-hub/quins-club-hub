@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Calendar tab shows events, not dots.** Jay: "tiny dots on days … isn't a
+- **Pitch sharing, phase 2: the portion picker and the column.** Adds
+  `events.pitch_portion` (`db/migrations/20260829_pitch_portion.sql`, text,
+  nullable, CHECK `quarter/half/full`) and a "How much of the pitch" picker on
+  EventForm, shown once a real pitch is chosen — "No pitch" and `Pitch TBD` have
+  nothing to split and save a null portion. It pre-fills from the squad's age and
+  the event type (matches U6–U8 ¼, U9–U11 ½, U12+ full; training leans smaller)
+  and keeps the suggestion in step with the squad and type until overridden, the
+  same prefill-don't-clobber rule the league-team tier follows. The portion rides
+  in the event payload's `common` (so a fan-out and a repeating term all carry it)
+  and joins `SERIES_EDITABLE_FIELDS`. The migration re-creates the `pitch_occupancy`
+  RPC to return the portion, so PitchGlance's clash view is portion-aware too.
+  ⚠️ The migration is applied to production before this deploys — the column must
+  exist before the writer names it. `src/screens/EventForm.jsx`, `src/data/events.js`,
+  `tests/event-form-pitch-portion.test.jsx`, `tests/series-edit.test.js`.
+  Allocator-side portion, the PitchGlance
+  stacked view, and the "sharing approved" override are phase 3. Plan:
+  `claude/plans/2026-08-29-pitch-portions.md`. (SHA follows in the next
+  changelog-touching PR.)
+- `238624b` — **Calendar tab shows events, not dots.** Jay: "tiny dots on days … isn't a
   premium design for users." The Calendar month view was a dot-grid at every
   width with the same month's fixtures repeated as a full list directly beneath
   it — every event drawn twice, once as a bare coloured dot that carried no
@@ -22,8 +40,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Timezone bucketing (the club's Abu Dhabi day) unchanged — a presentation
   change, not a data one. `src/screens/Schedule.jsx`,
   `tests/schedule.test.jsx`, `claude/specs/design-system.md` §4.14,
-  `claude/decisions/2026-08-29-calendar-shows-events.md`. (SHA follows in the
-  next changelog-touching PR.)
+  `claude/decisions/2026-08-29-calendar-shows-events.md`.
 - `a128447` — **Pitch sharing, phase 1: portions and capacity-based clash detection.**
   Different age groups routinely share a training pitch — a quarter or a half
   each — and matches split the pitch for the younger bands too, only U12 and
