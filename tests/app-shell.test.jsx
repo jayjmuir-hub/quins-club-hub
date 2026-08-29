@@ -25,7 +25,6 @@ vi.mock('../src/lib/auth.jsx', () => ({
 vi.mock('../src/data/members.js', () => ({
   countAdminWaiting: () => Promise.resolve(0),
   getMyProfile: (...args) => getMyProfileMock(...args),
-  updateProfileName: (...args) => updateProfileNameMock(...args),
   // AddYourPlayer (a section of the roll-call since 17 Aug 2026) calls this.
   // Its own behaviour is covered by tests/parent-self-registration.test.jsx;
   // here it only has to exist so nothing in this file can reach a real Supabase
@@ -57,7 +56,6 @@ import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
 const signOutMock = vi.fn()
 const getMyProfileMock = vi.fn()
-const updateProfileNameMock = vi.fn()
 const getMyAccessRequestMock = vi.fn()
 const createAccessRequestMock = vi.fn()
 const registerMyPlayerMock = vi.fn()

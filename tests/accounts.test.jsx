@@ -33,10 +33,9 @@ const dismissAccessRequestMock = vi.fn()
 const restoreAccessRequestMock = vi.fn()
 const updateMembershipRoleMock = vi.fn()
 const deleteMembershipMock = vi.fn()
-const updateProfileNameMock = vi.fn()
 // ⚠️ NEW 9 Aug 2026. The sheet's details form writes first_name/last_name/phone
-// through updateMemberProfile; updateProfileName (the legacy full_name writer)
-// no longer has a control anywhere on this screen.
+// through updateMemberProfile. (The legacy full_name writer updateProfileName
+// was removed on 29 Aug 2026 once confirmed unused.)
 const updateMemberProfileMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
@@ -54,7 +53,6 @@ vi.mock('../src/data/members.js', () => ({
   grantMemberships: (...args) => grantMembershipsMock(...args),
   updateMembershipRole: (...args) => updateMembershipRoleMock(...args),
   deleteMembership: (...args) => deleteMembershipMock(...args),
-  updateProfileName: (...args) => updateProfileNameMock(...args),
   updateMemberProfile: (...args) => updateMemberProfileMock(...args),
 }))
 
@@ -345,7 +343,6 @@ beforeEach(() => {
     team_id: role === 'admin' ? null : teamId,
   }))
   deleteMembershipMock.mockResolvedValue(undefined)
-  updateProfileNameMock.mockImplementation(async ({ fullName }) => ({ full_name: fullName.trim() }))
   updateMemberProfileMock.mockImplementation(async ({ firstName, lastName, phone }) => ({
     first_name: firstName?.trim() ?? null,
     last_name: lastName?.trim() ?? null,

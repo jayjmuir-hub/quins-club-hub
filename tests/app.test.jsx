@@ -75,7 +75,6 @@ vi.mock('../src/data/members.js', () => ({
   grantMemberships: () => new Promise(() => {}),
   updateMembershipRole: () => new Promise(() => {}),
   deleteMembership: () => new Promise(() => {}),
-  updateProfileName: () => new Promise(() => {}),
   createInvite: () => new Promise(() => {}),
   // /accept-invite/:token (Task 18) renders the real AcceptInvite screen,
   // which calls this on mount. Never resolving keeps that test focused on

@@ -707,10 +707,9 @@ export async function approveMembership(membershipId) {
  * Saves the first/family name the person entered themselves, and records that
  * they entered it.
  *
- * Distinct from `updateProfileName` above, which writes `full_name` and is what
- * an ADMIN uses to fix someone else's name from the Accounts screen. This one
- * is the person speaking for themselves, and it is the only writer of
- * `name_confirmed_at`.
+ * Distinct from `updateMemberProfile` (the admin's writer for someone else's
+ * name from the Accounts screen): this one is the person speaking for
+ * themselves, and it is the only writer of `name_confirmed_at`.
  *
  * ⚠️ `full_name` is NOT written here. The `profiles_sync_name` trigger rebuilds
  * it from first/last, so writing it too would be sending a value the database
@@ -1147,37 +1146,6 @@ export async function deleteMembership(membershipId) {
 
   if (error) throw error
   if (!data || data.length === 0) throw new Error(REFUSED_MEMBERSHIP_DELETE)
-}
-
-/**
- * Updates one profile's display name and returns the updated row.
- *
- * Writes profiles, not memberships: one person with several membership rows
- * (memberships has no unique constraint on (profile_id, club_id, role), so
- * duplicates are legitimate) has exactly one name, and this changes it
- * everywhere at once.
- *
- * A blank name is refused rather than written. Admin.jsx renders
- * `profiles?.full_name ?? 'Unnamed member'` — a null falls back, but an empty
- * string does not, so saving one would produce a nameless row that looks like
- * a rendering bug and can only be fixed by editing it again.
- */
-export async function updateProfileName({ profileId, fullName } = {}) {
-  if (!profileId) throw new Error('updateProfileName needs a profileId.')
-
-  const trimmed = typeof fullName === 'string' ? fullName.trim() : ''
-  if (!trimmed) throw new Error('Enter a name.')
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ full_name: trimmed })
-    .eq('id', profileId)
-    .select()
-    .maybeSingle()
-
-  if (error) throw error
-  if (!data) throw new Error(REFUSED_PROFILE)
-  return data
 }
 
 // ══ SUPER ADMIN AND PER-ADMIN RIGHTS (10 Aug 2026) ═══════════════════════
