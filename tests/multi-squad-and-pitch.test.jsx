@@ -261,7 +261,7 @@ describe('Also add for — the row-count guard', () => {
     await fillTraining(user)
     await user.click(screen.getByRole('checkbox', { name: 'U14' }))
     await user.click(screen.getByRole('checkbox', { name: 'Tue' }))
-    await user.type(screen.getByLabelText('Repeat until'), '2026-12-15')
+    await user.type(screen.getByLabelText('Repeat weekly for'), '12')
 
     fireEvent.submit(screen.getByRole('button', { name: /untick the extras/i }).closest('form'))
 
@@ -283,7 +283,7 @@ describe('Also add for — the row-count guard', () => {
 
     await fillTraining(user)
     await user.click(screen.getByRole('checkbox', { name: 'Tue' }))
-    await user.type(screen.getByLabelText('Repeat until'), '2026-12-15')
+    await user.type(screen.getByLabelText('Repeat weekly for'), '12')
 
     // Alone, the repeat is legitimate and the button names the series count.
     expect(screen.getByRole('button', { name: /^Add \d+ events$/ })).toBeEnabled()
@@ -312,7 +312,10 @@ describe('Also add for — the row-count guard', () => {
     await fillTraining(user)
     await user.click(screen.getByRole('checkbox', { name: 'U14' }))
     await user.click(screen.getByRole('checkbox', { name: 'Tue' }))
-    await user.type(screen.getByLabelText('Repeat until'), '2026-08-25')
+    // 2 weeks from 11 Aug = 25 Aug → Tue 11/18/25 = 3 sessions (the count this
+    // test asserts). The end-date calendar could pick 25 Aug too; weeks is the
+    // default control and lands the same date.
+    await user.type(screen.getByLabelText('Repeat weekly for'), '2')
     await user.click(screen.getByRole('checkbox', { name: 'U14' })) // untick
 
     await user.click(screen.getByRole('button', { name: /add 3 events/i }))

@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- Removed the `min` from the **"Repeat until"** date field. With the field
+- Replaced the native **"Repeat until"** date picker entirely (Jay's phone: the
+  OS calendar committed a date when you navigated to the next MONTH, so reaching
+  a month further out was impossible — removing `min` the PR before did not fix
+  it, because the commit-on-navigate is the native picker's own behaviour). New
+  `src/components/RepeatUntilField.jsx`: defaults to **"Repeat weekly for [N]
+  weeks"** (a plain number, no calendar), with an **"or pick an end date"** link
+  that opens the app's OWN inline calendar (built from `calendarGrid.js`) whose
+  ‹ › month buttons are ordinary React clicks and cannot commit a date. Both
+  paths resolve to the same end-date string, so series generation is unchanged.
+  A test proves month navigation does not commit; `repeating-events`,
+  `multi-squad-and-pitch` and `duplicate-event` moved to the new control.
+  `src/components/RepeatUntilField.jsx`, `src/screens/EventForm.jsx`,
+  `tests/repeat-until-field.test.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `ecafb92` — Removed the `min` from the **"Repeat until"** date field. With the field
   empty, Chrome's calendar misbehaved on month navigation (Jay's phone: each hop
   to the next month committed a date and closed the picker, so it needed
   reopening every time) — an empty `<input type="date">` carrying a `min` is a

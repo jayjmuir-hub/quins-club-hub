@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
+import RepeatUntilField from '../components/RepeatUntilField.jsx'
 import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
 import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '../data/events.js'
@@ -1383,25 +1384,14 @@ export default function EventForm({
               })}
             </div>
 
-            <label className={LABEL} htmlFor="event-repeat-until">
-              Repeat until
-            </label>
-            {/* ⚠️ NO `min` — Jay's phone, 29 Aug 2026: with the field EMPTY,
-                Chrome's calendar misbehaved on month navigation (clicking to the
-                next month committed a date and closed the picker, so each hop
-                needed reopening). An empty `<input type="date">` carrying a
-                `min` is a well-worn source of that quirk; without it the picker
-                navigates cleanly. The "must be after the start" guard is not
-                lost — generateSeriesDates returns no dates when the end is
-                before the start (recurrence.js), so the preview simply shows
-                "0 sessions". */}
-            <input
-              id="event-repeat-until"
-              type="date"
-              value={repeatUntil}
-              onChange={(domEvent) => setRepeatUntil(domEvent.target.value)}
-              className={inputClasses(false)}
-            />
+            {/* ⚠️ NOT a native `<input type="date">` — Jay's phone, 29 Aug 2026:
+                the OS calendar committed a date when you navigated to the next
+                MONTH, so reaching a month further out was impossible. Native
+                pickers are OS-level, vary by browser and cannot be driven in a
+                test, so this is a plain "number of weeks" by default with an
+                optional inline calendar (React buttons that cannot commit on
+                navigation). See RepeatUntilField.jsx. */}
+            <RepeatUntilField startDate={values.date} value={repeatUntil} onChange={setRepeatUntil} />
 
             {/* Said here, before submit, because the refusal on Save is
                 otherwise a surprise arriving after the work of ticking
@@ -1416,7 +1406,7 @@ export default function EventForm({
 
             {repeatDays.length === 0 || !repeatUntil ? (
               <p className="mt-2 text-[12.5px] text-ink-muted">
-                Pick the days it runs on and a date to run until, and you&apos;ll get one event for
+                Pick the days it runs on and how long it runs, and you&apos;ll get one event for
                 each. Leave this alone for a one-off.
               </p>
             ) : previewError ? (
