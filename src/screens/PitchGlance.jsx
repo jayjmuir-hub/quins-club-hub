@@ -3,10 +3,10 @@ import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
-import { PitchMonth, PitchWeek } from '../components/PitchCalendar.jsx'
+import { PitchMonth, PitchOccupancy, PitchWeek } from '../components/PitchCalendar.jsx'
 import Segmented from '../components/Segmented.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { findPitchClashes, listPitchOccupancy } from '../data/pitches.js'
+import { findPitchClashes, listPitchOccupancy, pitchShares } from '../data/pitches.js'
 import { monthGrid, shiftDay, shiftMonth, weekDays, windowFor } from '../lib/calendarGrid.js'
 import { clubToday } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -91,6 +91,11 @@ export default function PitchGlance() {
     return ids
   }, [events])
 
+  // Every shared pitch in the loaded window, for the occupancy panel below the
+  // calendar — the "what's free before I ask" view. Clashes are the subset of
+  // these that overflow; the panel shows the room left on the ones that fit too.
+  const shares = useMemo(() => pitchShares(events), [events])
+
   if (membershipsLoading) return <Spinner label="Loading…" />
   if (!mayView) {
     return <Empty message="The pitch calendar is for squad staff. If you should be picking teams and booking pitches, ask an admin to add you." />
@@ -166,6 +171,10 @@ export default function PitchGlance() {
           />
         )
       )}
+
+      {/* The occupancy view — how full each shared pitch is, and what's spare.
+          Renders nothing when nothing is shared in the loaded window. */}
+      {!loading && !error && <PitchOccupancy shares={shares} teamsById={teamsById} />}
     </section>
   )
 }

@@ -114,3 +114,62 @@ describe('the week', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/Something went wrong/i)
   })
 })
+
+describe('the occupancy panel', () => {
+  // A share row at a given hour, on one pitch, with the given squad+portion pairs.
+  function share(hour, pitch, members) {
+    const start = new Date()
+    start.setUTCHours(hour, 0, 0, 0)
+    const ends_at = new Date(start.getTime() + 90 * 60000).toISOString()
+    return members.map((m, i) => ({
+      id: `${pitch}-${i}`,
+      team_id: `t-${i}`,
+      team_name: m.squad,
+      type: 'training',
+      pitch,
+      group_id: null,
+      pitch_portion: m.portion,
+      starts_at: start.toISOString(),
+      ends_at,
+    }))
+  }
+
+  it('shows a shared pitch that FITS as room used and room free', async () => {
+    listPitchOccupancyMock.mockResolvedValue(
+      share(16, 'C1', [
+        { squad: 'U8 Tag', portion: 'quarter' },
+        { squad: 'U10 Reds', portion: 'half' },
+      ]),
+    )
+    renderScreen()
+    const panel = await screen.findByTestId('pitch-occupancy')
+    const row = within(panel).getByTestId('share-row')
+    expect(row).toHaveTextContent('C1')
+    expect(row).toHaveTextContent('U8 Tag')
+    expect(row).toHaveTextContent('U10 Reds')
+    // ¼ + ½ = ¾ of a pitch, a quarter spare.
+    expect(row).toHaveTextContent(/three quarters used/i)
+    expect(row).toHaveTextContent(/a quarter free/i)
+  })
+
+  it('marks an overflowing share as over, and never shows a fan-out as a share', async () => {
+    // The default rows: D2 is two full-pitch matches (over); A1 is a fan-out.
+    renderScreen()
+    const panel = await screen.findByTestId('pitch-occupancy')
+    const over = within(panel).getByTestId('share-row-over')
+    expect(over).toHaveTextContent('D2')
+    expect(over).toHaveTextContent(/over by/i)
+    // Exactly one share row — the A1 fan-out is one occupant, not a share.
+    expect(within(panel).queryAllByTestId('share-row')).toHaveLength(0)
+    expect(within(panel).getAllByTestId('share-row-over')).toHaveLength(1)
+    expect(panel).not.toHaveTextContent('A1')
+  })
+
+  it('is absent when no pitch is shared', async () => {
+    // A single booking on a pitch — nothing to share.
+    listPitchOccupancyMock.mockResolvedValue(share(16, 'C1', [{ squad: 'U8 Tag', portion: 'quarter' }]))
+    renderScreen()
+    await screen.findByTestId('pitch-week')
+    expect(screen.queryByTestId('pitch-occupancy')).not.toBeInTheDocument()
+  })
+})
