@@ -18,12 +18,23 @@
 // ⚠️ The import specifier is '../../src/data/pitches.js', which does NOT match
 // the alias (anchored on '../data/pitches.js'), so this cannot recurse into
 // itself — the same trick the auth.jsx alias documents.
-import { findPitchClashes as realFindPitchClashes, PITCH_TBD as REAL_PITCH_TBD } from '../../src/data/pitches.js'
+import {
+  findPitchClashes as realFindPitchClashes,
+  pitchShares as realPitchShares,
+  PITCH_TBD as REAL_PITCH_TBD,
+} from '../../src/data/pitches.js'
 
 export const PITCH_TBD = REAL_PITCH_TBD
 
 export function findPitchClashes(events) {
   return realFindPitchClashes(events)
+}
+
+// Real too, for the same reason as findPitchClashes: the occupancy bars are
+// most of what the pitch-glance panel is FOR, so a hand-picked share list would
+// be the harness checking its own fixture.
+export function pitchShares(events) {
+  return realPitchShares(events)
 }
 
 // The club's real fifteen, in the real blocks (A1-A4, B1, C1-C5, D1-D5), plus
@@ -56,11 +67,15 @@ export async function listPitchOccupancy({ from } = {}) {
     }
   }
   return [
-    { id: 'po-1', team_id: 't1', team_name: 'U12 Mixed', type: 'match', pitch: 'D2', group_id: null, ...at(1, 8) },
-    { id: 'po-2', team_id: 't2', team_name: 'U14 Boys', type: 'match', pitch: 'D2', group_id: null, ...at(1, 8) },
+    { id: 'po-1', team_id: 't1', team_name: 'U12 Mixed', type: 'match', pitch: 'D2', group_id: null, pitch_portion: 'full', ...at(1, 8) },
+    { id: 'po-2', team_id: 't2', team_name: 'U14 Boys', type: 'match', pitch: 'D2', group_id: null, pitch_portion: 'full', ...at(1, 8) },
     { id: 'po-3', team_id: 't1', team_name: 'U12 Mixed', type: 'training', pitch: 'C1', group_id: null, ...at(3, 16) },
     { id: 'po-4', team_id: 't1', team_name: 'U12 Mixed', type: 'training', pitch: 'A1', group_id: 'g-1', ...at(4, 16) },
     { id: 'po-5', team_id: 't2', team_name: 'U14 Boys', type: 'training', pitch: 'A1', group_id: 'g-1', ...at(4, 16) },
+    // A share that FITS: two age groups on a quarter and a half of C3, a quarter
+    // spare — exercises the occupancy bar's non-overflowing state.
+    { id: 'po-6', team_id: 't3', team_name: 'U8 Tag', type: 'training', pitch: 'C3', group_id: null, pitch_portion: 'quarter', ...at(2, 16) },
+    { id: 'po-7', team_id: 't2', team_name: 'U14 Boys', type: 'training', pitch: 'C3', group_id: null, pitch_portion: 'half', ...at(2, 16) },
   ]
 }
 

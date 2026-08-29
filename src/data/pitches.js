@@ -127,10 +127,22 @@ const EPSILON = 1e-9
  * multi-squad fixture would read as a pile-up and the feature would be switched
  * off within a week.
  */
+// One OCCUPATION of the ground. A fan-out shares a group_id — one session
+// across several squads, on the pitch once — so it is one occupant; anything
+// else is its own. See the group_id note in pitchLoad.
+function occupantKey(event) {
+  return event.group_id ? `g:${event.group_id}` : `e:${event.id}`
+}
+
+/** Distinct occupations in a cohort — a share is two or more of these. */
+function occupantCount(cohort) {
+  return new Set(cohort.map(occupantKey)).size
+}
+
 function pitchLoad(cohort) {
   const byOccupant = new Map()
   for (const event of cohort) {
-    const key = event.group_id ? `g:${event.group_id}` : `e:${event.id}`
+    const key = occupantKey(event)
     const fraction = portionFraction(event.pitch_portion)
     byOccupant.set(key, Math.max(byOccupant.get(key) ?? 0, fraction))
   }
@@ -144,9 +156,50 @@ function pitchLoad(cohort) {
  *
  * Returns `[{ pitch, load, events }]`, where `load` is the summed portion in
  * whole-pitch units (> 1) and `events` is every booking sharing that overloaded
- * moment. Events with no pitch, or the `Pitch TBD` placeholder, are ignored —
- * "not allocated yet" cannot clash with anything, and treating 26 unallocated
- * fixtures as one enormous pile-up would bury the real ones.
+ * moment. A clash is just a SHARE that no longer fits, so this is pitchShares
+ * filtered to the overloaded ones — see collectPitchShares for the engine.
+ */
+export function findPitchClashes(events) {
+  return collectPitchShares(events).filter((group) => group.load > CAPACITY + EPSILON)
+}
+
+/**
+ * Every set of squads SHARING a pitch — the occupancy view's data, and the
+ * superset findPitchClashes filters down. Returns `[{ pitch, load, events }]`
+ * for each MAXIMAL group of two or more bookings occupying one pitch at the same
+ * moment, `load` their summed portion in whole-pitch units. A quarter beside a
+ * half is a share at ¾ of a pitch; three halves is a share that overflows (and
+ * so is also a clash).
+ *
+ * ⚠️ MAXIMAL, so a peak overlap {A,B,C} is one bar and not also its subset
+ * {A,B}. Two share windows on one pitch that only touch at the edges stay
+ * separate — neither contains the other — because they are two moments to look
+ * at, not one.
+ */
+export function pitchShares(events) {
+  // A share is two or more DIFFERENT occupations of one pitch. A fan-out (one
+  // session across squads, sharing a group_id) is a single occupant, so it is
+  // not a share on its own however many squad rows it carries.
+  const groups = collectPitchShares(events).filter((group) => occupantCount(group.events) >= 2)
+  const idSet = (group) => new Set(group.events.map((event) => event.id))
+  return groups.filter((group, i) => {
+    const mine = idSet(group)
+    // Keep it unless another group on the SAME pitch strictly contains it.
+    return !groups.some((other, j) => {
+      if (j === i || other.pitch !== group.pitch || other.events.length <= group.events.length) return false
+      const theirs = idSet(other)
+      for (const id of mine) if (!theirs.has(id)) return false
+      return true
+    })
+  })
+}
+
+/**
+ * The shared engine: every cohort of two or more bookings occupying one pitch at
+ * one instant, deduplicated by the exact set involved. Events with no pitch, or
+ * the `Pitch TBD` placeholder, are ignored — "not allocated yet" cannot share
+ * with anything, and treating 26 unallocated fixtures as one pile-up would bury
+ * the real ones.
  *
  * ⚠️ `ends_at` IS NULLABLE, and that is the whole subtlety. A booking with a
  * real end occupies the half-open span [start, end) — so one ending at 18:00
@@ -158,7 +211,7 @@ function pitchLoad(cohort) {
  * data nobody entered. The two are handled in two passes for exactly that
  * reason.
  */
-export function findPitchClashes(events) {
+function collectPitchShares(events) {
   if (!Array.isArray(events)) return []
 
   const byPitch = new Map()
@@ -170,17 +223,15 @@ export function findPitchClashes(events) {
     byPitch.get(pitch).push(event)
   }
 
-  // Deduplicated by the exact set of events involved, so a nested overload
-  // (say {A,B} inside {A,B,C}) is reported as the two distinct situations it is
-  // and an identical cohort found from two anchors is reported once.
+  // Deduplicated by the exact set of events involved: the load is a pure
+  // function of that set, so an identical cohort found from two anchors is
+  // stored once, and a nested overlap {A,B} inside {A,B,C} stays a distinct
+  // entry (pitchShares later drops the non-maximal ones for display).
   const groups = new Map()
   const record = (pitch, cohort) => {
     if (cohort.length < 2) return
-    const load = pitchLoad(cohort)
-    if (load <= CAPACITY + EPSILON) return
     const key = `${pitch}|${cohort.map((event) => event.id).sort().join(',')}`
-    const existing = groups.get(key)
-    if (!existing || load > existing.load) groups.set(key, { pitch, load, events: cohort })
+    if (!groups.has(key)) groups.set(key, { pitch, load: pitchLoad(cohort), events: cohort })
   }
 
   for (const [pitch, booked] of byPitch) {

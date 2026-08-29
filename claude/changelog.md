@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Home rides the centre of the mobile dock.** It sat on the far-left slot of
+- **Pitch sharing: the occupancy view.** A "Shared pitches" panel under the
+  pitch calendar shows how full each shared pitch is and what is spare — the
+  "what's free before I ask" the screen promises. `pitchShares` in
+  `src/data/pitches.js` returns every maximal set of two-or-more squads on one
+  pitch at one moment (the superset `findPitchClashes` already filtered for
+  clashes), and a new `PitchOccupancy` component draws each as a stacked bar: a
+  segment per squad sized by its portion, the empty track the room left, a warn
+  fill and a ⚠ line when the portions overtop the pitch. Every segment is named
+  in a legend and in the bar's aria-label, so colour is never the only signal.
+  `src/components/PitchCalendar.jsx`, `src/screens/PitchGlance.jsx`,
+  `harness/stubs/pitches.js`, `tests/pitch-shares.test.js`,
+  `tests/pitch-glance.test.jsx`. Plan: `claude/plans/2026-08-29-pitch-portions.md`.
+  (SHA follows in the next changelog-touching PR.)
+- `1c26e4f` — **Home rides the centre of the mobile dock.** It sat on the far-left slot of
   the bottom tab bar; Jay wanted it in the middle. The app opens on Home
   (`start_url` `/` → Dashboard) and the centre of the bar is the thumb's resting
   slot, so the tab you land on is the tab under your thumb. Mobile-bar-only
@@ -18,8 +31,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   first, where the top of a vertical nav belongs; only the horizontal dock moves
   it, to `floor(count/2)` (dead centre of the five-tab squad-staff bar, the
   middle of the four-tab parent/player one). `src/components/Nav.jsx`,
-  `tests/nav.test.jsx`, `claude/specs/design-system.md` §4.3. (SHA follows in the
-  next changelog-touching PR.)
+  `tests/nav.test.jsx`, `claude/specs/design-system.md` §4.3.
 - `c9ca550` — **Pitch sharing, phase 3: allocator-side portion.** The two assign sheets on
   the Allocation screen (queue answer + direct assign) set only a pitch, so a
   pitch answered from a coach's request landed with no portion — a full pitch —

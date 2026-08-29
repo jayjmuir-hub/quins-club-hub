@@ -1,8 +1,9 @@
 import Card from './Card.jsx'
 import { dayKey, dayKeyOf, monthGrid, sameDay, weekDays } from '../lib/calendarGrid.js'
-import { eventDate, eventTimeLabel } from '../lib/eventFormat.js'
+import { eventDate, eventTimeLabel, formatTableDate } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PITCH_TBD } from '../data/pitches.js'
+import { portionFraction, portionLabel } from '../lib/pitchPortion.js'
 
 // The WEEK and MONTH views of the pitch calendar. The DAY view — pitches down
 // the side, hours across the top — stays in src/screens/Allocation.jsx, because
@@ -243,6 +244,145 @@ export function PitchMonth({ anchor, today, events, clashing, onPickDay }) {
           <span aria-hidden="true" className="h-2 w-2 rounded-full border-[1.5px] border-ink-muted" />{' '}
           waiting for a pitch
         </span>
+      </div>
+    </Card>
+  )
+}
+
+// ── The occupancy view ──────────────────────────────────────────────────────
+//
+// "What's free before I ask." A pitch is routinely shared — a quarter here, a
+// half there — and pitchShares (src/data/pitches.js) finds every set of two or
+// more squads on one pitch at one moment. This panel draws each as a stacked
+// bar: a segment per squad sized by its portion, the empty track the room left,
+// and a warn fill when the portions overtop the pitch (which is also a clash).
+//
+// ⚠️ COLOUR IS NEVER THE ONLY SIGNAL. Every segment is named in the legend and
+// in the bar's aria-label, and the over state carries the word "Over" and a ⚠,
+// so the ~8% of this club's mostly-male volunteers with a colour deficiency get
+// the same information (design-system §accessibility, the same rule the clash
+// markers in the month view follow).
+
+const SEG_TONES = ['bg-brand', 'bg-accent', 'bg-brand/55', 'bg-accent/55']
+const OVER = 1 + 1e-9
+
+/** A share's segments, one per OCCUPANT — a fan-out (shared group_id) counts
+ *  once, exactly as pitchLoad sums it, so the bar matches the load. Widest first. */
+function shareSegments(group) {
+  const byOccupant = new Map()
+  for (const event of group.events) {
+    const key = event.group_id ? `g:${event.group_id}` : `e:${event.id}`
+    const fraction = portionFraction(event.pitch_portion)
+    const existing = byOccupant.get(key)
+    if (!existing || fraction > existing.fraction) byOccupant.set(key, { key, event, fraction })
+  }
+  return [...byOccupant.values()].sort((a, b) => b.fraction - a.fraction)
+}
+
+const squadOf = (event, teamsById) =>
+  event.team_name ?? teamsById?.get(event.team_id)?.name ?? 'A squad'
+
+const portionOf = (event) => portionLabel(event.pitch_portion) ?? 'Full pitch'
+
+/** The instant a share peaks — its latest start, when everyone is present. */
+const peakEvent = (group) =>
+  group.events.reduce((a, b) => ((eventDate(b)?.getTime() ?? 0) > (eventDate(a)?.getTime() ?? 0) ? b : a))
+
+/** A pitch fraction as words: 0.25 → "a quarter", 1.5 → "1½ pitches". */
+function fractionWord(fraction) {
+  const words = { 0.25: 'a quarter', 0.5: 'a half', 0.75: 'three quarters', 1: 'a full pitch' }
+  const quarters = Math.round(fraction * 4) / 4
+  return words[quarters] ?? `${quarters} pitches`
+}
+
+function occupancyStatus(load) {
+  if (load > OVER) return { over: true, text: `Over by ${fractionWord(load - 1)} — needs another pitch` }
+  const free = 1 - load
+  if (free < 1e-9) return { over: false, text: 'Full — nothing spare' }
+  return { over: false, text: `${fractionWord(load)} used · ${fractionWord(free)} free` }
+}
+
+/** One shared pitch, as a stacked bar plus a named legend. */
+function ShareRow({ group, teamsById }) {
+  const segments = shareSegments(group)
+  const status = occupancyStatus(group.load)
+  // When a share overflows, scale to the load so every segment stays visible
+  // inside the bar rather than being clipped at the pitch edge.
+  const scale = Math.max(group.load, 1)
+  const rep = peakEvent(group)
+  const spoken = `${group.pitch}: ${segments
+    .map((seg) => `${squadOf(seg.event, teamsById)} ${portionOf(seg.event).toLowerCase()}`)
+    .join(', ')} — ${status.text}`
+
+  return (
+    <div data-testid={status.over ? 'share-row-over' : 'share-row'} className="px-3 py-2.5">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <span className="text-[13px] font-extrabold text-ink">{group.pitch}</span>
+        <span className="text-[11.5px] font-semibold text-ink-muted">
+          {formatTableDate(eventDate(rep))} · {eventTimeLabel(rep)}
+        </span>
+      </div>
+
+      <div
+        role="img"
+        aria-label={spoken}
+        className="flex h-3.5 w-full overflow-hidden rounded-full bg-surface-mute ring-1 ring-inset ring-line"
+      >
+        {segments.map((seg, i) => (
+          <div
+            key={seg.key}
+            title={`${squadOf(seg.event, teamsById)} · ${portionOf(seg.event)}`}
+            style={{ width: `${(seg.fraction / scale) * 100}%` }}
+            className={status.over ? 'bg-warn' : SEG_TONES[i % SEG_TONES.length]}
+          />
+        ))}
+      </div>
+
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        {segments.map((seg, i) => (
+          <span key={seg.key} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-muted">
+            <span
+              aria-hidden="true"
+              className={['h-2 w-2 rounded-full', status.over ? 'bg-warn' : SEG_TONES[i % SEG_TONES.length]].join(' ')}
+            />
+            {squadOf(seg.event, teamsById)} · {portionOf(seg.event)}
+          </span>
+        ))}
+      </div>
+
+      <p className={['mt-1 text-[11.5px] font-bold', status.over ? 'text-warn-ink' : 'text-ink-faint'].join(' ')}>
+        {status.over ? '⚠ ' : ''}
+        {status.text}
+      </p>
+    </div>
+  )
+}
+
+/**
+ * The shared-pitch panel under the calendar. Renders nothing when no pitch is
+ * shared in the loaded window — a permanent empty "Sharing" card would be furniture.
+ */
+export function PitchOccupancy({ shares, teamsById }) {
+  if (!shares || shares.length === 0) return null
+  const sorted = [...shares].sort(
+    (a, b) => (eventDate(peakEvent(a))?.getTime() ?? 0) - (eventDate(peakEvent(b))?.getTime() ?? 0),
+  )
+  return (
+    <Card data-testid="pitch-occupancy" className="mt-3 p-0">
+      <div className="border-b border-line px-3 py-2.5">
+        <h3 className="text-[13px] font-extrabold text-ink">Shared pitches</h3>
+        <p className="text-[11.5px] font-medium text-ink-muted">
+          How full each shared pitch is, and what&apos;s spare before you ask.
+        </p>
+      </div>
+      <div className="divide-y divide-line">
+        {sorted.map((group) => (
+          <ShareRow
+            key={`${group.pitch}|${group.events.map((e) => e.id).sort().join(',')}`}
+            group={group}
+            teamsById={teamsById}
+          />
+        ))}
       </div>
     </Card>
   )

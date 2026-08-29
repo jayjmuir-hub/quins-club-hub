@@ -1,9 +1,9 @@
 # Pitch sharing: portions and capacity-based clash detection
 
-**Status: PARTLY SHIPPED — phase 1 merged (#522, `a128447`); phase 2 merged
-(#523, `a4283c7`), migration applied to production; phase 3 allocator-side
-portion code written, the PitchGlance stacked view and the "sharing approved"
-override still not started.** Dated 2026-08-29.
+**Status: MOSTLY SHIPPED — phases 1 (#522, `a128447`), 2 (#523, `a4283c7`,
+migration applied) and 3-allocator (#525, `c9ca550`) all merged; the PitchGlance
+stacked occupancy view is code-written; only the "sharing approved" override is
+left.** Dated 2026-08-29.
 
 ## What Jay asked for
 
@@ -76,7 +76,13 @@ a drop-column change). Jay applies the migration; the PR merges after.
   squad (`portionDefaultFor`), and `setEventPitch` / `allocatePitch` in
   `src/data/pitchRequests.js` write `pitch_portion` alongside the pitch (null when
   there is no real pitch). `tests/allocation.test.jsx`, `tests/pitch-requests.test.js`.
-- **PitchGlance stacked occupancy (not started).** Render each pitch/time slot as
-  a stacked bar (¼ U8 · ½ U12) so "what's free before I ask" shows the room left.
+- **PitchGlance stacked occupancy (CODE WRITTEN).** `pitchShares` in
+  `src/data/pitches.js` returns every maximal set of two-or-more squads sharing a
+  pitch at one moment (the superset `findPitchClashes` filters), and a new
+  `PitchOccupancy` panel under the calendar draws each as a stacked bar — a
+  segment per squad sized by its portion, the empty track the room left, a warn
+  fill when it overflows — with a named legend and an aria-label so colour is
+  never the only signal. `src/components/PitchCalendar.jsx`, `src/screens/PitchGlance.jsx`,
+  `harness/stubs/pitches.js`, `tests/pitch-shares.test.js`, `tests/pitch-glance.test.jsx`.
 - **"Sharing approved" override (not started)** for a genuine over-capacity that
   is still fine, keyed to the exact set of events so a new booking re-flags.
