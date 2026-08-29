@@ -21,6 +21,12 @@ import { MemoryRouter } from 'react-router-dom'
 const useMembershipsMock = vi.fn()
 const listEventsMock = vi.fn()
 const subscribeEventsMock = vi.fn()
+// Phase 4: a tournament container routes to TournamentDetail, which reads its
+// games and can set a placing / delete. Stubbed so opening one does not crash.
+const listTournamentGamesMock = vi.fn()
+const deleteEventMock = vi.fn()
+const setTournamentPlacingMock = vi.fn()
+const upsertEventMock = vi.fn()
 const listAvailabilityMock = vi.fn()
 const subscribeAvailabilityMock = vi.fn()
 const setAvailabilityMock = vi.fn()
@@ -47,6 +53,10 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 vi.mock('../src/data/events.js', () => ({
   listEvents: (...args) => listEventsMock(...args),
   subscribeEvents: (...args) => subscribeEventsMock(...args),
+  listTournamentGames: (...args) => listTournamentGamesMock(...args),
+  deleteEvent: (...args) => deleteEventMock(...args),
+  setTournamentPlacing: (...args) => setTournamentPlacingMock(...args),
+  upsertEvent: (...args) => upsertEventMock(...args),
 }))
 
 vi.mock('../src/data/availability.js', () => ({
@@ -187,6 +197,10 @@ beforeEach(() => {
   useMembershipsMock.mockReturnValue(memberships(ADMIN))
   listEventsMock.mockResolvedValue(ALL_EVENTS)
   subscribeEventsMock.mockReturnValue(unsubscribeEvents)
+  listTournamentGamesMock.mockResolvedValue([])
+  deleteEventMock.mockResolvedValue(undefined)
+  setTournamentPlacingMock.mockResolvedValue({ id: 'trn-1' })
+  upsertEventMock.mockResolvedValue({ id: 'g-new' })
   listAvailabilityMock.mockResolvedValue([])
   subscribeAvailabilityMock.mockReturnValue(vi.fn())
   setAvailabilityMock.mockResolvedValue({ id: 'a-1' })
@@ -767,6 +781,37 @@ describe('Schedule — event detail sheet', () => {
     expect(within(dialog).getByText('Zayed Sports City')).toBeInTheDocument()
     expect(within(dialog).getByText('West Asia Premiership')).toBeInTheDocument()
     expect(within(dialog).getByText('U10')).toBeInTheDocument()
+  })
+
+  it('opens the tournament detail screen — not EventDetail — for a container', async () => {
+    // A tournament container (competition_type tournament, no parent) routes to
+    // TournamentDetail: a games list + Add game + placing, none of which
+    // EventDetail has. Phase 4.
+    const container = {
+      id: 'e-tournament',
+      team_id: 'team-u10',
+      type: 'match',
+      title: null,
+      opponent: null,
+      home: true,
+      venue: 'Al Ain RFC',
+      competition: 'Al Ain Tournament',
+      competition_type: 'tournament',
+      tournament_id: null,
+      tier: 'A',
+      starts_at: days(3),
+      result_us: null,
+      result_them: null,
+    }
+    listEventsMock.mockResolvedValue([container])
+    const { user } = setup()
+
+    await user.click(await screen.findByRole('button', { name: /Al Ain Tournament/ }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Games')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /add game/i })).toBeInTheDocument()
+    expect(listTournamentGamesMock).toHaveBeenCalledWith('e-tournament')
   })
 
   it('says once that times are Abu Dhabi time, on the date line only', async () => {

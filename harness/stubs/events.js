@@ -293,6 +293,21 @@ export async function getEvent(id) {
   }
 }
 
+// Phase 4: the games of a tournament, and its placing. The harness bundle
+// imports every screen, so TournamentDetail needs these to exist even though no
+// harness stub carries a real tournament today (they resolve to empty / echo).
+export async function listTournamentGames(tournamentId) {
+  if (!tournamentId) return []
+  return EVENTS.filter((event) => event.tournament_id === tournamentId)
+}
+
+export async function setTournamentPlacing(eventId, placing) {
+  const event = EVENTS.find((row) => row.id === eventId)
+  return event
+    ? { ...event, placing: placing || null }
+    : { id: eventId, placing: placing || null }
+}
+
 // ⚠️ MIRRORS THE REAL MODULE'S EXPORT, and tests/harness-stubs.test.js is what
 // forced it — adding REALTIME_DEBOUNCE_MS to src/data/events.js without adding
 // it here turns every harness scenario dark at once, because harness/main.jsx
