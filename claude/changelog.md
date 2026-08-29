@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Pitch sharing, phase 1: portions and capacity-based clash detection.**
+- **Calendar tab shows events, not dots.** Jay: "tiny dots on days … isn't a
+  premium design for users." The Calendar month view was a dot-grid at every
+  width with the same month's fixtures repeated as a full list directly beneath
+  it — every event drawn twice, once as a bare coloured dot that carried no
+  name or time and once as a full row. Now width-responsive: on a wide screen
+  each day cell carries its own events (type dot + kick-off time + name, up to
+  three then "+N more"), with no list underneath; on a phone the tab is an
+  agenda of the month's rich fixture rows under the month nav. The day sheet
+  becomes the wide side's entry point (a phone row opens the event directly).
+  Timezone bucketing (the club's Abu Dhabi day) unchanged — a presentation
+  change, not a data one. `src/screens/Schedule.jsx`,
+  `tests/schedule.test.jsx`, `claude/specs/design-system.md` §4.14,
+  `claude/decisions/2026-08-29-calendar-shows-events.md`. (SHA follows in the
+  next changelog-touching PR.)
+- `a128447` — **Pitch sharing, phase 1: portions and capacity-based clash detection.**
   Different age groups routinely share a training pitch — a quarter or a half
   each — and matches split the pitch for the younger bands too, only U12 and
   older getting a full pitch (Jay, 29 Aug). New `src/lib/pitchPortion.js` holds
@@ -23,8 +37,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   and the picker are phase 2). The fan-out `group_id` exemption, "touching is not
   overlapping", `Pitch TBD`, and the nullable-`ends_at` rule are all preserved.
   `src/data/pitches.js`, `src/screens/Allocation.jsx`, `src/screens/PitchGlance.jsx`,
-  `tests/pitch-portion.test.js`, `tests/pitch-clashes.test.js`. (SHA follows in
-  the next changelog-touching PR.)
+  `tests/pitch-portion.test.js`, `tests/pitch-clashes.test.js`.
 - `94fa065` — **Removed the dead `updateProfileName` writer.** The legacy admin name-fixer
   that wrote the combined `full_name` column directly — superseded by
   `updateMemberProfile` (first/last, admin path) and `updateProfileNames`
