@@ -83,7 +83,11 @@ async function fillTuesdayThursdaySeries(user) {
 
   await user.click(screen.getByRole('checkbox', { name: 'Tue' }))
   await user.click(screen.getByRole('checkbox', { name: 'Thu' }))
-  await user.type(screen.getByLabelText('Repeat until'), '2026-08-20')
+  // The end date is now set through the app's own inline calendar (the native
+  // date picker was retired 29 Aug 2026). Start is 11 Aug, so the calendar opens
+  // on August — the day buttons carry the ISO date as their accessible name.
+  await user.click(screen.getByRole('button', { name: /or pick an end date/i }))
+  await user.click(screen.getByRole('button', { name: '2026-08-20' }))
 }
 
 beforeEach(() => {
@@ -97,7 +101,8 @@ describe('Repeats section', () => {
     renderForm()
     expect(screen.getByRole('group', { name: 'Repeats' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Tue' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Repeat until')).toBeInTheDocument()
+    // Defaults to a week count; the exact-date calendar is behind a link.
+    expect(screen.getByLabelText('Repeat weekly for')).toBeInTheDocument()
   })
 
   it('is NOT offered when editing an existing event', () => {
@@ -106,7 +111,7 @@ describe('Repeats section', () => {
     renderForm({ event: EXISTING_TRAINING })
     expect(screen.queryByRole('group', { name: 'Repeats' })).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox', { name: 'Tue' })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Repeat until')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Repeat weekly for')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
   })
 

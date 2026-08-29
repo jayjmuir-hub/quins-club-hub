@@ -262,14 +262,14 @@ describe('Duplicate — the sheet says what it is', () => {
     // possible at all — Repeats is create-time only, so it cannot extend an
     // existing series.
     renderForm({ event: TRAINING, duplicate: true })
-    expect(await screen.findByLabelText(/repeat until/i)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/repeat weekly for/i)).toBeInTheDocument()
   })
 
   it('does NOT offer "apply to the rest of the series"', async () => {
     // That control rewrites every later occurrence of the ORIGINAL series. On
     // a duplicate it would be an edit wearing a create's clothes.
     renderForm({ event: TRAINING, duplicate: true })
-    await screen.findByLabelText(/repeat until/i)
+    await screen.findByLabelText(/repeat weekly for/i)
     expect(screen.queryByText(/apply to this and every later session/i)).toBeNull()
   })
 })
