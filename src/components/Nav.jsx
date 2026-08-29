@@ -226,18 +226,35 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
       })()
     : NAV_ITEMS
 
-  // ⚠️ HOME RIDES THE CENTRE OF THE DOCK, NOT THE LEFT EDGE — Jay, 29 Aug 2026.
-  // The app opens on Home (the PWA `start_url` is `/`, which routes to the
-  // Dashboard), and the middle of the bar is the thumb's natural resting slot —
-  // so the tab you land on is the tab under your thumb.
+  // ══ FEW-TAB ISLAND (parent/player, four tabs) — Jay, 30 Aug 2026 ════════════
+  // The dock's spacing was tuned for the five-tab squad-staff bar. A parent or
+  // player has only four (no Squad Hub), and at that count the full-width
+  // `justify-between` spread nearly DOUBLES every gap — ~44px against the staff
+  // bar's ~23px, measured — so the icons scatter and the pill is marooned in
+  // acres of space ("don't look good", Jay). Below five tabs the dock becomes a
+  // fixed-width CENTRED ISLAND that hugs its tabs (see the nav className); at
+  // five it stays the full-width bar it has always been, so squad staff see no
+  // change. Derived from `base` (before the Home reorder, which preserves
+  // length) so it can gate that reorder too.
+  const compact = base.length < 5
+
+  // ⚠️ HOME'S SLOT DEPENDS ON THE BAR — Jay, 29–30 Aug 2026.
+  // FIVE-TAB squad-staff bar: Home rides the CENTRE. The app opens on Home (the
+  // PWA `start_url` is `/`, which routes to the Dashboard), and the middle of a
+  // full-width bar is the thumb's natural resting slot — so the tab you land on
+  // is the tab under your thumb.
+  // FOUR-TAB parent/player ISLAND: Home stays FAR LEFT, its natural NAV_ITEMS
+  // slot (Jay, 30 Aug 2026). On the narrow centred island the middle is no
+  // longer where the thumb rests, and Home anchoring the left edge reads
+  // cleaner than stranded in the centre.
   //
-  // ⚠️ THIS IS A MOBILE-BAR-ONLY REORDER. NAV_ITEMS — and so the desktop
-  // Sidebar, which imports it — keep Home FIRST, where the top of a vertical
-  // nav belongs; only this horizontal dock moves it. `findIndex` + splice, not
-  // a hard index, so it holds for both bars: Home lands at `floor(count/2)`,
-  // the centre slot — dead centre of the five-tab squad-staff bar, the middle
-  // of the four-tab parent/player one.
+  // ⚠️ MOBILE-BAR-ONLY EITHER WAY. NAV_ITEMS — and so the desktop Sidebar, which
+  // imports it — keep Home FIRST, where the top of a vertical nav belongs; only
+  // this horizontal dock ever moves it, and only when it is the wide bar.
+  // `findIndex` + splice, not a hard index, so it survives a NAV_ITEMS reorder;
+  // Home lands at `floor(count/2)`, dead centre of the five-tab bar.
   const items = (() => {
+    if (compact) return [...base]
     const list = [...base]
     const homeAt = list.findIndex((item) => item.to === '/')
     if (homeAt < 0) return list
@@ -254,19 +271,6 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
   // is now shared with the masthead, which slides in step with this dock.
   // The numbers (80px grace, 6px hysteresis) live in the hook.
   const hidden = useAutoHideOnScroll()
-
-  // ══ SHRINK-TO-FIT FOR FEW TABS — Jay, 30 Aug 2026 ═══════════════════════════
-  // The dock's spacing was tuned for the five-tab squad-staff bar. A parent or
-  // player has only four (no Squad Hub), and at that count the full-width
-  // `justify-between` spread nearly DOUBLES every gap — ~44px against the staff
-  // bar's ~23px, measured — so the icons scatter and the centred Home pill is
-  // marooned in acres of space ("don't look good", Jay). Below five tabs the
-  // dock becomes a fixed-width CENTRED ISLAND that hugs its tabs; at five it
-  // stays the full-width bar it has always been, so squad staff see no change.
-  // The glider math below is untouched: BOTH widths are still `justify-between`,
-  // so measure() just distributes within the narrower island. 300px holds four
-  // tabs at ~staff density and clears the 320px floor via max-w.
-  const compact = items.length < 5
 
   // Where is the active link? Re-measured on route change and on resize, and
   // once more after the label's 300ms unfurl so the pill's final width is the

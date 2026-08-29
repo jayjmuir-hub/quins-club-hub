@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Pitch sharing: the "it's fine" override.** The last piece — an admin can
+- **Home sits far left on the four-tab parent/player bar.** #530 centred Home
+  on the dock, but on the narrow four-tab island the middle is no longer the
+  thumb's resting slot and the centred Home read as stranded (Jay). Home now
+  keeps its natural NAV_ITEMS lead on the four-tab bar; the wide five-tab
+  squad-staff bar still centres it. `src/components/Nav.jsx`, `tests/nav.test.jsx`,
+  `claude/specs/design-system.md`. (SHA follows in the next changelog-touching PR.)
+- `b8b635c` — **Pitch sharing: the "it's fine" override.** The last piece — an admin can
   mark a genuine over-capacity share as OK, and the clash marker clears across
   the calendar. `pitch_share_approvals`
   (`db/migrations/20260830_pitch_share_approvals.sql`) stores an approval keyed
@@ -27,8 +33,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `harness/vite.config.js`, `tests/pitch-share-approvals.test.js`,
   `tests/allocation.test.jsx`, `tests/pitch-glance.test.jsx`,
   `tests/harness-stubs.test.js`. This completes
-  `claude/plans/2026-08-29-pitch-portions.md`. (SHA follows in the next
-  changelog-touching PR.)
+  `claude/plans/2026-08-29-pitch-portions.md`.
 - `703c8d2` — **The parent/player tab bar shrinks to a centred island.** The bottom dock's
   spacing was tuned for the five-tab squad-staff bar; a parent or player has only
   four (no Squad Hub), and at that count the full-width `justify-between` spread

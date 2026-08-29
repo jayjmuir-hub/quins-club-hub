@@ -69,19 +69,17 @@ describe('Nav', () => {
     expect(document.querySelectorAll('nav a')).toHaveLength(5)
   })
 
-  // ⚠️ HOME RIDES THE CENTRE OF THE DOCK, not the left edge (Jay, 29 Aug 2026):
-  // the app opens on Home and the middle of the bar is the thumb's resting slot.
-  // A mobile-bar-only reorder — NAV_ITEMS above still leads with Home for the
-  // desktop Sidebar. Four-tab bar: Home lands third (floor(4/2)); five-tab bar
-  // is covered by the Squad Hub test above.
-  it('places Home in the centre of the bar, not on the left edge', () => {
+  // ⚠️ HOME STAYS FAR LEFT ON THE FOUR-TAB BAR (Jay, 30 Aug 2026). Home rides
+  // the CENTRE only on the wide five-tab squad-staff bar (the Squad Hub test
+  // above); on the narrow parent/player island the centre is no longer the
+  // thumb's resting slot, so Home keeps its natural NAV_ITEMS lead. See Nav.jsx.
+  it('keeps Home on the far left of the four-tab bar', () => {
     renderNav()
 
     const labels = [...document.querySelectorAll('[data-testid="dock-caption"]')].map((el) => el.textContent)
-    expect(labels).toEqual(['Schedule', 'Roster', 'Home', 'Chat'])
-    // Home is neither first nor last — it is off both edges.
-    expect(labels[0]).not.toBe('Home')
-    expect(labels[labels.length - 1]).not.toBe('Home')
+    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Chat'])
+    // Home leads — the natural NAV_ITEMS order, un-reordered.
+    expect(labels[0]).toBe('Home')
   })
 
   // The PILL label (beside the icon) still belongs to the active tab only: it
@@ -108,7 +106,7 @@ describe('Nav', () => {
     renderNav('/roster')
 
     const captions = [...document.querySelectorAll('[data-testid="dock-caption"]')]
-    expect(captions.map((el) => el.textContent)).toEqual(['Schedule', 'Roster', 'Home', 'Chat'])
+    expect(captions.map((el) => el.textContent)).toEqual(['Home', 'Schedule', 'Roster', 'Chat'])
 
     const shown = captions.filter((el) => el.className.includes('opacity-100'))
     const hidden = captions.filter((el) => el.className.includes('opacity-0'))
