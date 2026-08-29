@@ -54,16 +54,16 @@ describe('Nav', () => {
     expect(document.querySelectorAll('nav a')).toHaveLength(4)
   })
 
-  it('shows Squad Hub after Chat when showSquadHub is set — five tabs, no More', () => {
+  // ⚠️ Squad Hub sits BEFORE Chat (29 Aug 2026): Chat keeps the rightmost slot
+  // so its short caption, not the long "SQUAD HUB" one, meets the dock's rounded
+  // corner. See Nav.jsx.
+  it('inserts Squad Hub before Chat when showSquadHub is set — five tabs, no More', () => {
     renderNav('/', { showSquadHub: true })
 
     const squadHub = screen.getByRole('link', { name: 'Squad Hub' })
     expect(squadHub).toHaveAttribute('href', '/squad')
-    // The active tab's pill label is in the DOM in full for every item —
-    // "Squad Hub", not the "Squad" abbreviation the six-up grid briefly needed
-    // — and the bar is a flex row, not a column grid.
     const labels = [...document.querySelectorAll('[data-testid="dock-label"]')].map((el) => el.textContent)
-    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'Squad Hub'])
+    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Squad Hub', 'Chat'])
     expect(document.querySelectorAll('nav a')).toHaveLength(5)
   })
 

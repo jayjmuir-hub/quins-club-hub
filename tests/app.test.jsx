@@ -62,8 +62,8 @@ vi.mock('../src/data/players.js', () => ({
   listPlayerPrivate: async () => [],
 }))
 
-// "/more" renders the real More screen (admin-dashboard plan, 2026-08-05),
-// which makes no query at all — these member mocks are here for the /admin
+// "/settings" (was "/more") renders the real settings screen (admin-dashboard
+// plan, 2026-08-05) — these member mocks are here for the /admin
 // routes, whose Accounts tab is the real Accounts.jsx. Those screens' own
 // behaviour is covered by tests/more.test.jsx,
 // tests/admin-dashboard.test.jsx and tests/accounts.test.jsx; here they only
@@ -180,23 +180,34 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /roster/i })).toBeInTheDocument()
   })
 
-  it('renders the More screen at /more when signed in', () => {
+  it('renders the Settings screen at /settings when signed in', () => {
+    window.history.pushState({}, '', '/settings')
+    useAuthMock.mockReturnValue(signedIn)
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+  })
+
+  // The route was /more until 29 Aug 2026; old links, bookmarks and the
+  // notification deep-links keep working through a redirect.
+  it('redirects the old /more path to the Settings screen', () => {
     window.history.pushState({}, '', '/more')
     useAuthMock.mockReturnValue(signedIn)
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
   })
 
-  it('renders the More screen at /more for a non-admin too, with no not-authorised card', () => {
-    window.history.pushState({}, '', '/more')
+  it('renders the Settings screen for a non-admin too, with no not-authorised card', () => {
+    window.history.pushState({}, '', '/settings')
     useAuthMock.mockReturnValue(signedIn)
     useMembershipsMock.mockReturnValue(COACH)
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.queryByText(/not authorised/i)).not.toBeInTheDocument()
   })
 
@@ -313,9 +324,9 @@ describe('App — /admin', () => {
 // every parent, player and coach out of signing out. A parent is used here
 // deliberately — the role with no management route to fall back on.
 describe('App — a parent can still sign out', () => {
-  it('signs out from /more', async () => {
+  it('signs out from /settings', async () => {
     const user = userEvent.setup()
-    window.history.pushState({}, '', '/more')
+    window.history.pushState({}, '', '/settings')
     useAuthMock.mockReturnValue(signedIn)
     useMembershipsMock.mockReturnValue(PARENT)
 

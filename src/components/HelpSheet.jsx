@@ -52,7 +52,7 @@ const ROUTE_LABELS = {
   '/notices': 'Notices',
   '/chat': 'Chat',
   '/chat/dm': 'Messages',
-  '/more': 'More',
+  '/settings': 'Settings',
   '/approvals': 'Approvals',
   '/game-time': 'Game time',
 }

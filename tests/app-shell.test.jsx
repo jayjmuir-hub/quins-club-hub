@@ -393,22 +393,22 @@ describe('AppShell', () => {
     expect(await screen.findByText(/network unreachable/i)).toBeInTheDocument()
   })
 
-  it('offers sign-out on the More route once memberships have loaded', () => {
+  it('offers sign-out on the Settings route once memberships have loaded', () => {
     useMembershipsMock.mockReturnValue(loaded())
 
-    renderShell('/more', <h1>More</h1>)
+    renderShell('/settings', <h1>Settings</h1>)
 
-    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
 
-  // ⚠️ The regression guard for the admin-dashboard plan. /more used to be
-  // an admin-only screen, and the temptation when building /admin is to
-  // redirect /more into it — which would take the ONLY sign-out control in
-  // the app away from every parent, player and coach. A parent, specifically,
-  // because they are the role with no management route to fall back on.
-  // tests/app.test.jsx proves the same thing through the real App and router.
-  it('a parent can sign out from the More route', async () => {
+  // ⚠️ The regression guard for the admin-dashboard plan. The settings route
+  // (was /more) used to be an admin-only screen, and the temptation when
+  // building /admin is to redirect it into there — which would take the ONLY
+  // in-page sign-out control away from every parent, player and coach. A
+  // parent, specifically, because they are the role with no management route to
+  // fall back on. tests/app.test.jsx proves the same through the real router.
+  it('a parent can sign out from the Settings route', async () => {
     useMembershipsMock.mockReturnValue(
       loaded({
         memberships: [{ role: 'parent', team_id: 't1', player_id: 'p1' }],
@@ -418,7 +418,7 @@ describe('AppShell', () => {
     signOutMock.mockResolvedValue(undefined)
     const user = userEvent.setup()
 
-    renderShell('/more', <h1>More</h1>)
+    renderShell('/settings', <h1>Settings</h1>)
 
     await user.click(screen.getByRole('button', { name: /sign out/i }))
 
@@ -539,7 +539,7 @@ describe('AppShell — the account menu', () => {
   // overflow five times in sixteen days, and Jay asked for the controls beside
   // the initial to go behind it — "tap the J and have a drop down". My account
   // is the first item; the link to /more is still there, one tap further in.
-  it('opens a menu whose first item points at /more', async () => {
+  it('opens a menu whose first item points at /settings', async () => {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(loaded())
     getMyProfileMock.mockResolvedValue({ id: 'user-1', first_name: 'Jay' })
@@ -550,7 +550,7 @@ describe('AppShell — the account menu', () => {
     expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
     expect(screen.queryByTestId('account-menu')).not.toBeInTheDocument()
     await user.click(trigger)
-    expect(screen.getByRole('menuitem', { name: 'My account' })).toHaveAttribute('href', '/more')
+    expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings')
   })
 
   it('names the person for a screen reader', async () => {

@@ -205,18 +205,25 @@ function Dot() {
 
 // The Admin pill that used to render here (admin-only, desktop-only) is now
 // the sidebar's Admin item — same isAdmin() gate, same destination. The tab
-// bar never showed it and still does not: since phase 4 the phone's route to
-// /admin is the Manage card on More, not a fifth tab.
+// bar never showed it and still does not: the phone's route to /admin is the
+// Admin row in the account menu (AccountMenu.jsx), not a tab.
 export default function Nav({ showSquadHub = false, badges = {} }) {
   // Squad Hub joins the bar for the same people the sidebar shows it to
-  // (22 Aug 2026, Jay) — until now the Dashboard card was the phone's only
-  // way in. Between Roster and More, matching the sidebar's order.
+  // (22 Aug 2026, Jay). ⚠️ INSERTED BEFORE CHAT, NOT AFTER — so CHAT keeps the
+  // rightmost slot. Its short caption meets the dock's rounded corner cleanly;
+  // "SQUAD HUB", the longest caption, sat ON the outline out there (Jay's phone,
+  // 29 Aug 2026: "the b is sitting on the menu outline"). Interior, it has the
+  // room. findIndex rather than a hard slice so it survives a NAV_ITEMS reorder.
   const items = showSquadHub
-    ? [
-        ...NAV_ITEMS.filter((item) => item.to !== '/more'),
-        { to: '/squad', label: 'Squad Hub', icon: SquadIcon },
-        ...NAV_ITEMS.filter((item) => item.to === '/more'),
-      ]
+    ? (() => {
+        const chatAt = NAV_ITEMS.findIndex((item) => item.to === '/chat')
+        const at = chatAt < 0 ? NAV_ITEMS.length : chatAt
+        return [
+          ...NAV_ITEMS.slice(0, at),
+          { to: '/squad', label: 'Squad Hub', icon: SquadIcon },
+          ...NAV_ITEMS.slice(at),
+        ]
+      })()
     : NAV_ITEMS
 
   const { pathname } = useLocation()

@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- The bottom tab bar loses **More**; its contents move to the masthead
+- **`/more` is now `/settings`.** The settings page (the retired More tab's
+  home) gets a proper name: the route is `/settings`, and the page heading and
+  the account-menu row are titled **Settings** (with a gear, was "My account").
+  Old `/more` links, bookmarks and the notification deep-links redirect there.
+  ⚠️ The component keeps its filename (`src/screens/More.jsx`) ON PURPOSE — the
+  changelog refers to it by path and docs-check fails the build on a documented
+  path that no longer resolves, so a file rename would red every historical
+  entry; the filename is internal, the route and title are what users see. Also:
+  on the phone bar **Squad Hub swaps with Chat** so Chat holds the rightmost
+  slot — the long "SQUAD HUB" caption was sitting on the dock's rounded corner
+  out there (Jay's phone). `src/App.jsx`, `src/components/Nav.jsx`,
+  `src/components/AccountMenu.jsx`, `src/components/AppShell.jsx`,
+  `src/components/HelpSheet.jsx`, `src/components/NotificationsNudge.jsx`,
+  `src/components/NamePrompt.jsx`, `src/screens/DeleteAccount.jsx`,
+  `src/screens/More.jsx`. (SHA follows in the next changelog-touching PR.)
+- `b9f129f` — The bottom tab bar loses **More**; its contents move to the masthead
   **account menu** (the initial dropdown). The bar is now Home · Schedule ·
   Roster · Chat (squad staff keep Squad Hub), and every idle tab gains a small
   caption under its icon while the active tab still expands into the red pill.
@@ -23,8 +38,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Also: idle dock icons read at full ink and the dock's light-mode frost is
   strengthened, so the bar is legible over pale content. `src/components/Nav.jsx`,
   `src/components/AccountMenu.jsx`, `src/components/Sidebar.jsx`,
-  `src/screens/More.jsx`, `src/index.css`. (SHA follows in the next
-  changelog-touching PR.)
+  `src/screens/More.jsx`, `src/index.css`.
 
 ## 28 Aug 2026
 

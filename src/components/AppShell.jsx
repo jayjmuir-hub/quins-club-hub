@@ -245,7 +245,9 @@ export default function AppShell({ children }) {
   // an account-menu row and the menu panel unmounts on close.
   const [getAppOpen, setGetAppOpen] = useState(false)
 
-  const isMoreRoute = location.pathname === '/more'
+  // The settings route (renamed from /more on 29 Aug 2026). The app's only
+  // in-page sign-out control renders here — see the block keyed on this below.
+  const isSettingsRoute = location.pathname === '/settings'
   // WhatsApp-style chrome-free conversations (Jay, 25 Aug 2026: "lets try
   // the no bottom menu inside a conversation"). Inside a THREAD the phone
   // shows no tab bar and no masthead island — the chat header's ← and the
@@ -804,7 +806,7 @@ export default function AppShell({ children }) {
                 this. It is not redundant: AppShell itself, MembershipProvider
                 and RequireAuth can throw, and none of that is inside this one. */}
             <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
-            {isMoreRoute && (
+            {isSettingsRoute && (
               <div className="mt-6 border-t border-line pt-6">
                 <SignOutControl signOut={signOut} />
               </div>

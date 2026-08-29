@@ -86,11 +86,13 @@ function EyeIcon(props) {
   )
 }
 
-function UserIcon(props) {
+// The settings page's own row — a gear, since 29 Aug 2026 it goes to /settings
+// (renamed from /more) and the page is titled "Settings", not "My account".
+function SettingsIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" {...props}>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 20.5c0-3.6 3.6-6 8-6s8 2.4 8 6" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 3.5v2.2M12 18.3v2.2M4.8 4.8l1.6 1.6M17.6 17.6l1.6 1.6M3.5 12h2.2M18.3 12h2.2M4.8 19.2l1.6-1.6M17.6 6.4l1.6-1.6" />
     </svg>
   )
 }
@@ -379,9 +381,9 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
                 )}
               </div>
 
-              <Link to="/more" role="menuitem" onClick={() => close({ refocus: false })} className={`${ITEM} mt-1`}>
-                <UserIcon className={ICON} />
-                My account
+              <Link to="/settings" role="menuitem" onClick={() => close({ refocus: false })} className={`${ITEM} mt-1`}>
+                <SettingsIcon className={ICON} />
+                Settings
               </Link>
 
               {/* The Admin / Approvals doors that used to be the More tab's
@@ -490,12 +492,12 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
               {/* Notifications and Calendar are page-sized (a permission flow, a
                   subscribe URL), so they stay on /more — the menu just carries a
                   direct door to each section. */}
-              <Link to="/more#notifications" role="menuitem" data-testid="account-notifications" onClick={() => close({ refocus: false })} className={ITEM}>
+              <Link to="/settings#notifications" role="menuitem" data-testid="account-notifications" onClick={() => close({ refocus: false })} className={ITEM}>
                 <BellIcon className={ICON} />
                 Notifications
               </Link>
 
-              <Link to="/more#your-calendar" role="menuitem" data-testid="account-calendar" onClick={() => close({ refocus: false })} className={ITEM}>
+              <Link to="/settings#your-calendar" role="menuitem" data-testid="account-calendar" onClick={() => close({ refocus: false })} className={ITEM}>
                 <CalendarIcon className={ICON} />
                 Add to your calendar
               </Link>
