@@ -86,8 +86,7 @@ export default function PitchGlance() {
   const clashing = useMemo(() => {
     const ids = new Set()
     for (const clash of findPitchClashes(events)) {
-      ids.add(clash.a.id)
-      ids.add(clash.b.id)
+      for (const event of clash.events) ids.add(event.id)
     }
     return ids
   }, [events])

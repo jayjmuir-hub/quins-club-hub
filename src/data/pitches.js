@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { upsertById } from './upsertById.js'
+import { portionFraction } from '../lib/pitchPortion.js'
 
 // The managed pitch list, and clash detection over it.
 //
@@ -101,39 +102,61 @@ export async function setPitchActive(id, isActive) {
 // so this surfaces a warning and never blocks a save. Blocking would teach
 // people to work around it by typing a different spelling, which is exactly
 // the drift the list is here to end.
+//
+// ⚠️ IT IS A CAPACITY QUESTION, NOT A COLLISION ONE (Jay, 29 Aug 2026). A pitch
+// is routinely SHARED — a quarter here, a half there — so two bookings on one
+// pitch at one time are only a clash when the portions they use add up to MORE
+// than a whole pitch. A quarter beside a half is fine; three halves is not. The
+// portion lives on `events.pitch_portion` (see src/lib/pitchPortion.js); a
+// booking with none set counts as a full pitch, so a database with no portions
+// yet behaves exactly as the old pairwise detector did.
+
+const CAPACITY = 1
+// Portions are dyadic (¼, ½, 1) so their sums are exact in floating point, but
+// a hair of slack keeps a legitimate "adds up to exactly one pitch" off the
+// warning list even if a future portion is not.
+const EPSILON = 1e-9
 
 /**
- * True when two events overlap in time.
+ * The pitch load of a set of co-occupying events, in whole-pitch units.
  *
- * ⚠️ `ends_at` IS NULLABLE, and that is the whole difficulty. An event with no
- * end has no duration to overlap WITH, so two events are treated as clashing
- * only if they start at the same instant. Assuming a default duration would
- * invent a clash — or, worse, invent the absence of one — from data nobody
- * entered.
+ * ⚠️ A SHARED group_id COUNTS ONCE. A multi-squad session is fanned out into
+ * one event per squad, all on the same pitch at the same time by construction
+ * (the 5 Aug fan-out decision) — it is ONE occupation of the ground, not one
+ * per squad, so its portion is counted a single time. Without this every
+ * multi-squad fixture would read as a pile-up and the feature would be switched
+ * off within a week.
  */
-function overlaps(a, b) {
-  const aStart = Date.parse(a.starts_at)
-  const bStart = Date.parse(b.starts_at)
-  if (Number.isNaN(aStart) || Number.isNaN(bStart)) return false
-
-  const aEnd = a.ends_at ? Date.parse(a.ends_at) : null
-  const bEnd = b.ends_at ? Date.parse(b.ends_at) : null
-
-  if (aEnd === null || bEnd === null) return aStart === bStart
-
-  // Touching is not overlapping: a session ending at 18:00 and the next
-  // starting at 18:00 share a pitch cleanly, which is how a club actually
-  // runs a Saturday.
-  return aStart < bEnd && bStart < aEnd
+function pitchLoad(cohort) {
+  const byOccupant = new Map()
+  for (const event of cohort) {
+    const key = event.group_id ? `g:${event.group_id}` : `e:${event.id}`
+    const fraction = portionFraction(event.pitch_portion)
+    byOccupant.set(key, Math.max(byOccupant.get(key) ?? 0, fraction))
+  }
+  let total = 0
+  for (const fraction of byOccupant.values()) total += fraction
+  return total
 }
 
 /**
- * Pairs of events booked on the same pitch at overlapping times.
+ * Groups of events whose portions overtop one pitch at the same time.
  *
- * Returns `[{ pitch, a, b }]`. Events with no pitch, or with the `Pitch TBD`
- * placeholder, are ignored — "not allocated yet" cannot clash with anything,
- * and treating 26 unallocated fixtures as one enormous pile-up would bury the
- * real ones.
+ * Returns `[{ pitch, load, events }]`, where `load` is the summed portion in
+ * whole-pitch units (> 1) and `events` is every booking sharing that overloaded
+ * moment. Events with no pitch, or the `Pitch TBD` placeholder, are ignored —
+ * "not allocated yet" cannot clash with anything, and treating 26 unallocated
+ * fixtures as one enormous pile-up would bury the real ones.
+ *
+ * ⚠️ `ends_at` IS NULLABLE, and that is the whole subtlety. A booking with a
+ * real end occupies the half-open span [start, end) — so one ending at 18:00
+ * and the next starting at 18:00 share a pitch cleanly (touching is not
+ * overlapping, which is how a club runs a Saturday). A booking with NO end has
+ * no duration to occupy a span with, so it can only load a pitch AT ITS OWN
+ * START INSTANT, against other bookings starting at that same instant. Assuming
+ * a default length would invent a clash, or invent the absence of one, from
+ * data nobody entered. The two are handled in two passes for exactly that
+ * reason.
  */
 export function findPitchClashes(events) {
   if (!Array.isArray(events)) return []
@@ -142,26 +165,54 @@ export function findPitchClashes(events) {
   for (const event of events) {
     const pitch = (event?.pitch ?? '').trim()
     if (!pitch || pitch === PITCH_TBD) continue
+    if (Number.isNaN(Date.parse(event.starts_at))) continue // rubbish start: skip, never throw
     if (!byPitch.has(pitch)) byPitch.set(pitch, [])
     byPitch.get(pitch).push(event)
   }
 
-  const clashes = []
-  for (const [pitch, booked] of byPitch) {
-    const sorted = [...booked].sort((x, y) => Date.parse(x.starts_at) - Date.parse(y.starts_at))
-    for (let i = 0; i < sorted.length; i += 1) {
-      for (let j = i + 1; j < sorted.length; j += 1) {
-        // ⚠️ SAME group_id IS NOT A CLASH. A multi-squad session is fanned out
-        // into one event per squad, all on the same pitch at the same time by
-        // construction — see the 5 Aug fan-out decision. Reporting those would
-        // make every multi-squad fixture look like a double booking, and the
-        // feature would be switched off within a week.
-        if (sorted[i].group_id && sorted[i].group_id === sorted[j].group_id) continue
-        if (overlaps(sorted[i], sorted[j])) {
-          clashes.push({ pitch, a: sorted[i], b: sorted[j] })
-        }
-      }
-    }
+  // Deduplicated by the exact set of events involved, so a nested overload
+  // (say {A,B} inside {A,B,C}) is reported as the two distinct situations it is
+  // and an identical cohort found from two anchors is reported once.
+  const groups = new Map()
+  const record = (pitch, cohort) => {
+    if (cohort.length < 2) return
+    const load = pitchLoad(cohort)
+    if (load <= CAPACITY + EPSILON) return
+    const key = `${pitch}|${cohort.map((event) => event.id).sort().join(',')}`
+    const existing = groups.get(key)
+    if (!existing || load > existing.load) groups.set(key, { pitch, load, events: cohort })
   }
-  return clashes
+
+  for (const [pitch, booked] of byPitch) {
+    // ── Pass A — timed bookings. The load of half-open intervals is piecewise
+    // constant and only ever rises at a start, so its peak is reached at one of
+    // the start instants: testing each start finds every overload.
+    const timed = booked.filter((event) => {
+      const end = event.ends_at ? Date.parse(event.ends_at) : null
+      return end !== null && !Number.isNaN(end)
+    })
+    for (const anchor of timed) {
+      const t = Date.parse(anchor.starts_at)
+      const cohort = timed.filter((event) => {
+        const start = Date.parse(event.starts_at)
+        const end = Date.parse(event.ends_at)
+        return start <= t && t < end
+      })
+      record(pitch, cohort)
+    }
+
+    // ── Pass B — coincident starts. The ONLY way a booking with no end loads a
+    // pitch: grouped by the exact start instant, so a no-end booking never
+    // combines with a timed one that merely covers it, only with bookings that
+    // begin at the very same moment.
+    const byStart = new Map()
+    for (const event of booked) {
+      const start = String(Date.parse(event.starts_at))
+      if (!byStart.has(start)) byStart.set(start, [])
+      byStart.get(start).push(event)
+    }
+    for (const cohort of byStart.values()) record(pitch, cohort)
+  }
+
+  return [...groups.values()]
 }
