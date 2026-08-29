@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- New reusable **`src/components/DatePicker.jsx`** — the app's own date control,
+- The four **date-of-birth** fields now use the same `DatePicker` too (Jay:
+  "migrate the event date + birthdays"). Player registration (both the parent
+  and the "I'm the player" paths), the parent-facing **MyPlayerForm**, the
+  admin/coach **PlayerForm**, and the first-run **NamePrompt** birthday prompt
+  all drop the native `<input type="date">` for the app's calendar — whose
+  month and year `<select>`s matter most here, since a birthday is years back.
+  The `yyyy-mm-dd` value contract, the `1900-01-02..today` bounds and the
+  `player_private_dob_sane` database guard are all unchanged. Each wrapping
+  `<label>` became `htmlFor`+`id` so a click on a calendar day is not forwarded
+  to the trigger, and `DatePicker` gained a `testId` prop. The shared
+  `tests/helpers/pickDate.js` gained `pickDateByTestId`, and every test that
+  set a birthday moved to it. `src/components/PlayerRegistrationForm.jsx`,
+  `src/screens/MyPlayerForm.jsx`, `src/screens/PlayerForm.jsx`,
+  `src/components/NamePrompt.jsx`, `src/components/DatePicker.jsx`,
+  `tests/helpers/pickDate.js`, `tests/parent-self-registration.test.jsx`,
+  `tests/more.test.jsx`, `tests/player-form.test.jsx`,
+  `tests/name-prompt.test.jsx`, `tests/roll-call.test.jsx`. (SHA follows in the
+  next changelog-touching PR.)
+- `3e66c4a` — New reusable **`src/components/DatePicker.jsx`** — the app's own date control,
   and the **event Date** field is the first to use it (Jay: "why can't we use
   that calendar everywhere?"). Same `yyyy-mm-dd` value contract as the native
   input, so callers and the database are unchanged. A trigger shows the value
@@ -20,7 +38,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   of paging. A shared `tests/helpers/pickDate.js` drives it; the event-form test
   suites moved to it. Birthdays are next. `src/components/DatePicker.jsx`,
   `src/screens/EventForm.jsx`, `tests/date-picker.test.jsx`,
-  `tests/helpers/pickDate.js`. (SHA follows in the next changelog-touching PR.)
+  `tests/helpers/pickDate.js`.
 - `7e30d4b` — The **"Repeat weekly for … weeks"** field now starts showing **0** instead of
   blank, and its stepper can go back down to 0 (Jay: a blank box does not say
   what it is for, and `min={1}` trapped the spinner above zero). 0 weeks still

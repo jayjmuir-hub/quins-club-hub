@@ -79,6 +79,7 @@ export default function DatePicker({
   disabled = false,
   invalid = false,
   placeholder = 'Choose a date',
+  testId,
 }) {
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(
@@ -147,6 +148,7 @@ export default function DatePicker({
         ref={triggerRef}
         type="button"
         id={id}
+        data-testid={testId}
         disabled={disabled}
         aria-haspopup="dialog"
         aria-expanded={open}

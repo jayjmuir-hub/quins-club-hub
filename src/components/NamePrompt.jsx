@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sheet from './Sheet.jsx'
 import Button from './Button.jsx'
+import DatePicker from './DatePicker.jsx'
 import PhoneInput from './PhoneInput.jsx'
 import {
   confirmMyDetails,
@@ -97,6 +98,8 @@ import { primeMyProfileCache } from '../lib/useMyProfile.js'
 //     had already answered on their laptop. `profiles.name_confirmed_at` is
 //     the state, and it is per-person, not per-device.
 
+// Birthday cap for the DatePicker; the database is the real guard.
+const TODAY = new Date().toISOString().slice(0, 10)
 const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const INPUT =
   'w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition placeholder:text-ink-faint focus:border-brand'
@@ -714,19 +717,23 @@ export default function NamePrompt() {
           </p>
 
           {dobChildren.map((child) => (
-            <label key={child.id} className="mb-3 block">
-              <span className="mb-1 block text-[13px] font-bold text-ink">{child.name}</span>
-              <input
-                type="date"
-                required
-                data-testid={`dob-${child.id}`}
+            <div key={child.id} className="mb-3">
+              {/* htmlFor + id, not a wrapping <label>: a <label> around the
+                  DatePicker's button would forward a calendar-day click to the
+                  trigger. Empty dates are caught by handleSaveBirthdays, so the
+                  native `required` is not lost. */}
+              <label htmlFor={`dob-${child.id}`} className="mb-1 block text-[13px] font-bold text-ink">
+                {child.name}
+              </label>
+              <DatePicker
+                id={`dob-${child.id}`}
+                testId={`dob-${child.id}`}
                 value={dobDrafts[child.id] ?? ''}
-                onChange={(event) =>
-                  setDobDrafts((prev) => ({ ...prev, [child.id]: event.target.value }))
-                }
-                className="w-full rounded-[11px] border border-line bg-surface-card px-3 py-2.5 text-[15px] text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                onChange={(next) => setDobDrafts((prev) => ({ ...prev, [child.id]: next }))}
+                min="1900-01-02"
+                max={TODAY}
               />
-            </label>
+            </div>
           ))}
 
           {error && (
