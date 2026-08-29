@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- The four **date-of-birth** fields now use the same `DatePicker` too (Jay:
+- **Tournaments as containers — phase 1 (schema + read paths, nothing user-visible).**
+  Groundwork for entering a tournament as its own object with the games played
+  recorded underneath it (design:
+  `claude/plans/2026-08-29-tournaments-as-containers.md`). Migration
+  `20260829_events_tournament_id.sql` adds `events.tournament_id`
+  (self-referencing FK, **ON DELETE CASCADE** so deleting a tournament takes its
+  games and their sheets), plus `placing` (container) and `stage` (game) — all
+  nullable, no backfill, every existing row unchanged. `tournament_id IS NULL`
+  is the rule for "a top-level calendar entry": `listEvents`
+  (`src/data/events.js`) and `calendar_events_for_token`
+  (`20260829_calendar_feed_exclude_tournament_games.sql`, CREATE OR REPLACE so
+  grants are untouched) both filter it, so a tournament's games never appear
+  loose on the schedule or in the feed. `eventTitle` (`src/lib/eventFormat.js`)
+  gains a `!tournament_id` guard so a game reads "Quins vs Exiles", not the
+  tournament's name. Proven by a rolled-back `db/tests/tournaments.sql` harness
+  (cascade + control fixture + feed exclusion + a SET-NULL self-test) and JS
+  tests. `db/schema/tables.sql`, `db/schema/functions.sql`,
+  `tests/tournament-title.test.js`, `tests/data.test.js`. Phases 3–6 (the
+  chooser, the tournament screen, add-game, delete-confirm) follow. (SHA follows
+  in the next changelog-touching PR.)
+- `6b7750b` — The four **date-of-birth** fields now use the same `DatePicker` too (Jay:
   "migrate the event date + birthdays"). Player registration (both the parent
   and the "I'm the player" paths), the parent-facing **MyPlayerForm**, the
   admin/coach **PlayerForm**, and the first-run **NamePrompt** birthday prompt
@@ -26,8 +46,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/components/NamePrompt.jsx`, `src/components/DatePicker.jsx`,
   `tests/helpers/pickDate.js`, `tests/parent-self-registration.test.jsx`,
   `tests/more.test.jsx`, `tests/player-form.test.jsx`,
-  `tests/name-prompt.test.jsx`, `tests/roll-call.test.jsx`. (SHA follows in the
-  next changelog-touching PR.)
+  `tests/name-prompt.test.jsx`, `tests/roll-call.test.jsx`.
 - `3e66c4a` — New reusable **`src/components/DatePicker.jsx`** — the app's own date control,
   and the **event Date** field is the first to use it (Jay: "why can't we use
   that calendar everywhere?"). Same `yyyy-mm-dd` value contract as the native

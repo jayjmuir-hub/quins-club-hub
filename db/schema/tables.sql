@@ -804,6 +804,26 @@ CREATE TABLE public.events (
   -- NULL for a friendly and anything untiered. NOT derived from
   -- league_team_id — see the migration's comment.
   tier         text,
+  -- Added 2026-08-29 (events_tournament_id). A TOURNAMENT is a container: one
+  -- events row a squad attends for the day, with the individual GAMES played
+  -- recorded as their own events rows underneath it. See
+  -- claude/plans/2026-08-29-tournaments-as-containers.md.
+  --   tournament_id: on a GAME, the id of its container (itself an events row,
+  --   competition_type='tournament', tournament_id null). NULL on every
+  --   top-level calendar entry, container included. `tournament_id IS NULL` is
+  --   the filter that keeps games out of listEvents and the calendar feed.
+  --   ⚠️ EXCLUSIVE of group_id and series_id — a tournament offers neither
+  --   "Also add for" nor Repeats, so it never sets either, the same "never both"
+  --   discipline group_id/series_id already follow.
+  --   placing: on a CONTAINER, the optional overall result of the day
+  --   ("Runners-up"). Free text, no CHECK, the shape `competition` uses. NOT
+  --   derived from the games' scores.
+  --   stage: on a GAME, the optional "Pool A" / "Semi-final" label. Free text.
+  tournament_id uuid,
+  -- ⚠️ `placing` IS A RESERVED WORD — quoted here and in the migration / harness.
+  -- The app never trips on it (PostgREST quotes every identifier).
+  "placing"     text,
+  stage         text,
   CONSTRAINT events_pkey          PRIMARY KEY (id),
   CONSTRAINT events_club_id_fkey    FOREIGN KEY (club_id)    REFERENCES clubs(id)    ON DELETE CASCADE,
   CONSTRAINT events_team_id_fkey    FOREIGN KEY (team_id)    REFERENCES teams(id)    ON DELETE CASCADE,
@@ -812,6 +832,13 @@ CREATE TABLE public.events (
   -- FIXTURE, which is not.
   CONSTRAINT events_league_team_id_fkey FOREIGN KEY (league_team_id) REFERENCES league_teams(id) ON DELETE SET NULL,
   CONSTRAINT events_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id),
+  -- Added 2026-08-29 (events_tournament_id). Self-referencing: a game points at
+  -- its tournament, another events row. ⚠️ ON DELETE CASCADE, ON PURPOSE:
+  -- deleting a tournament deletes its games, and each game's match_sheets row
+  -- cascades from events in turn — the whole subtree goes in one statement.
+  -- That is not recoverable, so the UI carries a loud two-step confirm naming
+  -- the game count; the database cascades, the confirm is the safety.
+  CONSTRAINT events_tournament_id_fkey FOREIGN KEY (tournament_id) REFERENCES events(id) ON DELETE CASCADE,
   CONSTRAINT events_type_check      CHECK ((type = ANY (ARRAY['match'::text, 'training'::text, 'social'::text]))),
   -- ⚠️ NO 'friendly' VALUE, DELIBERATELY. A friendly is the ABSENCE of a
   -- competition, so it is NULL — adding a third value would make "not answered"
@@ -854,6 +881,11 @@ CREATE INDEX events_series_id_idx ON public.events USING btree (series_id)
 -- survived a re-capture that was supposed to catch exactly that.
 CREATE INDEX events_group_id_idx ON public.events USING btree (group_id)
   WHERE (group_id IS NOT NULL);
+
+-- Added 2026-08-29 (events_tournament_id). Partial, matching the two above:
+-- only game rows are indexed, and the hot read is "the games of THIS tournament".
+CREATE INDEX events_tournament_id_idx ON public.events USING btree (tournament_id)
+  WHERE (tournament_id IS NOT NULL);
 
 -- ── Added 2026-08-13, migration events_indexes_and_social_upload_gate ──
 --

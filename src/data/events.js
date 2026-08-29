@@ -53,6 +53,15 @@ export async function listEvents({ teamIds, from, to } = {}) {
     }
     if (from) query = query.gte('starts_at', from)
     if (to) query = query.lte('starts_at', to)
+    // ⚠️ TOP-LEVEL CALENDAR ENTRIES ONLY. A tournament's individual games are
+    // events rows with tournament_id set (see the container model in
+    // claude/plans/2026-08-29-tournaments-as-containers.md); they are shown
+    // INSIDE the tournament, never loose on the schedule. Every read that feeds
+    // a calendar-shaped surface — this, and calendar_events_for_token — filters
+    // tournament_id IS NULL, and the two must agree or games appear as
+    // duplicates of the tournament. A container (tournament_id null) and every
+    // ordinary fixture pass; a game does not.
+    query = query.is('tournament_id', null)
     return query
   }
 

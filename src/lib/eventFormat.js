@@ -136,7 +136,19 @@ export function eventTitle(event) {
   // ⚠️ AHEAD OF THE OPPONENT CHECK ON PURPOSE. Those existing rows hold the
   // tournament name in BOTH columns, so an opponent-first order would keep
   // rendering the old string for every fixture already entered.
-  if (event?.type === 'match' && event.competition_type === 'tournament' && event.competition) {
+  // ⚠️ THE CONTAINER ONLY, NOT ITS GAMES. A tournament's individual games are
+  // also type='match' with competition_type='tournament' and the tournament's
+  // name in `competition` (copied down) — but they DO have an opponent, and
+  // must read "Quins vs Exiles", not the tournament's name. `tournament_id` is
+  // set on a game and null on the container, so guarding on it keeps this branch
+  // to the container. Rows predating tournaments have tournament_id null and are
+  // unaffected. See claude/plans/2026-08-29-tournaments-as-containers.md.
+  if (
+    event?.type === 'match' &&
+    event.competition_type === 'tournament' &&
+    event.competition &&
+    !event.tournament_id
+  ) {
     return event.competition
   }
   if (event?.type === 'match' && event.opponent) return `Quins vs ${event.opponent}`
