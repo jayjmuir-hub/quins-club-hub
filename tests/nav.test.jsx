@@ -56,15 +56,32 @@ describe('Nav', () => {
 
   // ⚠️ Squad Hub sits BEFORE Chat (29 Aug 2026): Chat keeps the rightmost slot
   // so its short caption, not the long "SQUAD HUB" one, meets the dock's rounded
-  // corner. See Nav.jsx.
-  it('inserts Squad Hub before Chat when showSquadHub is set — five tabs, no More', () => {
+  // corner. See Nav.jsx. ⚠️ AND HOME IS CENTRED (29 Aug 2026): on the five-tab
+  // bar that is dead centre, so the rendered order is Schedule, Roster, Home,
+  // Squad Hub, Chat — Squad-Hub-before-Chat still holds around it.
+  it('inserts Squad Hub before Chat when showSquadHub is set — five tabs, Home centred, no More', () => {
     renderNav('/', { showSquadHub: true })
 
     const squadHub = screen.getByRole('link', { name: 'Squad Hub' })
     expect(squadHub).toHaveAttribute('href', '/squad')
     const labels = [...document.querySelectorAll('[data-testid="dock-label"]')].map((el) => el.textContent)
-    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Squad Hub', 'Chat'])
+    expect(labels).toEqual(['Schedule', 'Roster', 'Home', 'Squad Hub', 'Chat'])
     expect(document.querySelectorAll('nav a')).toHaveLength(5)
+  })
+
+  // ⚠️ HOME RIDES THE CENTRE OF THE DOCK, not the left edge (Jay, 29 Aug 2026):
+  // the app opens on Home and the middle of the bar is the thumb's resting slot.
+  // A mobile-bar-only reorder — NAV_ITEMS above still leads with Home for the
+  // desktop Sidebar. Four-tab bar: Home lands third (floor(4/2)); five-tab bar
+  // is covered by the Squad Hub test above.
+  it('places Home in the centre of the bar, not on the left edge', () => {
+    renderNav()
+
+    const labels = [...document.querySelectorAll('[data-testid="dock-caption"]')].map((el) => el.textContent)
+    expect(labels).toEqual(['Schedule', 'Roster', 'Home', 'Chat'])
+    // Home is neither first nor last — it is off both edges.
+    expect(labels[0]).not.toBe('Home')
+    expect(labels[labels.length - 1]).not.toBe('Home')
   })
 
   // The PILL label (beside the icon) still belongs to the active tab only: it
@@ -91,7 +108,7 @@ describe('Nav', () => {
     renderNav('/roster')
 
     const captions = [...document.querySelectorAll('[data-testid="dock-caption"]')]
-    expect(captions.map((el) => el.textContent)).toEqual(['Home', 'Schedule', 'Roster', 'Chat'])
+    expect(captions.map((el) => el.textContent)).toEqual(['Schedule', 'Roster', 'Home', 'Chat'])
 
     const shown = captions.filter((el) => el.className.includes('opacity-100'))
     const hidden = captions.filter((el) => el.className.includes('opacity-0'))
