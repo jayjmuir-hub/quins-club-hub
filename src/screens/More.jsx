@@ -346,22 +346,41 @@ export default function More() {
   const { profile } = useMyProfile()
   const squads = visibleTeams(memberships, teams)
 
-  // #notifications lands here from the Home nudge ("Turn them on"), which
-  // used to link to bare /more — Jay's phone, 25 Aug 2026: "it takes you to
-  // the screen ... but does not scroll down automatically to that section".
-  // React Router does not scroll to hashes on its own. The double rAF lets
-  // the sections above lay themselves out first; without it the measurement
-  // happens against a half-painted page and lands short. Any future section
+  // The account menu's "Notifications" / "Add to your calendar" rows (and the
+  // Home nudge's "Turn them on") deep-link to #notifications / #your-calendar,
+  // because React Router does not scroll to a hash on its own (Jay, 25 Aug 2026:
+  // "does not scroll down automatically to that section"). Any future section
   // that wants to be linkable gets an id and a scroll-mt the same way.
+  //
+  // ⚠️ RE-SCROLL AS THE PAGE FILLS — a single scroll lands high. The sections
+  // ABOVE the target (the You card's async profile, the photo, Your players)
+  // arrive over the first second and push the target DOWN, so one scroll — even
+  // after a double rAF — fires against a short page and leaves the section off
+  // the top of the screen (Jay, 29 Aug 2026: "it doesn't pop to the
+  // notifications section, just the top of that area"). A handful of scrolls
+  // across that window corrects for each reflow: the first animates, the rest
+  // snap, and once it has landed they are no-ops. The `typeof` guard keeps a
+  // late timer harmless if the element or its scrollIntoView has gone (unmount,
+  // or a test that stubs it).
   const { hash } = useLocation()
   useEffect(() => {
-    if (!hash) return
-    const el = document.getElementById(hash.slice(1))
-    if (!el) return
-    const frame = requestAnimationFrame(() =>
-      requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' })),
-    )
-    return () => cancelAnimationFrame(frame)
+    if (!hash) return undefined
+    const id = hash.slice(1)
+    let cancelled = false
+    const scroll = (smooth) => {
+      if (cancelled) return
+      const el = document.getElementById(id)
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' })
+      }
+    }
+    // Spread across ~1.7s: Your players in particular renders nothing until its
+    // read returns, and on a pitch-side connection that is the slow one.
+    const timers = [0, 200, 500, 1000, 1700].map((ms, i) => setTimeout(() => scroll(i === 0), ms))
+    return () => {
+      cancelled = true
+      timers.forEach(clearTimeout)
+    }
   }, [hash])
 
   return (

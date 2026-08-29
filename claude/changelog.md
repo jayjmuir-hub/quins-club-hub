@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **`/more` is now `/settings`.** The settings page (the retired More tab's
+- Fixed the account menu's **Notifications / Add-to-your-calendar** deep-links
+  landing at the top of the Settings page instead of on the section (Jay's
+  phone). The sections above the target (the You card, the photo, Your players)
+  load async and push it down, so a single scroll — even after a double rAF —
+  fired against a short page and left the section off screen. The hash-scroll
+  now re-scrolls across ~1.7s, correcting for each reflow as the page fills.
+  `src/screens/More.jsx`, `tests/more.test.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `c3b82f6` — **`/more` is now `/settings`.** The settings page (the retired More tab's
   home) gets a proper name: the route is `/settings`, and the page heading and
   the account-menu row are titled **Settings** (with a gear, was "My account").
   Old `/more` links, bookmarks and the notification deep-links redirect there.
