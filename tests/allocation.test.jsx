@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+// Resolves to the REAL shareKey (the mock below spreads importActual).
+import { shareKey } from '../src/data/pitchShareApprovals.js'
 
 // The allocation grid — pitches down the side, the day across the top.
 //
@@ -60,6 +62,22 @@ vi.mock('../src/data/pitches.js', async () => {
   return { ...actual, listPitches: (...a) => listPitchesMock(...a) }
 })
 
+// Same reason as the mocks above: unmocked, this reaches Supabase. shareKey
+// stays REAL — the panel and the clash filter key on it, and a stubbed key
+// would only test the stub.
+const listShareApprovalKeysMock = vi.fn(() => Promise.resolve(new Set()))
+const approveShareMock = vi.fn(() => Promise.resolve({}))
+const unapproveShareMock = vi.fn(() => Promise.resolve())
+vi.mock('../src/data/pitchShareApprovals.js', async () => {
+  const actual = await vi.importActual('../src/data/pitchShareApprovals.js')
+  return {
+    ...actual,
+    listShareApprovalKeys: (...a) => listShareApprovalKeysMock(...a),
+    approveShare: (...a) => approveShareMock(...a),
+    unapproveShare: (...a) => unapproveShareMock(...a),
+  }
+})
+
 const mod = await import('../src/screens/Allocation.jsx')
 const Allocation = mod.default
 const { hourRange, rowsFor } = mod
@@ -85,6 +103,9 @@ beforeEach(() => {
   listPitchRequestsMock.mockReset().mockResolvedValue([])
   allocatePitchMock.mockReset().mockResolvedValue({})
   setEventPitchMock.mockReset().mockResolvedValue({})
+  listShareApprovalKeysMock.mockReset().mockResolvedValue(new Set())
+  approveShareMock.mockReset().mockResolvedValue({})
+  unapproveShareMock.mockReset().mockResolvedValue()
   useMembershipsMock.mockReset().mockReturnValue({
     memberships: [{ role: 'admin', status: 'active', admin_rights: ['pitches'] }],
     teams: TEAMS,
@@ -388,5 +409,44 @@ describe('direct assignment', () => {
     const row = await screen.findByTestId('unallocated')
     expect(row.textContent).toMatch(/Sat/)
     expect(row.textContent).toMatch(/Sep/)
+  })
+})
+
+describe('the "it\'s fine" override', () => {
+  // Two full-pitch matches on A1 at the same time — a genuine overload.
+  const overload = [
+    { id: 'e1', team_id: 't1', type: 'match', title: 'A', pitch: 'A1', pitch_portion: 'full', club_id: 'club-1', starts_at: '2026-09-05T05:00:00Z', ends_at: '2026-09-05T06:30:00Z' },
+    { id: 'e2', team_id: 't2', type: 'match', title: 'B', pitch: 'A1', pitch_portion: 'full', club_id: 'club-1', starts_at: '2026-09-05T05:00:00Z', ends_at: '2026-09-05T06:30:00Z' },
+  ]
+
+  it('an admin approves an overload, and it writes the exact share', async () => {
+    listPitchesMock.mockResolvedValue([pitch('A1')])
+    listEventsMock.mockResolvedValue(overload)
+    const user = userEvent.setup()
+    render(<Allocation />)
+
+    const panel = await screen.findByTestId('pitch-occupancy')
+    const row = within(panel).getByTestId('share-row-over')
+    expect(row).toHaveTextContent(/over by/i)
+
+    await user.click(within(row).getByRole('button', { name: /approve/i }))
+
+    await waitFor(() => expect(approveShareMock).toHaveBeenCalledTimes(1))
+    const passed = approveShareMock.mock.calls[0][0]
+    expect(passed.map((e) => e.id).sort()).toEqual(['e1', 'e2'])
+  })
+
+  it('an already-approved overload reads as resolved, with an Undo, not a clash', async () => {
+    // Approving here also clears the grid marker: `clashing` skips any cohort
+    // whose shareKey is approved (proven directly in the pitch-glance suite).
+    listPitchesMock.mockResolvedValue([pitch('A1')])
+    listEventsMock.mockResolvedValue(overload)
+    listShareApprovalKeysMock.mockResolvedValue(new Set([shareKey(overload)]))
+    render(<Allocation />)
+
+    const panel = await screen.findByTestId('pitch-occupancy')
+    expect(within(panel).getByText(/Sharing approved/i)).toBeInTheDocument()
+    expect(within(panel).queryByText(/over by/i)).not.toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: /undo/i })).toBeInTheDocument()
   })
 })

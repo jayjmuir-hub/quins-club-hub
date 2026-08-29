@@ -29,7 +29,16 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+// shareKey stays REAL (importActual), so the approved-key seeding below matches
+// the cohort findPitchClashes produces; the read is mocked so no Supabase call.
+const listShareApprovalKeysMock = vi.fn(() => Promise.resolve(new Set()))
+vi.mock('../src/data/pitchShareApprovals.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, listShareApprovalKeys: (...args) => listShareApprovalKeysMock(...args) }
+})
+
 import PitchGlance from '../src/screens/PitchGlance.jsx'
+import { shareKey } from '../src/data/pitchShareApprovals.js'
 
 const TEAMS = [
   { id: 't-u12', name: 'U12 Mixed', sort_order: 3 },
@@ -71,6 +80,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   useMembershipsMock.mockReturnValue({ memberships: COACH, teams: TEAMS, loading: false })
   listPitchOccupancyMock.mockResolvedValue(occupancyRows())
+  listShareApprovalKeysMock.mockResolvedValue(new Set())
 })
 
 describe('the gate', () => {
@@ -171,5 +181,22 @@ describe('the occupancy panel', () => {
     renderScreen()
     await screen.findByTestId('pitch-week')
     expect(screen.queryByTestId('pitch-occupancy')).not.toBeInTheDocument()
+  })
+
+  it('an approved overload reads as resolved and its clash markers clear', async () => {
+    // The default D2 pair is the overload; approve it by key.
+    const rows = occupancyRows()
+    const d2 = rows.filter((r) => r.pitch === 'D2')
+    listShareApprovalKeysMock.mockResolvedValue(new Set([shareKey(d2)]))
+    renderScreen()
+
+    const panel = await screen.findByTestId('pitch-occupancy')
+    expect(within(panel).getByText(/Sharing approved/i)).toBeInTheDocument()
+    // Read-only screen: no approve/undo control for staff.
+    expect(within(panel).queryByRole('button')).not.toBeInTheDocument()
+
+    // The calendar agrees: the D2 entries are no longer marked as clashes.
+    const week = await screen.findByTestId('pitch-week')
+    expect(within(week).queryAllByTestId('week-entry-clash')).toHaveLength(0)
   })
 })
