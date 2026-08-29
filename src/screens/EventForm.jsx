@@ -1386,11 +1386,19 @@ export default function EventForm({
             <label className={LABEL} htmlFor="event-repeat-until">
               Repeat until
             </label>
+            {/* ⚠️ NO `min` — Jay's phone, 29 Aug 2026: with the field EMPTY,
+                Chrome's calendar misbehaved on month navigation (clicking to the
+                next month committed a date and closed the picker, so each hop
+                needed reopening). An empty `<input type="date">` carrying a
+                `min` is a well-worn source of that quirk; without it the picker
+                navigates cleanly. The "must be after the start" guard is not
+                lost — generateSeriesDates returns no dates when the end is
+                before the start (recurrence.js), so the preview simply shows
+                "0 sessions". */}
             <input
               id="event-repeat-until"
               type="date"
               value={repeatUntil}
-              min={values.date || undefined}
               onChange={(domEvent) => setRepeatUntil(domEvent.target.value)}
               className={inputClasses(false)}
             />
