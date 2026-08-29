@@ -1190,6 +1190,23 @@ describe('More — the #notifications hash scrolls to the section', () => {
     expect(target?.id).toBe('notifications')
   })
 
+  // ⚠️ THE REGRESSION GUARD FOR "lands at the top". The sections above the
+  // target load async and push it down, so the effect must scroll MORE THAN
+  // ONCE — a single scroll fires against a short page and leaves you high (Jay,
+  // 29 Aug 2026). jsdom has no layout, so we cannot assert the final position;
+  // we assert the correction attempts happen across the settle window.
+  it('re-scrolls across the settle window, not just once', () => {
+    vi.useFakeTimers()
+    try {
+      renderMore('/settings#notifications')
+      vi.advanceTimersByTime(1700)
+      const notifications = scrollSpy.mock.instances.filter((el) => el?.id === 'notifications')
+      expect(notifications.length).toBeGreaterThan(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('control: a plain /settings visit never scrolls', async () => {
     renderMore('/settings')
     // Give the (absent) effect the same two frames the real one uses.
