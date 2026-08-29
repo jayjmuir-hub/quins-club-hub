@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
 import DatePicker from '../components/DatePicker.jsx'
+import TimePicker from '../components/TimePicker.jsx'
 import RepeatUntilField from '../components/RepeatUntilField.jsx'
 import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
@@ -1349,12 +1350,17 @@ export default function EventForm({
                 <label className={LABEL} htmlFor="event-time">
                   Time
                 </label>
-                <input
+                {/* The app's own picker, not the native OS one (29 Aug 2026) —
+                    see TimePicker.jsx. It emits the same 'HH:MM' string the
+                    native input did, so the drag-the-end logic below is
+                    unchanged; only the event source differs. */}
+                <TimePicker
                   id="event-time"
-                  type="time"
+                  testId="event-time"
                   value={values.time}
-                  onChange={(domEvent) => {
-                    const nextTime = domEvent.target.value
+                  invalid={invalid.time}
+                  describedBy="event-time-note"
+                  onChange={(nextTime) => {
                     setDurationNote(null)
                     // ⚠️ MOVING THE START DRAGS THE END WITH IT, keeping the gap
                     // the person already set — the behaviour every calendar app
@@ -1375,9 +1381,6 @@ export default function EventForm({
                       return { ...current, time: nextTime }
                     })
                   }}
-                  aria-invalid={invalid.time ? 'true' : undefined}
-                  aria-describedby="event-time-note"
-                  className={inputClasses(invalid.time)}
                 />
               </div>
               <div>
@@ -1389,17 +1392,16 @@ export default function EventForm({
                 <label className={LABEL} htmlFor="event-end-time">
                   End time
                 </label>
-                <input
+                <TimePicker
                   id="event-end-time"
-                  type="time"
+                  testId="event-end-time"
                   value={values.endTime}
-                  onChange={(domEvent) => {
+                  invalid={invalid.endTime}
+                  describedBy="event-time-note"
+                  onChange={(nextEnd) => {
                     setDurationNote(null)
-                    set('endTime')(domEvent.target.value)
+                    set('endTime')(nextEnd)
                   }}
-                  aria-invalid={invalid.endTime ? 'true' : undefined}
-                  aria-describedby="event-time-note"
-                  className={inputClasses(invalid.endTime)}
                 />
               </div>
             </div>

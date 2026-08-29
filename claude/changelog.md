@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Tournaments as containers — phase 4 (the tournament detail screen + games).**
+- **Desktop time entry — the app's own `TimePicker`.** The event form's two time
+  fields (Time and End time) drop the native `<input type="time">`, which on
+  desktop is a cramped AM/PM spinner that is awkward with a mouse (Jay: "fix the
+  way times are selected when using a desktop"). New
+  `src/components/TimePicker.jsx` mirrors `DatePicker`'s trigger + popover: you
+  can **type** any time — `1845`, `18:45`, `6`, `630` all resolve, and any
+  minute is allowed rather than snapped — or **tap** a popover of quick-pick
+  chips and hour/minute columns (the columns snap to :00/:15/:30/:45). Both stay
+  in sync. Value stays `HH:MM`, so the "drag the end time with the start" logic,
+  the kick-off-TBD checkbox and the calendar feed are all unchanged; tournament
+  mode gets it too, since the time fields render there as well. The popover is a
+  `role="group"`, not a dialog — it is non-modal and stays open across column
+  taps, so it must not read as a second dialog over the form sheet.
+  `src/components/TimePicker.jsx`, `src/screens/EventForm.jsx`,
+  `tests/time-picker.test.jsx`. (SHA follows in the next changelog-touching PR.)
+- `c37ed35` — **Tournaments as containers — phase 4 (the tournament detail screen + games).**
   A tournament container now opens its own screen instead of the single-fixture
   `EventDetail`: the day's setup, the **games** played inside it, an overall
   **placing**, and an **Add game** action. New `src/screens/TournamentDetail.jsx`
@@ -24,8 +39,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `listTournamentGames` and `setTournamentPlacing` in `src/data/events.js`.
   Tests: `tests/tournament-detail.test.jsx`, data-helper cases in
   `tests/data.test.js`, and a Schedule routing test. Depends on phase 1's
-  migration (#511), which was applied to production the same day. (SHA follows
-  in the next changelog-touching PR.)
+  migration (#511), which was applied to production the same day.
 - `796c6fc` — **Tournaments as containers — phase 3 (the chooser + the tournament form).**
   Adding an event now opens a small **"What are you adding?"** chooser (Match /
   Tournament / Training / Social) before the form, so a tournament is a
