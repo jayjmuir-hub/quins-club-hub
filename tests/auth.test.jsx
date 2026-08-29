@@ -187,6 +187,9 @@ describe('AuthProvider / useAuth', () => {
       options: {
         emailRedirectTo:
           window.location.origin + window.location.pathname + window.location.search,
+        // Sign-in only, never sign-up: a link request for an unknown email must
+        // not silently create a bare account (added 29 Aug 2026).
+        shouldCreateUser: false,
       },
     })
   })

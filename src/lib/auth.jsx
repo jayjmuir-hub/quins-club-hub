@@ -90,6 +90,17 @@ export function AuthProvider({ children }) {
       options: {
         emailRedirectTo:
           window.location.origin + window.location.pathname + window.location.search,
+        // ⚠️ SIGN-IN, NEVER SIGN-UP. signInWithOtp defaults shouldCreateUser to
+        // TRUE, so a magic-link request for an email with no account would
+        // silently MINT a bare, intent-less account — no name, no role, no
+        // access request — which then sits in the admin list as "hasn't said
+        // what they need". A real one landed 29 Aug 2026 from a stale-cache
+        // client still showing the (mothballed) magic-link button. This flow is
+        // only ever a way back IN for someone who already has an account;
+        // creating one is the sign-up wizard's job, which collects the intent
+        // first. false makes a link request for an unknown email a no-op login,
+        // never a new account.
+        shouldCreateUser: false,
       },
     })
     if (error) throw error

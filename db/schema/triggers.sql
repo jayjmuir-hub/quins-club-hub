@@ -116,6 +116,23 @@ CREATE TRIGGER profiles_sync_name
 
 
 -- ---------------------------------------------------------------------
+-- public.profiles → hold_bare_signup                 ADDED 2026-08-29
+--
+-- A profile born with no name AND no signup_intent is a signup that skipped the
+-- sign-up wizard (bot, stale-cache client, or a magic-link/OTP for an unknown
+-- email) — it is not a real half-finished member, so it is pre-DISMISSED to keep
+-- it out of the admin's active review list. Non-blocking and reversible: see
+-- db/migrations/20260829_hold_bare_signup.sql and the body in functions.sql.
+-- The junk signature is unambiguous — the wizard always carries an intent, OAuth
+-- always carries a name, and invited members sign in before redeeming — so this
+-- can never fire on a legitimate signup.
+-- ---------------------------------------------------------------------
+CREATE TRIGGER hold_bare_signup
+  AFTER INSERT ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION private.hold_bare_signup();
+
+
+-- ---------------------------------------------------------------------
 -- public.memberships → notify_pending_membership     ADDED 2026-08-09
 --
 -- Fires only on an INSERT whose status is 'pending' (the WHEN clause), i.e.

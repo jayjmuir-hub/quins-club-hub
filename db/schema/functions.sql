@@ -790,6 +790,37 @@ REVOKE ALL ON FUNCTION private.handle_new_user() FROM PUBLIC;
 
 
 -- ---------------------------------------------------------------------
+-- private.hold_bare_signup()  — trigger fn for hold_bare_signup on
+--   public.profiles                                  ADDED 2026-08-29
+--
+-- Pre-dismisses a profile born with no name AND no signup_intent — the
+-- unambiguous signature of a signup that skipped the wizard (bot, stale-cache
+-- client, or a magic-link/OTP for an unknown email). Keeps junk out of the
+-- admin's active list; non-blocking (its only action is a guarded, always-valid
+-- insert) and reversible (a later access request flips the row to pending).
+-- db/migrations/20260829_hold_bare_signup.sql; trigger in triggers.sql.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.hold_bare_signup()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if coalesce(btrim(new.full_name), '') = '' and new.signup_intent is null then
+    insert into public.access_requests (profile_id, status)
+    values (new.id, 'dismissed')
+    on conflict (profile_id) do nothing;
+  end if;
+  return new;
+end;
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.hold_bare_signup() FROM PUBLIC;
+
+
+-- ---------------------------------------------------------------------
 -- private.handle_user_email_change()  — trigger fn for
 --   on_auth_user_email_updated
 --
