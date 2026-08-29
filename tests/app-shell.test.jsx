@@ -164,7 +164,7 @@ describe('AppShell', () => {
     // mobile tab bar and the desktop Sidebar — and CSS (not JS) decides
     // which paints. jsdom sees both, so each shared destination appears
     // exactly twice; one or three would both be bugs.
-    for (const name of ['Home', 'Schedule', 'Roster', 'More']) {
+    for (const name of ['Home', 'Schedule', 'Roster', 'Chat']) {
       expect(screen.getAllByRole('link', { name })).toHaveLength(2)
     }
     // Sidebar-only destinations appear once.

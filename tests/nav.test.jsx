@@ -20,10 +20,17 @@ function renderNav(initialEntry = '/', props = {}) {
 }
 
 describe('NAV_ITEMS', () => {
-  // Chat joined on 23 Aug 2026 — the squad channel's phone entry point.
-  it('is exactly Home, Schedule, Roster, Chat, More, in that order', () => {
-    expect(NAV_ITEMS.map((item) => item.label)).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'More'])
-    expect(NAV_ITEMS.map((item) => item.to)).toEqual(['/', '/schedule', '/roster', '/chat', '/more'])
+  // Chat joined on 23 Aug 2026; the More tab was retired on 29 Aug 2026 — its
+  // contents moved to the masthead account menu (see AccountMenu.jsx).
+  it('is exactly Home, Schedule, Roster, Chat, in that order', () => {
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(['Home', 'Schedule', 'Roster', 'Chat'])
+    expect(NAV_ITEMS.map((item) => item.to)).toEqual(['/', '/schedule', '/roster', '/chat'])
+  })
+
+  // The retired tab must not creep back onto the bar — its home is the account
+  // menu now, and a second entry point is exactly the clutter the move removed.
+  it('has no More tab', () => {
+    expect(NAV_ITEMS.map((item) => item.to)).not.toContain('/more')
   })
 })
 
@@ -34,7 +41,8 @@ describe('Nav', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Roster' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'More' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Chat' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'More' })).not.toBeInTheDocument()
   })
 
   // The tab bar's Squad Hub entry (22 Aug 2026) — same showSquadHub gate the
@@ -43,36 +51,52 @@ describe('Nav', () => {
     renderNav()
 
     expect(screen.queryByRole('link', { name: 'Squad Hub' })).not.toBeInTheDocument()
-    expect(document.querySelectorAll('nav a')).toHaveLength(5)
+    expect(document.querySelectorAll('nav a')).toHaveLength(4)
   })
 
-  it('shows Squad Hub between Chat and More when showSquadHub is set, in a 6-column grid', () => {
+  it('shows Squad Hub after Chat when showSquadHub is set — five tabs, no More', () => {
     renderNav('/', { showSquadHub: true })
 
     const squadHub = screen.getByRole('link', { name: 'Squad Hub' })
     expect(squadHub).toHaveAttribute('href', '/squad')
-    // Design "A" (23 Aug 2026): icons only, the active tab's label slides
-    // open beside it. So every label is in the DOM in full — "Squad Hub",
-    // not the "Squad" abbreviation the six-up grid briefly needed — and the
-    // bar is a flex row, not a column grid.
-    const labels = [...document.querySelectorAll('nav a span')].map((el) => el.textContent)
-    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'Squad Hub', 'More'])
-    expect(document.querySelectorAll('nav a')).toHaveLength(6)
+    // The active tab's pill label is in the DOM in full for every item —
+    // "Squad Hub", not the "Squad" abbreviation the six-up grid briefly needed
+    // — and the bar is a flex row, not a column grid.
+    const labels = [...document.querySelectorAll('[data-testid="dock-label"]')].map((el) => el.textContent)
+    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Chat', 'Squad Hub'])
+    expect(document.querySelectorAll('nav a')).toHaveLength(5)
   })
 
-  // Design "A": only the ACTIVE tab shows its label. The others keep the text
-  // in the DOM (screen readers, and the slide-open animation) but collapsed
-  // to zero width and invisible.
-  it('shows only the active tab label; the rest are collapsed', () => {
+  // The PILL label (beside the icon) still belongs to the active tab only: it
+  // slides open on the active one and stays collapsed to zero width on the
+  // rest. The always-on caption under every icon is a separate element, tested
+  // below.
+  it('shows only the active tab pill label; the rest are collapsed', () => {
     renderNav('/roster')
 
-    const labels = [...document.querySelectorAll('nav a span')]
+    const labels = [...document.querySelectorAll('[data-testid="dock-label"]')]
     const open = labels.filter((el) => el.className.includes('max-w-[96px]'))
     const shut = labels.filter((el) => el.className.includes('max-w-0') && el.className.includes('opacity-0'))
     expect(open.map((el) => el.textContent)).toEqual(['Roster'])
     expect(shut).toHaveLength(labels.length - 1)
     // And every link is still named in full for assistive tech.
     expect(screen.getByRole('link', { name: 'Schedule' })).toBeInTheDocument()
+  })
+
+  // Captions (29 Aug 2026, Jay): every button carries a small label under its
+  // icon so you can tell what it does without tapping. The text is present on
+  // every tab; the ACTIVE tab's caption is hidden (its word rides in the pill
+  // instead), the rest are shown.
+  it('shows a caption under every button, hidden only on the active tab', () => {
+    renderNav('/roster')
+
+    const captions = [...document.querySelectorAll('[data-testid="dock-caption"]')]
+    expect(captions.map((el) => el.textContent)).toEqual(['Home', 'Schedule', 'Roster', 'Chat'])
+
+    const shown = captions.filter((el) => el.className.includes('opacity-100'))
+    const hidden = captions.filter((el) => el.className.includes('opacity-0'))
+    expect(hidden.map((el) => el.textContent)).toEqual(['Roster'])
+    expect(shown).toHaveLength(captions.length - 1)
   })
 
   // The motion pass (23 Aug 2026): the red pill is ONE element that slides to
@@ -99,10 +123,10 @@ describe('Nav', () => {
   // the word "new" in its accessible name so the dot is never the only
   // signal. Never on the ACTIVE tab — you are looking at it.
   it('shows a dot and says "new" for a badged tab, but not on the active one', () => {
-    renderNav('/', { badges: { '/chat': true, '/more': true } })
+    renderNav('/', { badges: { '/chat': true, '/roster': true } })
 
     expect(screen.getByRole('link', { name: 'Chat, new' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'More, new' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Roster, new' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
     expect(document.querySelectorAll('[data-testid="dock-dot"]')).toHaveLength(2)
 
@@ -152,9 +176,9 @@ describe('Nav', () => {
 
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
 
-    await user.click(screen.getByRole('link', { name: 'More' }))
+    await user.click(screen.getByRole('link', { name: 'Chat' }))
 
-    expect(screen.getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Chat' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
   })
 
@@ -163,7 +187,7 @@ describe('Nav', () => {
 
     expect(screen.getByRole('link', { name: 'Schedule' })).toHaveAttribute('href', '/schedule')
     expect(screen.getByRole('link', { name: 'Roster' })).toHaveAttribute('href', '/roster')
-    expect(screen.getByRole('link', { name: 'More' })).toHaveAttribute('href', '/more')
+    expect(screen.getByRole('link', { name: 'Chat' })).toHaveAttribute('href', '/chat')
   })
 })
 
@@ -171,9 +195,9 @@ describe('Nav', () => {
 // the Overview pill (admin OR coach, gated on `canManage`) and the Accounts
 // pill (admin only, gated on `canManageAccounts`). /overview is deleted and
 // /accounts is now a tab inside /admin, so there is one destination and one
-// gate. NAV_ITEMS is deliberately still exactly four — the Admin pill is a
-// conditional desktop-only extra, not a tab-bar item, so the "exactly Home,
-// Schedule, Roster, More" assertion above still holds.
+// gate. NAV_ITEMS is deliberately just the four core destinations — the Admin
+// pill is a conditional desktop-only extra, not a tab-bar item, so the "exactly
+// Home, Schedule, Roster, Chat" assertion above still holds.
 describe('Nav — Admin pill', () => {
   it('does not render an Admin link when canManageClub is false (default)', () => {
     renderNav()

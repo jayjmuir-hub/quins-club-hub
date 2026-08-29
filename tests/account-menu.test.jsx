@@ -178,3 +178,63 @@ describe('AccountMenu', () => {
     expect(screen.getByTestId('account-menu').parentElement).toBe(document.body)
   })
 })
+
+// ── The management doors (moved here from the More tab, 29 Aug 2026) ──────────
+//
+// ⚠️ THIS IS A COACH'S ONLY ROUTE TO THE APPROVALS QUEUE FROM A PHONE now that
+// the More tab is gone — the desktop Sidebar's Admin item is admin-only and
+// desktop-only. The gating is canApproveAnything (status- AND role-aware), the
+// same it was on the More page; these tests carry the edge cases over with it.
+describe('AccountMenu — the management doors', () => {
+  const COACH_U10 = [{ id: 'm-c', role: 'coach', team_id: 'team-u10', club_id: 'c1', status: 'active' }]
+  const MANAGER_U10 = [{ id: 'm-m', role: 'manager', team_id: 'team-u10', club_id: 'c1', status: 'active' }]
+  const MEDIC_U10 = [{ id: 'm-md', role: 'medic', team_id: 'team-u10', club_id: 'c1', status: 'active' }]
+  // The row request_staff_role actually creates: coach, no player, PENDING.
+  const PENDING_COACH = [
+    { id: 'm-pc', role: 'coach', team_id: 'team-u10', club_id: 'c1', player_id: null, status: 'pending' },
+  ]
+
+  async function open(memberships) {
+    renderMenu({}, memberships)
+    await userEvent.setup().click(screen.getByTestId('account-button'))
+  }
+
+  it('gives an admin the Admin door and not Approvals', async () => {
+    await open(ADMIN)
+    expect(screen.getByTestId('account-admin')).toHaveAttribute('href', '/admin')
+    expect(screen.queryByTestId('account-approvals')).not.toBeInTheDocument()
+  })
+
+  it('gives a coach the Approvals door and not Admin', async () => {
+    await open(COACH_U10)
+    expect(screen.getByTestId('account-approvals')).toHaveAttribute('href', '/approvals')
+    expect(screen.queryByTestId('account-admin')).not.toBeInTheDocument()
+  })
+
+  it('gives a team manager the Approvals door', async () => {
+    await open(MANAGER_U10)
+    expect(screen.getByTestId('account-approvals')).toHaveAttribute('href', '/approvals')
+  })
+
+  // Medic may EDIT a squad's players but is deliberately off the approvals list.
+  it('gives a medic neither door', async () => {
+    await open(MEDIC_U10)
+    expect(screen.queryByTestId('account-approvals')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('account-admin')).not.toBeInTheDocument()
+  })
+
+  // ⚠️ THE SAFEGUARDING CASE. A pending coach request has the same role and team
+  // as an approved coach; it must NOT be handed the queue that judges it. Gated
+  // by STATUS via canApproveAnything, not by role alone.
+  it('gives a coach whose request is still pending neither door', async () => {
+    await open(PENDING_COACH)
+    expect(screen.queryByTestId('account-approvals')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('account-admin')).not.toBeInTheDocument()
+  })
+
+  it('gives a parent neither door', async () => {
+    await open(PARENT)
+    expect(screen.queryByTestId('account-approvals')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('account-admin')).not.toBeInTheDocument()
+  })
+})

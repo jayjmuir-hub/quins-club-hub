@@ -7,7 +7,6 @@ import CalendarSubscribe from '../components/CalendarSubscribe.jsx'
 import IdeaForm from '../components/IdeaForm.jsx'
 import MyPhotoField from '../components/MyPhotoField.jsx'
 import PhoneInput from '../components/PhoneInput.jsx'
-import EnterSendsToggle from '../components/EnterSendsToggle.jsx'
 import PushNotificationsToggle from '../components/PushNotificationsToggle.jsx'
 import YourPlayers from '../components/YourPlayers.jsx'
 import IdentityBadges from '../components/IdentityBadges.jsx'
@@ -16,7 +15,7 @@ import { useAuth } from '../lib/auth.jsx'
 import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { joinPhone, splitPhone } from '../lib/phone.js'
-import { canApproveAnything, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { roleLabel, visibleTeams } from '../lib/scope.js'
 
 // The "More" tab, for EVERYONE (admin-dashboard plan, 2026-08-05).
 //
@@ -345,7 +344,6 @@ export default function More() {
   const { memberships, teams, reload } = useMemberships()
   const { user } = useAuth()
   const { profile } = useMyProfile()
-  const admin = isAdmin(memberships)
   const squads = visibleTeams(memberships, teams)
 
   // #notifications lands here from the Home nudge ("Turn them on"), which
@@ -449,33 +447,12 @@ export default function More() {
       <SectionTitle>Social media</SectionTitle>
       <SendAnIdea />
 
-      {/* ⚠️ THE COACH'S AND TEAM MANAGER'S ONLY WAY IN (Jay, 9 Aug 2026).
-          The Admin pill in the tab bar is admin-only AND desktop-only, so
-          without this a coach has no route to the approvals queue from a
-          phone — which is exactly where they will be when a parent registers.
-
-          Not shown to admins: they already have the Admin pill, and a second
-          entry point to a screen they can reach from the nav is clutter. The
-          screen itself gates independently, so this only decides who is
-          OFFERED it. */}
-      {!admin && canApproveAnything(memberships) && (
-        <>
-          <SectionTitle>Manage</SectionTitle>
-          <Card className="p-[14px]">
-            <Link
-              to="/approvals"
-              className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand-ink"
-            >
-              <span>Players waiting to be approved</span>
-              <span aria-hidden="true">›</span>
-            </Link>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
-              Parents who have registered a player in your age groups, waiting for you
-              to let them in.
-            </p>
-          </Card>
-        </>
-      )}
+      {/* ⚠️ THE "Manage" CARDS MOVED TO THE ACCOUNT MENU on 29 Aug 2026, with
+          the More tab (Jay). A coach/manager's Approvals link and an admin's
+          Admin door are rows in AccountMenu.jsx now, gated by the same
+          canApproveAnything / isAdmin. Do not re-add a door here — the whole
+          point of the move was to stop More being the grab-bag with three
+          entry points to everything. */}
 
       {/* The Game time entry that lived here 14-22 Aug 2026 moved to the
           Squad Hub's front doors: its audience is exactly the hub's (people
@@ -486,25 +463,14 @@ export default function More() {
       {/* The .ics feed already existed but lived only on Schedule. This is
           where someone comes looking for "my stuff", so it belongs here too;
           the component is shared, not copied. */}
-      <SectionTitle>Your calendar</SectionTitle>
-      <Card className="p-[14px]">
-        <CalendarSubscribe />
-      </Card>
-
-      {/* Admins only — and since phase 4, at EVERY width: this is the
-          phone's front door to /admin now that the width gate is gone
-          (Jay's 21 Aug ruling). On desktop the sidebar also carries Admin,
-          so this block is mostly a phone affordance, and that is the point. */}
-      {admin && (
-        <div>
-          <SectionTitle>Manage</SectionTitle>
-          <Card className="p-[14px]">
-            <Button as={Link} variant="secondary" full to="/admin">
-              Admin
-            </Button>
-          </Card>
-        </div>
-      )}
+      {/* `id`/`scroll-mt` so the account menu's "Add to your calendar" row can
+          land here, the same hash-scroll the Notifications section uses. */}
+      <div id="your-calendar" className="scroll-mt-24">
+        <SectionTitle>Your calendar</SectionTitle>
+        <Card className="p-[14px]">
+          <CalendarSubscribe />
+        </Card>
+      </div>
 
       {/* ⚠️ FIRST TRIGGER ONLY — a reply to your own report, and nothing
           else yet. Jay asked for push notifications directly, 18 Aug 2026,
@@ -523,42 +489,13 @@ export default function More() {
         </Card>
       </div>
 
-      {/* Chat behaviour — device-level, see the component's header. */}
-      <SectionTitle>Chat</SectionTitle>
-      <Card className="p-4">
-        <EnterSendsToggle />
-      </Card>
-
-      {/* Account — the IN-APP half of Google Play's account deletion
-          requirement (the other half is the public /delete-account URL, which
-          is the same screen). Deliberately a link out to that page rather
-          than a delete button here: one implementation of a destructive
-          action, not two that can drift apart.
-
-          Not styled as a danger button. This sits directly above sign-out,
-          and a red "Delete" next to "Sign out" is a mis-tap waiting to
-          happen on a phone — the confirmation lives on the page itself. */}
-      <SectionTitle>Account</SectionTitle>
-      <Card className="overflow-hidden">
-        <Link
-          to="/privacy"
-          className="flex items-center justify-between gap-3 border-b border-line px-[14px] py-[11px] transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
-        >
-          <span className="text-[15px] font-bold text-ink">Privacy policy</span>
-          <span aria-hidden="true" className="text-[15px] text-ink-faint">
-            ›
-          </span>
-        </Link>
-        <Link
-          to="/delete-account"
-          className="flex items-center justify-between gap-3 px-[14px] py-[11px] transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
-        >
-          <span className="text-[15px] font-bold text-ink">Delete your account</span>
-          <span aria-hidden="true" className="text-[15px] text-ink-faint">
-            ›
-          </span>
-        </Link>
-      </Card>
+      {/* ⚠️ THE Chat toggle AND the Account links (Privacy policy, Delete your
+          account) MOVED TO THE ACCOUNT MENU on 29 Aug 2026. Enter-sends is a
+          row there; Privacy and Delete are links to their own routes
+          (/privacy, /delete-account), which are unchanged — this page just no
+          longer duplicates them. Notifications and Your calendar stay above,
+          because a permission flow and a subscribe URL are page-sized; the menu
+          links to those two sections by hash. */}
 
       {/* Sign out is rendered by AppShell below this, on this route only.
           See the header comment — do not add a second one here. */}

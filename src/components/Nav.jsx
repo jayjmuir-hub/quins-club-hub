@@ -67,16 +67,6 @@ export function ChatIcon(props) {
   )
 }
 
-function MoreIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="4" y="5" width="16" height="3.2" rx="1.2" />
-      <rect x="4" y="10.4" width="16" height="3.2" rx="1.2" />
-      <rect x="4" y="15.8" width="16" height="3.2" rx="1.2" />
-    </svg>
-  )
-}
-
 // Single source of truth for the nav items, so nothing (AppShell, Nav
 // itself, any future breadcrumb-style consumer) duplicates this list.
 export const NAV_ITEMS = [
@@ -87,7 +77,14 @@ export const NAV_ITEMS = [
   // phone's only entry point is the thing you cannot delete (the 22 Aug
   // handoff's lesson), and a chat nobody can find is a chat nobody uses.
   { to: '/chat', label: 'Chat', icon: ChatIcon },
-  { to: '/more', label: 'More', icon: MoreIcon },
+  // ⚠️ NO "More" TAB SINCE 29 Aug 2026 (Jay). It was a grab-bag — the You
+  // editor, photo, players, notices, calendar, notification/chat toggles,
+  // privacy/delete, sign-out and the admin/approvals doors — and its home is
+  // the masthead account menu (AccountMenu.jsx), which already links to /more
+  // as "My account" and now carries the settings rows and the Admin/Approvals
+  // doors directly. Dropping the tab also lets the captions below fit: staff
+  // top out at five tabs, not six. /more stays a real route, reached from the
+  // account menu — App.jsx and AppShell's sign-out gate are unchanged.
 ]
 
 
@@ -110,13 +107,17 @@ function linkClassName({ isActive }) {
     // Press squash — the iOS tab feel. 90% on the way down, and the spring
     // curve on the transition above gives it the bounce back.
     'active:scale-90 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
-    // white/90 for idle icons — the dock is 62% glass now; src/index.css
-    // carries the arithmetic (icons are components, 3:1, and this is 4.4).
     // Idle icons are INK, not white, since the clear-glass pass (24 Aug 2026):
     // the dock is transparent now, so idle items must read on whatever is
     // behind it — ink flips with the theme. The active item stays white ON
     // ITS OWN RED PILL, which is opaque and theme-independent.
-    isActive ? 'px-3 text-white' : 'px-2 text-ink/90 hover:text-ink',
+    // ⚠️ FULL INK, NOT text-ink/90 (28 Aug 2026). The 10% fade came off the old
+    // white/90 idle treatment and carried over by habit; on the transparent
+    // dock in light mode it left the inactive icons reading faint over pale
+    // content (Jay). Ink already meets icon contrast on its own — dropping the
+    // fade is the free half of that. The frost that backs it in light mode is
+    // strengthened in src/index.css (see `.glass-dock` cool-grey stops).
+    isActive ? 'px-3 text-white' : 'px-2 text-ink',
   ].join(' ')
 }
 
@@ -132,6 +133,23 @@ function labelClassName({ isActive }) {
     'overflow-hidden whitespace-nowrap font-condensed text-[11px] font-bold uppercase tracking-[0.06em]',
     'transition-[max-width,opacity,margin] duration-300 ease-out motion-reduce:transition-none',
     isActive ? 'max-w-[96px] opacity-100' : 'max-w-0 opacity-0 -ml-1.5',
+  ].join(' ')
+}
+
+// The small caption under every IDLE icon (29 Aug 2026, Jay: each button should
+// say what it does without being tapped). ⚠️ ABSOLUTE ON PURPOSE — it must not
+// add to the item's width, because the Glider measures idle items as icon-width
+// and predicts the settled layout from it (see measure() below). Centred under
+// the icon and allowed to overflow into the gap `justify-between` already leaves
+// between icons; kept tiny (9px condensed) so even "Squad Hub" clears its
+// neighbours. Hidden on the ACTIVE tab, whose label rides beside its icon in the
+// pill instead — so no tab shows the word twice.
+function captionClassName({ isActive }) {
+  return [
+    'pointer-events-none absolute bottom-[3px] left-1/2 -translate-x-1/2 whitespace-nowrap',
+    'font-condensed text-[9px] font-bold uppercase leading-none tracking-[0.03em]',
+    'transition-opacity duration-200 ease-out motion-reduce:transition-none',
+    isActive ? 'opacity-0' : 'opacity-100',
   ].join(' ')
 }
 
@@ -308,8 +326,21 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
           {({ isActive }) => (
             <>
               {badges[to] && !isActive && <Dot />}
-              <Icon className="h-[22px] w-[22px] shrink-0" aria-hidden="true" />
-              <span className={labelClassName({ isActive })}>{label}</span>
+              {/* Lifted 5px when idle so the caption below has room; drops to
+                  centre as the tab becomes active and the pill takes over. */}
+              <Icon
+                className={[
+                  'h-[22px] w-[22px] shrink-0 transition-transform duration-300 ease-out motion-reduce:transition-none',
+                  isActive ? '' : '-translate-y-[5px]',
+                ].join(' ')}
+                aria-hidden="true"
+              />
+              {/* The active tab's label, sliding open beside the icon in the pill. */}
+              <span data-testid="dock-label" className={labelClassName({ isActive })}>{label}</span>
+              {/* The always-on caption under every idle icon. */}
+              <span data-testid="dock-caption" aria-hidden="true" className={captionClassName({ isActive })}>
+                {label}
+              </span>
             </>
           )}
         </NavLink>

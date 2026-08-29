@@ -176,13 +176,15 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
     return []
   }
 
+  // ⚠️ NO "More" ROW SINCE 29 Aug 2026. It was never really a sidebar
+  // destination — it held the account/settings grab-bag and was pinned last —
+  // and that whole tab moved into the masthead account menu (AccountMenu.jsx).
+  // NAV_ITEMS no longer carries it, so the old filter/append pair is gone.
   const items = [
-    ...NAV_ITEMS.filter((item) => item.to !== '/more'),
+    ...NAV_ITEMS,
     ...(showSquadHub ? [{ to: '/squad', label: 'Squad Hub', icon: SquadIcon }] : []),
     { to: '/notices', label: 'Notices', icon: NoticesIcon },
     ...(showAdmin ? [{ to: '/admin', label: 'Admin', icon: AdminIcon }] : []),
-    // More stays last, matching the tab bar's order instinct.
-    ...NAV_ITEMS.filter((item) => item.to === '/more'),
   ]
 
   return (

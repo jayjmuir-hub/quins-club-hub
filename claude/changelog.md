@@ -8,9 +8,27 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 29 Aug 2026
+
+- The bottom tab bar loses **More**; its contents move to the masthead
+  **account menu** (the initial dropdown). The bar is now Home · Schedule ·
+  Roster · Chat (squad staff keep Squad Hub), and every idle tab gains a small
+  caption under its icon while the active tab still expands into the red pill.
+  The account menu gains the **Admin** door (admins) and the **Approvals** door
+  (coaches/managers — the phone's only route to the queue now, gated by
+  `canApproveAnything`, pending/medic cases and all), an **Enter-sends** chat
+  toggle, **Notifications** and **Add to your calendar** links to the /more
+  sections, and **Privacy policy** / **Delete your account** links. `/more`
+  stays as the settings page behind "My account", trimmed of the moved sections.
+  Also: idle dock icons read at full ink and the dock's light-mode frost is
+  strengthened, so the bar is legible over pale content. `src/components/Nav.jsx`,
+  `src/components/AccountMenu.jsx`, `src/components/Sidebar.jsx`,
+  `src/screens/More.jsx`, `src/index.css`. (SHA follows in the next
+  changelog-touching PR.)
+
 ## 28 Aug 2026
 
-- Rights log (`/admin/rights-log`) gains read-only view controls, in a
+- `2000049` — Rights log (`/admin/rights-log`) gains read-only view controls, in a
   collapsed **Filter & group** panel: show access-grants-only, filter by
   person (matched as subject OR actor), restrict to a date range, and group
   entries under day headings. An active-filter badge, a **Clear filters**
@@ -18,8 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   narrowed-to-nothing view from reading as a wiped log. ⚠️ THE LOG STAYS
   APPEND-ONLY — these are client-side filters over the already-fetched 200-entry
   window; nothing writes, hides a row from anyone else, or removes one.
-  `src/screens/AdminRightsLog.jsx`, `tests/rights-log.test.jsx`. (SHA follows in
-  the next changelog-touching PR.)
+  `src/screens/AdminRightsLog.jsx`, `tests/rights-log.test.jsx`.
 - `596319e` — Updated `claude/state-of-play.md` with today's chat photo/voice preview fix
   (`my_chats` returns `last_attachment_path`) and the provider-resilience work
   (`src/lib/resilientFetch.js`, ride through a stalled Supabase). Docs-only, no

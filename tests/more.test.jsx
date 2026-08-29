@@ -468,27 +468,25 @@ describe('More — for every role', () => {
   })
 })
 
-describe('More — the Admin link', () => {
-  it('offers an Admin link to an admin, pointing at /admin', () => {
+// ⚠️ THE "Admin" AND "Approvals" DOORS MOVED TO THE ACCOUNT MENU on 29 Aug 2026
+// with the More tab. Their gating — isAdmin for Admin, canApproveAnything for a
+// coach/manager's Approvals — is proved in tests/account-menu.test.jsx now,
+// including the pending-coach and medic edge cases that used to live here. The
+// More page renders neither, which is asserted directly below.
+describe('More — no longer carries the management doors', () => {
+  it('shows an admin no Admin/Manage door on the page (it is in the account menu)', () => {
     renderMore()
 
-    expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/admin')
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /waiting to be approved/i })).not.toBeInTheDocument()
   })
 
-  it('does not offer an Admin link to a coach', () => {
+  it('shows a coach no approvals door on the page', () => {
     useMembershipsMock.mockReturnValue(memberships(COACH))
 
     renderMore()
 
-    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument()
-  })
-
-  it('does not offer an Admin link to a parent', () => {
-    useMembershipsMock.mockReturnValue(memberships(PARENT))
-
-    renderMore()
-
-    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /waiting to be approved/i })).not.toBeInTheDocument()
   })
 })
 
@@ -697,82 +695,6 @@ describe('More — the You card is editable', () => {
 
     const [fields] = updateMyProfileMock.mock.calls[0]
     expect(Object.keys(fields).sort()).toEqual(['firstName', 'lastName', 'phone', 'profileId'])
-  })
-})
-
-// ── The approvals entry point (Jay, 9 Aug 2026) ────────────────────────
-//
-// ⚠️ THIS IS A COACH'S ONLY ROUTE TO THE QUEUE FROM A PHONE. The Admin pill in
-// the tab bar is admin-only AND desktop-only ("hidden desktop:flex"), so
-// without this link a coach standing on a pitch has no way in at all. That is
-// the failure this block exists to catch, and it is invisible in a browser at
-// laptop width.
-describe('More — the approvals link', () => {
-  const COACH_U10 = [{ id: 'm-c', role: 'coach', team_id: 'team-u10', club_id: 'club-1', status: 'active' }]
-  const MANAGER_U10 = [{ id: 'm-m', role: 'manager', team_id: 'team-u10', club_id: 'club-1', status: 'active' }]
-  const MEDIC_U10 = [{ id: 'm-md', role: 'medic', team_id: 'team-u10', club_id: 'club-1', status: 'active' }]
-  // ⚠️ THE ROW request_staff_role ACTUALLY CREATES: coach, no player, PENDING.
-  // Until 17 Aug 2026 this shape was shown the approvals link and the database
-  // then let it approve. It is a request, not access.
-  const PENDING_COACH_U10 = [
-    { id: 'm-pc', role: 'coach', team_id: 'team-u10', club_id: 'club-1', player_id: null, status: 'pending' },
-  ]
-
-  const approvalsLink = () => screen.queryByRole('link', { name: /waiting to be approved/i })
-
-  it('offers it to a coach', async () => {
-    useMembershipsMock.mockReturnValue(memberships(COACH_U10))
-    renderMore()
-    await screen.findByDisplayValue('Jay')
-    expect(approvalsLink()).toHaveAttribute('href', '/approvals')
-  })
-
-  it('offers it to a team manager', async () => {
-    useMembershipsMock.mockReturnValue(memberships(MANAGER_U10))
-    renderMore()
-    await screen.findByDisplayValue('Jay')
-    expect(approvalsLink()).toHaveAttribute('href', '/approvals')
-  })
-
-  // Medic is a squad staff role and may EDIT this squad's players. Approval is
-  // deliberately a shorter list — Jay, 9 Aug 2026.
-  it('does not offer it to a medic', async () => {
-    useMembershipsMock.mockReturnValue(memberships(MEDIC_U10))
-    renderMore()
-    await screen.findByDisplayValue('Jay')
-    expect(approvalsLink()).toBeNull()
-  })
-
-  // ⚠️ THE ONE THAT WAS LIVE — 17 Aug 2026. A pending coach request has the
-  // same role and the same team_id as an approved coach, so every check in this
-  // file passed it through, and private.can_approve_team agreed: the Approve
-  // button then worked. The row must be able to see its own request waiting
-  // WITHOUT being handed the queue that judges it.
-  //
-  // ⚠️ THIS DIFFERS FROM THE MEDIC CASE ABOVE BY ONE FIELD, ON PURPOSE. Medic
-  // is refused by ROLE; this is refused by STATUS. A fix that only re-checked
-  // roles would pass the medic test and still leave this one open.
-  it('does not offer it to a coach whose request is still pending', async () => {
-    useMembershipsMock.mockReturnValue(memberships(PENDING_COACH_U10))
-    renderMore()
-    await screen.findByDisplayValue('Jay')
-    expect(approvalsLink()).toBeNull()
-  })
-
-  it('does not offer it to a parent', async () => {
-    useMembershipsMock.mockReturnValue(memberships(PARENT))
-    renderMore()
-    await screen.findByDisplayValue('Jay')
-    expect(approvalsLink()).toBeNull()
-  })
-
-  // An admin already has the Admin pill in the nav. A second door to the same
-  // screen is clutter, not access.
-  it('does not duplicate it for an admin, who has the Admin pill', async () => {
-    useMembershipsMock.mockReturnValue(memberships(ADMIN))
-    renderMore()
-    await screen.findByDisplayValue('Jay')
-    expect(approvalsLink()).toBeNull()
   })
 })
 

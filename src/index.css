@@ -520,6 +520,29 @@
       inset 0 -8px 14px -10px rgb(40 50 70 / 0.35),
       0 8px 24px rgb(0 0 0 / 0.12);
   }
+  /* ⚠️ THE DOCK GETS A LITTLE MORE FROST IN LIGHT MODE (28 Aug 2026, Jay: the
+     bottom bar reads faint in light mode). The base stops above are a few
+     percent — glorious over a photo, but over the app's pale content well
+     there is almost nothing behind the dark idle icons, so they wash out. This
+     doubles the cool-grey backing FOR THE DOCK, IN LIGHT ONLY: still plainly
+     glass (max ~22%, and grey-blue, never the white smoke Jay rejected), just
+     enough that an inactive icon has something to sit on wherever it floats.
+     Scoped off `.dark` so dark mode — light icons on dark content, already
+     legible — and the masthead island are untouched. Pairs with Nav.jsx
+     dropping the idle /90 fade. */
+  /* ⚠️ GUARDED so it cannot beat the opaque `@supports not (backdrop-filter)`
+     fallback below on specificity — where the glass does not filter, the dock
+     must stay the solid card surface, not this translucent tint. */
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root:not(.dark) .glass-dock {
+      background: linear-gradient(
+        160deg,
+        rgb(140 150 165 / 0.18),
+        rgb(90 100 115 / 0.1) 45%,
+        rgb(140 150 165 / 0.22)
+      );
+    }
+  }
   /* The light-catch glint: strongest top-left, a faint cool return at the
      bottom-right — the sliding reflection that says "glass" even when the
      page behind is featureless. pointer-events-none, pure paint. */
