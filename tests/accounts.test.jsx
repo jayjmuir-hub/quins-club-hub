@@ -1932,6 +1932,97 @@ describe('Accounts — viewing by type', () => {
 })
 
 /* ══════════════════════════════════════════════════════════════════════════
+   Searching the accounts — Jay, 29 Aug 2026: "i need to be able to search
+   them, there is no current search function". A free-text box over the ACTIVE
+   list, matching name or email, composing with the type chips, and appearing
+   only once there is more than a screenful to scan.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('Accounts — searching by name or email', () => {
+  // Eight distinct people — enough to cross the threshold the box appears above.
+  // Invented names, real shape (CLAUDE.md rule 9): two coaches, six parents.
+  const PEOPLE = [
+    ['Amara Bello', 'amara@example.com', 'coach', 'team-u10'],
+    ['Bao Nguyen', 'bao@example.com', 'parent', 'team-u10'],
+    ['Cira Okonkwo', 'cira@example.com', 'parent', 'team-u12'],
+    ['Dmitri Volkov', 'dmitri@example.com', 'parent', 'team-u12'],
+    ['Elif Demir', 'elif@example.com', 'coach', 'team-u14'],
+    ['Farah Haddad', 'farah@example.com', 'parent', 'team-u14'],
+    ['Gita Rao', 'gita@example.com', 'parent', 'team-u16'],
+    ['Hugo Silva', 'hugo@example.com', 'parent', 'team-u16'],
+  ]
+  const ROWS = PEOPLE.map(([name, email, role, team], i) => ({
+    id: `mem-search-${i}`,
+    profile_id: `profile-search-${i}`,
+    club_id: CLUB_ID,
+    role,
+    status: 'active',
+    team_id: team,
+    created_at: '2026-04-01T09:00:00Z',
+    profiles: { full_name: name, email },
+    teams: null,
+  }))
+
+  const box = () => screen.getByLabelText(/search accounts/i)
+
+  const renderMany = async () => {
+    listClubMembersMock.mockResolvedValue(ROWS)
+    useMembershipsMock.mockReturnValue(memberships(ADMIN))
+    setup()
+    return screen.findByTestId('account-search')
+  }
+
+  it('offers a search box once there is more than a screenful', async () => {
+    await renderMany()
+    expect(await screen.findAllByTestId('account-person')).toHaveLength(8)
+  })
+
+  it('narrows the list to a name match', async () => {
+    const user = userEvent.setup()
+    await renderMany()
+    await user.type(box(), 'okonkwo')
+    expect(screen.getAllByTestId('account-person')).toHaveLength(1)
+    expect(screen.getByText('Cira Okonkwo')).toBeInTheDocument()
+  })
+
+  it('matches on email too, for a nameless or half-remembered row', async () => {
+    const user = userEvent.setup()
+    await renderMany()
+    await user.type(box(), 'dmitri@')
+    expect(screen.getAllByTestId('account-person')).toHaveLength(1)
+    expect(screen.getByText('Dmitri Volkov')).toBeInTheDocument()
+  })
+
+  it('composes with the type filter rather than replacing it', async () => {
+    const user = userEvent.setup()
+    await renderMany()
+    const chips = await screen.findByTestId('account-type-filter')
+    await user.click([...chips.querySelectorAll('button')].find((b) => b.textContent.startsWith('Coach')))
+    expect(screen.getAllByTestId('account-person')).toHaveLength(2) // Amara, Elif
+    await user.type(box(), 'elif')
+    expect(screen.getAllByTestId('account-person')).toHaveLength(1)
+    expect(screen.getByText('Elif Demir')).toBeInTheDocument()
+  })
+
+  it('says so when nothing matches, without claiming the club is empty', async () => {
+    const user = userEvent.setup()
+    await renderMany()
+    await user.type(box(), 'nobody by that name')
+    expect(screen.queryAllByTestId('account-person')).toHaveLength(0)
+    expect(screen.getByText(/no accounts match/i)).toBeInTheDocument()
+  })
+
+  it('stays hidden for a small club, where the eye is faster than the box', async () => {
+    // The default four rows are three people — below the threshold.
+    listClubMembersMock.mockResolvedValue(MEMBER_ROWS)
+    useMembershipsMock.mockReturnValue(memberships(ADMIN))
+    setup()
+    await screen.findAllByTestId('account-person')
+    expect(screen.queryByTestId('account-search')).toBeNull()
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
    "Waiting for access" — showing what we already know, 16 Aug 2026
    ══════════════════════════════════════════════════════════════════════════
 

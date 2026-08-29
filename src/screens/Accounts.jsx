@@ -866,6 +866,13 @@ export default function Accounts() {
   // Which kind of account the list is narrowed to. Jay, 16 Aug 2026: "we need to
   // be able to view accounts by type, Parent/Player, Coach, Manager, etc".
   const [roleFilter, setRoleFilter] = useState(ALL_ROLES)
+  // Free-text search over the active accounts by name or email. Jay, 29 Aug 2026:
+  // "i need to be able to search them, there is no current search function". It
+  // composes WITH the role filter rather than replacing it — narrow to Coach,
+  // then find one by name — and it only ever narrows what is already on screen,
+  // never the pending queues (a request must not be searchable-away, same reason
+  // the role chips leave those untouched).
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
@@ -1223,10 +1230,19 @@ export default function Accounts() {
   // access" is a fact about the club, not about the filter — recomputing it
   // against the narrowed list would make the number change every time somebody
   // taps a chip, which is the sort of counter people stop believing.
-  const shownGroups =
-    roleFilter === ALL_ROLES
-      ? groups
-      : groups.filter((group) => group.memberships.some((member) => member.role === roleFilter))
+  // ⚠️ NAME AND EMAIL, THE TWO THINGS AN ADMIN KNOWS. A person's name is what
+  // they are looking for; the email is the fallback for a nameless row (a
+  // just-signed-up account) and the thing an admin often has to hand. Matched
+  // as a case-insensitive substring — no fuzzy matching, because "find Muir"
+  // must not also surface everyone else.
+  const query = search.trim().toLowerCase()
+  const shownGroups = groups.filter((group) => {
+    const roleOk =
+      roleFilter === ALL_ROLES || group.memberships.some((member) => member.role === roleFilter)
+    if (!roleOk) return false
+    if (!query) return true
+    return `${group.name ?? ''} ${group.email ?? ''}`.toLowerCase().includes(query)
+  })
   const isFirstLoad = loading && members.length === 0
 
   // ⚠️ LOOKED UP FROM `groups` EVERY RENDER RATHER THAN HELD IN STATE. The
@@ -2238,6 +2254,38 @@ export default function Accounts() {
           filtering to "Coach" is asking who the coaches ARE, not asking to be
           shown fewer people waiting to be let in. Hiding a pending request
           behind a filter is how one sits unnoticed for a week. ── */}
+      {/* ⚠️ SEARCH SITS ABOVE THE TYPE CHIPS AND NARROWS ONLY THE ACTIVE LIST.
+          Shown whenever there is more than a screenful to scan — below that the
+          eye is faster than the box. Gated on the whole-club count, not the
+          filtered one, so typing a query that shrinks the list to nothing can
+          never make the box that is doing the shrinking disappear. */}
+      {!isFirstLoad && !error && groups.length > 6 && (
+        <div className="mb-3" data-testid="account-search">
+          <label htmlFor="account-search" className="sr-only">
+            Search accounts by name or email
+          </label>
+          <div className="relative">
+            <svg
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
+              strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-muted"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+            <input
+              id="account-search"
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by name or email"
+              autoComplete="off"
+              className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card py-2.5 pl-10 pr-3 text-[15px] text-ink outline-none transition placeholder:text-ink-faint focus:border-brand"
+            />
+          </div>
+        </div>
+      )}
+
       {!isFirstLoad && !error && availableRoles.length > 1 && (
         <div className="mb-3.5 flex flex-wrap gap-2" data-testid="account-type-filter">
           <button
@@ -2281,7 +2329,11 @@ export default function Accounts() {
       {!isFirstLoad && !error && groups.length > 0 && shownGroups.length === 0 && (
         <Card>
           <Empty
-            message={`Nobody holds that kind of account. Tap Everyone to see all ${groups.length}.`}
+            message={
+              query
+                ? `No accounts match “${search.trim()}”.`
+                : `Nobody holds that kind of account. Tap Everyone to see all ${groups.length}.`
+            }
           />
         </Card>
       )}

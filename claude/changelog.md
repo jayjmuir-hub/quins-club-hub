@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Two guards against blank "hasn't said what they need" signups** (Jay traced
+- **Search the accounts list by name or email.** Jay: "i need to be able to
+  search them, there is no current search function". A free-text box on the
+  admin Accounts screen that narrows the ACTIVE list as you type, matching a
+  person's name or email (case-insensitive substring). It composes with the
+  existing type chips — narrow to Coach, then find one by name — and never
+  touches the pending queues, for the same reason the chips don't: a request
+  must not be searchable-away. Shown only once there is more than a screenful
+  (`groups.length > 6`), gated on the whole-club count so a query that empties
+  the list can't hide its own box; the no-match state says "No accounts match …"
+  rather than claiming the club is empty. `src/screens/Accounts.jsx`,
+  `tests/accounts.test.jsx`. (SHA follows in the next changelog-touching PR.)
+- `bb0ada6` — **Two guards against blank "hasn't said what they need" signups** (Jay traced
   one to a stale-cache client, 29 Aug). (1) `src/lib/auth.jsx` adds
   `shouldCreateUser: false` to the mothballed magic-link sign-in, so a link
   request for an unknown email is a no-op login instead of silently minting a
@@ -24,8 +35,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   completes the request. Applied to production and proven by a rolled-back
   `db/tests/hold-bare-signup.sql` harness (bare held, named control left alone,
   self-test). `db/schema/triggers.sql`, `db/schema/functions.sql`. Existing bare
-  accounts are unaffected — dismiss those by hand. (SHA follows in the next
-  changelog-touching PR.)
+  accounts are unaffected — dismiss those by hand.
 - `d9f3be8` — **Re-captured `handle_new_user` in `db/schema/functions.sql`** to match the
   live function. The captured body had drifted well behind production: it showed
   only the profile insert, while the deployed trigger also derives the name,
