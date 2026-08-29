@@ -264,6 +264,20 @@
 --                     version difference — the revokes are in
 --                     db/migrations/20260816_photo_orphan_scan.sql.
 --   pitch_requests    anon, authenticated, postgres, service_role   ALL 8
+--   pitch_share_approvals authenticated  SELECT INSERT UPDATE DELETE REFERENCES TRIGGER (6)
+--   pitch_share_approvals postgres, service_role  the same six + TRUNCATE (7)
+--   pitch_share_approvals anon                                      ← NOTHING AT ALL
+--                     ⚠️ ADDED 30 Aug 2026 with the sharing override
+--                     (20260830_pitch_share_approvals.sql). MEASURED after
+--                     applying, not guessed: the migration REVOKEs anon
+--                     (Supabase's create-table default had handed it everything,
+--                     and only a REVOKE takes that back — it now has nothing)
+--                     and GRANTs select/insert/delete to authenticated, inert on
+--                     top of the six the default already gave it. ⚠️ NOT "ALL 8"
+--                     like the rows above — on this Postgres 17 project nobody
+--                     holds MAINTAIN, and authenticated lacks TRUNCATE, so the
+--                     honest counts are 6 and 7. RLS does the real gating
+--                     (read = staff, write = is_admin).
 --   pitches           anon, authenticated, postgres, service_role   ALL 8
 --   player_contacts   anon, authenticated, postgres, service_role   ALL 8
 --   player_parents    anon, authenticated, postgres, service_role   ALL 8

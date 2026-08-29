@@ -76,6 +76,8 @@ const ALIASES = [
   // exact omission the export-parity check below exists to catch.
   ['harness/stubs/playerTiers.js', 'src/data/playerTiers.js'],
   ['harness/stubs/pitchRequests.js', 'src/data/pitchRequests.js'],
+  // The "this overload is fine" approvals, 30 Aug 2026.
+  ['harness/stubs/pitchShareApprovals.js', 'src/data/pitchShareApprovals.js'],
   // The Squad contacts block on Home, 13 Aug 2026.
   //
   // ⚠️ AND THE COUNT ASSERTION CAUGHT IT AGAIN — 14 vs 13, on the fourth

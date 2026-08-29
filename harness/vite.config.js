@@ -115,6 +115,13 @@ export default defineConfig({
       // src/screens/, one level below src/, so the specifier text matches the
       // same rule shape as every alias above.
       { find: /^\.\.\/data\/pitches\.js$/, replacement: path.resolve(__dirname, 'stubs/pitches.js') },
+      // The "this overload is fine" approvals (30 Aug 2026). PitchCalendar.jsx
+      // (src/components/) and PitchGlance/Allocation (src/screens/) all import it
+      // one level below src/, so the one specifier-text rule covers all three.
+      {
+        find: /^\.\.\/data\/pitchShareApprovals\.js$/,
+        replacement: path.resolve(__dirname, 'stubs/pitchShareApprovals.js'),
+      },
       // Player grades (25 Aug 2026): Lineup.jsx reads them for the tier
       // warnings, and src/data/playerTiers.js imports supabase at module
       // scope — the stubs/staff.js failure mode, not a broken read.

@@ -1,8 +1,10 @@
 import Card from './Card.jsx'
+import Button from './Button.jsx'
 import { dayKey, dayKeyOf, monthGrid, sameDay, weekDays } from '../lib/calendarGrid.js'
 import { eventDate, eventTimeLabel, formatTableDate } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PITCH_TBD } from '../data/pitches.js'
+import { shareKey } from '../data/pitchShareApprovals.js'
 import { portionFraction, portionLabel } from '../lib/pitchPortion.js'
 
 // The WEEK and MONTH views of the pitch calendar. The DAY view — pitches down
@@ -303,16 +305,20 @@ function occupancyStatus(load) {
 }
 
 /** One shared pitch, as a stacked bar plus a named legend. */
-function ShareRow({ group, teamsById }) {
+function ShareRow({ group, teamsById, approved, canApprove, onApprove, onUndo, busy }) {
   const segments = shareSegments(group)
   const status = occupancyStatus(group.load)
+  // An APPROVED overload is a resolved one: it stops reading as a warning
+  // (bar tones, not warn) and its line says who cleared it. Only an unapproved
+  // overload is still "over" for styling.
+  const overActive = status.over && !approved
   // When a share overflows, scale to the load so every segment stays visible
   // inside the bar rather than being clipped at the pitch edge.
   const scale = Math.max(group.load, 1)
   const rep = peakEvent(group)
   const spoken = `${group.pitch}: ${segments
     .map((seg) => `${squadOf(seg.event, teamsById)} ${portionOf(seg.event).toLowerCase()}`)
-    .join(', ')} — ${status.text}`
+    .join(', ')} — ${approved ? 'sharing approved' : status.text}`
 
   return (
     <div data-testid={status.over ? 'share-row-over' : 'share-row'} className="px-3 py-2.5">
@@ -333,7 +339,7 @@ function ShareRow({ group, teamsById }) {
             key={seg.key}
             title={`${squadOf(seg.event, teamsById)} · ${portionOf(seg.event)}`}
             style={{ width: `${(seg.fraction / scale) * 100}%` }}
-            className={status.over ? 'bg-warn' : SEG_TONES[i % SEG_TONES.length]}
+            className={overActive ? 'bg-warn' : SEG_TONES[i % SEG_TONES.length]}
           />
         ))}
       </div>
@@ -343,26 +349,57 @@ function ShareRow({ group, teamsById }) {
           <span key={seg.key} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-muted">
             <span
               aria-hidden="true"
-              className={['h-2 w-2 rounded-full', status.over ? 'bg-warn' : SEG_TONES[i % SEG_TONES.length]].join(' ')}
+              className={['h-2 w-2 rounded-full', overActive ? 'bg-warn' : SEG_TONES[i % SEG_TONES.length]].join(' ')}
             />
             {squadOf(seg.event, teamsById)} · {portionOf(seg.event)}
           </span>
         ))}
       </div>
 
-      <p className={['mt-1 text-[11.5px] font-bold', status.over ? 'text-warn-ink' : 'text-ink-faint'].join(' ')}>
-        {status.over ? '⚠ ' : ''}
-        {status.text}
-      </p>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <p
+          className={[
+            'text-[11.5px] font-bold',
+            approved ? 'text-accent-ink' : overActive ? 'text-warn-ink' : 'text-ink-faint',
+          ].join(' ')}
+        >
+          {approved ? '✓ Sharing approved' : `${overActive ? '⚠ ' : ''}${status.text}`}
+        </p>
+
+        {/* Only an admin sees a control, and only on an OVERLOAD — a share that
+            fits has nothing to approve. Approving clears the clash marker across
+            the calendar; undoing brings it back. */}
+        {canApprove && status.over && (
+          approved ? (
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => onUndo(shareKey(group.events))}>
+              Undo
+            </Button>
+          ) : (
+            <Button variant="secondary" size="sm" disabled={busy} onClick={() => onApprove(group)}>
+              It&apos;s fine — approve
+            </Button>
+          )
+        )}
+      </div>
     </div>
   )
 }
 
 /**
  * The shared-pitch panel under the calendar. Renders nothing when no pitch is
- * shared in the loaded window — a permanent empty "Sharing" card would be furniture.
+ * shared in the loaded window — a permanent empty "Sharing" card would be
+ * furniture. `approvedKeys` marks the overloads an admin has cleared;
+ * `canApprove` (admins only) turns on the approve / undo control.
  */
-export function PitchOccupancy({ shares, teamsById }) {
+export function PitchOccupancy({
+  shares,
+  teamsById,
+  approvedKeys,
+  canApprove = false,
+  onApprove,
+  onUndo,
+  busy = false,
+}) {
   if (!shares || shares.length === 0) return null
   const sorted = [...shares].sort(
     (a, b) => (eventDate(peakEvent(a))?.getTime() ?? 0) - (eventDate(peakEvent(b))?.getTime() ?? 0),
@@ -378,9 +415,14 @@ export function PitchOccupancy({ shares, teamsById }) {
       <div className="divide-y divide-line">
         {sorted.map((group) => (
           <ShareRow
-            key={`${group.pitch}|${group.events.map((e) => e.id).sort().join(',')}`}
+            key={`${group.pitch}|${shareKey(group.events)}`}
             group={group}
             teamsById={teamsById}
+            approved={Boolean(approvedKeys?.has(shareKey(group.events)))}
+            canApprove={canApprove}
+            onApprove={onApprove}
+            onUndo={onUndo}
+            busy={busy}
           />
         ))}
       </div>

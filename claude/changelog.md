@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **The parent/player tab bar shrinks to a centred island.** The bottom dock's
+- **Pitch sharing: the "it's fine" override.** The last piece — an admin can
+  mark a genuine over-capacity share as OK, and the clash marker clears across
+  the calendar. `pitch_share_approvals`
+  (`db/migrations/20260830_pitch_share_approvals.sql`) stores an approval keyed
+  to the EXACT set of bookings (`shareKey` — the involved event ids, sorted), so
+  it clears that overload and no other, and a fourth squad added to the pitch
+  changes the key and re-flags. New `src/data/pitchShareApprovals.js`; the
+  occupancy panel grows an admin-only "It's fine — approve" / "Undo" control
+  (`private.is_admin` gated in RLS, matching the request queue), and both the
+  Allocation grid and the PitchGlance markers skip an approved cohort. The
+  approve action lives on Allocation, where the fixtures carry the club the
+  write needs; PitchGlance reflects the approved state read-only.
+  `src/components/PitchCalendar.jsx`, `src/screens/Allocation.jsx`,
+  `src/screens/PitchGlance.jsx`, `harness/stubs/pitchShareApprovals.js`,
+  `harness/vite.config.js`, `tests/pitch-share-approvals.test.js`,
+  `tests/allocation.test.jsx`, `tests/pitch-glance.test.jsx`,
+  `tests/harness-stubs.test.js`. This completes
+  `claude/plans/2026-08-29-pitch-portions.md`. (SHA follows in the next
+  changelog-touching PR.)
+- `703c8d2` — **The parent/player tab bar shrinks to a centred island.** The bottom dock's
   spacing was tuned for the five-tab squad-staff bar; a parent or player has only
   four (no Squad Hub), and at that count the full-width `justify-between` spread
   nearly doubled every gap — ~44px against staff's ~23px — so the icons scattered
@@ -18,7 +37,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the dock is now a fixed-width centred island that hugs its tabs (gaps back to
   ~27px); at five it stays the full-width bar, so squad staff see no change. Both
   widths keep `justify-between`, so the glider math is untouched. `src/components/Nav.jsx`.
-  (SHA follows in the next changelog-touching PR.)
 - `b7e6c73` — **Tournaments can be added for several age groups at once.** "Also add for" was
   hidden in tournament mode at ship (phase 3); Jay asked for it back — a festival
   is one event several of our squads enter. Ticking extra squads now fans the

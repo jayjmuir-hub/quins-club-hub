@@ -1,9 +1,10 @@
 # Pitch sharing: portions and capacity-based clash detection
 
-**Status: MOSTLY SHIPPED — phases 1 (#522, `a128447`), 2 (#523, `a4283c7`,
-migration applied) and 3-allocator (#525, `c9ca550`) all merged; the PitchGlance
-stacked occupancy view is code-written; only the "sharing approved" override is
-left.** Dated 2026-08-29.
+**Status: COMPLETE (pending final merge) — phases 1 (#522, `a128447`), 2 (#523,
+`a4283c7`, migration applied), 3-allocator (#525, `c9ca550`) and the occupancy
+view (#527, `44d53e5`) all merged and live; the "sharing approved" override is
+code-written with its migration pending. Every part of this plan is now built.**
+Dated 2026-08-29, override added 2026-08-30.
 
 ## What Jay asked for
 
@@ -84,5 +85,14 @@ a drop-column change). Jay applies the migration; the PR merges after.
   fill when it overflows — with a named legend and an aria-label so colour is
   never the only signal. `src/components/PitchCalendar.jsx`, `src/screens/PitchGlance.jsx`,
   `harness/stubs/pitches.js`, `tests/pitch-shares.test.js`, `tests/pitch-glance.test.jsx`.
-- **"Sharing approved" override (not started)** for a genuine over-capacity that
-  is still fine, keyed to the exact set of events so a new booking re-flags.
+- **"Sharing approved" override (CODE WRITTEN, migration pending).** For a
+  genuine over-capacity that is still fine. `pitch_share_approvals`
+  (`db/migrations/20260830_pitch_share_approvals.sql`) stores an approval keyed
+  to the exact set of bookings — `shareKey` in `src/data/pitchShareApprovals.js`,
+  the same identity the clash cohort has — so it clears that overload and no
+  other, and a changed cohort re-flags. The occupancy panel gains an admin-only
+  "It's fine — approve" / "Undo" control (`private.is_admin` in RLS); the
+  Allocation grid and the PitchGlance markers both skip an approved cohort. The
+  approve action is on Allocation (the fixtures there carry the club_id the write
+  needs); PitchGlance reflects the state read-only. `src/components/PitchCalendar.jsx`,
+  `src/screens/Allocation.jsx`, `src/screens/PitchGlance.jsx`.

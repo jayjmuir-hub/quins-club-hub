@@ -7,6 +7,7 @@ import { PitchMonth, PitchOccupancy, PitchWeek } from '../components/PitchCalend
 import Segmented from '../components/Segmented.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { findPitchClashes, listPitchOccupancy, pitchShares } from '../data/pitches.js'
+import { listShareApprovalKeys, shareKey } from '../data/pitchShareApprovals.js'
 import { monthGrid, shiftDay, shiftMonth, weekDays, windowFor } from '../lib/calendarGrid.js'
 import { clubToday } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -37,6 +38,7 @@ export default function PitchGlance() {
   const [view, setView] = useState('week')
   const [anchor, setAnchor] = useState(() => clubToday())
   const [events, setEvents] = useState([])
+  const [approvedKeys, setApprovedKeys] = useState(() => new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -60,9 +62,18 @@ export default function PitchGlance() {
     let mounted = true
     setLoading(true)
     setError(null)
-    listPitchOccupancy(window)
-      .then((rows) => {
-        if (mounted) setEvents(rows)
+    // ⚠️ THE APPROVALS RIDE ALONGSIDE, AND A FAILED READ IS NOT AN ERROR. If the
+    // approvals table is unreachable the calendar still loads — it just shows
+    // the clash markers an admin may already have cleared, which is the safe
+    // direction (a warning that should be gone, not a clash silently hidden).
+    Promise.all([
+      listPitchOccupancy(window),
+      listShareApprovalKeys().catch(() => new Set()),
+    ])
+      .then(([rows, keys]) => {
+        if (!mounted) return
+        setEvents(rows)
+        setApprovedKeys(keys)
       })
       .catch((cause) => {
         if (mounted) setError(cause)
@@ -83,13 +94,17 @@ export default function PitchGlance() {
     return map
   }, [events])
 
+  // A clash an admin has marked "fine" stops highlighting — so the same
+  // approval that resolves the occupancy row also clears the calendar marker,
+  // and the two never disagree.
   const clashing = useMemo(() => {
     const ids = new Set()
     for (const clash of findPitchClashes(events)) {
+      if (approvedKeys.has(shareKey(clash.events))) continue
       for (const event of clash.events) ids.add(event.id)
     }
     return ids
-  }, [events])
+  }, [events, approvedKeys])
 
   // Every shared pitch in the loaded window, for the occupancy panel below the
   // calendar — the "what's free before I ask" view. Clashes are the subset of
@@ -173,8 +188,13 @@ export default function PitchGlance() {
       )}
 
       {/* The occupancy view — how full each shared pitch is, and what's spare.
-          Renders nothing when nothing is shared in the loaded window. */}
-      {!loading && !error && <PitchOccupancy shares={shares} teamsById={teamsById} />}
+          Read-only here (approving lives on the Allocation screen, where the
+          fixtures carry the club the write needs); it reflects the approved
+          state so a cleared clash reads as resolved. Renders nothing when
+          nothing is shared in the loaded window. */}
+      {!loading && !error && (
+        <PitchOccupancy shares={shares} teamsById={teamsById} approvedKeys={approvedKeys} />
+      )}
     </section>
   )
 }

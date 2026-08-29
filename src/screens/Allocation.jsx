@@ -3,15 +3,16 @@ import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
-import { listPitches, findPitchClashes, PITCH_TBD } from '../data/pitches.js'
+import { listPitches, findPitchClashes, pitchShares, PITCH_TBD } from '../data/pitches.js'
+import { listShareApprovalKeys, approveShare, unapproveShare, shareKey } from '../data/pitchShareApprovals.js'
 import { PITCH_PORTIONS, defaultPitchPortion } from '../lib/pitchPortion.js'
 import { listPitchRequests, allocatePitch, declinePitch, setEventPitch } from '../data/pitchRequests.js'
 import { Sheet } from '../components/Sheet.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { hasAdminRight, visibleTeams } from '../lib/scope.js'
+import { hasAdminRight, isAdmin, visibleTeams } from '../lib/scope.js'
 import { CLUB_TIME_ZONE, clubToday, eventDate, eventEndDate, eventTimeLabel, eventTitle, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
-import { PitchMonth, PitchWeek } from '../components/PitchCalendar.jsx'
+import { PitchMonth, PitchOccupancy, PitchWeek } from '../components/PitchCalendar.jsx'
 import EventDetail from './EventDetail.jsx'
 import {
   monthGrid,
@@ -166,6 +167,11 @@ export default function Allocation() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
+  // The "this overload is fine" approvals, and the state for the approve/undo
+  // control on the occupancy panel below.
+  const [approvedKeys, setApprovedKeys] = useState(() => new Set())
+  const [approveBusy, setApproveBusy] = useState(false)
+  const [approveError, setApproveError] = useState(null)
 
   const teamIds = useMemo(() => visibleTeams(memberships, teams).map((team) => team.id), [memberships, teams])
   const teamsById = useMemo(() => new Map((teams ?? []).map((team) => [team.id, team])), [teams])
@@ -191,12 +197,16 @@ export default function Allocation() {
       // to the visible day would hide next Saturday's requests every weekday
       // and the queue would look empty precisely when there is work.
       listPitchRequests({ status: 'submitted' }).catch(() => []),
+      // A failed approvals read is not an error state — it just leaves the
+      // clash markers showing, the safe direction.
+      listShareApprovalKeys().catch(() => new Set()),
     ])
-      .then(([eventRows, pitchRows, requestRows]) => {
+      .then(([eventRows, pitchRows, requestRows, approvalKeys]) => {
         if (!mounted) return
         setEvents(eventRows)
         setPitches(pitchRows)
         setRequests(requestRows)
+        setApprovedKeys(approvalKeys)
       })
       .catch((failure) => {
         if (!mounted) return
@@ -217,14 +227,19 @@ export default function Allocation() {
   // ⚠️ Clashes are computed over the DAY'S events, and the exemptions live in
   // findPitchClashes — a multi-squad fan-out sharing a group_id is not a clash,
   // portions that fit within one pitch are not a clash, touching is not
-  // overlapping, and Pitch TBD never clashes.
+  // overlapping, and Pitch TBD never clashes. An overload an admin has marked
+  // "fine" is excluded too, so the marker and the occupancy row agree.
   const clashing = useMemo(() => {
     const ids = new Set()
     for (const clash of findPitchClashes(events)) {
+      if (approvedKeys.has(shareKey(clash.events))) continue
       for (const event of clash.events) ids.add(event.id)
     }
     return ids
-  }, [events])
+  }, [events, approvedKeys])
+
+  // Every shared pitch on screen, for the occupancy panel below the grid.
+  const shares = useMemo(() => pitchShares(events), [events])
 
   // ⚠️ AWAY MATCHES ARE NOT WAITING FOR ANYTHING — somebody else's ground,
   // no pitch of ours to give (Jay, 24 Aug 2026). Strict `=== false`, the
@@ -254,6 +269,21 @@ export default function Allocation() {
       setDecideError(failure)
     } finally {
       setDecideBusy(false)
+    }
+  }
+
+  // Approve / undo a sharing overload. Re-reads just the approvals afterwards —
+  // the fixtures did not change, only whether one overlap is being flagged.
+  async function runApproval(work) {
+    setApproveBusy(true)
+    setApproveError(null)
+    try {
+      await work()
+      setApprovedKeys(await listShareApprovalKeys())
+    } catch (failure) {
+      setApproveError(failure)
+    } finally {
+      setApproveBusy(false)
     }
   }
 
@@ -552,6 +582,26 @@ export default function Allocation() {
           </div>
         </Card>
       )}
+
+      {/* ── The occupancy view, with the "it's fine" override ─────────────
+          Admins can clear a genuine overload here; the marker on the grid above
+          clears with it. `isAdmin`, not the pitches right, matches the RLS that
+          backs the write (private.is_admin), the same gate the request queue's
+          Answer uses. */}
+      {approveError && (
+        <p role="alert" className="mt-3 text-[13px] font-semibold text-danger-ink">
+          {approveError.message || "That didn't save. Try again."}
+        </p>
+      )}
+      <PitchOccupancy
+        shares={shares}
+        teamsById={teamsById}
+        approvedKeys={approvedKeys}
+        canApprove={isAdmin(memberships)}
+        onApprove={(group) => runApproval(() => approveShare(group.events))}
+        onUndo={(key) => runApproval(() => unapproveShare(key))}
+        busy={approveBusy}
+      />
 
       {/* ── The Pitch Management queue ───────────────────────────────────
           ⚠️ NOT FILTERED BY THE DAY ON SCREEN — see the fetch. A request is a
