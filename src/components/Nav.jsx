@@ -214,7 +214,7 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
   // "SQUAD HUB", the longest caption, sat ON the outline out there (Jay's phone,
   // 29 Aug 2026: "the b is sitting on the menu outline"). Interior, it has the
   // room. findIndex rather than a hard slice so it survives a NAV_ITEMS reorder.
-  const items = showSquadHub
+  const base = showSquadHub
     ? (() => {
         const chatAt = NAV_ITEMS.findIndex((item) => item.to === '/chat')
         const at = chatAt < 0 ? NAV_ITEMS.length : chatAt
@@ -225,6 +225,26 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
         ]
       })()
     : NAV_ITEMS
+
+  // ⚠️ HOME RIDES THE CENTRE OF THE DOCK, NOT THE LEFT EDGE — Jay, 29 Aug 2026.
+  // The app opens on Home (the PWA `start_url` is `/`, which routes to the
+  // Dashboard), and the middle of the bar is the thumb's natural resting slot —
+  // so the tab you land on is the tab under your thumb.
+  //
+  // ⚠️ THIS IS A MOBILE-BAR-ONLY REORDER. NAV_ITEMS — and so the desktop
+  // Sidebar, which imports it — keep Home FIRST, where the top of a vertical
+  // nav belongs; only this horizontal dock moves it. `findIndex` + splice, not
+  // a hard index, so it holds for both bars: Home lands at `floor(count/2)`,
+  // the centre slot — dead centre of the five-tab squad-staff bar, the middle
+  // of the four-tab parent/player one.
+  const items = (() => {
+    const list = [...base]
+    const homeAt = list.findIndex((item) => item.to === '/')
+    if (homeAt < 0) return list
+    const [home] = list.splice(homeAt, 1)
+    list.splice(Math.floor(base.length / 2), 0, home)
+    return list
+  })()
 
   const { pathname } = useLocation()
   const navRef = useRef(null)

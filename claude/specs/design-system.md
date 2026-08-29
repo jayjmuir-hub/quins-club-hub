@@ -350,6 +350,8 @@ All icons referenced below are inline SVG strings from the `I` icon dictionary �
 - Desktop (≥820px): `.tabbar{display:none}` — replaced entirely by `.nav-desktop` in the header (§4.1). Same 4 items, same active/inactive logic, rendered from the same `NAV` array/`buildNav()` function into both containers simultaneously.
 - The exact same markup (icon+label button) is reused for both bars — `buildNav()` writes identical `innerHTML` into `#tabbar` and `#navDesktop`.
 
+⚠️ **The live dock has moved on from this prototype snapshot** (`src/components/Nav.jsx`, `src/components/Sidebar.jsx`). The "More" tab retired 29 Aug 2026 (its home is the masthead account menu); the items are now **Home, Schedule, Roster, Chat**, with **Squad Hub** inserted before Chat for squad staff. And since 29 Aug 2026 **Home rides the CENTRE of the mobile dock, not the left edge** (Jay) — the app opens on Home (`start_url` `/` → Dashboard) and the middle of the bar is the thumb's resting slot, so the tab you land on is the tab under your thumb. This is a **mobile-bar-only reorder**: `NAV_ITEMS` (and so the desktop Sidebar, a vertical list) keep Home first; only the horizontal dock centres it, at `floor(count/2)` — dead centre of the five-tab staff bar, the middle of the four-tab parent/player one.
+
 ### 4.4 FAB (floating action button)
 ```html
 <button class="fab" id="fab" title="Add">{plus svg}</button>

@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Pitch sharing, phase 3: allocator-side portion.** The two assign sheets on
+- **Home rides the centre of the mobile dock.** It sat on the far-left slot of
+  the bottom tab bar; Jay wanted it in the middle. The app opens on Home
+  (`start_url` `/` → Dashboard) and the centre of the bar is the thumb's resting
+  slot, so the tab you land on is the tab under your thumb. Mobile-bar-only
+  reorder: `NAV_ITEMS` — and so the desktop Sidebar, a vertical list — keep Home
+  first, where the top of a vertical nav belongs; only the horizontal dock moves
+  it, to `floor(count/2)` (dead centre of the five-tab squad-staff bar, the
+  middle of the four-tab parent/player one). `src/components/Nav.jsx`,
+  `tests/nav.test.jsx`, `claude/specs/design-system.md` §4.3. (SHA follows in the
+  next changelog-touching PR.)
+- `c9ca550` — **Pitch sharing, phase 3: allocator-side portion.** The two assign sheets on
   the Allocation screen (queue answer + direct assign) set only a pitch, so a
   pitch answered from a coach's request landed with no portion — a full pitch —
   and a shared U8 match would then flag as a clash. Now a "How much of the pitch"
@@ -20,8 +30,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/data/pitchRequests.js`, `tests/allocation.test.jsx`,
   `tests/pitch-requests.test.js`. PitchGlance's stacked occupancy view and the
   "sharing approved" override remain unbuilt. Plan:
-  `claude/plans/2026-08-29-pitch-portions.md`. (SHA follows in the next
-  changelog-touching PR.)
+  `claude/plans/2026-08-29-pitch-portions.md`.
 - `a4283c7` — **Pitch sharing, phase 2: the portion picker and the column.** Adds
   `events.pitch_portion` (`db/migrations/20260829_pitch_portion.sql`, text,
   nullable, CHECK `quarter/half/full`) and a "How much of the pitch" picker on
