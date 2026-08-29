@@ -887,8 +887,9 @@ export default function Accounts() {
   // first_name and last_name, and full_name is rebuilt from those two by the
   // profiles_sync_name trigger. Keeping both would have left two ways to set a
   // name, one of them editing the derived value — which is exactly how the two
-  // drift apart. `updateProfileName` still exists in src/data/members.js with
-  // its own tests; nothing in the app calls it any more.
+  // drift apart. The legacy `full_name` writer that did this (`updateProfileName`)
+  // was removed on 29 Aug 2026 once confirmed unused — the admin path is
+  // `updateMemberProfile`.
   //
   // An earlier draft of this change kept saveName "in case", with a comment
   // claiming it was still exercised. It was not: a review found no control

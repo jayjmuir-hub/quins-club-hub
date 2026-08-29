@@ -83,7 +83,6 @@ import {
   listClubMembers,
   updateMembershipRole,
   deleteMembership,
-  updateProfileName,
   listPendingProfiles,
   grantMembership,
   grantMemberships,
@@ -1667,82 +1666,6 @@ describe('deleteMembership', () => {
     supabase.from.mockReturnValue(builder)
 
     await expect(deleteMembership('m-1')).rejects.toThrow(/permission|not allowed|couldn.t remove/i)
-  })
-})
-
-// --- updateProfileName ----------------------------------------------------
-
-// Task 3. Writes profiles, not memberships: one person can hold several
-// membership rows (no unique constraint on (profile_id, club_id, role)), and
-// they share a single name. Permitted by the `profile update club admin`
-// policy added in the profiles_email_and_admin_access migration.
-describe('updateProfileName', () => {
-  it('updates profiles.full_name for the given profile id and reads the row back', async () => {
-    const saved = { id: 'u-1', full_name: 'Jay Muir', email: 'jay@example.com' }
-    const { builder, calls } = createQueryBuilder({ data: saved })
-    supabase.from.mockReturnValue(builder)
-
-    const result = await updateProfileName({ profileId: 'u-1', fullName: 'Jay Muir' })
-
-    expect(supabase.from).toHaveBeenCalledWith('profiles')
-    expect(builder.update).toHaveBeenCalledTimes(1)
-    expect(calls.update[0][0]).toEqual({ full_name: 'Jay Muir' })
-    expect(calls.eq[0]).toEqual(['id', 'u-1'])
-    expect(builder.select).toHaveBeenCalled()
-    expect(builder.maybeSingle).toHaveBeenCalled()
-    expect(result).toEqual(saved)
-  })
-
-  it('never writes the email column, which mirrors the login address', async () => {
-    // profiles.email is a trigger-maintained mirror of auth.users.email.
-    // Writing it here would desync the address the person signs in with.
-    const { builder, calls } = createQueryBuilder({ data: { id: 'u-1' } })
-    supabase.from.mockReturnValue(builder)
-
-    await updateProfileName({ profileId: 'u-1', fullName: 'Jay Muir', email: 'new@example.com' })
-
-    expect(calls.update[0][0]).not.toHaveProperty('email')
-    expect(calls.update[0][0]).not.toHaveProperty('id')
-  })
-
-  it('trims the name before writing', async () => {
-    const { builder, calls } = createQueryBuilder({ data: { id: 'u-1' } })
-    supabase.from.mockReturnValue(builder)
-
-    await updateProfileName({ profileId: 'u-1', fullName: '  Jay Muir  ' })
-
-    expect(calls.update[0][0]).toEqual({ full_name: 'Jay Muir' })
-  })
-
-  it('refuses a blank name rather than writing one', async () => {
-    // Admin.jsx renders `full_name ?? 'Unnamed member'` — null falls back, an
-    // empty string does not, so a blank save would render a nameless row.
-    for (const fullName of ['', '   ', null, undefined]) {
-      await expect(updateProfileName({ profileId: 'u-1', fullName })).rejects.toThrow(/name/i)
-    }
-    expect(supabase.from).not.toHaveBeenCalled()
-  })
-
-  it('refuses to write without a profile id rather than updating every row', async () => {
-    await expect(updateProfileName({ fullName: 'Jay Muir' })).rejects.toThrow(/profile/i)
-    await expect(updateProfileName()).rejects.toThrow(/profile/i)
-    expect(supabase.from).not.toHaveBeenCalled()
-  })
-
-  it('throws the Supabase error rather than returning a tuple', async () => {
-    const { builder } = createQueryBuilder({ error: new Error('boom') })
-    supabase.from.mockReturnValue(builder)
-
-    await expect(updateProfileName({ profileId: 'u-1', fullName: 'Jay' })).rejects.toThrow('boom')
-  })
-
-  it('throws when the write succeeds but comes back with no row (an RLS refusal)', async () => {
-    const { builder } = createQueryBuilder({ data: null })
-    supabase.from.mockReturnValue(builder)
-
-    await expect(updateProfileName({ profileId: 'u-other-club', fullName: 'Jay' })).rejects.toThrow(
-      /permission|not allowed|couldn.t save/i,
-    )
   })
 })
 

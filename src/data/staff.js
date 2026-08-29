@@ -273,8 +273,8 @@ const REFUSED_TITLE =
  *
  * ⚠️ A BLANK TITLE IS WRITTEN AS NULL, NEVER AS ''. Two values meaning "no
  * title" is how a screen ends up rendering an empty chip that cannot be clicked
- * away, and it is the same distinction `updateProfileName` enforces on the way
- * in.
+ * away, and it is the same distinction the profile-name writers in
+ * src/data/members.js enforce on the way in.
  *
  * ⚠️ READS THE ROW BACK AND TREATS "no row" AS A REFUSAL. RLS filters the row
  * out rather than erroring, so PostgREST answers a refused write with a

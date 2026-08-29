@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Search the accounts list by name or email.** Jay: "i need to be able to
+- **Removed the dead `updateProfileName` writer.** The legacy admin name-fixer
+  that wrote the combined `full_name` column directly — superseded by
+  `updateMemberProfile` (first/last, admin path) and `updateProfileNames`
+  (first/last, self path), with `full_name` rebuilt by the `profiles_sync_name`
+  trigger. It had no caller anywhere in the app (verified), and since the 28 Aug
+  contact-column lockdown it also carried the same bare-`.select()` /
+  "permission denied" trap the live writers were just fixed for — a latent
+  landmine with nobody on it. Deleted the function, its unit tests, its now-dead
+  mocks in four suites, and repointed the comments that referenced it. No
+  behaviour change: admins still fix names through the Edit-person sheet
+  (`updateMemberProfile`). `src/data/members.js`, `src/data/staff.js`,
+  `src/screens/Accounts.jsx`, `tests/data.test.js`, `tests/accounts.test.jsx`,
+  `tests/app-shell.test.jsx`, `tests/app.test.jsx`,
+  `tests/parent-self-registration.test.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `4515284` — **Search the accounts list by name or email.** Jay: "i need to be able to
   search them, there is no current search function". A free-text box on the
   admin Accounts screen that narrows the ACTIVE list as you type, matching a
   person's name or email (case-insensitive substring). It composes with the
@@ -20,7 +35,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   (`groups.length > 6`), gated on the whole-club count so a query that empties
   the list can't hide its own box; the no-match state says "No accounts match …"
   rather than claiming the club is empty. `src/screens/Accounts.jsx`,
-  `tests/accounts.test.jsx`. (SHA follows in the next changelog-touching PR.)
+  `tests/accounts.test.jsx`.
 - `bb0ada6` — **Two guards against blank "hasn't said what they need" signups** (Jay traced
   one to a stale-cache client, 29 Aug). (1) `src/lib/auth.jsx` adds
   `shouldCreateUser: false` to the mothballed magic-link sign-in, so a link
