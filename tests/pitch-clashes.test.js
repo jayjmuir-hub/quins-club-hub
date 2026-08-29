@@ -11,6 +11,12 @@ import { findPitchClashes, PITCH_TBD } from '../src/data/pitches.js'
 // for clash detection" from 4 Aug. This is the thing that precondition was
 // for, and the interesting cases are all about what must NOT be reported —
 // a detector that cries wolf gets switched off within a week.
+//
+// ⚠️ IT RETURNS GROUPS, NOT PAIRS. A pitch is a capacity, not a slot: the
+// question is whether the portions booked at one moment overtop a whole pitch,
+// which is a property of the whole overlapping SET, not of any two members.
+// Each result is `{ pitch, load, events }`; a helper collapses one to the set
+// of event ids it involves, which is all either screen consumes.
 
 const at = (iso, extra = {}) => ({
   id: extra.id ?? iso,
@@ -20,15 +26,25 @@ const at = (iso, extra = {}) => ({
   ...extra,
 })
 
+// The set of event ids caught up in any reported overload — how both Allocation
+// and PitchGlance actually use the result.
+const flaggedIds = (events) => {
+  const ids = new Set()
+  for (const clash of findPitchClashes(events)) for (const e of clash.events) ids.add(e.id)
+  return [...ids].sort()
+}
+
 describe('findPitchClashes', () => {
-  it('reports two events overlapping on one pitch', () => {
+  it('reports two full-pitch events overlapping on one pitch', () => {
     const clashes = findPitchClashes([
       at('2026-09-05T09:00:00Z', { id: 'a', ends_at: '2026-09-05T10:30:00Z' }),
       at('2026-09-05T10:00:00Z', { id: 'b', ends_at: '2026-09-05T11:30:00Z' }),
     ])
     expect(clashes).toHaveLength(1)
     expect(clashes[0].pitch).toBe('Pitch 2')
-    expect([clashes[0].a.id, clashes[0].b.id].sort()).toEqual(['a', 'b'])
+    expect(clashes[0].events.map((e) => e.id).sort()).toEqual(['a', 'b'])
+    // No portions set → each counts as a whole pitch → two overtop one.
+    expect(clashes[0].load).toBe(2)
   })
 
   it('⚠️ touching is not overlapping', () => {
@@ -75,8 +91,9 @@ describe('findPitchClashes', () => {
   it('⚠️ A MULTI-SQUAD FAN-OUT IS NOT A CLASH', () => {
     // The one that would have killed the feature. A multi-squad session is one
     // event PER SQUAD sharing a group_id, on the same pitch at the same time
-    // BY CONSTRUCTION (the 5 Aug fan-out decision). Reporting those would make
-    // every multi-squad fixture look double-booked.
+    // BY CONSTRUCTION (the 5 Aug fan-out decision). It is ONE occupation of the
+    // ground, so its portion is counted once — three full-pitch rows here still
+    // sum to one pitch, not three.
     const clashes = findPitchClashes([
       at('2026-09-05T09:00:00Z', { id: 'u10', ends_at: '2026-09-05T11:00:00Z', group_id: 'g1' }),
       at('2026-09-05T09:00:00Z', { id: 'u12', ends_at: '2026-09-05T11:00:00Z', group_id: 'g1' }),
@@ -93,6 +110,10 @@ describe('findPitchClashes', () => {
       at('2026-09-05T09:30:00Z', { id: 'seniors', ends_at: '2026-09-05T11:00:00Z', group_id: 'g2' }),
     ])
     expect(clashes).toHaveLength(1)
+    expect(flaggedIds([
+      at('2026-09-05T09:00:00Z', { id: 'u10', ends_at: '2026-09-05T11:00:00Z', group_id: 'g1' }),
+      at('2026-09-05T09:30:00Z', { id: 'seniors', ends_at: '2026-09-05T11:00:00Z', group_id: 'g2' }),
+    ])).toEqual(['seniors', 'u10'])
   })
 
   it('⚠️ with no end time, only an identical start counts', () => {
@@ -114,18 +135,79 @@ describe('findPitchClashes', () => {
     ).toHaveLength(1)
   })
 
-  it('reports every pair when three overlap, not just the first', () => {
-    const clashes = findPitchClashes([
+  it('⚠️ a no-end booking does NOT clash with a timed one that merely covers it', () => {
+    // The half-open sibling of the rule above: a booking with no duration is
+    // present only at its own start instant, so a timed session running across
+    // that instant is not something it can be said to overlap. Only a booking
+    // that STARTS at the same moment counts.
+    expect(
+      findPitchClashes([
+        at('2026-09-05T09:00:00Z', { id: 'timed', ends_at: '2026-09-05T11:00:00Z' }),
+        at('2026-09-05T10:00:00Z', { id: 'noend' }),
+      ]),
+    ).toEqual([])
+  })
+
+  it('reports the nested situations when three full pitches overlap', () => {
+    // a covers b covers c. There are two distinct overloads — {a,b} from 10:00
+    // and {a,b,c} from 11:00 — and every one of the three is caught up in one.
+    const events = [
       at('2026-09-05T09:00:00Z', { id: 'a', ends_at: '2026-09-05T12:00:00Z' }),
       at('2026-09-05T10:00:00Z', { id: 'b', ends_at: '2026-09-05T12:00:00Z' }),
       at('2026-09-05T11:00:00Z', { id: 'c', ends_at: '2026-09-05T12:00:00Z' }),
-    ])
-    expect(clashes).toHaveLength(3)
+    ]
+    expect(flaggedIds(events)).toEqual(['a', 'b', 'c'])
   })
 
   it('survives rubbish rather than throwing', () => {
     expect(findPitchClashes(null)).toEqual([])
     expect(findPitchClashes([])).toEqual([])
     expect(findPitchClashes([at('not-a-date', { id: 'a' }), at('2026-09-05T09:00:00Z', { id: 'b' })])).toEqual([])
+  })
+
+  // ── Portions: the whole point of the feature ──────────────────────────────
+
+  it('⚠️ a quarter beside a half is NOT a clash — they fit on one pitch', () => {
+    // The case the old detector got wrong and this feature exists to fix: two
+    // age groups genuinely sharing one pitch, ¼ + ½ = ¾ of a pitch.
+    expect(
+      findPitchClashes([
+        at('2026-09-05T09:00:00Z', { id: 'u8', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'quarter' }),
+        at('2026-09-05T09:00:00Z', { id: 'u10', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'half' }),
+      ]),
+    ).toEqual([])
+  })
+
+  it('portions that add up to exactly one pitch are not a clash', () => {
+    // ¼ + ½ + ¼ = a full pitch, cleanly shared.
+    expect(
+      findPitchClashes([
+        at('2026-09-05T09:00:00Z', { id: 'a', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'quarter' }),
+        at('2026-09-05T09:00:00Z', { id: 'b', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'half' }),
+        at('2026-09-05T09:00:00Z', { id: 'c', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'quarter' }),
+      ]),
+    ).toEqual([])
+  })
+
+  it('portions that overtop one pitch ARE a clash, and name everyone on it', () => {
+    // ¼ + ½ + ½ = 1¼ pitches: it no longer fits, and all three are involved.
+    const events = [
+      at('2026-09-05T09:00:00Z', { id: 'a', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'quarter' }),
+      at('2026-09-05T09:00:00Z', { id: 'b', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'half' }),
+      at('2026-09-05T09:00:00Z', { id: 'c', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'half' }),
+    ]
+    const clashes = findPitchClashes(events)
+    expect(clashes).toHaveLength(1)
+    expect(clashes[0].load).toBeCloseTo(1.25)
+    expect(flaggedIds(events)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('a full pitch leaves no room for even a quarter', () => {
+    expect(
+      findPitchClashes([
+        at('2026-09-05T09:00:00Z', { id: 'full', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'full' }),
+        at('2026-09-05T09:00:00Z', { id: 'quarter', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'quarter' }),
+      ]),
+    ).toHaveLength(1)
   })
 })

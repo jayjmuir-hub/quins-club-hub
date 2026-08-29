@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Removed the dead `updateProfileName` writer.** The legacy admin name-fixer
+- **Pitch sharing, phase 1: portions and capacity-based clash detection.**
+  Different age groups routinely share a training pitch — a quarter or a half
+  each — and matches split the pitch for the younger bands too, only U12 and
+  older getting a full pitch (Jay, 29 Aug). New `src/lib/pitchPortion.js` holds
+  the `quarter/half/full` vocabulary and an age-based default. `findPitchClashes`
+  is rewritten from "any two bookings overlapping on one pitch is a clash" to a
+  capacity question: it sums the portions occupying a pitch at each moment and
+  warns only when they overtop one whole pitch, so a quarter beside a half is
+  now cleanly shared. Backward-compatible — a booking with no portion counts as
+  a full pitch, so behaviour is unchanged until portions are entered (the column
+  and the picker are phase 2). The fan-out `group_id` exemption, "touching is not
+  overlapping", `Pitch TBD`, and the nullable-`ends_at` rule are all preserved.
+  `src/data/pitches.js`, `src/screens/Allocation.jsx`, `src/screens/PitchGlance.jsx`,
+  `tests/pitch-portion.test.js`, `tests/pitch-clashes.test.js`. (SHA follows in
+  the next changelog-touching PR.)
+- `94fa065` — **Removed the dead `updateProfileName` writer.** The legacy admin name-fixer
   that wrote the combined `full_name` column directly — superseded by
   `updateMemberProfile` (first/last, admin path) and `updateProfileNames`
   (first/last, self path), with `full_name` rebuilt by the `profiles_sync_name`
@@ -23,8 +38,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   (`updateMemberProfile`). `src/data/members.js`, `src/data/staff.js`,
   `src/screens/Accounts.jsx`, `tests/data.test.js`, `tests/accounts.test.jsx`,
   `tests/app-shell.test.jsx`, `tests/app.test.jsx`,
-  `tests/parent-self-registration.test.jsx`. (SHA follows in the next
-  changelog-touching PR.)
+  `tests/parent-self-registration.test.jsx`.
 - `4515284` — **Search the accounts list by name or email.** Jay: "i need to be able to
   search them, there is no current search function". A free-text box on the
   admin Accounts screen that narrows the ACTIVE list as you type, matching a

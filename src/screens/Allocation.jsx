@@ -209,13 +209,13 @@ export default function Allocation() {
   const rows = useMemo(() => rowsFor(pitches, events), [pitches, events])
 
   // ⚠️ Clashes are computed over the DAY'S events, and the exemptions live in
-  // findPitchClashes — a multi-squad fan-out sharing a group_id is not a
-  // clash, touching is not overlapping, and Pitch TBD never clashes.
+  // findPitchClashes — a multi-squad fan-out sharing a group_id is not a clash,
+  // portions that fit within one pitch are not a clash, touching is not
+  // overlapping, and Pitch TBD never clashes.
   const clashing = useMemo(() => {
     const ids = new Set()
     for (const clash of findPitchClashes(events)) {
-      ids.add(clash.a.id)
-      ids.add(clash.b.id)
+      for (const event of clash.events) ids.add(event.id)
     }
     return ids
   }, [events])
