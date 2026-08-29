@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Tournaments as containers — phase 3 (the chooser + the tournament form).**
+- **Tournaments as containers — phase 4 (the tournament detail screen + games).**
+  A tournament container now opens its own screen instead of the single-fixture
+  `EventDetail`: the day's setup, the **games** played inside it, an overall
+  **placing**, and an **Add game** action. New `src/screens/TournamentDetail.jsx`
+  (routed from `src/screens/Schedule.jsx` via the shared `isTournamentEvent`
+  test) and `src/screens/AddGameForm.jsx` — a lean form that writes a game
+  inheriting the tournament's squad, date, venue, competition and tier, adding
+  only opponent, kick-off, stage and score (`home` and `ends_at` null, since a
+  game is neither a standalone fixture nor a calendar entry). A game reuses the
+  existing match sheet by id, so tapping one for a viewer opens it. Delete is a
+  two-step confirm naming how many games the cascade takes. New data helpers
+  `listTournamentGames` and `setTournamentPlacing` in `src/data/events.js`.
+  Tests: `tests/tournament-detail.test.jsx`, data-helper cases in
+  `tests/data.test.js`, and a Schedule routing test. Depends on phase 1's
+  migration (#511), which was applied to production the same day. (SHA follows
+  in the next changelog-touching PR.)
+- `796c6fc` — **Tournaments as containers — phase 3 (the chooser + the tournament form).**
   Adding an event now opens a small **"What are you adding?"** chooser (Match /
   Tournament / Training / Social) before the form, so a tournament is a
   first-class thing you pick up front rather than a Match you scroll ten fields
@@ -28,8 +44,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `competition_type=tournament` with `opponent` and `home` null. The games
   played underneath it are phase 4. `tests/event-kind-chooser.test.jsx` and
   tournament-mode cases in `tests/event-form.test.jsx`; three Schedule tests
-  updated to click through the new chooser. (Phase 1 is #511.) (SHA follows in
-  the next changelog-touching PR.)
+  updated to click through the new chooser. (Phase 1 is #511.)
 - `888f544` — **Tournaments as containers — phase 1 (schema + read paths, nothing user-visible).**
   Groundwork for entering a tournament as its own object with the games played
   recorded underneath it (design:

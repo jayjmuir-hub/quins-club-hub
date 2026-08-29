@@ -13,6 +13,7 @@ import Register from './Register.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
 import EventKindChooser from '../components/EventKindChooser.jsx'
+import TournamentDetail, { isTournamentEvent } from './TournamentDetail.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
@@ -847,7 +848,28 @@ export default function Schedule() {
         />
       )}
 
-      {selectedEvent && !formState && !availabilityOpen && !registerOpen && (
+      {/* A tournament CONTAINER opens its own detail screen — a games list,
+          the placing, add-game — rather than the single-fixture EventDetail.
+          isTournamentEvent is the one test of "is this a container", shared so
+          the two screens cannot disagree. */}
+      {selectedEvent && isTournamentEvent(selectedEvent) && !formState && !availabilityOpen && !registerOpen && (
+        <TournamentDetail
+          event={selectedEvent}
+          team={teamsById.get(selectedEvent.team_id)}
+          onClose={() => setSelectedEventId(null)}
+          canEdit={canEditSelected}
+          onEdit={(event) => setFormState({ event })}
+          onChanged={refresh}
+          onOpenAvailability={() => setAvailabilityOpen(true)}
+          onOpenGame={(game) => navigate(`/match-sheet/${game.id}`)}
+          onDeleted={() => {
+            setSelectedEventId(null)
+            refresh()
+          }}
+        />
+      )}
+
+      {selectedEvent && !isTournamentEvent(selectedEvent) && !formState && !availabilityOpen && !registerOpen && (
         <EventDetail
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}

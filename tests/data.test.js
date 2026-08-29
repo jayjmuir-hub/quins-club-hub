@@ -50,6 +50,8 @@ import {
   deleteEvent,
   countSeriesFrom,
   deleteSeriesFrom,
+  listTournamentGames,
+  setTournamentPlacing,
 } from '../src/data/events.js'
 import { subscribeNotices } from '../src/data/announcements.js'
 import {
@@ -261,6 +263,59 @@ describe('listEvents', () => {
     supabase.from.mockReturnValue(builder)
 
     await expect(listEvents()).rejects.toThrow('permission denied')
+  })
+})
+
+// --- listTournamentGames (phase 4, 29 Aug 2026) -------------------------
+
+describe('listTournamentGames', () => {
+  it('queries the games of one tournament by tournament_id, ordered by kick-off then id', async () => {
+    const rows = [{ id: 'g-1' }]
+    const { builder, calls } = createQueryBuilder({ data: rows })
+    supabase.from.mockReturnValue(builder)
+
+    const result = await listTournamentGames('t-1')
+
+    expect(supabase.from).toHaveBeenCalledWith('events')
+    expect(calls.eq).toEqual([['tournament_id', 't-1']])
+    expect(builder.order).toHaveBeenCalledWith('starts_at', { ascending: true })
+    expect(builder.order).toHaveBeenCalledWith('id', { ascending: true })
+    expect(result).toEqual(rows)
+  })
+
+  it('returns [] without querying when given no id', async () => {
+    const result = await listTournamentGames(null)
+    expect(supabase.from).not.toHaveBeenCalled()
+    expect(result).toEqual([])
+  })
+})
+
+// --- setTournamentPlacing -----------------------------------------------
+
+describe('setTournamentPlacing', () => {
+  it('updates just the placing column for the event', async () => {
+    const { builder, calls } = createQueryBuilder({ data: { id: 'e-1', placing: 'Winners' } })
+    supabase.from.mockReturnValue(builder)
+
+    await setTournamentPlacing('e-1', 'Winners')
+
+    expect(builder.update).toHaveBeenCalledWith({ placing: 'Winners' })
+    expect(calls.eq).toEqual([['id', 'e-1']])
+  })
+
+  it('writes null when the placing is cleared', async () => {
+    const { builder } = createQueryBuilder({ data: { id: 'e-1', placing: null } })
+    supabase.from.mockReturnValue(builder)
+
+    await setTournamentPlacing('e-1', '')
+    expect(builder.update).toHaveBeenCalledWith({ placing: null })
+  })
+
+  it('throws when the write is refused (RLS returns no row)', async () => {
+    const { builder } = createQueryBuilder({ data: null })
+    supabase.from.mockReturnValue(builder)
+
+    await expect(setTournamentPlacing('e-1', 'Winners')).rejects.toThrow(/permission/i)
   })
 })
 

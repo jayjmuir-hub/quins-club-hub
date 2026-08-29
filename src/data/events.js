@@ -118,6 +118,56 @@ export async function getEvent(id) {
 }
 
 /**
+ * The games played inside one tournament — the events whose tournament_id is
+ * this container's id — ordered by kick-off. See the container model in
+ * claude/plans/2026-08-29-tournaments-as-containers.md.
+ *
+ * ⚠️ THE INVERSE OF listEvents' FILTER. listEvents returns only top-level
+ * entries (tournament_id IS NULL); this is the ONLY read that asks for the
+ * children, and it always scopes to one parent. RLS still applies — a game
+ * carries its container's team_id, so the same "event read" policy governs it,
+ * and nothing here can widen that.
+ *
+ * `id` is the tiebreak after starts_at for the same reason listEvents carries
+ * it: several games can kick off at the same minute in a festival.
+ */
+export async function listTournamentGames(tournamentId) {
+  if (!tournamentId) return []
+
+  const { data, error } = await supabase
+    .from('events')
+    .select('*, league_team:league_teams(id, rcm_name, division)')
+    .eq('tournament_id', tournamentId)
+    .order('starts_at', { ascending: true })
+    .order('id', { ascending: true })
+
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Sets a tournament's overall placing ('Winners', 'Runners-up', a custom
+ * string, or null to clear). A targeted UPDATE of the one column, mirroring
+ * setAvailabilityOverride — the detail screen sets it live without re-sending
+ * the whole row. RLS (the events write policy) is the gate; a refused write
+ * comes back as no row and is reported, never silently dropped.
+ */
+export async function setTournamentPlacing(eventId, placing) {
+  if (!eventId) throw new Error('setTournamentPlacing needs an event id.')
+
+  const { data, error } = await supabase
+    .from('events')
+    .update({ placing: placing || null })
+    .eq('id', eventId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error(REFUSED)
+  return data
+}
+
+/**
  * Subscribes to realtime changes on the events table. Returns an unsubscribe
  * function — call it from a useEffect cleanup. Safe to call more than once.
  *
