@@ -93,8 +93,14 @@ describe('allocatePitch', () => {
       'events.update',
       'pitch_requests.update',
     ])
-    expect(calls.log[0].fields).toEqual({ pitch: 'A1' })
+    // The portion is written with the pitch — null here, since none was given.
+    expect(calls.log[0].fields).toEqual({ pitch: 'A1', pitch_portion: null })
     expect(calls.log[1].fields).toMatchObject({ status: 'allocated', decided_by: 'me' })
+  })
+
+  it('writes the chosen portion alongside the pitch', async () => {
+    await allocatePitch({ requestId: 'r1', eventId: 'e1', pitch: 'A1', portion: 'half' })
+    expect(calls.log[0].fields).toEqual({ pitch: 'A1', pitch_portion: 'half' })
   })
 
   it('⚠️ leaves the request OPEN when the fixture write is refused', async () => {

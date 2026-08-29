@@ -1,8 +1,9 @@
 # Pitch sharing: portions and capacity-based clash detection
 
-**Status: PARTLY SHIPPED — phase 1 merged (#522, `a128447`); phase 2 code
-written, awaiting the production migration before it deploys; phase 3 not
-started.** Dated 2026-08-29.
+**Status: PARTLY SHIPPED — phase 1 merged (#522, `a128447`); phase 2 merged
+(#523, `a4283c7`), migration applied to production; phase 3 allocator-side
+portion code written, the PitchGlance stacked view and the "sharing approved"
+override still not started.** Dated 2026-08-29.
 
 ## What Jay asked for
 
@@ -51,7 +52,7 @@ age groups take a quarter each — looked like a double booking.
 - Consumers `src/screens/Allocation.jsx`, `src/screens/PitchGlance.jsx` updated.
 - `tests/pitch-portion.test.js`, `tests/pitch-clashes.test.js`.
 
-## Phase 2 — the column and the picker (CODE WRITTEN, migration pending)
+## Phase 2 — the column and the picker (SHIPPED, #523 / `a4283c7`; migration applied)
 
 - `db/migrations/20260829_pitch_portion.sql` — adds `events.pitch_portion`
   (text, nullable, CHECK) and re-creates the `pitch_occupancy` RPC to return it.
@@ -65,14 +66,17 @@ age groups take a quarter each — looked like a double booking.
 code deploys — the column must exist before the writer names it (the reverse of
 a drop-column change). Jay applies the migration; the PR merges after.
 
-## Phase 3 — not started
+## Phase 3
 
-- **Allocator-side portion.** The two assign sheets in `src/screens/Allocation.jsx`
-  (queue decide + direct assign) set only a pitch; a pitch answered from a
-  request keeps a null portion (= full). Add a portion dropdown there, defaulted
-  from the squad, and thread it through `setEventPitch` / `allocatePitch` in
-  `src/data/pitchRequests.js`.
-- **PitchGlance stacked occupancy.** Render each pitch/time slot as a stacked bar
-  (¼ U8 · ½ U12) so "what's free before I ask" shows the remaining room.
-- **"Sharing approved" override** for a genuine over-capacity that is still fine,
-  keyed to the exact set of events so a new booking re-flags.
+- **Allocator-side portion (CODE WRITTEN).** The two assign sheets in
+  `src/screens/Allocation.jsx` (queue decide + direct assign) set only a pitch;
+  a pitch answered from a request kept a null portion (= full), so a coach's U8
+  match — requested, then allocated — never got its quarter. Now a "How much of
+  the pitch" dropdown appears once a pitch is chosen, defaulted from the fixture's
+  squad (`portionDefaultFor`), and `setEventPitch` / `allocatePitch` in
+  `src/data/pitchRequests.js` write `pitch_portion` alongside the pitch (null when
+  there is no real pitch). `tests/allocation.test.jsx`, `tests/pitch-requests.test.js`.
+- **PitchGlance stacked occupancy (not started).** Render each pitch/time slot as
+  a stacked bar (¼ U8 · ½ U12) so "what's free before I ask" shows the room left.
+- **"Sharing approved" override (not started)** for a genuine over-capacity that
+  is still fine, keyed to the exact set of events so a new booking re-flags.
