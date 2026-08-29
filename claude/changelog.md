@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Re-captured `handle_new_user` in `db/schema/functions.sql`** to match the
+- **Two guards against blank "hasn't said what they need" signups** (Jay traced
+  one to a stale-cache client, 29 Aug). (1) `src/lib/auth.jsx` adds
+  `shouldCreateUser: false` to the mothballed magic-link sign-in, so a link
+  request for an unknown email is a no-op login instead of silently minting a
+  bare, intent-less account. (2) Migration `20260829_hold_bare_signup.sql` adds
+  an AFTER-INSERT trigger on `public.profiles` that pre-DISMISSES a profile born
+  with no name AND no `signup_intent` — the unambiguous signature of a signup
+  that skipped the wizard (bot, stale cache, or magic-link/OTP), which the wizard
+  (always an intent), Google OAuth (always a name) and invited members (who sign
+  in first, then redeem) never produce. Non-blocking and reversible: held junk
+  drops into "Show dismissed" and flips back to pending if the person later
+  completes the request. Applied to production and proven by a rolled-back
+  `db/tests/hold-bare-signup.sql` harness (bare held, named control left alone,
+  self-test). `db/schema/triggers.sql`, `db/schema/functions.sql`. Existing bare
+  accounts are unaffected — dismiss those by hand. (SHA follows in the next
+  changelog-touching PR.)
+- `d9f3be8` — **Re-captured `handle_new_user` in `db/schema/functions.sql`** to match the
   live function. The captured body had drifted well behind production: it showed
   only the profile insert, while the deployed trigger also derives the name,
   records `name_confirmed_at` and `signup_intent` on the profile, writes the
@@ -20,7 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   29 Aug while adding `hold_bare_signup`). Capture-only: no behaviour or schema
   change, the live function was already correct. The `on_auth_user_created` note
   in `db/schema/triggers.sql` is corrected to match. `db/schema/functions.sql`,
-  `db/schema/triggers.sql`. (SHA follows in the next changelog-touching PR.)
+  `db/schema/triggers.sql`.
 - `28a6c22` — **Fix: saving a phone number (or a name) threw "permission denied for table
   profiles".** The 28 Aug contact-column lockdown
   (`20260828_profiles_contact_revoke`) revoked `SELECT` on `profiles.phone` and
