@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin, parentPreviewTeamIds } from '../lib/scope.js'
+import { canApproveAnything, isAdmin, parentPreviewTeamIds } from '../lib/scope.js'
+import { enterSends, setEnterSends } from '../lib/chatComposer.js'
 import { effectiveTheme, toggleTheme, watchSystemTheme } from '../lib/theme.js'
 import { ViewAsOptions } from './ViewAsSwitcher.jsx'
 import { GetAppMenuItem } from './AppButton.jsx'
@@ -124,6 +125,69 @@ function BugIcon(props) {
   )
 }
 
+// Icons for the rows lifted out of the old More tab (29 Aug 2026). Same
+// 24-box, 1.8 stroke, currentColor language as the rest of this menu.
+function AdminIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z" />
+      <path d="M9.5 12l1.8 1.8 3.4-3.6" />
+    </svg>
+  )
+}
+
+function ApprovalsIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 10 -1.6" />
+      <path d="M15 13.5l1.6 1.6 3.4-3.6" />
+    </svg>
+  )
+}
+
+function BellIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" />
+      <path d="M10.5 19a1.5 1.5 0 0 0 3 0" />
+    </svg>
+  )
+}
+
+function CalendarIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M8 3v4M16 3v4M4 10h16" />
+    </svg>
+  )
+}
+
+function ChatBubbleIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H9l-4.2 3.4A.5.5 0 0 1 4 19z" />
+    </svg>
+  )
+}
+
+function ShieldIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z" />
+    </svg>
+  )
+}
+
+function TrashIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7" />
+    </svg>
+  )
+}
+
 const ITEM =
   'flex w-full items-center gap-3 rounded-[9px] px-3 py-2.5 text-left text-[14px] font-semibold text-ink transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-inset'
 const ICON = 'h-[18px] w-[18px] shrink-0 text-ink-muted'
@@ -156,6 +220,17 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
   // A coach/manager gets "View as" too since 26 Aug 2026 — parent persona,
   // own squads only. ViewAsOptions itself decides what the list offers.
   const canViewAs = admin || parentPreviewTeamIds(realMemberships).length > 0
+
+  // The management doors that used to live on the More tab's "Manage" card
+  // (29 Aug 2026). Admin gets the full portal; a coach/manager who is not an
+  // admin gets the approvals queue only — same split, and the same
+  // realMemberships gate as View-as, so a preview never hides your own door.
+  const canApprove = !admin && canApproveAnything(realMemberships)
+
+  // The chat Enter-sends toggle, lifted off the More tab. Device-level
+  // (localStorage via chatComposer.js), so it is read once and flipped in place
+  // like Dark mode — no account round trip.
+  const [enterSendsOn, setEnterSendsOn] = useState(() => enterSends())
 
   // Follow OS-level theme flips while mounted, so the row never lies.
   useEffect(() => {
@@ -309,6 +384,24 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
                 My account
               </Link>
 
+              {/* The Admin / Approvals doors that used to be the More tab's
+                  "Manage" card. Admin sees the portal; a non-admin coach or
+                  manager sees the approvals queue — the phone's only route to
+                  it now that the More tab is gone. */}
+              {admin && (
+                <Link to="/admin" role="menuitem" data-testid="account-admin" onClick={() => close({ refocus: false })} className={ITEM}>
+                  <AdminIcon className={ICON} />
+                  Admin
+                </Link>
+              )}
+
+              {canApprove && (
+                <Link to="/approvals" role="menuitem" data-testid="account-approvals" onClick={() => close({ refocus: false })} className={ITEM}>
+                  <ApprovalsIcon className={ICON} />
+                  Approvals
+                </Link>
+              )}
+
               {canViewAs && (
                 <button
                   type="button"
@@ -360,6 +453,53 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
                 </span>
               </button>
 
+              {/* Chat Enter-sends — lifted off the More tab (29 Aug 2026). A
+                  device toggle, drawn exactly like Dark mode above; the full
+                  explanation still lives on the /more page for anyone who wants
+                  it. */}
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={enterSendsOn}
+                data-testid="enter-sends-toggle"
+                onClick={() => {
+                  const next = !enterSendsOn
+                  setEnterSends(next)
+                  setEnterSendsOn(next)
+                }}
+                className={ITEM}
+              >
+                <ChatBubbleIcon className={ICON} />
+                <span className="flex-1">Enter sends chats</span>
+                <span
+                  aria-hidden="true"
+                  className={[
+                    'relative h-[18px] w-8 shrink-0 rounded-pill transition',
+                    enterSendsOn ? 'bg-brand' : 'bg-ink-faint/40',
+                  ].join(' ')}
+                >
+                  <span
+                    className={[
+                      'absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition',
+                      enterSendsOn ? 'left-[16px]' : 'left-[2px]',
+                    ].join(' ')}
+                  />
+                </span>
+              </button>
+
+              {/* Notifications and Calendar are page-sized (a permission flow, a
+                  subscribe URL), so they stay on /more — the menu just carries a
+                  direct door to each section. */}
+              <Link to="/more#notifications" role="menuitem" data-testid="account-notifications" onClick={() => close({ refocus: false })} className={ITEM}>
+                <BellIcon className={ICON} />
+                Notifications
+              </Link>
+
+              <Link to="/more#your-calendar" role="menuitem" data-testid="account-calendar" onClick={() => close({ refocus: false })} className={ITEM}>
+                <CalendarIcon className={ICON} />
+                Add to your calendar
+              </Link>
+
               {/* Was the floating `?` until 24 Aug 2026 — see
                   claude/plans/2026-08-24-help-into-account-menu.md. Close
                   WITHOUT refocus: the sheet is about to take focus, and
@@ -391,6 +531,23 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
                 itemClass={ITEM}
                 iconClass={ICON}
               />
+
+              {/* The account links that used to sit in More's "Account" card —
+                  now moved here (the More page no longer carries them). Both are
+                  standalone routes (/privacy, /delete-account), so this is a
+                  straight move. Delete is NOT drawn in danger red: it sits a row
+                  above Sign out, and a red control next to sign-out is a mis-tap;
+                  the confirmation lives on the destination page itself. */}
+              <div className="mt-1 border-t border-line pt-1">
+                <Link to="/privacy" role="menuitem" data-testid="account-privacy" onClick={() => close({ refocus: false })} className={ITEM}>
+                  <ShieldIcon className={ICON} />
+                  Privacy policy
+                </Link>
+                <Link to="/delete-account" role="menuitem" data-testid="account-delete" onClick={() => close({ refocus: false })} className={ITEM}>
+                  <TrashIcon className={ICON} />
+                  Delete your account
+                </Link>
+              </div>
 
               <div className="mt-1 border-t border-line pt-1">
                 <button
