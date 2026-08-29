@@ -66,4 +66,34 @@ describe('eventTitle — tournaments are named, not opposed', () => {
       'Quins match',
     )
   })
+
+  // ── A GAME inside a tournament (tournament_id set) is a fixture, named by its
+  //    opponent, NOT by the tournament — the container carries the name, the
+  //    game carries the opposition. See
+  //    claude/plans/2026-08-29-tournaments-as-containers.md. ──────────────────
+  const GAME = {
+    type: 'match',
+    opponent: 'Dubai Exiles',
+    competition: 'Al Ain Tournament', // copied down from the container
+    competition_type: 'tournament',
+    tournament_id: 'a-tournament-id',
+  }
+
+  it('names a tournament GAME by its opponent, not the tournament', () => {
+    // ⚠️ THE GUARD THIS BRANCH EXISTS FOR. A game is type=match,
+    // competition_type=tournament, with the tournament's name copied into
+    // `competition` — the exact shape the container branch matches. Only
+    // tournament_id (set on a game, null on a container) tells them apart.
+    expect(eventTitle(GAME)).toBe('Quins vs Dubai Exiles')
+  })
+
+  it('a game with no opponent yet still does not render the tournament name', () => {
+    expect(eventTitle({ ...GAME, opponent: null })).toBe('Quins match')
+  })
+
+  it('the CONTAINER (tournament_id null) still renders the tournament name', () => {
+    // The other half of the guard: nulling tournament_id must leave the
+    // container reading as the tournament, unchanged from before.
+    expect(eventTitle({ ...GAME, tournament_id: null, opponent: null })).toBe('Al Ain Tournament')
+  })
 })

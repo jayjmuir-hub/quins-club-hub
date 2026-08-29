@@ -327,6 +327,12 @@ AS $function$
       )
   )
   and e.starts_at > now() - interval '6 months'
+  -- Added 2026-08-29 (calendar_feed_exclude_tournament_games). A tournament's
+  -- games are shown inside the tournament, not as their own calendar entries;
+  -- src/data/events.js listEvents carries the identical filter for the in-app
+  -- schedule. CREATE OR REPLACE (return type unchanged) kept every grant, so no
+  -- grant/revoke was repeated.
+  and e.tournament_id is null
   order by e.starts_at;
 $function$
 ;

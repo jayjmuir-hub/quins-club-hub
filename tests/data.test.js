@@ -97,7 +97,7 @@ import { listMembershipAudit } from '../src/data/audit.js'
 // builder that only carried `data` could not express the shape countSeriesFrom
 // actually reads.
 function createQueryBuilder({ data = null, error = null, count = null } = {}) {
-  const calls = { select: [], in: [], gte: [], lte: [], eq: [], order: [], limit: [], range: [], insert: [], update: [], delete: [], upsert: [] }
+  const calls = { select: [], in: [], is: [], gte: [], lte: [], eq: [], order: [], limit: [], range: [], insert: [], update: [], delete: [], upsert: [] }
   const builder = {}
   const chain = (name) =>
     vi.fn((...args) => {
@@ -106,6 +106,9 @@ function createQueryBuilder({ data = null, error = null, count = null } = {}) {
     })
   builder.select = chain('select')
   builder.in = chain('in')
+  // `.is()` is the null-test filter — listEvents ends its builder with
+  // .is('tournament_id', null) to keep a tournament's games out of the schedule.
+  builder.is = chain('is')
   builder.gte = chain('gte')
   builder.lte = chain('lte')
   builder.eq = chain('eq')
@@ -226,6 +229,22 @@ describe('listEvents', () => {
 
     expect(calls.gte).toEqual([['starts_at', '2026-01-01T00:00:00Z']])
     expect(calls.lte).toEqual([['starts_at', '2026-12-31T23:59:59Z']])
+  })
+
+  it('excludes a tournament\'s games with .is("tournament_id", null), on every call', async () => {
+    // ⚠️ TOP-LEVEL CALENDAR ENTRIES ONLY. A tournament's games are events rows
+    // with tournament_id set; they belong inside the tournament, not loose on
+    // the schedule. The filter is unconditional — it does not depend on any arg
+    // — so it holds whether the read is club-wide or one squad. The calendar
+    // feed (calendar_events_for_token) carries the identical predicate; the two
+    // must agree or games appear as duplicates of their tournament. See
+    // claude/plans/2026-08-29-tournaments-as-containers.md.
+    const { builder, calls } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await listEvents({ teamIds: ['team-1'] })
+
+    expect(calls.is).toEqual([['tournament_id', null]])
   })
 
   it('returns [] rather than null when data is null', async () => {
