@@ -456,23 +456,61 @@ The single most-reused component — used identically in Home "Upcoming" list, H
 
 The date box (month / day / weekday) and the meta row's time are **Abu Dhabi time**, via `dateBoxParts` and `formatTime` from `src/lib/eventFormat.js` — see the timezone note under "Event object" in §7. The row itself carries no zone label; only the detail sheet says so (§4.21).
 
-### 4.14 Calendar grid (`.cal-grid`)
+### 4.14 Calendar (month grid on wide, agenda on phone)
+
+⚠️ **REDESIGNED 29 Aug 2026.** The Calendar tab used to be a dot-grid at every
+width, with a full fixture list repeated beneath it — so every event showed
+twice, once as a bare coloured dot that said nothing and once as a row. Jay:
+*"tiny dots on days … isn't a premium design for users."* It is now
+width-responsive, and the two layouts do not overlap. Implemented in
+`CalendarMonth` in `src/screens/Schedule.jsx`; the `isWide` prop
+(`useMediaQuery(DESKTOP_QUERY)`, 820px) chooses the branch.
+`claude/decisions/2026-08-29-calendar-shows-events.md`.
+
+**Wide (≥820px): a month grid whose cells carry the events themselves.**
 ```html
 <div class="card" style="padding:14px">
-  <div class="cal-head"><b>July 2026</b><div class="cal-nav"><button id="calPrev">‹</button><button id="calNext">›</button></div></div>
+  <div class="cal-head"><b>July 2026</b><div class="cal-nav"><button>‹</button><button>›</button></div></div>
   <div class="cal-grid">
     <div class="cal-dow">Sun</div>...<div class="cal-dow">Sat</div>  <!-- 7 headers -->
-    <div class="cal-cell out"></div>  <!-- leading blanks for days before month start -->
-    <div class="cal-cell today" data-event="1001"><!-- day number --> 21<div class="dots"><span class="cal-dot match"></span></div></div>
+    <div aria-hidden></div>  <!-- leading blanks for days before month start -->
+    <button data-testid="calendar-day" aria-label="21 July, 2 events"><!-- day number -->21
+      <!-- up to MAX_CELL_EVENTS (3) event lines: [type dot][kick-off time][name, truncated] -->
+      <span>● 7:00 PM Quins vs Exiles</span> ... <span>+1 more</span>
+    </button>
     ...
   </div>
   <div><!-- legend: Match / Training / Social dots + labels --></div>
 </div>
-<div class="card"><!-- .fixture rows for every event that month, chronological --></div>
 ```
-`grid-template-columns:repeat(7,1fr)`, `gap:5px`. Each `.cal-cell` is `aspect-ratio:1` (perfect square), white bg, `1px solid var(--line)`, `border-radius:9px`, `padding:5px`, `font-size:12.5px/600`. `.out` (days from adjacent months, only leading blanks are rendered — no trailing blanks) = `opacity:.35`. `.today` gets a maroon border + inset ring. Up to 4 small 6×6px coloured dots (`.cal-dot.match`=maroon, `.training`=sky, `.social`=warn) stack bottom-left inside the cell for each event that day; cell is clickable (opens the first event of that day) only if it has ≥1 event. Month navigation is prev/next arrow buttons (34×34px circular icon buttons) — no "today" jump button, no year picker, no swipe gesture.
+`grid-template-columns:repeat(7,1fr)`, `gap:5px`. Each cell is a `<button>`
+(every day is actionable — a tap opens that day's sheet, empty days included),
+`aspect-ratio:1`, card bg, `1px solid var(--line)`, `border-radius:9px`,
+`padding:5px`, `overflow:hidden` (a busy day can never spill onto its
+neighbours). Leading blanks only — no trailing ones. `today` gets a maroon
+border + inset ring and its date number takes `--brand-ink`. Inside a populated
+cell, each event renders as one line — a 6px type dot (match=maroon,
+training=`--accent-mid`, social=`--warn`), the kick-off time (dropped, not
+faked, for a TBD fixture), then the name, truncated so it can never break the
+grid. Past `MAX_CELL_EVENTS` (3) the tail collapses to a `+N more` line; the
+`aria-label` still reports the true count, and the day sheet always lists every
+one. **No fixture list beneath the grid** — the cells are the list now. Month
+navigation is prev/next arrow buttons (34×34px) — no "today" jump, no year
+picker, no swipe.
 
-**Timezone (Task 11 amendment).** Which cell a fixture's dot lands in, which month the grid opens on, and which cell gets `.today` are all computed on the **club's** calendar day (`clubDayParts` / `clubToday`, `Asia/Dubai`), never the browser's — a 01:00 Dubai kick-off is 21:00 the previous day in UTC, and for four hours of every UTC day the club is already on tomorrow. The month heading is formatted off a UTC-anchored anchor date for the same reason. See §7's timezone note.
+**Phone (<820px): an agenda, not a grid.** Seven columns at phone width leave
+cells too small to hold a name — the whole point of the redesign — so the month
+collapses to the same rich `FixtureRow`s the Upcoming/Results tabs use (§4.13):
+the month's events, sorted, under the month nav. A row opens the event directly;
+there is no cell to tap and so no day sheet on this side. The empty state is the
+fixture list's own "Nothing is scheduled this month."
+
+**Timezone (Task 11 amendment).** Which cell an event lands in, which month the
+grid opens on, and which cell is `today` are all computed on the **club's**
+calendar day (`clubDayParts` / `clubToday`, `Asia/Dubai`), never the browser's —
+a 01:00 Dubai kick-off is 21:00 the previous day in UTC, and for four hours of
+every UTC day the club is already on tomorrow. The month heading is formatted
+off a UTC-anchored anchor date for the same reason. See §7's timezone note.
 
 ### 4.15 Roster group header + player row
 ```html
@@ -604,7 +642,7 @@ Order, top to bottom:
    - Only shown when `schedTab !== "calendar"` — the calendar tab has no team filter (it always shows the persona's whole visible scope).
 5. Body, depending on `schedTab`:
    - **Upcoming/Results**: a single `.card` containing all matching `.fixture` rows (chronological ascending for upcoming, descending for results), or an `.empty` state card.
-   - **Calendar**: the `.cal-grid` month view + list of that month's events below it (§4.14).
+   - **Calendar**: width-responsive (§4.14) — a month grid whose cells carry the events on a wide screen, an agenda of the month's fixture rows on a phone.
 
 ### 5.3 Roster (`#view-roster`)
 1. `scopeNote()`.

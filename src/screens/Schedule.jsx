@@ -17,7 +17,16 @@ import TournamentDetail, { isTournamentEvent } from './TournamentDetail.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
-import { clubDayParts, clubToday, eventDate, hasResult, sortByStart } from '../lib/eventFormat.js'
+import {
+  clubDayParts,
+  clubToday,
+  eventDate,
+  eventTimeLabel,
+  eventTitle,
+  hasResult,
+  isTimeTbd,
+  sortByStart,
+} from '../lib/eventFormat.js'
 import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import { defaultEventWindow, isMonthOutsideWindow, windowCovering } from '../lib/eventWindow.js'
 import ScheduleTable from '../components/ScheduleTable.jsx'
@@ -118,11 +127,12 @@ const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// Every calendar day cell carries these, whether it renders as a <div> (no
-// events) or a <button> (has events). The flex + start-alignment tokens are
-// load-bearing, not decorative — see the comment at the cell markup.
-const CELL_LAYOUT =
-  'relative flex aspect-square items-start justify-start rounded-[9px] border p-[5px] text-left text-[12.5px] font-semibold text-ink'
+// How many events a wide calendar cell shows in full before the rest collapse
+// into a "+N more" line. Tapping the cell opens the day sheet, which always
+// lists every one — so this is a density cap, not a limit on what is reachable.
+// Three keeps the busiest day from stretching its whole grid-row taller than
+// the month can afford while still showing more than a bare count.
+const MAX_CELL_EVENTS = 3
 
 // design-system.md §4.14: match = maroon, training = --sky, social = --warn.
 // design-system.md's --muted (#77726e) is specified against a card, where it
@@ -237,7 +247,59 @@ function FixtureList({ events, teamsById, onSelect, emptyMessage, revealKey }) {
 // the grid; `onSelectDay` (a day number) is the grid's own handler. They are
 // separate because tapping a cell no longer means "open an event" — it means
 // "open that day".
-function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect, onSelectDay }) {
+// The month heading and its prev/next arrows. Shared by both the wide grid and
+// the narrow agenda so month navigation is identical whatever the layout —
+// there is no "today" jump, no year picker and no swipe (design-system.md §4.14).
+function CalendarNav({ label, onPrev, onNext }) {
+  return (
+    <div className="mb-3 flex items-center justify-between">
+      <b className="text-base font-extrabold text-ink">{label}</b>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          aria-label="Previous month"
+          onClick={onPrev}
+          className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-surface-mute text-ink transition hover:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          <ChevronIcon direction="left" className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label="Next month"
+          onClick={onNext}
+          className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-surface-mute text-ink transition hover:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          <ChevronIcon direction="right" className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// One event, as it reads inside a wide calendar cell: a type-coloured dot, the
+// kick-off time, then the name — the same three facts the old grid buried in a
+// bare dot, now legible at a glance (Jay, 29 Aug 2026: "tiny dots on days …
+// isn't a premium design"). The time is dropped for a TBD fixture rather than
+// printing a placeholder midnight, and the name truncates so a long title can
+// never break the seven-column grid. Non-interactive on purpose: the whole
+// cell is the button, so this stays a <span> and avoids a button nested in a
+// button. Full detail (venue, team, range) is one tap away in the day sheet.
+function CalendarCellEvent({ event }) {
+  return (
+    <span className="flex items-center gap-1 leading-tight" title={eventTitle(event)}>
+      <span
+        className={['h-1.5 w-1.5 shrink-0 rounded-full', DOT_COLOURS[event.type] ?? 'bg-ink-faint'].join(' ')}
+        aria-hidden="true"
+      />
+      {!isTimeTbd(event) && (
+        <span className="shrink-0 text-[10px] font-bold tabular-nums text-ink-muted">{eventTimeLabel(event)}</span>
+      )}
+      <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-ink">{eventTitle(event)}</span>
+    </span>
+  )
+}
+
+function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect, onSelectDay, isWide }) {
   const { year, month: monthIndex } = month
   const firstOfMonth = monthAnchor(year, monthIndex)
   const leadingBlanks = firstOfMonth.getUTCDay()
@@ -265,129 +327,117 @@ function CalendarMonth({ month, onMonthChange, events, teamsById, onSelect, onSe
   })
 
   const goToMonth = (delta) => onMonthChange(shiftMonth(month, delta))
+  const monthLabel = firstOfMonth.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', year: 'numeric' })
+  const monthName = firstOfMonth.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long' })
+  const nav = <CalendarNav label={monthLabel} onPrev={() => goToMonth(-1)} onNext={() => goToMonth(1)} />
 
-  return (
-    <>
-      <Card className="p-[14px]">
-        <div className="mb-3 flex items-center justify-between">
-          <b className="text-base font-extrabold text-ink">
-            {firstOfMonth.toLocaleDateString(undefined, {
-              timeZone: 'UTC',
-              month: 'long',
-              year: 'numeric',
-            })}
-          </b>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              aria-label="Previous month"
-              onClick={() => goToMonth(-1)}
-              className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-surface-mute text-ink transition hover:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
-              <ChevronIcon direction="left" className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              aria-label="Next month"
-              onClick={() => goToMonth(1)}
-              className="grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-surface-mute text-ink transition hover:bg-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
-              <ChevronIcon direction="right" className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
+  // ── Narrow screens: an agenda, not a grid ────────────────────────────────
+  // A seven-column month at phone width gives ~45px cells — too small to hold a
+  // fixture's name, which is the whole point of the redesign. So on a phone the
+  // month collapses to the same rich fixture rows the Upcoming and Results tabs
+  // use: the month's events, sorted, under the month nav. Tapping a row opens
+  // that event directly; there is no day sheet to reach because there are no
+  // cells to tap. The empty state is the fixture list's own.
+  if (!isWide) {
+    return (
+      <>
+        <Card className="p-[14px]">{nav}</Card>
+        <div className="mt-4">
+          <FixtureList
+            events={sortByStart(monthEvents, 'asc')}
+            teamsById={teamsById}
+            onSelect={onSelect}
+            emptyMessage="Nothing is scheduled this month."
+          />
         </div>
+      </>
+    )
+  }
 
-        <div className="grid grid-cols-7 gap-[5px]">
-          {WEEKDAYS.map((weekday) => (
-            <div key={weekday} className="text-center text-[10.5px] font-extrabold uppercase text-ink-faint">
-              {weekday}
-            </div>
-          ))}
+  // ── Wide screens: a month grid whose cells show the events themselves ─────
+  // No fixture list underneath: the grid now carries the names and times, so a
+  // second full copy of the month below it would be the exact redundancy this
+  // redesign removed.
+  return (
+    <Card className="p-[14px]">
+      {nav}
 
-          {Array.from({ length: leadingBlanks }, (_, index) => (
-            <div key={`blank-${index}`} aria-hidden="true" />
-          ))}
+      <div className="grid grid-cols-7 gap-[5px]">
+        {WEEKDAYS.map((weekday) => (
+          <div key={weekday} className="text-center text-[10.5px] font-extrabold uppercase text-ink-faint">
+            {weekday}
+          </div>
+        ))}
 
-          {Array.from({ length: dayCount }, (_, index) => {
-            const dayNumber = index + 1
-            const dayEvents = byDay.get(dayNumber) ?? []
-            const isToday = today.year === year && today.month === monthIndex && today.day === dayNumber
-            // CELL_LAYOUT is shared verbatim by both variants, and it is what
-            // keeps them aligned. A day with events must be a <button> for
-            // keyboard access, and Chromium's UA stylesheet lays a button's
-            // content out centred inside its box — so with only `p-[5px]` the
-            // number floated in the middle of a populated cell while its empty
-            // <div> neighbours sat top-left (measured 66px vs 8px from the top
-            // at 1280px, where the cells are 147px tall: the grid read as
-            // broken). Making every cell an explicit flex container with
-            // start alignment overrides that UA layout, so both variants place
-            // the number identically at any cell size. Do not move any of
-            // these tokens onto one branch only — tests/schedule.test.jsx
-            // asserts both variants carry all of them.
-            const cellClasses = [
-              CELL_LAYOUT,
-              isToday ? 'border-brand shadow-[inset_0_0_0_1px_theme(colors.brand.DEFAULT)]' : 'border-line',
-            ].join(' ')
+        {Array.from({ length: leadingBlanks }, (_, index) => (
+          <div key={`blank-${index}`} aria-hidden="true" />
+        ))}
 
-            // EVERY cell is a <button> as of Task 23, not just populated
-            // ones. Two reasons, and the second is the one that mattered:
-            //
-            //  1. A day with no events still has an action now — open the
-            //     day and add one — so an inert <div> would be a lie.
-            //  2. It collapses the two variants into one. The CELL_LAYOUT
-            //     note above exists because a <button> and a <div> lay their
-            //     content out differently under Chromium's UA stylesheet,
-            //     and the two had to be kept in lockstep by hand. With a
-            //     single variant there is nothing left to drift.
-            const monthName = firstOfMonth.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long' })
-            const eventCount = dayEvents.length
-            const label =
-              eventCount === 0
-                ? `${dayNumber} ${monthName}, no events`
-                : `${dayNumber} ${monthName}, ${eventCount} ${eventCount === 1 ? 'event' : 'events'}`
+        {Array.from({ length: dayCount }, (_, index) => {
+          const dayNumber = index + 1
+          const dayEvents = byDay.get(dayNumber) ?? []
+          const isToday = today.year === year && today.month === monthIndex && today.day === dayNumber
+          const eventCount = dayEvents.length
+          const label =
+            eventCount === 0
+              ? `${dayNumber} ${monthName}, no events`
+              : `${dayNumber} ${monthName}, ${eventCount} ${eventCount === 1 ? 'event' : 'events'}`
+          const visible = dayEvents.slice(0, MAX_CELL_EVENTS)
+          const overflow = eventCount - visible.length
 
-            return (
-              <button
-                key={dayNumber}
-                type="button"
-                data-testid="calendar-day"
-                onClick={() => onSelectDay(dayNumber)}
-                aria-label={label}
-                className={`${cellClasses} transition hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand`}
+          // Every cell is a <button> (since Task 23): a day with no events is
+          // still actionable — open it and add one — and a single tag means the
+          // two visual states can never drift apart under a UA stylesheet the
+          // way a <button>/<div> split once did. `overflow-hidden` guarantees a
+          // busy day's events can never spill past the square onto its
+          // neighbours; anything past MAX_CELL_EVENTS shows as "+N more".
+          return (
+            <button
+              key={dayNumber}
+              type="button"
+              data-testid="calendar-day"
+              onClick={() => onSelectDay(dayNumber)}
+              aria-label={label}
+              className={[
+                'flex aspect-square flex-col items-stretch overflow-hidden rounded-[9px] border p-[5px] text-left transition',
+                isToday
+                  ? 'border-brand shadow-[inset_0_0_0_1px_theme(colors.brand.DEFAULT)]'
+                  : 'border-line',
+                'hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'text-[12.5px] font-semibold leading-none',
+                  isToday ? 'text-brand-ink' : 'text-ink',
+                ].join(' ')}
               >
                 {dayNumber}
-                <span className="absolute bottom-1 left-1 flex gap-0.5" aria-hidden="true">
-                  {dayEvents.slice(0, 4).map((event) => (
-                    <span
-                      key={event.id}
-                      className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[event.type] ?? 'bg-ink-faint'].join(' ')}
-                    />
+              </span>
+              {eventCount > 0 && (
+                <span className="mt-1 flex min-h-0 flex-col gap-[3px]">
+                  {visible.map((event) => (
+                    <CalendarCellEvent key={event.id} event={event} />
                   ))}
+                  {overflow > 0 && (
+                    <span className="text-[10px] font-bold text-ink-faint">+{overflow} more</span>
+                  )}
                 </span>
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-          {Object.entries(TYPE_LABELS).map(([type, label]) => (
-            <span key={type} className="flex items-center gap-1.5 text-xs font-bold text-ink-muted">
-              <span className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[type]].join(' ')} aria-hidden="true" />
-              {label}
-            </span>
-          ))}
-        </div>
-      </Card>
-
-      <div className="mt-4">
-        <FixtureList
-          events={sortByStart(monthEvents, 'asc')}
-          teamsById={teamsById}
-          onSelect={onSelect}
-          emptyMessage="Nothing is scheduled this month."
-        />
+              )}
+            </button>
+          )
+        })}
       </div>
-    </>
+
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+        {Object.entries(TYPE_LABELS).map(([type, label]) => (
+          <span key={type} className="flex items-center gap-1.5 text-xs font-bold text-ink-muted">
+            <span className={['h-1.5 w-1.5 rounded-full', DOT_COLOURS[type]].join(' ')} aria-hidden="true" />
+            {label}
+          </span>
+        ))}
+      </div>
+    </Card>
   )
 }
 
@@ -815,6 +865,7 @@ export default function Schedule() {
           teamsById={teamsById}
           onSelect={setSelectedEventId}
           onSelectDay={(dayNumber) => setSelectedDay({ ...month, day: dayNumber })}
+          isWide={isWide}
         />
       )}
 

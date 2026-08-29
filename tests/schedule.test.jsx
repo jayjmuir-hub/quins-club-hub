@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -177,6 +177,33 @@ const ALL_EVENTS = [RESULT_WIN, PLAYED_NO_SCORE, UPCOMING_MATCH, UPCOMING_TRAINI
 // reasoning as tests/app-shell.test.jsx and tests/components.test.jsx.
 function hasClassToken(element, token) {
   return element.className.split(/\s+/).includes(token)
+}
+
+// The calendar's month GRID is a wide-screen layout as of the 29 Aug 2026
+// redesign: on a phone the Calendar tab is an agenda of fixture rows instead,
+// because a seven-column grid at phone width leaves cells too small to carry an
+// event's name — which the redesign exists to show. jsdom leaves
+// window.matchMedia undefined, so useMediaQuery(DESKTOP_QUERY) defaults to
+// false = mobile. The grid and day-sheet suites opt into the desktop branch by
+// calling this at the top of their describe; the afterEach clears the stub so
+// every other suite keeps rendering the mobile branch (one DOM, per
+// useMediaQuery's own note).
+function stubDesktopViewport() {
+  beforeEach(() => {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }))
+  })
+  afterEach(() => {
+    delete window.matchMedia
+  })
 }
 
 function memberships(rows, teams = TEAMS) {
@@ -431,7 +458,11 @@ describe('Schedule — no scope banner', () => {
   })
 })
 
-describe('Schedule — calendar tab', () => {
+describe('Schedule — calendar tab (wide: the month grid)', () => {
+  // The month grid is a wide-screen layout — see stubDesktopViewport's note.
+  // This whole suite exercises it, so it renders at desktop width.
+  stubDesktopViewport()
+
   // The displayed month follows the CLUB's today (Abu Dhabi), not the
   // runner's. Those differ for the last four hours of every UTC day, so
   // deriving the expectation from `new Date()` would flake nightly. This
@@ -499,9 +530,11 @@ describe('Schedule — calendar tab', () => {
       await user.click(screen.getByRole('button', { name: 'Calendar' }))
 
       // Nothing at all in this month's grid: every populated cell is a button
-      // whose name ends in "N event(s)".
+      // whose name ends in "N event(s)". (On a wide screen the grid carries the
+      // events itself and there is no fixture list beneath it, so the empty
+      // month simply reads as a grid of "no events" cells — the
+      // "nothing is scheduled" copy is the phone agenda's, asserted there.)
       expect(screen.queryAllByRole('button', { name: /, \d+ events?$/ })).toHaveLength(0)
-      expect(screen.getByText(/nothing is scheduled this month/i)).toBeInTheDocument()
 
       await user.click(screen.getByRole('button', { name: /next month/i }))
 
@@ -561,23 +594,18 @@ describe('Schedule — calendar tab', () => {
     }
   })
 
-  // A day with events has to be a <button> for keyboard access; a day
-  // without one stays a <div>. Chromium's UA stylesheet lays a button's
-  // content out centred inside its box, so the two variants silently drifted
-  // apart vertically — populated days floated mid-cell while their empty
-  // neighbours sat top-left (measured 66px vs 8px from the cell top at
-  // 1280px). jsdom applies no UA stylesheet and computes no layout, so no
-  // rendering assertion here could ever catch that. The testable invariant
-  // is that both variants carry the same alignment classes, which is what
-  // pins the number to the same place in either.
-  it('aligns populated and empty day cells identically', async () => {
-    const today = new Date()
-    listEventsMock.mockResolvedValue([
-      {
-        ...UPCOMING_MATCH,
-        starts_at: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 17, 0).toISOString(),
-      },
-    ])
+  // The heart of the 29 Aug 2026 redesign: a wide cell shows the event's NAME
+  // and TIME, not a bare colour dot. (This replaced 'aligns populated and empty
+  // day cells identically', which guarded a <button>/<div> split under
+  // Chromium's UA stylesheet — every cell is a <button> now, so that drift is
+  // gone, and the invariant worth pinning is that the grid actually shows what
+  // is on. The single-tag check is kept below so the old guarantee is not lost.)
+  it('shows each event’s name and time inside its day cell', async () => {
+    const { year, month } = dubaiToday()
+    // 09:00 UTC = 13:00 in Dubai, mid-month, so the fixture lands squarely on
+    // the club's 15th in every runner zone — no month- or day-boundary flake.
+    const startsAt = new Date(Date.UTC(year, month, 15, 9, 0)).toISOString()
+    listEventsMock.mockResolvedValue([{ ...UPCOMING_MATCH, starts_at: startsAt }])
 
     const { user } = setup()
 
@@ -586,31 +614,53 @@ describe('Schedule — calendar tab', () => {
 
     const cells = screen.getAllByTestId('calendar-day')
 
-    // As of Task 23 every cell is a <button>, because every day is actionable
-    // — a day with no events opens to "add one". This assertion is the point
-    // of the test now: the original mismatch was a <button> and a <div> laying
-    // their content out differently under Chromium's UA stylesheet, so proving
-    // there is only ever ONE tag is what forecloses that whole class of bug.
+    // Single-tag invariant, inherited from the test this replaced: every cell
+    // is a <button>, so the populated and empty states cannot lay their content
+    // out differently the way a <button> and a <div> once did.
     expect(cells.every((cell) => cell.tagName === 'BUTTON')).toBe(true)
 
-    // Split on the label rather than the tag, so both visual states are still
-    // covered: a populated cell also renders the dot row, which an empty one
-    // does not, and that is the remaining way the two could drift.
-    const empty = cells.filter((cell) => /, no events$/.test(cell.getAttribute('aria-label') ?? ''))
-    const populated = cells.filter((cell) => !/, no events$/.test(cell.getAttribute('aria-label') ?? ''))
+    const populated = cells.find((cell) => /, 1 event$/.test(cell.getAttribute('aria-label') ?? ''))
+    const empty = cells.find((cell) => /, no events$/.test(cell.getAttribute('aria-label') ?? ''))
+    // Guard the guard: both states must actually be present, or the assertions
+    // below pass vacuously.
+    expect(populated).toBeTruthy()
+    expect(empty).toBeTruthy()
 
-    // Guard the guard: if the month ever rendered only one state, the
-    // comparison below would pass vacuously.
-    expect(populated.length).toBeGreaterThan(0)
-    expect(empty.length).toBeGreaterThan(0)
+    // The name is legible in the cell itself — the whole point of the redesign.
+    expect(within(populated).getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+    // And a real kick-off time sits beside it. Format-agnostic (matches "1:00
+    // PM" and "13:00" alike) so the assertion pins the presence of a time, not
+    // a locale.
+    expect(populated).toHaveTextContent(/\d{1,2}[:.]\d{2}/)
+    // An empty cell carries neither — only its date number.
+    expect(within(empty).queryByText('Quins vs Dubai Exiles')).not.toBeInTheDocument()
+  })
 
-    // `flex` overrides the UA's centred button layout; `items-start` and
-    // `justify-start` then place the number top-left in both states.
-    const alignmentTokens = ['relative', 'flex', 'items-start', 'justify-start', 'text-left', 'p-[5px]']
-    alignmentTokens.forEach((token) => {
-      expect(populated.every((cell) => hasClassToken(cell, token))).toBe(true)
-      expect(empty.every((cell) => hasClassToken(cell, token))).toBe(true)
-    })
+  // Past MAX_CELL_EVENTS a cell collapses the tail into a "+N more" line rather
+  // than growing without bound; the aria-label still reports the true count, and
+  // the day sheet (tested in its own suite) always lists every one.
+  it('summarises a busy day as “+N more” without hiding the true count', async () => {
+    const { year, month } = dubaiToday()
+    const startsAt = new Date(Date.UTC(year, month, 15, 9, 0)).toISOString()
+    // Five events on one day — two past the cap of three.
+    listEventsMock.mockResolvedValue(
+      ['Exiles', 'Amblers', 'Warriors', 'Saracens', 'Wanderers'].map((opponent, index) => ({
+        ...UPCOMING_MATCH,
+        id: `busy-${index}`,
+        opponent,
+        starts_at: startsAt,
+      })),
+    )
+
+    const { user } = setup()
+    await screen.findAllByText(/Quins vs/)
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+
+    const busy = screen
+      .getAllByTestId('calendar-day')
+      .find((cell) => /, 5 events$/.test(cell.getAttribute('aria-label') ?? ''))
+    expect(busy).toBeTruthy()
+    expect(within(busy).getByText('+2 more')).toBeInTheDocument()
   })
 
   // The weekday-header assertions use an empty event list on purpose: a
@@ -646,19 +696,24 @@ describe('Schedule — calendar tab', () => {
     expect(screen.getByText(monthLabel(0))).toBeInTheDocument()
   })
 
-  it('lists this month’s fixtures under the grid, whatever tab they belong to', async () => {
-    const today = new Date()
-    const todayEvent = { ...UPCOMING_MATCH, starts_at: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 17, 0).toISOString() }
-    // Last month, so it must NOT appear in this month's list.
-    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 15, 17, 0)
-    const otherMonthEvent = { ...UPCOMING_TRAINING, starts_at: lastMonth.toISOString() }
-    listEventsMock.mockResolvedValue([todayEvent, otherMonthEvent])
+  it('shows this month’s fixtures in the grid, and only this month’s', async () => {
+    const { year, month } = dubaiToday()
+    // 09:00 UTC = 13:00 in Dubai on the club's 15th, whatever zone runs this.
+    const thisMonth = new Date(Date.UTC(year, month, 15, 9, 0)).toISOString()
+    // Last month, so it must NOT appear in this month's grid.
+    const lastMonth = new Date(Date.UTC(year, month - 1, 15, 9, 0)).toISOString()
+    listEventsMock.mockResolvedValue([
+      { ...UPCOMING_MATCH, starts_at: thisMonth },
+      { ...UPCOMING_TRAINING, starts_at: lastMonth },
+    ])
 
     const { user } = setup()
 
     await screen.findByText('Quins vs Dubai Exiles')
     await user.click(screen.getByRole('button', { name: 'Calendar' }))
 
+    // The wide grid carries the event names in the cells themselves — there is
+    // no fixture list beneath it any more.
     expect(screen.getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
     expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
   })
@@ -678,6 +733,12 @@ describe('Schedule — calendar tab', () => {
 // Task 23. Tapping a cell used to open dayEvents[0] and swallow the rest;
 // empty cells did nothing at all. These prove the sheet that replaced that.
 describe('Schedule — calendar day sheet (Task 23)', () => {
+  // The day sheet opens by tapping a grid cell, and the grid is a wide-screen
+  // layout since the 29 Aug 2026 redesign — so this whole suite renders at
+  // desktop width. (On a phone the Calendar tab is an agenda whose rows open
+  // the event directly; there is no cell to tap and no day sheet to reach.)
+  stubDesktopViewport()
+
   // Mid-month so the fixtures can never roll into a neighbouring month and
   // turn one of these into an accidental month-boundary test.
   const dayAt = (hour = 13) => {
@@ -768,6 +829,75 @@ describe('Schedule — calendar day sheet (Task 23)', () => {
     const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const dateField = await screen.findByLabelText('Date') // exact — "Clear date" also matches /date/i
     expect(dateField).toHaveTextContent(`15 ${SHORT[month]} ${year}`)
+  })
+})
+
+// The phone side of the 29 Aug 2026 redesign: no grid at all, the Calendar tab
+// is an agenda of the month's fixtures (the same rich rows the other tabs use)
+// with the month nav kept above them. Default jsdom width (no matchMedia stub)
+// IS the phone, so these need no viewport helper.
+describe('Schedule — calendar tab (narrow: the agenda)', () => {
+  // "September 2026" — month AND year, off a UTC-anchored instant so it never
+  // depends on the process zone. (monthName at module scope is month-only.)
+  const monthAndYear = (offset = 0) => {
+    const { year, month } = dubaiToday()
+    return new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'long', year: 'numeric' }).format(
+      Date.UTC(year, month + offset, 1),
+    )
+  }
+
+  it('shows the month as an agenda of fixture rows, not a grid', async () => {
+    const { year, month } = dubaiToday()
+    const startsAt = new Date(Date.UTC(year, month, 15, 9, 0)).toISOString()
+    listEventsMock.mockResolvedValue([{ ...UPCOMING_MATCH, starts_at: startsAt }])
+
+    const { user } = setup()
+    await screen.findByText('Quins vs Dubai Exiles')
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+
+    // No month grid on a phone…
+    expect(screen.queryAllByTestId('calendar-day')).toHaveLength(0)
+    // …the month's fixtures render as the same rich rows the other tabs use.
+    expect(screen.getByTestId('fixture-row')).toBeInTheDocument()
+    expect(screen.getByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+  })
+
+  it('reads the empty-month message when nothing is scheduled', async () => {
+    listEventsMock.mockResolvedValue([])
+
+    const { user } = setup()
+    await screen.findByText(/no upcoming fixtures/i)
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+
+    expect(screen.getByText(/nothing is scheduled this month/i)).toBeInTheDocument()
+    expect(screen.queryAllByTestId('calendar-day')).toHaveLength(0)
+  })
+
+  it('moves between months from the agenda', async () => {
+    listEventsMock.mockResolvedValue([])
+
+    const { user } = setup()
+    await screen.findByText(/no upcoming fixtures/i)
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+
+    expect(screen.getByText(monthAndYear(0))).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /next month/i }))
+    expect(screen.getByText(monthAndYear(1))).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /previous month/i }))
+    expect(screen.getByText(monthAndYear(0))).toBeInTheDocument()
+  })
+
+  it('opens a fixture’s detail sheet from an agenda row', async () => {
+    const { year, month } = dubaiToday()
+    const startsAt = new Date(Date.UTC(year, month, 15, 9, 0)).toISOString()
+    listEventsMock.mockResolvedValue([{ ...UPCOMING_MATCH, starts_at: startsAt }])
+
+    const { user } = setup()
+    await screen.findByText('Quins vs Dubai Exiles')
+    await user.click(screen.getByRole('button', { name: 'Calendar' }))
+    await user.click(screen.getByTestId('fixture-row'))
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
 })
 
