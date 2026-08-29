@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- ⚠️ **Fixed: editing a REPEATING event with "apply to this and every later
+- Removed the `min` from the **"Repeat until"** date field. With the field
+  empty, Chrome's calendar misbehaved on month navigation (Jay's phone: each hop
+  to the next month committed a date and closed the picker, so it needed
+  reopening every time) — an empty `<input type="date">` carrying a `min` is a
+  known source of that quirk. Without it the picker navigates cleanly; the
+  "end after start" guard is unchanged (`generateSeriesDates` yields no dates for
+  an end before the start, and the submit refuses "no sessions").
+  `src/screens/EventForm.jsx`. (SHA follows in the next changelog-touching PR.)
+- `38fdcdd` — ⚠️ **Fixed: editing a REPEATING event with "apply to this and every later
   session" failed with `invalid input syntax for type uuid: "null"`** (Jay's
   phone). Inside `EventForm`'s submit, a `const seriesId` for the CREATE path —
   `null` when editing, since `repeating` is `!editing` — shadowed the
