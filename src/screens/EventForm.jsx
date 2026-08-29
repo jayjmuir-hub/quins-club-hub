@@ -6,6 +6,7 @@ import TimePicker from '../components/TimePicker.jsx'
 import RepeatUntilField from '../components/RepeatUntilField.jsx'
 import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
+import { PITCH_PORTIONS, defaultPitchPortion } from '../lib/pitchPortion.js'
 import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '../data/events.js'
 import { SCORE_KINDS, hasNoComponents } from '../lib/scoring.js'
 import { isMinisTeam, recordsScores } from '../lib/minis.js'
@@ -274,6 +275,14 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       home: true,
       venue: DEFAULT_VENUE,
       pitch: '',
+      // Pre-filled from the squad's age and the event type (matches: U6–U8 a
+      // quarter, U9–U11 a half, U12+ full; training leans smaller). A
+      // suggestion, never a rule — the picker below can change it, and an
+      // effect keeps it in step with the squad and type until it is overridden.
+      pitchPortion: defaultPitchPortion(
+        editableTeams.find((team) => team.id === fallbackTeamId)?.name ?? null,
+        { type },
+      ),
       competition: '',
       // ⚠️ '' MEANS "NOT A LEAGUE MATCH", and that is the default for every new
       // fixture. Null league_team_id is what makes a fixture not a league one;
@@ -338,6 +347,19 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     home: event.home !== false,
     venue: event.venue ?? '',
     pitch: event.pitch ?? '',
+    // ⚠️ THE STORED PORTION WINS, and the default only fills a genuine blank.
+    // A booking made before this column keeps NULL until it is edited, and NULL
+    // reads as a whole pitch everywhere — so falling back to the age default is
+    // a suggestion for the person editing, not a silent rewrite of history (the
+    // save still writes null while the pitch is empty or Pitch TBD). Carried on
+    // a duplicate for the same reason the pitch is: the sharing arrangement is
+    // part of the work being copied.
+    pitchPortion:
+      event.pitch_portion ??
+      defaultPitchPortion(
+        editableTeams.find((team) => team.id === event.team_id)?.name ?? null,
+        { type: event.type ?? 'match' },
+      ),
     competition: event.competition ?? '',
     // ⚠️ AN OLD ROW WITH A COMPETITION AND NO TYPE IS READ AS A TOURNAMENT.
     // `competition` was free text from v1 until 12 Aug 2026, so every fixture
@@ -595,6 +617,30 @@ export default function EventForm({
       mounted = false
     }
   }, [])
+
+  // ══ PITCH PORTION ═══════════════════════════════════════════════════════
+  //
+  // Keep the suggested portion in step with the squad and the event type, but
+  // only while the person hasn't overridden it — the same prefill-don't-clobber
+  // rule the league-team TIER field follows. The baseline ref starts null so
+  // the FIRST run never disturbs a stored portion when editing an existing
+  // event; after that, a change of squad or type refills the field only while
+  // it still holds the last suggestion. `values.teamId` (not the reconciled
+  // `teamId`, computed further down) is deliberate — it lets this sit with the
+  // other loaders and the difference only shows in the rare shrunk-scope case.
+  const suggestedPortion = defaultPitchPortion(
+    editableTeams.find((team) => team.id === values.teamId)?.name ?? null,
+    { type: values.type },
+  )
+  const autoPortionRef = useRef(null)
+  useEffect(() => {
+    setValues((current) =>
+      autoPortionRef.current !== null && current.pitchPortion === autoPortionRef.current
+        ? { ...current, pitchPortion: suggestedPortion }
+        : current,
+    )
+    autoPortionRef.current = suggestedPortion
+  }, [suggestedPortion])
 
   // ══ LEAGUE TEAM ═════════════════════════════════════════════════════════
   //
@@ -949,6 +995,14 @@ export default function EventForm({
       home: isMatch && !tournamentMode ? values.home : null,
       venue: values.venue.trim() || null,
       pitch: values.pitch.trim() || null,
+      // ⚠️ NULL UNLESS THERE IS A REAL PITCH TO SPLIT. "No pitch" and the
+      // `Pitch TBD` placeholder are not pitches, so there is nothing to portion
+      // — writing a portion against them would be a fact about a booking that
+      // does not exist yet, and clash detection treats null as a whole pitch in
+      // any case. A portion rides in `common`, like the pitch itself, so a
+      // fan-out and a repeating term all carry it.
+      pitch_portion:
+        values.pitch.trim() && values.pitch !== PITCH_TBD ? values.pitchPortion : null,
       // ⚠️ `competition` NOW MEANS "THE TOURNAMENT'S NAME", so it is null for a
       // league fixture and for a friendly. Switching an event from Tournament
       // to League therefore clears the name, which is intended: the two answers
@@ -1708,6 +1762,37 @@ export default function EventForm({
             />
           )}
         </div>
+
+        {/* How much of the pitch this booking uses. Only meaningful once a REAL
+            pitch is chosen — "No pitch" and Pitch TBD are not pitches to split,
+            so the field is hidden for them and the save writes a null portion.
+            Pre-filled from the squad's age (see the PITCH PORTION effect above),
+            always editable. This is the whole point of the feature: squads
+            share a pitch, and a portion is how the calendar tells a genuine
+            clash from a share. */}
+        {values.pitch.trim() && values.pitch !== PITCH_TBD && (
+          <div className={FIELD}>
+            <label className={LABEL} htmlFor="event-pitch-portion">
+              How much of the pitch
+            </label>
+            <select
+              id="event-pitch-portion"
+              value={values.pitchPortion ?? 'full'}
+              onChange={(domEvent) => set('pitchPortion')(domEvent.target.value)}
+              className={inputClasses(false)}
+            >
+              {PITCH_PORTIONS.map((portion) => (
+                <option key={portion.value} value={portion.value}>
+                  {portion.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-[12px] font-medium text-ink-muted">
+              Squads share pitches — a quarter or a half each is normal. Pick how
+              much this booking uses so a share isn&apos;t flagged as a clash.
+            </p>
+          </div>
+        )}
 
         {isMatch && (
           <>
