@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
+import DatePicker from '../components/DatePicker.jsx'
 import {
   getPlayerContact,
   getPlayerDob,
@@ -80,6 +81,9 @@ import {
 // --muted on a light fill: #77726e fails AA at this size.
 const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const FIELD = 'mb-3.5'
+// Birthday cap — the database (player_private_dob_sane) is the real guard; this
+// keeps the calendar from offering future days.
+const TODAY = new Date().toISOString().slice(0, 10)
 const INPUT_BASE =
   'w-full rounded-[11px] border-[1.5px] bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition placeholder:text-ink-faint focus:border-brand'
 
@@ -813,14 +817,14 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           <label className={LABEL} htmlFor="player-dob">
             Date of birth
           </label>
-          <input
+          <DatePicker
             id="player-dob"
-            data-testid="player-dob"
-            type="date"
+            testId="player-dob"
             value={values.dob ?? ''}
+            onChange={(next) => setValues((v) => ({ ...v, dob: next }))}
+            min="1900-01-02"
+            max={TODAY}
             disabled={saving}
-            onChange={(event) => setValues((v) => ({ ...v, dob: event.target.value }))}
-            className={inputClasses(false)}
           />
         </div>
 

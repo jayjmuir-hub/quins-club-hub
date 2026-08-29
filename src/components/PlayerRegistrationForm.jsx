@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Button from './Button.jsx'
+import DatePicker from './DatePicker.jsx'
 import Segmented from './Segmented.jsx'
 import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
 import { MISMATCH, PLAY_UP, ageGradeCheck } from '../lib/ageGrade.js'
@@ -378,18 +379,18 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
       <label htmlFor={dobId} className={`${LABEL} mt-4`}>
         {selfNamed ? 'Your date of birth' : total === 1 ? 'Date of birth' : `Player ${index + 1}'s date of birth`}
       </label>
-      <input
+      {/* The app's DatePicker, not the native OS one (29 Aug 2026). Its
+          month/year dropdowns matter here — a birthday is years back. The
+          database refuses a future date and anything before 1900
+          (player_private_dob_sane); these bounds only save a round trip. */}
+      <DatePicker
         id={dobId}
-        name="playerDob"
-        type="date"
+        testId={dobId}
         value={row.dob}
-        disabled={disabled}
-        // The database refuses a future date and anything before 1900
-        // (player_private_dob_sane). These bounds only save a round trip.
-        max={TODAY}
+        onChange={(next) => onChange({ dob: next })}
         min="1900-01-02"
-        onChange={(event) => onChange({ dob: event.target.value })}
-        className={FIELD}
+        max={TODAY}
+        disabled={disabled}
       />
 
       <label htmlFor={teamId} className={`${LABEL} mt-4`}>

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDate } from './helpers/pickDate.js'
 
 // src/components/RollCall.jsx — the one screen a signed-in account with no
 // membership sees. Item 5 of
@@ -302,7 +303,7 @@ describe('the sections', () => {
 
     await user.type(await screen.findByLabelText(/player's first name/i), 'Ada')
     await user.type(screen.getByLabelText(/player's family name/i), 'Ashby')
-    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+    await pickDate(user, '2014-03-04', /date of birth/i)
     await user.selectOptions(screen.getByLabelText(/age group/i), 't-u13')
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 
@@ -320,7 +321,7 @@ describe('the sections', () => {
 
     await user.type(await screen.findByLabelText(/player's first name/i), 'Ada')
     await user.type(screen.getByLabelText(/player's family name/i), 'Ashby')
-    await user.type(screen.getByLabelText(/date of birth/i), '2014-03-04')
+    await pickDate(user, '2014-03-04', /date of birth/i)
     await user.selectOptions(screen.getByLabelText(/age group/i), 't-u13')
     await user.click(screen.getByRole('button', { name: /add my player/i }))
 

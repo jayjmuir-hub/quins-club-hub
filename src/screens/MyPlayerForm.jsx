@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
 import Button from '../components/Button.jsx'
+import DatePicker from '../components/DatePicker.jsx'
 import PhotoField from '../components/PhotoField.jsx'
 import StaffDmOptIn from '../components/StaffDmOptIn.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -27,6 +28,11 @@ import {
 import useOwnContactGate from '../lib/useOwnContactGate.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 import { parentNameProblem, toEditorRows, toSaveRows } from '../lib/parentRows.js'
+
+// Today's date, for the birthday cap — nobody is born in the future. The
+// database (player_private_dob_sane) is the real guard; this only saves a
+// round trip and keeps the calendar from offering future days.
+const TODAY = new Date().toISOString().slice(0, 10)
 
 // The self-service form: what a PARENT or the PLAYER themselves can change on
 // their own record — the photo, the player's own contact details, the
@@ -388,19 +394,24 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
               handleSubmit. Saving this form must not be able to withdraw a
               consent nobody was asked about. */}
           <div className="mt-5">
-            <label className="block">
-              <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
-                Date of birth
-              </span>
-              <input
-                type="date"
-                data-testid="my-player-dob"
-                value={dob}
-                disabled={saving}
-                onChange={(event) => setDob(event.target.value)}
-                className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition focus:border-brand"
-              />
+            {/* ⚠️ NOT a wrapping <label> around the DatePicker — a <label> around
+                a button forwards a click on any control inside it (a calendar
+                day) back to the trigger. htmlFor + id instead. */}
+            <label
+              htmlFor="my-player-dob"
+              className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted"
+            >
+              Date of birth
             </label>
+            <DatePicker
+              id="my-player-dob"
+              testId="my-player-dob"
+              value={dob}
+              onChange={setDob}
+              min="1900-01-02"
+              max={TODAY}
+              disabled={saving}
+            />
             <p className="mt-2 text-[12.5px] leading-relaxed text-ink-muted">
               The club uses this to put {player.full_name} in the right age group.
             </p>

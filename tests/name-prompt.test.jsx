@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDateByTestId } from './helpers/pickDate.js'
 import { MemoryRouter } from 'react-router-dom'
 
 // Unit tests for the sign-in NAME GATE
@@ -981,7 +982,7 @@ describe('NamePrompt — the birthday step', () => {
     renderShell()
 
     await screen.findByText(BIRTHDAY_TITLE)
-    await user.type(screen.getByTestId('dob-p-1'), '2015-03-04')
+    await pickDateByTestId(user, '2015-03-04', 'dob-p-1')
     await user.click(screen.getByRole('button', { name: /save and continue/i }))
 
     await waitFor(() => expect(updatePlayerDobMock).toHaveBeenCalledWith('p-1', '2015-03-04'))
@@ -1005,7 +1006,7 @@ describe('NamePrompt — the birthday step', () => {
     renderShell()
 
     await screen.findByText(BIRTHDAY_TITLE)
-    await user.type(screen.getByTestId('dob-p-1'), '2015-03-04')
+    await pickDateByTestId(user, '2015-03-04', 'dob-p-1')
     await user.click(screen.getByRole('button', { name: /save and continue/i }))
 
     await waitFor(() => expect(updatePlayerDobMock).toHaveBeenCalled())

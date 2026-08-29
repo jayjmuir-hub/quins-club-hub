@@ -2,6 +2,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDateByTestId } from './helpers/pickDate.js'
 
 // Unit tests for src/screens/PlayerForm.jsx (Task 15) plus the wiring that
 // opens it — Roster's "Add player" button and PlayerDetail's Edit/Delete
@@ -212,12 +213,12 @@ describe('PlayerForm — date of birth', () => {
   it('shows what is already on file', async () => {
     getPlayerDobMock.mockResolvedValue('2015-03-04')
     await renderEditForm()
-    await waitFor(() => expect(screen.getByTestId('player-dob')).toHaveValue('2015-03-04'))
+    await waitFor(() => expect(screen.getByTestId('player-dob')).toHaveTextContent('4 Mar 2015'))
   })
 
   it('leaves the box empty when the club has none', async () => {
     await renderEditForm()
-    expect(screen.getByTestId('player-dob')).toHaveValue('')
+    expect(screen.getByTestId('player-dob')).toHaveTextContent('Choose a date')
   })
 
   // ⚠️ THE ASSERTION THAT MATTERS. setPlayerDob would also write
@@ -229,7 +230,7 @@ describe('PlayerForm — date of birth', () => {
     const user = userEvent.setup()
     await renderEditForm()
 
-    await user.type(screen.getByTestId('player-dob'), '2016-04-05')
+    await pickDateByTestId(user, '2016-04-05', 'player-dob')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() =>
@@ -246,7 +247,7 @@ describe('PlayerForm — date of birth', () => {
     const user = userEvent.setup()
     getPlayerDobMock.mockResolvedValue('2015-03-04')
     await renderEditForm()
-    await waitFor(() => expect(screen.getByTestId('player-dob')).toHaveValue('2015-03-04'))
+    await waitFor(() => expect(screen.getByTestId('player-dob')).toHaveTextContent('4 Mar 2015'))
 
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
