@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { useLocation } from 'react-router-dom'
 
@@ -96,10 +97,16 @@ describe('?open=subscribe', () => {
 })
 
 describe('?open=add-event', () => {
-  it('opens the event form for squad staff, then clears the param', async () => {
+  it('opens the add-event flow for squad staff, then clears the param', async () => {
+    const user = userEvent.setup()
     renderAt('/schedule?open=add-event')
-    expect(await screen.findByTestId('event-form-stub')).toBeInTheDocument()
+    // The deeplink now opens the "What are you adding?" chooser first; picking a
+    // kind reaches the form. The param is cleared as soon as the flow opens.
+    const chooser = await screen.findByRole('dialog')
+    expect(within(chooser).getByText('What are you adding?')).toBeInTheDocument()
     expect(screen.getByTestId('search-probe').textContent).toBe('')
+    await user.click(within(chooser).getByRole('button', { name: /^match/i }))
+    expect(await screen.findByTestId('event-form-stub')).toBeInTheDocument()
   })
 
   it('for a parent it opens nothing and still clears the param', async () => {

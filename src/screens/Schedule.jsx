@@ -12,6 +12,7 @@ import Availability from './Availability.jsx'
 import Register from './Register.jsx'
 import EventDetail from './EventDetail.jsx'
 import EventForm from './EventForm.jsx'
+import EventKindChooser from '../components/EventKindChooser.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
@@ -447,6 +448,13 @@ export default function Schedule() {
   // A wrapper object rather than the event itself, so "add" is distinguishable
   // from "closed" without a second boolean that could drift out of sync.
   const [formState, setFormState] = useState(null)
+  // The "What are you adding?" chooser (Jay, 29 Aug 2026) sits in FRONT of the
+  // form for a NEW event only — editing and duplicating open the form directly,
+  // their kind already fixed by the row. Holds the pending context ({ date? })
+  // until a kind is picked, then hands off to formState with that kind. See
+  // src/components/EventKindChooser.jsx and
+  // claude/plans/2026-08-29-tournaments-as-containers.md.
+  const [choosingKind, setChoosingKind] = useState(null)
   // Whether the RSVP/team-sheet sheet is open for the currently selected
   // event (Task 16). Tied to selectedEventId rather than carrying its own
   // event id: Availability only ever opens from within the open detail
@@ -569,7 +577,7 @@ export default function Schedule() {
     if (openParam === 'subscribe') {
       setSubscribeRequest((n) => n + 1)
     } else if (openParam === 'add-event' && canEditAnything) {
-      setFormState({ event: null })
+      setChoosingKind({})
     }
     // Unknown values (and add-event for people who cannot add) just clear:
     // the gate is the UI's, RLS is the real one, and a stale param must not
@@ -683,7 +691,7 @@ export default function Schedule() {
         <div className="flex shrink-0 items-center gap-2">
           <CalendarSubscribe openRequest={subscribeRequest} />
           {canEditAnything && (
-            <Button onClick={() => setFormState({ event: null })} className="shrink-0">
+            <Button onClick={() => setChoosingKind({})} className="shrink-0">
               Add event
             </Button>
           )}
@@ -833,7 +841,7 @@ export default function Schedule() {
             setSelectedDay(null)
           }}
           onAddEvent={() => {
-            setFormState({ event: null, date: isoDay(selectedDay) })
+            setChoosingKind({ date: isoDay(selectedDay) })
             setSelectedDay(null)
           }}
         />
@@ -871,13 +879,27 @@ export default function Schedule() {
           above rather than stacking two dialogs. Closing the form drops
           back to the schedule, not to the detail sheet, which is where a
           coach who just saved wants to be. */}
+      {/* The kind chooser, in front of the form for a NEW event. Picking a kind
+          hands off to formState carrying that kind (and any date the user was
+          adding from); closing drops back to the schedule. */}
+      {choosingKind && !formState && (
+        <EventKindChooser
+          onPick={(kind) =>
+            setFormState({ event: null, initialKind: kind, date: choosingKind.date })
+          }
+          onClose={() => setChoosingKind(null)}
+        />
+      )}
+
       {formState && (
         <EventForm
           event={formState.event}
           duplicate={formState.duplicate ?? false}
           initialDate={formState.date ?? null}
+          initialKind={formState.initialKind ?? null}
           onClose={() => {
             setFormState(null)
+            setChoosingKind(null)
             setSelectedEventId(null)
           }}
           onSaved={refresh}
