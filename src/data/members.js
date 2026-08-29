@@ -737,7 +737,11 @@ export async function updateProfileNames({ profileId, firstName, lastName } = {}
       name_confirmed_at: new Date().toISOString(),
     })
     .eq('id', profileId)
-    .select()
+    // ⚠️ NOT `.select()` (= *): profiles.phone/email are no longer SELECTable by
+    // `authenticated` (20260828_profiles_contact_revoke), so RETURNING * throws
+    // "permission denied for table profiles" on an otherwise-valid write. Read
+    // back only granted columns.
+    .select('id, first_name, last_name, full_name, name_confirmed_at')
     .maybeSingle()
 
   if (error) throw error
@@ -800,14 +804,20 @@ export async function updateMyProfile({ profileId, firstName, lastName, phone } 
       name_confirmed_at: new Date().toISOString(),
     })
     .eq('id', profileId)
-    .select()
+    // ⚠️ NOT `.select()` (= *): profiles.phone/email SELECT is revoked from
+    // `authenticated` (20260828_profiles_contact_revoke), so RETURNING * threw
+    // "permission denied for table profiles" the moment a member saved a phone.
+    // Read back only granted columns; the phone we just wrote is re-attached below.
+    .select('id, first_name, last_name, full_name, name_confirmed_at')
     .maybeSingle()
 
   if (error) throw error
   // A refusal is a successful zero-row response, not an error — the same
   // silent-refusal shape every other writer in this module reads back.
   if (!data) throw new Error(REFUSED_MY_PROFILE)
-  return data
+  // Re-attach the phone we wrote — it is deliberately not read back (see the
+  // select above), and callers prime their cache/patch with this row.
+  return { ...data, phone: trimmedPhone || null }
 }
 
 /**
@@ -854,12 +864,17 @@ export async function updateMemberProfile({ profileId, firstName, lastName, phon
       phone: trimmedPhone || null,
     })
     .eq('id', profileId)
-    .select()
+    // ⚠️ NOT `.select()` (= *) — profiles.phone/email SELECT is revoked from
+    // `authenticated` (20260828_profiles_contact_revoke); RETURNING * throws
+    // "permission denied for table profiles". Read granted columns only.
+    .select('id, first_name, last_name, full_name')
     .maybeSingle()
 
   if (error) throw error
   if (!data) throw new Error(REFUSED_PROFILE)
-  return data
+  // The Accounts sheet patches member.profiles.phone from this row; re-attach the
+  // value we wrote, since it is no longer read back from the DB.
+  return { ...data, phone: trimmedPhone || null }
 }
 
 // Same silent-refusal mechanism as REFUSED_INVITE above, against the two

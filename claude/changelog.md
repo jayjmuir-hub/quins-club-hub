@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Desktop time entry — the app's own `TimePicker`.** The event form's two time
+- **Fix: saving a phone number (or a name) threw "permission denied for table
+  profiles".** The 28 Aug contact-column lockdown
+  (`20260828_profiles_contact_revoke`) revoked `SELECT` on `profiles.phone` and
+  `profiles.email` from `authenticated` — reads were rerouted through
+  `member_contacts`, but three writers still ended with a bare `.select()`,
+  which PostgREST turns into `UPDATE … RETURNING *`: a read of every column,
+  `phone` included. So the moment a parent saved their own phone, an admin
+  edited anyone's details, or a new member confirmed their name, the write threw
+  42501. Fixed by reading back only granted columns and re-attaching the phone
+  the writer just wrote (`updateMyProfile`, `updateMemberProfile`,
+  `updateProfileNames`). `src/data/members.js`,
+  `tests/profiles-write-grants.test.js`. (SHA follows in the next
+  changelog-touching PR.)
+- `299dba0` — **Desktop time entry — the app's own `TimePicker`.** The event form's two time
   fields (Time and End time) drop the native `<input type="time">`, which on
   desktop is a cramped AM/PM spinner that is awkward with a mouse (Jay: "fix the
   way times are selected when using a desktop"). New
@@ -24,7 +37,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `role="group"`, not a dialog — it is non-modal and stays open across column
   taps, so it must not read as a second dialog over the form sheet.
   `src/components/TimePicker.jsx`, `src/screens/EventForm.jsx`,
-  `tests/time-picker.test.jsx`. (SHA follows in the next changelog-touching PR.)
+  `tests/time-picker.test.jsx`.
 - `c37ed35` — **Tournaments as containers — phase 4 (the tournament detail screen + games).**
   A tournament container now opens its own screen instead of the single-fixture
   `EventDetail`: the day's setup, the **games** played inside it, an overall
