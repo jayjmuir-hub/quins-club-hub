@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDate } from './helpers/pickDate.js'
 
 // Duplicating an event. Jay, 12 Aug 2026: "need the ability to duplicate an
 // event, mainly training" — and, asked what Duplicate solves that the existing
@@ -112,9 +113,7 @@ const field = (id) => document.getElementById(id)
 const payload = () => upsertEventMock.mock.calls[0][0]
 
 async function pickDateAndSave(user, date = '2026-09-15') {
-  const input = field('event-date')
-  await user.clear(input)
-  await user.type(input, date)
+  await pickDate(user, date)
   await user.click(screen.getByRole('button', { name: /^add event$/i }))
   await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
 }
@@ -161,7 +160,8 @@ describe('Duplicate — what must NOT carry over', () => {
     // be wrong, only unfinished — and the form's existing required-date check
     // is what enforces it, which is why this needed no new guard.
     const user = renderForm({ event: TRAINING, duplicate: true })
-    expect(field('event-date')).toHaveValue('')
+    // The DatePicker trigger shows its empty-state placeholder, not a value.
+    expect(field('event-date')).toHaveTextContent('Choose a date')
 
     await user.click(screen.getByRole('button', { name: /^add event$/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/highlighted fields/i)

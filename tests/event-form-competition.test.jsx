@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDate } from './helpers/pickDate.js'
 
 // Competition is a CHOICE, not a free-text box — Jay, 12 Aug 2026: "a way to
 // select in competition either league or tournament, for league it should then
@@ -60,10 +61,9 @@ function renderForm({ event = null } = {}) {
 
 async function fillMatch(user) {
   await user.type(screen.getByLabelText(/opponent/i), 'Dubai Exiles')
-  const date = document.getElementById('event-date')
   const time = document.getElementById('event-time')
   const end = document.getElementById('event-end-time')
-  await user.clear(date); await user.type(date, '2026-09-12')
+  await pickDate(user, '2026-09-12')
   await user.clear(time); await user.type(time, '09:00')
   await user.clear(end); await user.type(end, '10:30')
 }

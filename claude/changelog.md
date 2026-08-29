@@ -10,11 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- The **"Repeat weekly for … weeks"** field now starts showing **0** instead of
+- New reusable **`src/components/DatePicker.jsx`** — the app's own date control,
+  and the **event Date** field is the first to use it (Jay: "why can't we use
+  that calendar everywhere?"). Same `yyyy-mm-dd` value contract as the native
+  input, so callers and the database are unchanged. A trigger shows the value
+  (with a clear ✕) and opens an inline calendar built from `calendarGrid.js`
+  whose ‹ › are plain buttons — no commit-on-navigate — plus **month and year
+  `<select>`s** so a far-back date (a birthday) is a couple of taps, not months
+  of paging. A shared `tests/helpers/pickDate.js` drives it; the event-form test
+  suites moved to it. Birthdays are next. `src/components/DatePicker.jsx`,
+  `src/screens/EventForm.jsx`, `tests/date-picker.test.jsx`,
+  `tests/helpers/pickDate.js`. (SHA follows in the next changelog-touching PR.)
+- `7e30d4b` — The **"Repeat weekly for … weeks"** field now starts showing **0** instead of
   blank, and its stepper can go back down to 0 (Jay: a blank box does not say
   what it is for, and `min={1}` trapped the spinner above zero). 0 weeks still
   means "no repeat", so a one-off stays the default. `src/components/RepeatUntilField.jsx`,
-  `tests/repeat-until-field.test.jsx`. (SHA follows in the next changelog-touching PR.)
+  `tests/repeat-until-field.test.jsx`.
 - `dd59dfb` — Replaced the native **"Repeat until"** date picker entirely (Jay's phone: the
   OS calendar committed a date when you navigated to the next MONTH, so reaching
   a month further out was impossible — removing `min` the PR before did not fix

@@ -745,9 +745,11 @@ describe('Schedule — calendar day sheet (Task 23)', () => {
     // known, so the user should never have to retype it. Asserted as the
     // CLUB's 15th — a form that defaulted to today, or that let the browser
     // zone shift the day, fails here.
-    const pad = (n) => String(n).padStart(2, '0')
-    const dateField = await screen.findByLabelText(/date/i)
-    expect(dateField).toHaveValue(`${year}-${pad(month + 1)}-15`)
+    // The DatePicker trigger shows the value formatted ("15 Aug 2026"), not a
+    // raw input value — still the CLUB's 15th, whatever zone the reader is in.
+    const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const dateField = await screen.findByLabelText('Date') // exact — "Clear date" also matches /date/i
+    expect(dateField).toHaveTextContent(`15 ${SHORT[month]} ${year}`)
   })
 })
 

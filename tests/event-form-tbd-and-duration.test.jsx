@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDate } from './helpers/pickDate.js'
 
 // Jay, 14 Aug 2026, three asks on the event form:
 //   - a TBD option on the competition dropdown
@@ -63,9 +64,7 @@ function renderForm({ event = null } = {}) {
 /** Fill the fields every match needs, so a test can assert on one thing. */
 async function fillMatchBasics(user, { date = '2026-09-12' } = {}) {
   await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
-  const dateInput = screen.getByLabelText('Date')
-  await user.clear(dateInput)
-  await user.type(dateInput, date)
+  await pickDate(user, date)
 }
 
 beforeEach(() => {
@@ -196,9 +195,7 @@ describe('tournaments have no opponent', () => {
   // "Quins vs Al Ain Tournament" everywhere.
   it('saves a tournament with the opponent left blank', async () => {
     const user = renderForm()
-    const dateInput = screen.getByLabelText('Date')
-    await user.clear(dateInput)
-    await user.type(dateInput, '2026-10-10')
+    await pickDate(user, '2026-10-10')
     await user.type(screen.getByLabelText('Time'), '09:00')
     await user.type(screen.getByLabelText('End time'), '17:00')
     await user.selectOptions(screen.getByLabelText('Competition'), 'tournament')
@@ -274,7 +271,8 @@ describe('start time TBD', () => {
   it('still requires the date — TBD is about the time, not the day', async () => {
     const user = renderForm()
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
-    await user.clear(screen.getByLabelText('Date'))
+    // The create form defaults the date to today; clear it to test the guard.
+    await user.click(screen.getByRole('button', { name: 'Clear date' }))
     await user.click(screen.getByRole('checkbox', { name: /kick-off time to be confirmed/i }))
     await user.click(screen.getByRole('button', { name: /add event/i }))
 

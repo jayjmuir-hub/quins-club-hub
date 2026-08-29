@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
+import DatePicker from '../components/DatePicker.jsx'
 import RepeatUntilField from '../components/RepeatUntilField.jsx'
 import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
@@ -1179,13 +1180,14 @@ export default function EventForm({
           <label className={LABEL} htmlFor="event-date">
             Date
           </label>
-          <input
+          {/* The app's own picker, not the native OS one (29 Aug 2026) — see
+              DatePicker.jsx for why. onChange takes the value string directly,
+              so `set` rather than `setFromInput`. */}
+          <DatePicker
             id="event-date"
-            type="date"
             value={values.date}
-            onChange={setFromInput('date')}
-            aria-invalid={invalid.date ? 'true' : undefined}
-            className={inputClasses(invalid.date)}
+            onChange={set('date')}
+            invalid={invalid.date}
           />
         </div>
         {/* ⚠️ TIME TBD (Jay, 14 Aug 2026). A CHECKBOX rather than a "TBD" option
