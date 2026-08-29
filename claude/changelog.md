@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Tournaments can be added for several age groups at once.** "Also add for" was
+- **The parent/player tab bar shrinks to a centred island.** The bottom dock's
+  spacing was tuned for the five-tab squad-staff bar; a parent or player has only
+  four (no Squad Hub), and at that count the full-width `justify-between` spread
+  nearly doubled every gap — ~44px against staff's ~23px — so the icons scattered
+  and the centred Home pill was marooned (Jay: "don't look good"). Below five tabs
+  the dock is now a fixed-width centred island that hugs its tabs (gaps back to
+  ~27px); at five it stays the full-width bar, so squad staff see no change. Both
+  widths keep `justify-between`, so the glider math is untouched. `src/components/Nav.jsx`.
+  (SHA follows in the next changelog-touching PR.)
+- `b7e6c73` — **Tournaments can be added for several age groups at once.** "Also add for" was
   hidden in tournament mode at ship (phase 3); Jay asked for it back — a festival
   is one event several of our squads enter. Ticking extra squads now fans the
   **container** out: one independent tournament per squad, each with its own games
@@ -22,15 +31,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   container↔game and squad↔squad relationships stay distinct. Deleting one squad's
   tournament removes only that container and its games. `src/screens/EventForm.jsx`,
   `tests/multi-squad-and-pitch.test.jsx`, `tests/event-form.test.jsx`,
-  `claude/plans/2026-08-29-tournaments-as-containers.md`. (SHA follows in the next
-  changelog-touching PR.)
-- **The DatePicker's "Clear date" × stays put when the calendar opens.** The ×
+  `claude/plans/2026-08-29-tournaments-as-containers.md`.
+- `b7e6c73` — **The DatePicker's "Clear date" × stays put when the calendar opens.** The ×
   was absolutely positioned against the component root, which grew to include the
   open calendar popover — so `top-1/2` dropped it from beside the calendar icon
   down into the day grid (it read as a stray mark near a random day). Wrapping the
   trigger and the × in their own positioning context pins it to the trigger's
-  height regardless of the calendar. `src/components/DatePicker.jsx`. (SHA follows
-  in the next changelog-touching PR.)
+  height regardless of the calendar. `src/components/DatePicker.jsx`. (Shipped in
+  the same squash as the tournaments change above.)
 
 ## 29 Aug 2026
 

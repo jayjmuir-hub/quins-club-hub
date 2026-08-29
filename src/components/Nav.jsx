@@ -255,6 +255,19 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
   // The numbers (80px grace, 6px hysteresis) live in the hook.
   const hidden = useAutoHideOnScroll()
 
+  // ══ SHRINK-TO-FIT FOR FEW TABS — Jay, 30 Aug 2026 ═══════════════════════════
+  // The dock's spacing was tuned for the five-tab squad-staff bar. A parent or
+  // player has only four (no Squad Hub), and at that count the full-width
+  // `justify-between` spread nearly DOUBLES every gap — ~44px against the staff
+  // bar's ~23px, measured — so the icons scatter and the centred Home pill is
+  // marooned in acres of space ("don't look good", Jay). Below five tabs the
+  // dock becomes a fixed-width CENTRED ISLAND that hugs its tabs; at five it
+  // stays the full-width bar it has always been, so squad staff see no change.
+  // The glider math below is untouched: BOTH widths are still `justify-between`,
+  // so measure() just distributes within the narrower island. 300px holds four
+  // tabs at ~staff density and clears the 320px floor via max-w.
+  const compact = items.length < 5
+
   // Where is the active link? Re-measured on route change and on resize, and
   // once more after the label's 300ms unfurl so the pill's final width is the
   // settled one, not the one captured mid-transition.
@@ -336,7 +349,17 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
         // rounded-[22px], not rounded-pill, since 24 Aug 2026 — Jay: the two
         // bars should be the same shape, and the masthead island's 22px won.
         // The ITEMS inside (glider, hover fills) stay capsules on purpose.
-        'glass-dock fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-[22px] px-2 py-[7px] desktop:hidden',
+        'glass-dock fixed bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-[22px] px-2 py-[7px] desktop:hidden',
+        // Width: the full-width bar (12px inset each edge) for five+ tabs; a
+        // centred ~300px island that hugs its tabs for four (see `compact`).
+        // `left-0 right-0 mx-auto` + a DEFINITE width is what centres a `fixed`
+        // element — fixed width, not `w-fit`, so the island does not resize and
+        // re-centre each time the active pill swaps label. max-w keeps ≥12px of
+        // air each side at the 320px floor. ⚠️ FULL CLASS NAMES so Tailwind
+        // emits them — never build these from a variable.
+        compact
+          ? 'left-0 right-0 mx-auto w-[300px] max-w-[calc(100%-24px)]'
+          : 'inset-x-3',
         'transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none',
         hidden ? 'translate-y-[calc(100%+24px)] opacity-0' : 'translate-y-0 opacity-100',
       ].join(' ')}
