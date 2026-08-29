@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Fix: saving a phone number (or a name) threw "permission denied for table
+- **Re-captured `handle_new_user` in `db/schema/functions.sql`** to match the
+  live function. The captured body had drifted well behind production: it showed
+  only the profile insert, while the deployed trigger also derives the name,
+  records `name_confirmed_at` and `signup_intent` on the profile, writes the
+  pending `access_requests` row from the intent, and calls `apply_signup_intent`
+  once the email is confirmed — grown by the 25 Aug signup-before-confirm work
+  and the 26 Aug volunteer change without the capture being refreshed (found
+  29 Aug while adding `hold_bare_signup`). Capture-only: no behaviour or schema
+  change, the live function was already correct. The `on_auth_user_created` note
+  in `db/schema/triggers.sql` is corrected to match. `db/schema/functions.sql`,
+  `db/schema/triggers.sql`. (SHA follows in the next changelog-touching PR.)
+- `28a6c22` — **Fix: saving a phone number (or a name) threw "permission denied for table
   profiles".** The 28 Aug contact-column lockdown
   (`20260828_profiles_contact_revoke`) revoked `SELECT` on `profiles.phone` and
   `profiles.email` from `authenticated` — reads were rerouted through
@@ -21,8 +32,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   42501. Fixed by reading back only granted columns and re-attaching the phone
   the writer just wrote (`updateMyProfile`, `updateMemberProfile`,
   `updateProfileNames`). `src/data/members.js`,
-  `tests/profiles-write-grants.test.js`. (SHA follows in the next
-  changelog-touching PR.)
+  `tests/profiles-write-grants.test.js`.
 - `299dba0` — **Desktop time entry — the app's own `TimePicker`.** The event form's two time
   fields (Time and End time) drop the native `<input type="time">`, which on
   desktop is a cramped AM/PM spinner that is awkward with a mouse (Jay: "fix the
