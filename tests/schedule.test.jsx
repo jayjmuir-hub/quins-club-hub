@@ -740,6 +740,10 @@ describe('Schedule — calendar day sheet (Task 23)', () => {
     await user.click(screen.getByRole('button', { name: new RegExp(`^15 ${monthName(year, month)}, no events`) }))
     const sheet = within(await screen.findByRole('dialog'))
     await user.click(sheet.getByRole('button', { name: 'Add event' }))
+    // "Add event" from a day cell now opens the "What are you adding?" chooser,
+    // carrying the tapped date through it; pick Match to reach the form.
+    const chooser = within(await screen.findByRole('dialog'))
+    await user.click(chooser.getByRole('button', { name: /^match/i }))
 
     // The whole point of opening the form from a cell: the date is already
     // known, so the user should never have to retype it. Asserted as the

@@ -368,6 +368,67 @@ describe('EventForm — end time', () => {
   })
 })
 
+// --- tournament mode (phase 3, 29 Aug 2026) -------------------------------
+//
+// The chooser's Tournament card opens the form as a CONTAINER: the name is the
+// identity, and opponent / home-away / league / round / competition-dropdown /
+// score / repeats / also-add-for all disappear. Editing is unaffected — this is
+// driven by initialKind, not by competition_type. See
+// claude/plans/2026-08-29-tournaments-as-containers.md.
+
+describe('EventForm — tournament mode', () => {
+  it('opens as a tournament: name at the top, no opponent, no competition dropdown', () => {
+    renderForm({ initialKind: 'tournament' })
+
+    expect(screen.getByRole('heading', { name: 'New tournament' })).toBeInTheDocument()
+    // The name IS the fixture — a Tournament picker, not an Opponent box.
+    expect(screen.getByLabelText('Tournament')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Opponent')).not.toBeInTheDocument()
+    // The chooser already answered "tournament", so these are all gone.
+    expect(screen.queryByLabelText('Competition')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Type' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Home or away' })).not.toBeInTheDocument()
+  })
+
+  it('requires a name — "Something else" left blank refuses to save', async () => {
+    const user = userEvent.setup()
+    renderForm({ initialKind: 'tournament' })
+
+    // The default selection is "Something else…" with an empty custom box.
+    await pickDate(user, '2026-09-12')
+    await user.type(screen.getByLabelText('Time'), '09:00')
+    await user.type(screen.getByLabelText('End time'), '15:00')
+    await user.click(screen.getByRole('button', { name: /add tournament/i }))
+
+    expect(upsertEventMock).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Tournament name')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('saves a container: match + competition_type tournament, no opponent or home', async () => {
+    const user = userEvent.setup()
+    renderForm({ initialKind: 'tournament' })
+
+    await user.selectOptions(screen.getByLabelText('Tournament'), 'ADHJRT')
+    await pickDate(user, '2026-09-12')
+    await user.type(screen.getByLabelText('Time'), '09:00')
+    await user.type(screen.getByLabelText('End time'), '15:00')
+    await user.click(screen.getByRole('button', { name: /add tournament/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    const written = upsertEventMock.mock.calls[0][0]
+    expect(written).toMatchObject({
+      type: 'match',
+      competition_type: 'tournament',
+      competition: 'ADHJRT',
+    })
+    // Named, not opposed; not home or away — those belong to the games.
+    expect(written.opponent).toBeNull()
+    expect(written.home).toBeNull()
+    // A container is not itself part of another tournament.
+    expect(written.tournament_id ?? null).toBeNull()
+  })
+})
+
 // --- notes (8 Aug 2026) ---------------------------------------------------
 
 describe('EventForm — additional info', () => {
@@ -687,7 +748,11 @@ describe('Schedule wiring', () => {
     useMembershipsMock.mockReturnValue(membershipValue(COACH_U12))
     render(withRouter(<Schedule />))
 
+    // "Add event" now opens the "What are you adding?" chooser first; pick Match
+    // to reach the generic form this test is about.
     await user.click(await screen.findByRole('button', { name: /add event/i }))
+    const chooser = await screen.findByRole('dialog')
+    await user.click(within(chooser).getByRole('button', { name: /^match/i }))
 
     expect(await screen.findByRole('heading', { name: 'Add event' })).toBeInTheDocument()
     expect(screen.getByLabelText('Opponent')).toHaveValue('')
@@ -699,6 +764,8 @@ describe('Schedule wiring', () => {
     render(withRouter(<Schedule />))
 
     await user.click(await screen.findByRole('button', { name: /add event/i }))
+    const chooser = await screen.findByRole('dialog')
+    await user.click(within(chooser).getByRole('button', { name: /^match/i }))
     const callsBefore = listEventsMock.mock.calls.length
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')

@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 29 Aug 2026
 
-- **Tournaments as containers — phase 1 (schema + read paths, nothing user-visible).**
+- **Tournaments as containers — phase 3 (the chooser + the tournament form).**
+  Adding an event now opens a small **"What are you adding?"** chooser (Match /
+  Tournament / Training / Social) before the form, so a tournament is a
+  first-class thing you pick up front rather than a Match you scroll ten fields
+  down to reclassify (Jay, 29 Aug 2026: he liked "the quick what are you adding?
+  thing then the form comes up"). New `src/components/EventKindChooser.jsx`;
+  `src/screens/Schedule.jsx` routes every NEW-event entry (the button, a day
+  cell, the `?open=add-event` deeplink) through it, while editing and
+  duplicating still open the form directly. `src/screens/EventForm.jsx` gains an
+  `initialKind` prop and a **`tournamentMode`** — new-event-only, driven by the
+  chooser and deliberately NOT by `competition_type`, so the edit path and its
+  tests are untouched. In that mode the tournament's **name is the identity** at
+  the top, and opponent, home/away, league team, round, the Competition
+  dropdown, score, Repeats and "Also add for" are all hidden; the name is
+  required, and the container saves as `type=match`,
+  `competition_type=tournament` with `opponent` and `home` null. The games
+  played underneath it are phase 4. `tests/event-kind-chooser.test.jsx` and
+  tournament-mode cases in `tests/event-form.test.jsx`; three Schedule tests
+  updated to click through the new chooser. (Phase 1 is #511.) (SHA follows in
+  the next changelog-touching PR.)
+- `888f544` — **Tournaments as containers — phase 1 (schema + read paths, nothing user-visible).**
   Groundwork for entering a tournament as its own object with the games played
   recorded underneath it (design:
   `claude/plans/2026-08-29-tournaments-as-containers.md`). Migration
@@ -28,8 +48,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   (cascade + control fixture + feed exclusion + a SET-NULL self-test) and JS
   tests. `db/schema/tables.sql`, `db/schema/functions.sql`,
   `tests/tournament-title.test.js`, `tests/data.test.js`. Phases 3–6 (the
-  chooser, the tournament screen, add-game, delete-confirm) follow. (SHA follows
-  in the next changelog-touching PR.)
+  chooser, the tournament screen, add-game, delete-confirm) follow.
 - `6b7750b` — The four **date-of-birth** fields now use the same `DatePicker` too (Jay:
   "migrate the event date + birthdays"). Player registration (both the parent
   and the "I'm the player" paths), the parent-facing **MyPlayerForm**, the

@@ -238,15 +238,27 @@ function Segmented({ legend, name, options, value, onChange }) {
 // the calendar grid is built from numbers: a Date would re-read the browser's
 // zone and could land the event on the wrong day for a reader outside Abu
 // Dhabi. See CLUB_TIME_ZONE in src/lib/eventFormat.js.
-function initialValues(event, editableTeams, initialDate = null, duplicating = false) {
+function initialValues(event, editableTeams, initialDate = null, duplicating = false, initialKind = null) {
   const teamIds = editableTeams.map((team) => team.id)
   const fallbackTeamId = teamIds[0] ?? ''
 
   if (!event) {
     const today = clubToday()
     const pad = (n) => String(n).padStart(2, '0')
+    // ⚠️ THE CHOOSER'S KIND, TRANSLATED TO COLUMNS. 'tournament' is a match
+    // whose competition_type is 'tournament' (a container); the other kinds are
+    // just the event.type. Null (opened without the chooser) keeps the historic
+    // default of a Match. A tournament defaults its Self-service availability to
+    // Auto like any match — nothing kind-specific rides on this beyond type and
+    // competitionType.
+    const isTournamentKind = initialKind === 'tournament'
+    const type = isTournamentKind
+      ? 'match'
+      : initialKind === 'training' || initialKind === 'social' || initialKind === 'match'
+        ? initialKind
+        : 'match'
     return {
-      type: 'match',
+      type,
       availabilityOverride: 'auto',
       title: '',
       opponent: '',
@@ -268,8 +280,9 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       leagueTeamId: '',
       round: '',
       tier: '',
-      // '' = neither: a friendly. See the block by COMPETITION_LEAGUE.
-      competitionType: '',
+      // '' = neither: a friendly. A tournament pick presets this to 'tournament'
+      // so the container saves as one; see the block by COMPETITION_LEAGUE.
+      competitionType: isTournamentKind ? COMPETITION_TOURNAMENT : '',
       notes: '',
       resultUs: '',
       resultThem: '',
@@ -403,6 +416,15 @@ export default function EventForm({
   // with, on a date nobody would think to check.
   duplicate = false,
   initialDate = null,
+  // ⚠️ THE KIND CHOSEN IN THE "What are you adding?" CHOOSER, for a NEW event
+  // only — 'match' | 'tournament' | 'training' | 'social', or null when the
+  // form was opened some other way (editing, duplicating, a test). 'tournament'
+  // is not an event.type; it opens the form as a match with competition_type
+  // 'tournament' AND drives tournamentMode below, which reshapes the fields into
+  // the container form. Any other value is just the initial `type`. See
+  // src/components/EventKindChooser.jsx and
+  // claude/plans/2026-08-29-tournaments-as-containers.md.
+  initialKind = null,
   onClose,
   onSaved,
 }) {
@@ -419,7 +441,7 @@ export default function EventForm({
   )
 
   const [values, setValues] = useState(() =>
-    initialValues(event, editableTeams, initialDate, duplicate),
+    initialValues(event, editableTeams, initialDate, duplicate, initialKind),
   )
   const [invalid, setInvalid] = useState({})
   const [error, setError] = useState(null)
@@ -473,6 +495,23 @@ export default function EventForm({
   // than six separate places each remembering to ask about `duplicate`.
   const editing = Boolean(event?.id) && !duplicate
 
+  // ⚠️ TOURNAMENT-CONTAINER MODE — a NEW event added via the chooser's
+  // Tournament card. It reshapes the form into the container: the tournament's
+  // NAME is its identity (no opponent, no home/away), and league/round, the
+  // competition dropdown, the score, Repeats and "Also add for" all disappear.
+  // The games played get added underneath it later (phase 4), each a fixture of
+  // its own. See claude/plans/2026-08-29-tournaments-as-containers.md.
+  //
+  // ⚠️ DELIBERATELY NEW-ONLY, AND THAT IS WHAT KEEPS THE EDIT PATH UNTOUCHED.
+  // It is driven by `initialKind`, not by `isTournament` (competition_type ===
+  // tournament) — because that derived flag is ALSO true for a legacy match
+  // whose competition someone set to Tournament with an opponent still on it,
+  // and reshaping THAT would strand the opponent and change long-standing edit
+  // behaviour (and its tests). Editing a tournament still uses the generic form
+  // for now; the tournament detail screen is where a container is edited
+  // properly (phase 4).
+  const tournamentMode = !editing && initialKind === 'tournament'
+
   // ⚠️ A SCORE WITH COMPONENTS BEHIND IT CANNOT BE TYPED HERE, AND SAYING SO IS
   // THE WHOLE POINT OF THIS FLAG. Since 12 Aug 2026 result_us / result_them are
   // DERIVED by a database trigger from the tries, conversions, penalties and
@@ -499,7 +538,13 @@ export default function EventForm({
   // tapped, and "Edit event" would be a lie that costs an accidental overwrite.
   // It is derived from `duplicate` rather than from `editing`, because
   // `editing` is false for BOTH a duplicate and a plain add.
-  const sheetTitle = duplicate ? 'Duplicate event' : editing ? 'Edit event' : 'Add event'
+  const sheetTitle = tournamentMode
+    ? 'New tournament'
+    : duplicate
+      ? 'Duplicate event'
+      : editing
+        ? 'Edit event'
+        : 'Add event'
 
   // Repeating is a CREATE-time feature. Editing an existing event never
   // shows the section, and this flag makes that structural rather than a
@@ -828,6 +873,11 @@ export default function EventForm({
       // tournament branch is the cosmetic half.
       opponent: isMatch && !isTournament && !values.opponent.trim(),
       title: !isMatch && !values.title.trim(),
+      // ⚠️ THE TOURNAMENT'S NAME IS REQUIRED, and only in tournament mode — it
+      // is that fixture's whole identity (there is no opponent or title to fall
+      // back on). The empty case in practice is "Something else…" chosen with
+      // the custom box left blank; a regular from the list is always non-empty.
+      competition: tournamentMode && !values.competition.trim(),
     }
     setInvalid(nextInvalid)
 
@@ -888,8 +938,14 @@ export default function EventForm({
       // lock; 'open'/'locked' override it. Enforced in RLS.
       availability_override: values.availabilityOverride,
       title: isMatch ? null : values.title.trim(),
-      opponent: isMatch ? values.opponent.trim() : null,
-      home: isMatch ? values.home : null,
+      // ⚠️ NULL FOR A TOURNAMENT CONTAINER, not the empty string a hidden field
+      // would otherwise write. A tournament is named, not opposed, and is not
+      // home or away — those belong to the games underneath it. tournamentMode
+      // hides both fields, so their values are never touched; writing null keeps
+      // the row honest rather than storing an empty answer to a question the
+      // form did not ask.
+      opponent: isMatch && !tournamentMode ? values.opponent.trim() : null,
+      home: isMatch && !tournamentMode ? values.home : null,
       venue: values.venue.trim() || null,
       pitch: values.pitch.trim() || null,
       // ⚠️ `competition` NOW MEANS "THE TOURNAMENT'S NAME", so it is null for a
@@ -1098,16 +1154,64 @@ export default function EventForm({
           bubble is neither announced reliably nor visible to the browser
           check. */}
       <form onSubmit={handleSubmit} noValidate>
-        <Segmented
-          legend="Type"
-          name="event-type"
-          options={TYPES}
-          value={values.type}
-          onChange={(next) => {
-            set('type')(next)
-            setInvalid({})
-          }}
-        />
+        {/* ⚠️ IN TOURNAMENT MODE THE NAME IS THE IDENTITY, so it takes the top
+            slot the Type control has for every other kind. The kind was already
+            chosen in the "What are you adding?" chooser, so a Type selector here
+            would be a second, contradictory answer to a question already asked.
+            The name picker is the same TOURNAMENTS + "Something else" control
+            that appears under Competition for a match — see that block below,
+            which is hidden in this mode so only one renders. */}
+        {tournamentMode ? (
+          <div className={FIELD}>
+            <label className={LABEL} htmlFor="event-tournament">
+              Tournament
+            </label>
+            <select
+              id="event-tournament"
+              value={
+                TOURNAMENTS.includes(values.competition) ? values.competition : OTHER_TOURNAMENT
+              }
+              onChange={(domEvent) => {
+                const chosen = domEvent.target.value
+                set('competition')(chosen === OTHER_TOURNAMENT ? '' : chosen)
+              }}
+              className={inputClasses(false)}
+            >
+              {TOURNAMENTS.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+              <option value={OTHER_TOURNAMENT}>Something else…</option>
+            </select>
+            {!TOURNAMENTS.includes(values.competition) && (
+              <input
+                type="text"
+                aria-label="Tournament name"
+                value={values.competition}
+                onChange={setFromInput('competition')}
+                aria-invalid={invalid.competition ? 'true' : undefined}
+                placeholder="e.g. Sharjah Sevens"
+                className={`${inputClasses(invalid.competition)} mt-2`}
+              />
+            )}
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+              Set the day up here — squad, date, venue. Add the games played
+              inside it, each with its own score and team sheet, once you&apos;ve saved.
+            </p>
+          </div>
+        ) : (
+          <Segmented
+            legend="Type"
+            name="event-type"
+            options={TYPES}
+            value={values.type}
+            onChange={(next) => {
+              set('type')(next)
+              setInvalid({})
+            }}
+          />
+        )}
 
         <Segmented
           legend="Self-service availability"
@@ -1122,7 +1226,11 @@ export default function EventForm({
           or <strong>Locked</strong> to close them to parents now.
         </p>
 
-        {isMatch ? (
+        {/* ⚠️ NO OPPONENT (nor title) IN TOURNAMENT MODE. A tournament is named,
+            not opposed — its own name IS the fixture, entered above. The games
+            underneath it carry the opponents. Hidden rather than optional so the
+            container form does not ask a question its answer will not use. */}
+        {!tournamentMode && (isMatch ? (
           <div className={FIELD}>
             <label className={LABEL} htmlFor="event-opponent">
               {/* ⚠️ THE LABEL DOES NOT CHANGE WITH THE COMPETITION, AND THAT IS
@@ -1168,7 +1276,7 @@ export default function EventForm({
               className={inputClasses(invalid.title)}
             />
           </div>
-        )}
+        ))}
 
         {/* Date on its own row, then the two times side by side.
             End time joined this form on 8 Aug 2026, and the obvious layout
@@ -1357,8 +1465,11 @@ export default function EventForm({
         {/* Repeats. Create-time only — an existing event has occurrences
             around it that editing this one must not silently rewrite, so
             editing shows nothing here at all. Every occurrence is a real,
-            independent event row; see the header of src/lib/recurrence.js. */}
-        {!editing && (
+            independent event row; see the header of src/lib/recurrence.js.
+            ⚠️ NOT IN TOURNAMENT MODE — a tournament is a one-off; its repetition
+            is next season's separate entry, not a weekly recurrence, and its
+            games are added underneath it rather than as repeats. */}
+        {!editing && !tournamentMode && (
           <fieldset className="mb-3.5 rounded-[11px] border-[1.5px] border-line p-3">
             <legend className={`${LABEL} px-1`}>Repeats</legend>
 
@@ -1479,8 +1590,12 @@ export default function EventForm({
             this at all. Each ticked squad gets its OWN event row, sharing a
             group_id; nothing here makes one event belong to several teams.
             Same chip styling as the Repeats weekdays, so the two
-            row-multiplying controls on this form look like each other. */}
-        {otherTeams.length > 0 && (
+            row-multiplying controls on this form look like each other.
+            ⚠️ NOT IN TOURNAMENT MODE — a tournament is one squad's entry, and
+            "Also add for" fans out via group_id, which is exclusive of the
+            container relationship (see the schema note on tournament_id). Each
+            squad enters its own tournament. */}
+        {otherTeams.length > 0 && !tournamentMode && (
           <fieldset className={FIELD}>
             <legend className={LABEL}>Also add for</legend>
             <div className="flex flex-wrap gap-2">
@@ -1514,7 +1629,7 @@ export default function EventForm({
           </fieldset>
         )}
 
-        {isMatch && (
+        {isMatch && !tournamentMode && (
           <Segmented
             legend="Home or away"
             name="event-home"
@@ -1603,7 +1718,7 @@ export default function EventForm({
                 to have a team in — unless this fixture is already holding one,
                 in which case it stays visible so it can be cleared. See the
                 `minisSquad` block above. */}
-            {showLeagueTeam && (
+            {showLeagueTeam && !tournamentMode && (
             <div className={FIELD}>
               <label className={LABEL} htmlFor="event-league-team">
                 League team
@@ -1690,7 +1805,12 @@ export default function EventForm({
             {/* ⚠️ A CHOICE, NOT A FREE-TEXT BOX, as of 12 Aug 2026. It was an
                 open text field ("e.g. UAE Youth League"), which meant every
                 coach spelled the same competition differently and nothing could
-                group by it. Jay's ruling: ask which of the two it is. */}
+                group by it. Jay's ruling: ask which of the two it is.
+                ⚠️ HIDDEN IN TOURNAMENT MODE — the chooser already said this is a
+                tournament, and the name is entered at the top; a Competition
+                dropdown here would be the same question asked twice, and letting
+                it change competition_type would fight the container form. */}
+            {!tournamentMode && (
             <div className={FIELD}>
               <label className={LABEL} htmlFor="event-competition-type">
                 Competition
@@ -1744,6 +1864,7 @@ export default function EventForm({
                 </p>
               )}
             </div>
+            )}
 
             {/* ⚠️ ROUND BELONGS TO THE LEAGUE, so it appears with it and only
                 with it. The set is small and closed, so a select rather than a
@@ -1778,8 +1899,11 @@ export default function EventForm({
             {/* ⚠️ THE FOUR REGULARS PLUS AN ESCAPE HATCH, the shape the pitch
                 picker above settled on. A one-off invitational the club has
                 never entered must be nameable without a deploy, or somebody
-                files it under the closest wrong option. */}
-            {values.competitionType === COMPETITION_TOURNAMENT && (
+                files it under the closest wrong option.
+                ⚠️ NOT IN TOURNAMENT MODE — the identical picker is at the TOP of
+                the form there (the name is the fixture's identity), so rendering
+                it here too would duplicate the field and its id. */}
+            {!tournamentMode && values.competitionType === COMPETITION_TOURNAMENT && (
               <div className={FIELD}>
                 <label className={LABEL} htmlFor="event-tournament">
                   Tournament
@@ -1828,8 +1952,12 @@ export default function EventForm({
                 fixture already holding a score keeps its boxes, so a value that
                 is really stored can be seen and cleared rather than being
                 stranded. No such fixture exists today — measured against the
-                live database the day this shipped — so this is insurance. */}
-            {showScore && (
+                live database the day this shipped — so this is insurance.
+                ⚠️ NO SCORE IN TOURNAMENT MODE — a tournament is many games, not
+                one scoreline. The score lives on each game underneath it; a
+                single result box on the container would be a number with no
+                clear meaning. */}
+            {showScore && !tournamentMode && (
             <>
             <div className={FIELD_ROW}>
               <div>
@@ -1962,7 +2090,12 @@ export default function EventForm({
             ? 'Saving…'
             : editing
               ? 'Save changes'
-              : blockedByRowGuard
+              : tournamentMode
+                ? // The container is what's being added; its games come after.
+                  // Repeats and multi-squad are hidden in this mode, so none of
+                  // the count-naming branches below can apply here.
+                  'Add tournament'
+                : blockedByRowGuard
                 ? // ⚠️ MUST come before the series branch. That branch counts
                   // the series and would promise "Add 14 events" for a
                   // combination that writes nothing — the defect this fixes.
