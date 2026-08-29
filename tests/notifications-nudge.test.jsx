@@ -45,12 +45,12 @@ describe('the notifications nudge', () => {
   it('offers a way in for somebody who has not turned them on', async () => {
     renderNudge()
     expect(await screen.findByTestId('notify-nudge')).toBeInTheDocument()
-    // The hash matters: More scrolls to the anchored Notifications section
-    // (25 Aug 2026 — bare /more dropped people at the top of a long screen,
+    // The hash matters: Settings scrolls to the anchored Notifications section
+    // (25 Aug 2026 — a bare path dropped people at the top of a long screen,
     // Jay: "does not scroll down automatically to that section").
     expect(screen.getByRole('link', { name: /turn them on/i })).toHaveAttribute(
       'href',
-      '/more#notifications',
+      '/settings#notifications',
     )
   })
 

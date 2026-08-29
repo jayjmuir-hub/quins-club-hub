@@ -62,11 +62,12 @@ import AuthConfirm from './screens/AuthConfirm.jsx'
 // lot. The catch-all redirect stays INSIDE the group, so an unknown URL still
 // lands a signed-out visitor on the login screen exactly as before.
 //
-// "/more" renders the real More screen — for EVERY role, not just admins.
-// It used to render Admin.jsx, which meant a parent, player or coach opening
-// the More tab got a "not authorised" card. ⚠️ /more must stay a real route:
-// AppShell renders the app's only sign-out control on this exact path, so
-// redirecting it into /admin would leave every non-admin unable to sign out.
+// "/settings" (was "/more" until 29 Aug 2026) renders the settings page — for
+// EVERY role, not just admins. It used to render Admin.jsx, which meant a
+// parent, player or coach got a "not authorised" card. ⚠️ It must stay a real
+// route: AppShell renders the app's only in-page sign-out control on this exact
+// path, so redirecting it into /admin would leave every non-admin unable to
+// sign out. Bare /more redirects here so old links and bookmarks keep working.
 //
 // "/admin" is the admin-only back-end dashboard, with its two tabs mounted
 // as CHILD ROUTES so each is linkable and survives a refresh. Bare /admin
@@ -167,7 +168,15 @@ export default function App() {
           <Route path="/" element={<AppShell><Dashboard /></AppShell>} />
           <Route path="/schedule" element={<AppShell><Schedule /></AppShell>} />
           <Route path="/roster" element={<AppShell><Roster /></AppShell>} />
-          <Route path="/more" element={<AppShell><More /></AppShell>} />
+          <Route path="/settings" element={<AppShell><More /></AppShell>} />
+          {/* Renamed /more → /settings on 29 Aug 2026 (Jay). Old links,
+              bookmarks and notification deep-links keep working through this
+              redirect. ⚠️ THE COMPONENT STAYS More.jsx ON PURPOSE: the changelog
+              refers to `src/screens/More.jsx` by path, and docs-check fails the
+              build on any documented path that no longer resolves — so the file
+              keeps its name while the route and the page title are "Settings".
+              The filename is internal; nobody sees it. */}
+          <Route path="/more" element={<Navigate to="/settings" replace />} />
 
           {/* Where "somebody replied to your report" lands (19 Aug 2026).
               ⚠️ A ROUTE EXISTS AT ALL SO THE NOTIFICATION HAS A DESTINATION.

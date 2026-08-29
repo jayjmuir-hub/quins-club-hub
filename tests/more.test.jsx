@@ -125,7 +125,7 @@ function memberships(rows, teams = TEAMS) {
   return { memberships: rows, teams, loading: false, error: null, reload: vi.fn() }
 }
 
-function renderMore(entry = '/more') {
+function renderMore(entry = '/settings') {
   return render(
     <MemoryRouter initialEntries={[entry]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <More />
@@ -427,17 +427,17 @@ describe('More — for every role', () => {
 
     renderMore()
 
-    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByText(/not authorised/i)).not.toBeInTheDocument()
   })
 
-  it('renders a real More screen for a coach, not a not-authorised card', () => {
+  it('renders a real Settings screen for a coach, not a not-authorised card', () => {
     useMembershipsMock.mockReturnValue(memberships(COACH))
 
     renderMore()
 
-    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.queryByText(/not authorised/i)).not.toBeInTheDocument()
   })
 
@@ -1158,8 +1158,8 @@ describe('More — the registrant’s own name', () => {
 
 // ═══ The #notifications hash scroll (25 Aug 2026) ═══════════════════════════
 //
-// The Home nudge's "Turn them on" links to /more#notifications; More owns the
-// scroll because React Router does not scroll to hashes on its own (Jay's
+// The Home nudge's "Turn them on" links to /settings#notifications; the page
+// owns the scroll because React Router does not scroll to hashes on its own (Jay's
 // phone: "does not scroll down automatically to that section"). jsdom has no
 // layout, so the observable contract here is the scrollIntoView CALL on the
 // anchored section — and the control below proves the spy would catch a
@@ -1182,7 +1182,7 @@ describe('More — the #notifications hash scrolls to the section', () => {
   })
 
   it('scrolls the Notifications section into view when the hash is present', async () => {
-    renderMore('/more#notifications')
+    renderMore('/settings#notifications')
     await waitFor(() => expect(scrollSpy).toHaveBeenCalled())
     // The element the call landed on is the anchored section, not something
     // else that happens to scroll.
@@ -1190,8 +1190,8 @@ describe('More — the #notifications hash scrolls to the section', () => {
     expect(target?.id).toBe('notifications')
   })
 
-  it('control: a plain /more visit never scrolls', async () => {
-    renderMore('/more')
+  it('control: a plain /settings visit never scrolls', async () => {
+    renderMore('/settings')
     // Give the (absent) effect the same two frames the real one uses.
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(scrollSpy).not.toHaveBeenCalled()

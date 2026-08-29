@@ -189,7 +189,7 @@ export default function DeleteAccount() {
               </Button>
 
               <Link
-                to="/more"
+                to="/settings"
                 className="mt-3 block text-center text-[14px] font-bold text-ink-muted underline"
               >
                 Cancel and go back

@@ -59,12 +59,12 @@ describe('AccountMenu', () => {
     expect(screen.getByTestId('account-menu-name')).toHaveTextContent('jay@example.com')
   })
 
-  it('offers My account, Dark mode and Sign out — and no View as — to a parent', async () => {
+  it('offers Settings, Dark mode and Sign out — and no View as — to a parent', async () => {
     const user = userEvent.setup()
     renderMenu()
 
     await user.click(screen.getByTestId('account-button'))
-    expect(screen.getByRole('menuitem', { name: 'My account' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByRole('menuitemcheckbox', { name: 'Dark mode' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
     expect(screen.queryByTestId('view-as-trigger')).not.toBeInTheDocument()
@@ -158,12 +158,12 @@ describe('AccountMenu', () => {
     expect(screen.queryByTestId('account-menu')).not.toBeInTheDocument()
   })
 
-  it('choosing My account closes the menu', async () => {
+  it('choosing Settings closes the menu', async () => {
     const user = userEvent.setup()
     renderMenu()
 
     await user.click(screen.getByTestId('account-button'))
-    await user.click(screen.getByRole('menuitem', { name: 'My account' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Settings' }))
     expect(screen.queryByTestId('account-menu')).not.toBeInTheDocument()
   })
 

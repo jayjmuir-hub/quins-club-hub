@@ -619,7 +619,7 @@ export default function NamePrompt() {
   function handleAddPlayer() {
     settled.current = true
     setStep(null)
-    navigate('/more')
+    navigate('/settings')
   }
 
   if (!step) return null
@@ -649,7 +649,7 @@ export default function NamePrompt() {
           <Button
             onClick={() => {
               setStep(null)
-              navigate('/more')
+              navigate('/settings')
             }}
           >
             Show me how
