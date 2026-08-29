@@ -372,8 +372,10 @@ describe('EventForm — end time', () => {
 //
 // The chooser's Tournament card opens the form as a CONTAINER: the name is the
 // identity, and opponent / home-away / league / round / competition-dropdown /
-// score / repeats / also-add-for all disappear. Editing is unaffected — this is
-// driven by initialKind, not by competition_type. See
+// score / repeats all disappear. "Also add for" STAYS (it fans the container
+// out, one tournament per squad — Jay, 30 Aug 2026; see
+// tests/multi-squad-and-pitch.test.jsx). Editing is unaffected — this is driven
+// by initialKind, not by competition_type. See
 // claude/plans/2026-08-29-tournaments-as-containers.md.
 
 describe('EventForm — tournament mode', () => {

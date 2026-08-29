@@ -8,9 +8,33 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 30 Aug 2026
+
+- **Tournaments can be added for several age groups at once.** "Also add for" was
+  hidden in tournament mode at ship (phase 3); Jay asked for it back — a festival
+  is one event several of our squads enter. Ticking extra squads now fans the
+  **container** out: one independent tournament per squad, each with its own games
+  added underneath. Each row is a real container (`type='match'`,
+  `competition_type='tournament'`, `tournament_id` null) sharing one `group_id`,
+  which links the sibling festivals so pitch-clash detection exempts them at the
+  same venue and pitch occupancy collapses them — exactly a training fan-out's
+  behaviour. Games attach via `tournament_id`, never `group_id`, so the
+  container↔game and squad↔squad relationships stay distinct. Deleting one squad's
+  tournament removes only that container and its games. `src/screens/EventForm.jsx`,
+  `tests/multi-squad-and-pitch.test.jsx`, `tests/event-form.test.jsx`,
+  `claude/plans/2026-08-29-tournaments-as-containers.md`. (SHA follows in the next
+  changelog-touching PR.)
+- **The DatePicker's "Clear date" × stays put when the calendar opens.** The ×
+  was absolutely positioned against the component root, which grew to include the
+  open calendar popover — so `top-1/2` dropped it from beside the calendar icon
+  down into the day grid (it read as a stray mark near a random day). Wrapping the
+  trigger and the × in their own positioning context pins it to the trigger's
+  height regardless of the calendar. `src/components/DatePicker.jsx`. (SHA follows
+  in the next changelog-touching PR.)
+
 ## 29 Aug 2026
 
-- **Pitch sharing: the occupancy view.** A "Shared pitches" panel under the
+- `44d53e5` — **Pitch sharing: the occupancy view.** A "Shared pitches" panel under the
   pitch calendar shows how full each shared pitch is and what is spare — the
   "what's free before I ask" the screen promises. `pitchShares` in
   `src/data/pitches.js` returns every maximal set of two-or-more squads on one
@@ -22,7 +46,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/components/PitchCalendar.jsx`, `src/screens/PitchGlance.jsx`,
   `harness/stubs/pitches.js`, `tests/pitch-shares.test.js`,
   `tests/pitch-glance.test.jsx`. Plan: `claude/plans/2026-08-29-pitch-portions.md`.
-  (SHA follows in the next changelog-touching PR.)
 - `1c26e4f` — **Home rides the centre of the mobile dock.** It sat on the far-left slot of
   the bottom tab bar; Jay wanted it in the middle. The app opens on Home
   (`start_url` `/` → Dashboard) and the centre of the bar is the thumb's resting

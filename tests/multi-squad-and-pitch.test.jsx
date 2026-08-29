@@ -77,7 +77,7 @@ const EXISTING_TRAINING = {
   result_them: null,
 }
 
-function renderForm({ memberships = ADMIN, teams = TEAMS, event = null } = {}) {
+function renderForm({ memberships = ADMIN, teams = TEAMS, event = null, initialKind = null } = {}) {
   useMembershipsMock.mockReturnValue({
     memberships,
     teams,
@@ -87,7 +87,7 @@ function renderForm({ memberships = ADMIN, teams = TEAMS, event = null } = {}) {
   })
   const onSaved = vi.fn()
   const onClose = vi.fn()
-  render(<EventForm event={event} onClose={onClose} onSaved={onSaved} />)
+  render(<EventForm event={event} initialKind={initialKind} onClose={onClose} onSaved={onSaved} />)
   return { onSaved, onClose, user: userEvent.setup() }
 }
 
@@ -99,6 +99,14 @@ async function fillTraining(user) {
   await pickDate(user, '2026-08-11')
   await user.type(screen.getByLabelText('Time'), '18:00')
   await user.type(screen.getByLabelText('End time'), '19:30')
+}
+
+/** A valid tournament container on 12 Sep 2026, named from the preset list. */
+async function fillTournament(user) {
+  await user.selectOptions(screen.getByLabelText('Tournament'), 'ADHJRT')
+  await pickDate(user, '2026-09-12')
+  await user.type(screen.getByLabelText('Time'), '09:00')
+  await user.type(screen.getByLabelText('End time'), '15:00')
 }
 
 beforeEach(() => {
@@ -243,6 +251,69 @@ describe('Also add for — what it writes', () => {
     // No group_id on a one-squad event: the column means "created alongside
     // other squads", and stamping a lone row would make a group of one.
     expect(upsertEventMock.mock.calls[0][0].group_id).toBeUndefined()
+  })
+})
+
+// A tournament is a container, but a festival is one event several of our
+// squads enter — so "Also add for" fans it out too (Jay, 30 Aug 2026),
+// reversing the phase-3 rule that hid it in tournament mode. Each ticked squad
+// gets its OWN independent container; the games go on underneath per squad.
+describe('Also add for — in tournament mode', () => {
+  it('offers the extras when adding a tournament', () => {
+    renderForm({ initialKind: 'tournament' })
+
+    expect(screen.getByRole('group', { name: 'Also add for' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'U14' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'U16' })).toBeInTheDocument()
+  })
+
+  it('names the tournament count on the button, not the event count', async () => {
+    const { user } = renderForm({ initialKind: 'tournament' })
+
+    await fillTournament(user)
+    await user.click(screen.getByRole('checkbox', { name: 'U14' }))
+
+    expect(screen.getByRole('button', { name: 'Add 2 tournaments' })).toBeInTheDocument()
+  })
+
+  it('fans out one INDEPENDENT container per squad, sharing a group_id', async () => {
+    const { user } = renderForm({ initialKind: 'tournament' })
+
+    await fillTournament(user)
+    await user.click(screen.getByRole('checkbox', { name: 'U14' }))
+    await user.click(screen.getByRole('checkbox', { name: 'U16' }))
+    await user.click(screen.getByRole('button', { name: 'Add 3 tournaments' }))
+
+    await waitFor(() => expect(insertEventsMock).toHaveBeenCalledTimes(1))
+    expect(upsertEventMock).not.toHaveBeenCalled()
+
+    const rows = insertEventsMock.mock.calls[0][0]
+    expect(rows).toHaveLength(3)
+    expect(rows.map((row) => row.team_id)).toEqual(['t-u12', 't-u14', 't-u16'])
+
+    rows.forEach((row) => {
+      // Every row is a valid tournament CONTAINER: a match carrying the
+      // festival name, with tournament_id null so isTournamentEvent sees it as
+      // a container rather than a game.
+      expect(row).toMatchObject({
+        type: 'match',
+        competition_type: 'tournament',
+        competition: 'ADHJRT',
+      })
+      expect(row.opponent).toBeNull()
+      expect(row.home).toBeNull()
+      // ⚠️ THE WHOLE POINT: a container is never itself inside a tournament.
+      // A group_id that leaked into tournament_id would make U14's festival a
+      // game of U12's.
+      expect(row.tournament_id ?? null).toBeNull()
+    })
+
+    // One group_id across all three — the sibling festivals are linked so pitch
+    // clash detection exempts them from each other, exactly as a training
+    // fan-out is.
+    const ids = new Set(rows.map((row) => row.group_id))
+    expect(ids.size).toBe(1)
+    expect([...ids][0]).toEqual(expect.any(String))
   })
 })
 

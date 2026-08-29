@@ -69,11 +69,23 @@ squads" and "many games, one tournament" indistinguishable and would corrupt
 pitch-clash and availability grouping. `series_id` is likewise spoken for
 (repeating sessions across dates). A dedicated column is the honest move.
 
-Note this also means the **"Also add for" multi-squad fan-out and Repeats are
-not offered on a tournament** — a tournament is a one-off for one squad. Hiding
-them keeps `tournament_id` and `group_id`/`series_id` mutually exclusive by
-construction, the same discipline the existing `group_id`/`series_id` "never
-both set" rule already follows.
+Note this also means **Repeats is not offered on a tournament** — a tournament is
+a one-off, its repetition next season's separate entry rather than a weekly
+recurrence.
+
+⚠️ **UPDATE, 30 Aug 2026 — "Also add for" IS now offered on a tournament** (it
+was hidden here at ship; Jay asked for it back). A festival is one event several
+of our squads enter, so ticking extra squads fans the **container** out: one
+independent tournament per squad, each with its own games underneath. This does
+NOT blur the distinction above. A container carries a `group_id` (linking the
+sibling festivals) but `tournament_id` null; its games carry `tournament_id` but
+no `group_id` — so "same festival, many squads" and "many games, one tournament"
+stay distinguishable, exactly as before. The shared `group_id` on the containers
+is what makes `findPitchClashes` exempt the siblings at one venue and the
+availability functions collapse them, which is precisely what a multi-squad
+festival wants. Repeats stays hidden — it and the fan-out remain mutually
+exclusive by the row-count guard in `handleSubmit`. See
+`src/screens/EventForm.jsx` and `tests/multi-squad-and-pitch.test.jsx`.
 
 ### New columns (one additive migration)
 
@@ -165,7 +177,8 @@ behaviour exactly.
      time (+ "time TBD") · Venue · Tier (U11+ only, as today) · Availability.
    - **Hide:** Opponent · Home/Away · League team · Round · the Competition
      dropdown (the chooser already answered it) · score boxes · match sheet ·
-     Repeats · "Also add for".
+     Repeats. (⚠️ "Also add for" was hidden here at ship, **re-enabled 30 Aug
+     2026** — it fans the container out per squad; see §"Why a new `tournament_id`".)
    - On save: one `events` row, `type='match'`, `competition_type='tournament'`,
      `tournament_id=NULL`, `competition=<name>`, optional `placing` left null at
      creation (set later from the detail screen).
@@ -231,7 +244,8 @@ before trusting the runner with DDL.
   "Quins vs <opponent>" for a game; existing (`tournament_id` null) rows
   unchanged.
 - **Form**: the chooser routes to the right kind; tournament mode hides
-  opponent/home-away/league-team/round/competition/score/repeats/also-add-for;
+  opponent/home-away/league-team/round/competition/score/repeats ("Also add for"
+  re-enabled 30 Aug 2026 — it fans the container out per squad);
   add-game inherits date/venue/squad/tier and writes `tournament_id`.
 - **Delete**: the two-step confirm names the game count; cancel writes nothing.
 - Follow the invented-data rule — opponents like "Exiles"/"Dragons"/"Al Ain",
