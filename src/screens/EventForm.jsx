@@ -318,9 +318,20 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     // ══ DUPLICATING ═══════════════════════════════════════════════════════
     //
     // Jay, 12 Aug 2026: "the details are the work, the date is trivial." So a
-    // duplicate carries everything that took effort — times, venue, pitch,
-    // notes, squad, competition, league team — and clears the three things
-    // that belong to the ORIGINAL OCCURRENCE and to nothing else.
+    // duplicate carries everything that took effort — times, venue, notes,
+    // squad, competition, league team — and clears the things that belong to
+    // the ORIGINAL OCCURRENCE and to nothing else.
+    //
+    // ⚠️ THE PITCH IS ONE OF THOSE THINGS, reversed 30 Aug 2026. It used to
+    // carry ("the sharing arrangement is part of the work"), but a pitch is a
+    // scarce shared booking on a SPECIFIC date, not a detail of the fixture:
+    // carrying A2 onto a new date silently re-books A2 then, skipping the
+    // allocation step every other booking goes through, and the clash that
+    // creates stays invisible until two squads turn up on the same grass. So a
+    // duplicate opens at `Pitch TBD` — "not allocated yet", the same marker the
+    // Allocation screen lists as unallocated — and must be given a pitch afresh.
+    // The portion goes with it: a split with no pitch to split is meaningless,
+    // and the save writes pitch_portion null whenever the pitch is TBD anyway.
     //
     // ⚠️ THE DATE IS BLANK, AND JAY CHOSE THAT OVER THREE SMARTER DEFAULTS
     // (next week, same date, today). The reasoning is the one already written
@@ -346,16 +357,17 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     teamId: teamIds.includes(event.team_id) ? event.team_id : fallbackTeamId,
     home: event.home !== false,
     venue: event.venue ?? '',
-    pitch: event.pitch ?? '',
+    pitch: duplicating ? PITCH_TBD : event.pitch ?? '',
     // ⚠️ THE STORED PORTION WINS, and the default only fills a genuine blank.
     // A booking made before this column keeps NULL until it is edited, and NULL
     // reads as a whole pitch everywhere — so falling back to the age default is
     // a suggestion for the person editing, not a silent rewrite of history (the
-    // save still writes null while the pitch is empty or Pitch TBD). Carried on
-    // a duplicate for the same reason the pitch is: the sharing arrangement is
-    // part of the work being copied.
+    // save still writes null while the pitch is empty or Pitch TBD). NOT carried
+    // on a duplicate — the pitch is cleared to TBD there (see above), so the
+    // portion resets to the age default like a fresh booking rather than
+    // carrying the original's split into a fixture that has no pitch yet.
     pitchPortion:
-      event.pitch_portion ??
+      (duplicating ? null : event.pitch_portion) ??
       defaultPitchPortion(
         editableTeams.find((team) => team.id === event.team_id)?.name ?? null,
         { type: event.type ?? 'match' },
