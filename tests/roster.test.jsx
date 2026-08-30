@@ -88,7 +88,7 @@ const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 1
 const TEAMS = [TEAM_FIRST_XV, TEAM_U12] // deliberately unsorted; visibleTeams sorts
 
 const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null }]
-const COACH_ONE_TEAM = [{ id: 'm2', role: 'coach', team_id: 'team-u12' }]
+const COACH_ONE_TEAM = [{ id: 'm2', role: 'coach', status: 'active', team_id: 'team-u12' }]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u12', player_id: 'p-flanker' }]
 // A membership pointing at a team that isn't in the teams list — visibleTeams
 // resolves it to zero teams. See the "no visible teams" test for why that
@@ -400,7 +400,7 @@ describe('Roster — a team filter that outlives its team', () => {
     await chooseAgeGroup(user, 'U12')
     expect(screen.queryByText('Craig Muir')).not.toBeInTheDocument()
 
-    useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', team_id: 'team-1xv' }]))
+    useMembershipsMock.mockReturnValue(memberships([{ id: 'm5', role: 'coach', status: 'active', team_id: 'team-1xv' }]))
     listPlayersMock.mockResolvedValue([SENIOR])
     rerender(<MemoryRouter><Roster /></MemoryRouter>)
 

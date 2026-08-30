@@ -208,6 +208,30 @@ describe('canEditTeam', () => {
     expect(canEditTeam(coachMemberships, undefined)).toBe(false)
   })
 
+  // ⚠️ ADDED 30 Aug 2026 (Grok item 4): a PENDING coach/manager request is
+  // not access. The SQL can_edit_team has required status='active' all along;
+  // the client gate now agrees, so a self-registered pending coach no longer
+  // sees edit controls whose every write fails at RLS.
+  it('is false for a PENDING coach or manager — a request is not access', () => {
+    const memberships = [
+      membership({ role: 'parent', status: 'active', team_id: U12.id, player_id: 'player-1' }),
+      membership({ role: 'coach', status: 'pending', team_id: U12.id }),
+    ]
+    expect(canEditTeam(memberships, U12.id)).toBe(false)
+
+    const managerRequest = [membership({ role: 'manager', status: 'pending', team_id: U8.id })]
+    expect(canEditTeam(managerRequest, U8.id)).toBe(false)
+  })
+
+  it('an ACTIVE coach still edits their squad after the pending gate', () => {
+    const memberships = [
+      membership({ role: 'coach', status: 'active', team_id: U12.id }),
+      membership({ role: 'coach', status: 'pending', team_id: U8.id }),
+    ]
+    expect(canEditTeam(memberships, U12.id)).toBe(true)
+    expect(canEditTeam(memberships, U8.id)).toBe(false)
+  })
+
   it('does not let a malformed coach row with team_id null match a null teamId', () => {
     // Regression: m.team_id === teamId would be true if both sides were
     // null. Coach rows always carry a real team_id in production, but the
@@ -701,7 +725,9 @@ describe('canEditTeam — manager and medic are exactly a coach', () => {
   // Parameterised on the set itself, so a role added to SQUAD_STAFF_ROLES
   // without the matching rights is caught here rather than in production.
   it.each(SQUAD_STAFF_ROLES)('lets a %s edit the squad they are attached to', (role) => {
-    const memberships = [{ id: 'm1', role, team_id: 'team-u12' }]
+    // status carried since 30 Aug 2026: canEditTeam demands an ACTIVE row,
+    // and memberships.status is NOT NULL in the schema anyway.
+    const memberships = [{ id: 'm1', role, status: 'active', team_id: 'team-u12' }]
     expect(canEditTeam(memberships, 'team-u12')).toBe(true)
   })
 

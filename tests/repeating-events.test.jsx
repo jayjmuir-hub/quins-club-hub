@@ -39,7 +39,7 @@ import EventForm from '../src/screens/EventForm.jsx'
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const TEAM_U12 = { id: 't-u12', club_id: CLUB_ID, name: 'U12', sort_order: 7 }
 const TEAMS = [TEAM_U12]
-const COACH_U12 = [{ id: 'm-c', role: 'coach', team_id: 't-u12' }]
+const COACH_U12 = [{ id: 'm-c', role: 'coach', status: 'active', team_id: 't-u12' }]
 
 const EXISTING_TRAINING = {
   id: 'e-1',

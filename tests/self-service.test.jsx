@@ -94,7 +94,7 @@ const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u14', player_id: 'p-min
 const PARENT_U10 = [
   { id: 'm-p10', role: 'parent', team_id: 't-u10', player_id: 'p-u10', club_id: CLUB },
 ]
-const COACH = [{ id: 'm-c', role: 'coach', team_id: 't-u14', club_id: CLUB }]
+const COACH = [{ id: 'm-c', role: 'coach', status: 'active', team_id: 't-u14', club_id: CLUB }]
 
 const U10_CHILD = { ...MY_CHILD, id: 'p-u10', team_id: 't-u10', full_name: 'Jackson Muir' }
 

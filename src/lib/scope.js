@@ -433,6 +433,11 @@ export function isPendingOnly(memberships) {
  * allTeams is never mutated.
  */
 export function visibleTeams(memberships, allTeams) {
+  // ⚠️ PENDING squads stay VISIBLE on purpose (D6, 30 Aug 2026): a pending
+  // membership still attaches the person to the squad (fixtures, their own
+  // child) — see the memberships.status column comment. Visibility is not
+  // capability: the edit gates (canEditTeam, canApproveTeam) each demand
+  // status='active' themselves.
   if (!allTeams) return []
   if (!memberships || memberships.length === 0) return []
 
@@ -477,7 +482,11 @@ export function canEditTeam(memberships, teamId) {
   if (teamId == null) return false
   if (!memberships) return false
   if (isAdmin(memberships)) return true
-  return memberships.some((m) => isSquadStaffRole(m.role) && m.team_id === teamId)
+  // ⚠️ isActiveMembership — a PENDING coach/manager request is not access
+  // (Grok item 4, mirroring canApproveTeam and the SQL can_edit_team, which
+  // requires status='active'). Without it a self-registered pending coach saw
+  // live edit controls whose every write then failed at RLS.
+  return memberships.some((m) => isActiveMembership(m) && isSquadStaffRole(m.role) && m.team_id === teamId)
 }
 
 /**
@@ -545,6 +554,10 @@ export function labelForRole(role) {
  */
 export function isOwnPlayer(memberships, playerId) {
   if (!memberships || !playerId) return false
+  // ⚠️ NO status check, DELIBERATELY (30 Aug 2026): this mirrors the SQL
+  // private.is_own_player, which is also status-blind — a pending parent may
+  // still maintain their own child's record. Do not "fix" this in the next
+  // add-status-everywhere pass.
   return memberships.some(
     (m) => m.player_id === playerId && (m.role === 'parent' || m.role === 'player'),
   )

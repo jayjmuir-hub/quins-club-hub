@@ -66,7 +66,7 @@ const TEAM_U12 = { id: 'team-u12', name: 'U12', sort_order: 6 }
 const TEAMS = [TEAM_U10, TEAM_U12]
 
 const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null }]
-const COACH_U10 = [{ id: 'm2', role: 'coach', team_id: 'team-u10' }]
+const COACH_U10 = [{ id: 'm2', role: 'coach', status: 'active', team_id: 'team-u10' }]
 
 const TOM = { id: 'p1', team_id: 'team-u10', full_name: 'Tom Fletcher', position: 'Flanker', is_captain: true }
 const AMY = { id: 'p2', team_id: 'team-u12', full_name: 'Amy Rose', position: 'Wing', is_captain: false }
@@ -324,7 +324,7 @@ describe('RosterTable — permissions', () => {
     // rule that already hid Tier), so the control has to be asserted on a
     // squad that can have one.
     useMembershipsMock.mockReturnValue({
-      memberships: [{ id: 'm2', role: 'coach', team_id: 'team-u12' }],
+      memberships: [{ id: 'm2', role: 'coach', status: 'active', team_id: 'team-u12' }],
       teams: TEAMS,
     })
     listPlayersMock.mockResolvedValue([AMY])

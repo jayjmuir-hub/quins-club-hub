@@ -54,7 +54,7 @@ const TEAM_U16 = { id: 't-u16', club_id: CLUB_ID, name: 'U16', sort_order: 11 }
 const TEAMS = [TEAM_U16, TEAM_U12, TEAM_U14]
 
 const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
-const COACH_ONE = [{ id: 'm-c', role: 'coach', team_id: 't-u12' }]
+const COACH_ONE = [{ id: 'm-c', role: 'coach', status: 'active', team_id: 't-u12' }]
 
 const EXISTING_TRAINING = {
   id: 'e-1',

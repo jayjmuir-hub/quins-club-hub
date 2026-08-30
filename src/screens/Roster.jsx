@@ -21,7 +21,7 @@ import { listPlayers, listPlayerPrivate } from '../data/players.js'
 // one that decides which squad a child belongs in.
 import { ageAt } from '../lib/ageGrade.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isActiveMembership, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
 import { GENDERS, genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
@@ -307,7 +307,12 @@ export default function Roster() {
   // rights (SQUAD_STAFF_ROLES in src/lib/scope.js, mirrored by
   // private.can_edit_team). Asking the helper rather than testing the string
   // is what stops the next role needing an edit here.
-  const canEditAnything = admin || memberships.some((membership) => isSquadStaffRole(membership.role))
+  // ⚠️ ACTIVE staff only (Grok item 4) — a pending coach request must not
+  // surface Add player / Import controls whose writes all fail at RLS. Note
+  // this gate is deliberately not team-scoped: any active squad staff may
+  // open the add sheet; which squads they may write to is canEditTeam's call.
+  const canEditAnything =
+    admin || memberships.some((membership) => isActiveMembership(membership) && isSquadStaffRole(membership.role))
 
   // The sidebar's Roster sub-menu deep-links: /roster?open=add-player and
   // /roster?open=import (22 Aug 2026). Same consume-and-clear contract as
