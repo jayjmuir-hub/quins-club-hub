@@ -1,4 +1,4 @@
-import { adminRightLabel, hasAdminRight, isSuperAdmin } from './scope.js'
+import { adminRightLabel, canReviewDm, hasAdminRight, isSuperAdmin } from './scope.js'
 
 // The admin portals — /admin is a chooser, and each job is its own space with
 // its own tabs. Ruling: claude/decisions/2026-08-12-admin-portals.md.
@@ -189,12 +189,21 @@ export function portalHome(portal) {
  * (claude/specs/accessibility.md).
  *
  * ⚠️ hasAdminRight RETURNS TRUE FOR A SUPER ADMIN without the right being
- * listed, deliberately. So a super admin sees three open cards and one grey —
- * correct, because the grey one has no screen, not a missing right.
+ * listed, deliberately. So a super admin sees the other cards open —
+ * correct, because a grey one there has no screen, not a missing right.
+ *
+ * ⚠️ WELFARE IS THE EXCEPTION (30 Aug 2026, Grok item 7). can_review_dm has
+ * NO super short-circuit in the database, and since the welfare directory and
+ * DM/group reports moved behind it (20260830_welfare_review_gate.sql) a super
+ * who has not ticked `welfare` gets EMPTY welfare screens — so offering the
+ * portal on the implicit right was offering a door onto a bare room. The card
+ * greys until welfare is explicitly held; a super self-ticks it (an audited
+ * write) to review, exactly the ceremony the carve-out intends.
  */
 export function isPortalOpen(portal, memberships) {
   if (portal.tabs.length === 0) return false
   if (!portal.right) return true
+  if (portal.right === 'welfare') return canReviewDm(memberships)
   return hasAdminRight(memberships, portal.right)
 }
 

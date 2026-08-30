@@ -63,7 +63,7 @@ const U10 = { id: 't-u10', club_id: CLUB, name: 'U10 Mixed Contact', sort_order:
 const U14B = { id: 't-u14b', club_id: CLUB, name: 'U14B Contact', sort_order: 9 }
 
 const coachOf = (team) => [{ id: 'm-c', role: 'coach', status: 'active', team_id: team.id }]
-const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null, club_id: CLUB }]
+const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', admin_rights: ['clubadmin'], team_id: null, club_id: CLUB }]
 
 const squadOf = (team) => [
   { id: `${team.id}-1`, team_id: team.id, full_name: 'Ade Kwarteng', position: 'Prop', unit: 'forward' },

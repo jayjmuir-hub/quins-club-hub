@@ -208,15 +208,18 @@ export function parentPreviewTeamIds(memberships) {
 // makes a super admin an admin, so all twelve keep working untouched.
 // Reasoning in full: claude/decisions/2026-08-10-role-dashboards.md.
 //
-// ⚠️ THE RIGHTS GATE SCREENS, NOT DATA, AND THIS IS THE SENTENCE TO RE-READ
-// BEFORE ADDING ANOTHER — it was "before adding a fourth" until `training`
-// became the fourth on 21 Aug 2026, and it applies unchanged to the fifth.
-// Every admin already sees every child's name, photo
-// and contact details — Jay's ruling, 10 Aug: "trusted volunteers". A right
-// decides which specialist DASHBOARD appears; it withholds nothing. This
-// repo's own rule applies: a screen that hides a row is not security. A future
-// right that must genuinely withhold data — finances, safeguarding notes —
-// needs an RLS policy, and hiding the menu item will not do.
+// ⚠️ THE RIGHTS IN THIS LIST GATE SCREENS. SOME OF THEM ALSO NAME REAL DATA
+// BOUNDARIES NOW — this sentence read "the rights gate screens, not data"
+// until 30 Aug 2026, and that described pre-Phase-1 (the 10 Aug "trusted
+// volunteers" posture, where every admin saw every child's details). The
+// admin-rights redesign turned that off in the DATABASE: child DOB/contacts
+// read/edit, child photos, player writes and DM review are all RLS-enforced
+// allowlists keyed on these right values (the canSee/canEdit/canWrite/
+// canReview helpers below mirror them). The rule that survives unchanged:
+// a screen that hides a row is not security — the RLS policy is the boundary,
+// and these helpers only keep the UI honest about it. A future right that
+// must withhold data needs its OWN policy; adding it here draws a checkbox
+// and nothing more.
 //
 // ⚠️ `clubadmin` (28 Aug 2026, Phase 0a) IS THE SIXTH, AND IT IS DIFFERENT IN
 // INTENT — it is the base "Club Hub Admin" right that every admin holds
@@ -235,10 +238,11 @@ export function parentPreviewTeamIds(memberships) {
 // these values (that would mean a migration per job title, for a value that
 // gates a screen and cannot do harm), so this list is the only vocabulary
 // there is. An unrecognised right matches no dashboard and is inert.
-// `welfare` (23 Aug 2026) gates the Welfare dashboard SCREEN — every channel,
-// every DM, the reports queue. It is NOT a data permission: any admin can read
-// a DM (Jay's ruling, db/migrations/20260823_squad_chat_phase3.sql). It exists
-// so one named person sees the whole picture without holding every other job.
+// `welfare` (23 Aug 2026) IS a data permission since Phase 4 (28-30 Aug
+// 2026): private.can_review_dm keys on it, gating DM review, the welfare
+// directory (welfare_overview) and DM/group report handling in RLS. The 23 Aug
+// "any admin can read a DM" ruling is DEAD. It is also the one right a super
+// does NOT hold implicitly — see canReviewDm below.
 // ⚠️ The three `chat-*` rights (30 Aug 2026) are CHANNEL ACCESS, not a
 // dashboard: each puts the ticked admin into one role channel
 // (db/migrations/20260830_role_channels.sql — private.in_role_channel is the
@@ -386,6 +390,71 @@ export function canSeeChildContacts(memberships) {
 export function canEditChildContacts(memberships) {
   if (isSuperAdmin(memberships)) return true
   return adminRights(memberships).some((right) => CHILD_CONTACTS_EDIT_RIGHTS.includes(right))
+}
+
+// ── The sibling allowlists (S1 write, S3 photos, S7b DM review) ────────────
+//
+// ⚠️ SEPARATE ARRAYS ON PURPOSE, mirroring the SQL exactly: can_write_child /
+// can_see_child_photos / can_edit_child_photos share the contacts allowlist's
+// VALUE today but are separate functions in the database
+// (db/migrations/20260828_child_write_allowlist.sql, _child_photos_allowlist.sql)
+// so Jay can rule the surfaces apart later. Change one, change both.
+export const CHILD_WRITE_RIGHTS = ['clubadmin', 'youth', 'media']
+export const CHILD_PHOTOS_READ_RIGHTS = ['clubadmin', 'youth', 'media', 'welfare']
+export const CHILD_PHOTOS_EDIT_RIGHTS = ['clubadmin', 'youth', 'media']
+
+/** May this person's ADMIN hat write a player row? Mirrors private.can_write_child. */
+export function canWriteChild(memberships) {
+  if (isSuperAdmin(memberships)) return true
+  return adminRights(memberships).some((right) => CHILD_WRITE_RIGHTS.includes(right))
+}
+
+/** May this person see children's photos? Mirrors private.can_see_child_photos. */
+export function canSeeChildPhotos(memberships) {
+  if (isSuperAdmin(memberships)) return true
+  return adminRights(memberships).some((right) => CHILD_PHOTOS_READ_RIGHTS.includes(right))
+}
+
+/** May this person change children's photos? Mirrors private.can_edit_child_photos. */
+export function canEditChildPhotos(memberships) {
+  if (isSuperAdmin(memberships)) return true
+  return adminRights(memberships).some((right) => CHILD_PHOTOS_EDIT_RIGHTS.includes(right))
+}
+
+/**
+ * May this person review DMs — the welfare directory, reports on DM/group
+ * messages, reading a reviewable conversation? Mirrors private.can_review_dm.
+ *
+ * ⚠️ NO isSuperAdmin SHORT-CIRCUIT, AND NOT adminRights() — DELIBERATELY, and
+ * different from every helper above. A super must hold `welfare` EXPLICITLY
+ * (spec §5.2 note ², 28 Aug 2026): reading children's private messages is the
+ * one power that is never implicit, so a super self-ticks welfare (an audited
+ * write) to review and unticks it after. adminRights() hands a super every
+ * right, which is exactly the short-circuit this must not have.
+ */
+export function canReviewDm(memberships) {
+  if (!memberships) return false
+  return memberships.some(
+    (m) =>
+      m.role === 'admin' && m.status === 'active' && (m.admin_rights ?? []).includes('welfare'),
+  )
+}
+
+/**
+ * May this person write THIS player row? The client mirror of the "player
+ * edit" policy (20260828_child_write_allowlist.sql):
+ * `can_write_child() OR is_team_staff(team_id)` — an admin needs the write
+ * allowlist, squad staff need to be ACTIVE on the squad. This is what the
+ * roster's edit affordances should ask, NOT canEditTeam, whose admin arm is
+ * any-admin and so draws dead controls for a pitches-only admin.
+ */
+export function canWritePlayer(memberships, teamId) {
+  if (!memberships) return false
+  if (canWriteChild(memberships)) return true
+  if (teamId == null) return false
+  return memberships.some(
+    (m) => isActiveMembership(m) && isSquadStaffRole(m.role) && m.team_id === teamId,
+  )
 }
 
 /**
