@@ -231,10 +231,55 @@ describe('MembershipProvider / useMemberships', () => {
       </MembershipProvider>,
     )
 
-    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    // ⚠️ timeout: the provider retries once after ~900ms (30 Aug 2026), so a
+    // PERSISTENT failure takes two attempts before the error is honest.
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'), {
+      timeout: 4000,
+    })
 
     expect(screen.getByTestId('error')).toHaveTextContent('permission denied')
     expect(screen.getByTestId('memberships')).toHaveTextContent('[]')
+  })
+
+  // ⚠️ THE QUIET RETRY — 30 Aug 2026, from a real incident. One transient 401
+  // ("JWT issued at future": Supabase's own gateway clocks a few ms apart on a
+  // fresh token, Jay's phone clock proven exact) painted the full-page
+  // "Couldn't load your account" card. A single failure now gets ONE silent
+  // second attempt; only a second failure reaches the card.
+  it('a transient first failure is retried quietly and never shows the error card', async () => {
+    useAuthMock.mockReturnValue({ session: { user: { id: 'u1' } } })
+    let membershipCalls = 0
+    supabase.from.mockImplementation((table) => {
+      if (table === 'memberships') {
+        membershipCalls += 1
+        const result =
+          membershipCalls === 1
+            ? { data: null, error: new Error('JWT issued at future') }
+            : { data: [MEMBERSHIP_ROW], error: null }
+        return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue(result) }) }
+      }
+      if (table === 'teams') {
+        const builder = {
+          order: vi.fn(() => builder),
+          then: (resolve, reject) => Promise.resolve({ data: [TEAM_ROW], error: null }).then(resolve, reject),
+        }
+        return { select: vi.fn().mockReturnValue(builder) }
+      }
+      throw new Error(`Unexpected table in test: ${table}`)
+    })
+
+    render(
+      <MembershipProvider>
+        <Harness />
+      </MembershipProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'), {
+      timeout: 4000,
+    })
+    expect(membershipCalls).toBe(2)
+    expect(screen.getByTestId('error')).toHaveTextContent('none')
+    expect(screen.getByTestId('memberships')).toHaveTextContent('m-1')
   })
 
   it('resolves loading to false and sets error when the teams query fails', async () => {
@@ -247,7 +292,7 @@ describe('MembershipProvider / useMemberships', () => {
       </MembershipProvider>,
     )
 
-    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'), { timeout: 4000 })
 
     expect(screen.getByTestId('error')).toHaveTextContent('teams unavailable')
   })

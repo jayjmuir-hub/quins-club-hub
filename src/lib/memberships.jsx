@@ -170,7 +170,26 @@ export function MembershipProvider({ children }) {
     // (profile_id = auth.uid() OR is_admin(club_id)), so an unfiltered read
     // hands an ADMIN the whole club's memberships — and this provider's output
     // is what every screen treats as "mine". See loadMyMemberships.
-    Promise.all([loadMyMemberships(userId), loadTeams()])
+    //
+    // ⚠️ ONE QUIET RETRY BEFORE THE ERROR CARD — 30 Aug 2026, from a real
+    // incident. Jay's phone showed "Couldn't load your account · JWT issued at
+    // future"; the phone's clock was EXACT (measured against the server), and
+    // the edge logs held exactly ONE 401 at that second: a freshly refreshed
+    // token validated by a gateway node whose clock ran milliseconds behind
+    // the minting node. Sub-second, self-healing — and this screen turned it
+    // into a full-page error. The same shape covers an ordinary pitch-side
+    // network blip. One retry, ~900ms later, is the whole cure; a SECOND
+    // failure is a real outage and still gets the honest card.
+    const loadBoth = async () => {
+      try {
+        return await Promise.all([loadMyMemberships(userId), loadTeams()])
+      } catch (firstFailure) {
+        await new Promise((resolve) => setTimeout(resolve, 900))
+        if (!mounted) throw firstFailure
+        return Promise.all([loadMyMemberships(userId), loadTeams()])
+      }
+    }
+    loadBoth()
       .then(async ([membershipRows, teamRows]) => {
         if (!mounted) return
 
