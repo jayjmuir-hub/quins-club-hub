@@ -10,14 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **The shared pitch picture is legible again — every label was rendering as
-  dashes.** The share PNG is drawn by html2canvas, which positions each glyph
-  itself and OVERLAPS them under the compact bars' negative `letter-spacing`
-  (`-0.04em`, added when the codes were tightened to fit) — so on the exported
-  image every squad code collapsed to a row of dashes/dots while the live card
-  looked perfect (Jay). Removed the negative tracking (the codes fit at normal
-  spacing); the on-screen card is unchanged. `src/components/PitchShareCard.jsx`.
-  (SHA follows in the next changelog-touching PR.)
+- **The shared pitch picture is legible — the real cause was a too-small font.**
+  #545 guessed the dashes came from negative letter-spacing and removed it; that
+  did NOT fix it (verified by exporting the card in the harness and reading the
+  pixels): html2canvas simply does not render text at ~8px — it collapses tiny
+  glyphs to dashes, while the black `D2` (11px) and red time (9.5px) rendered
+  fine all along. So the compact week codes are now **11px**, and the week share
+  card is **widened** (1180→1540px) so `U12G`/`U14G` still fit a quarter bar at
+  that size. The on-screen card gains bigger, clearer labels; the export finally
+  reads as text. `src/components/PitchShareCard.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `8e78c2b` — **First attempt at the dashes: removed the compact bars' negative
+  `letter-spacing`.** A real html2canvas hazard, but not THIS bug's cause — the
+  labels still exported as dashes; see the font-size fix above.
+  `src/components/PitchShareCard.jsx`.
 - `cd59f9f` — **Club-wide events are editable again, and a long one no longer wrecks the
   pitch picture.** Two faults in the whole-club feature Jay hit: (1) clicking a
   club-wide event showed NO edit option — `canEditTeam` deliberately refuses a
