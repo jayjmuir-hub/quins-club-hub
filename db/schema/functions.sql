@@ -5111,6 +5111,8 @@ $function$
 -- ---------------------------------------------------------------------
 -- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
 -- private.admin_may_review — a minor in it, or a reported message. md5 4c2b0b533f8d37aaead7213105d43720.
+-- ⚠️ GATE NARROWED 30 Aug 2026 (20260830_welfare_review_gate): `ok` keys on
+-- private.can_review_dm — the dashboard needs the explicit welfare grant.
 CREATE OR REPLACE FUNCTION public.welfare_overview()
  RETURNS TABLE(kind text, id uuid, label text, detail text, members bigint, last_at timestamp with time zone, open_reports bigint)
  LANGUAGE sql
@@ -5120,7 +5122,7 @@ AS $function$
   with me as (select auth.uid() as id),
   club as (select m.club_id as id from memberships m, me
             where m.profile_id = me.id and m.status = 'active' order by m.created_at limit 1),
-  ok as (select private.is_admin(club.id) as yes from club)
+  ok as (select private.can_review_dm(club.id) as yes from club)
   select rows.kind, rows.id, rows.label, rows.detail, rows.members, rows.last_at, rows.open_reports from (
     select 'squad'::text as kind, t.id as id, t.name as label,
            case when private.channel_announce_only(t.id) then 'Squad · announce-only' else 'Squad · open chat' end as detail,
@@ -5441,6 +5443,26 @@ $function$
 -- adults should be visible to anyone except those people, unless a message is
 -- reported." Captured from pg_get_functiondef in a rolled-back apply; md5s below.
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- private.report_on_conversation(_message uuid)   (30 Aug 2026 — welfare_review_gate)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+-- Classifies a reported message: conversation (DM/group → welfare gate) vs
+-- channel (→ any admin). SECURITY DEFINER so the split is decidable by admins
+-- who may not read the message itself; leaks only the channel class.
+CREATE OR REPLACE FUNCTION private.report_on_conversation(_message uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from messages m
+     where m.id = _message and m.conversation_id is not null
+  );
+$function$
+;
 
 -- ---------------------------------------------------------------------
 -- private.conversation_reviewable(_conversation uuid)   (23 Aug 2026)

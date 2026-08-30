@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **The head-coach TITLE and FLAG are linked on the staff screen — offer one
+- **Grok item 1 & 2 SHIPPED — the welfare directory and DM/group reports move
+  behind the explicit `welfare` grant.** `welfare_overview()` gated on
+  `private.can_review_dm` (was `is_admin` — a pitches-only admin could
+  enumerate every reviewable child conversation by calling the RPC; measured
+  pre-fix: 33 rows). `message_reports` read/resolve SPLIT BY CONTEXT (Jay's
+  ruling, 30 Aug): a report on a conversation message (DM/group) is
+  welfare-only, a report on a channel message stays any-admin — mirrors the
+  reported-message arm of "message delete" — and the reporter keeps sight of
+  their own. New classifier `private.report_on_conversation` (SECURITY
+  DEFINER: the split must be decidable by admins who may not read the
+  message). Applied to prod and proven by injected fault both ways: harness
+  red pre-apply, green post-apply, rolled back clean, and Jay already holds
+  `welfare` so nothing went dark.
+  `db/migrations/20260830_welfare_review_gate.sql`,
+  `db/tests/dm-review-welfare.sql` (extended: overview gate, report split,
+  self-test 2), `db/schema/policies.sql`, `db/schema/functions.sql`. (SHA
+  follows in the next changelog-touching PR.)
+- `6f49559` — **The head-coach TITLE and FLAG are linked on the staff screen — offer one
   way, fill the other.** Two real coaches sat titled "Head Coach" with the
   flag off, silently outside the approval emails and the Club Head Coaches
   channel (both flagged by hand the same evening). The ruling "a title is
@@ -19,8 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   typing. The free direction: ticking the flag fills an EMPTY title with
   "Head Coach"; a custom title is never overwritten, and a failed fill is a
   missing label, not a broken flag. `src/screens/AdminStaff.jsx`,
-  `tests/admin-staff.test.jsx`. (SHA follows in the next changelog-touching
-  PR.)
+  `tests/admin-staff.test.jsx`.
 - `4da1d26` — **Edit your own messages, emoji-only bubbles render BIG, and the managers
   channel is "Club Age Group Managers".** Three at once, all in the SHARED
   chat components so every surface (channels, replies, DMs, groups, the dock)
