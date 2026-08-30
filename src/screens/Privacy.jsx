@@ -98,7 +98,7 @@ export default function Privacy() {
       <P>
         Most players are under 18. Younger children do not sign in — their
         accounts are held by parents, guardians, coaches and club staff. From
-        U13 upwards the club allows a player to hold their own account, and a
+        U13 upwards, players are allowed to hold their own accounts, and a
         parent or carer is still kept on record for them. Every account,
         whoever holds it, sees nothing until the club has approved it.
         Photographs are optional and can be removed at any time on request.
