@@ -189,21 +189,17 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
 
 ### Latent — bites only when a narrowed admin grant is issued (harmless today via the `clubadmin` backfill)
 
-- **Child-contact UI helpers unused; no photo/write mirror.**
-  `canSeeChildContacts`/`canEditChildContacts` (`src/lib/scope.js:368,374`) are
-  tested but imported by **no screen**; there is no
-  `canWriteChild`/`canSeeChildPhotos`/`canReviewDm`. `PlayerForm` gates on
-  `canEditTeam` (`:194-195`), true for every admin — so after a narrowed grant a
-  pitches admin gets an editable form with blank fields and a failing Save; a
-  welfare admin (read-only at RLS) gets a writable form that also fails Save.
-  Super `adminRights()` (`scope.js:335`) returns **every** right incl `welfare`,
-  so the UI offers the Welfare portal to a super who hasn't ticked it (server
-  denies; the client swallows the 42501 to `console.warn` + an empty thread — the
-  mismatch is real). The doctrine comment (`scope.js:211-241`, "rights gate
-  screens not data", "any admin can read a DM") describes pre-28-Aug and is
-  stale. **Fix:** wire the helpers into PlayerForm/PlayerDetail/Roster/Accounts,
-  add the three missing helpers, welfare → read-only fields, stop offering
-  Welfare to an un-ticked super, rewrite the comment.
+- ✅ **Item 7 FIXED (core), 30 Aug 2026**: new client mirrors `canWriteChild`,
+  `canSeeChildPhotos`, `canEditChildPhotos`, `canWritePlayer` (the "player
+  edit" policy) and `canReviewDm` (explicit welfare, NO super short-circuit);
+  PlayerForm and Roster gate player editing on `canWritePlayer`, so a
+  narrowed admin gets no dead form (the welfare persona reaches data
+  read-only via PlayerDetail's refuse-by-empty, not a failing form); the
+  Welfare portal greys for an un-ticked super; the stale "rights gate
+  screens not data" / "any admin can read a DM" doctrine comments rewritten.
+  Residual (minor, latent): PlayerDetail/Accounts read-surface polish for a
+  narrowed persona rides on RLS refuse-by-empty rather than explicit gating —
+  revisit if a narrowed grant is ever issued and a screen looks broken.
 
 ### Hygiene / process (medium-low)
 

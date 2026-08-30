@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Grok item 4 SHIPPED — staff edit-gates require an ACTIVE membership.**
+- **Grok item 7 SHIPPED — the UI reads the child-PII allowlists that already
+  gate the data.** New client mirrors of the 28 Aug RLS boundaries:
+  `canWriteChild`, `canSeeChildPhotos`, `canEditChildPhotos`,
+  `canWritePlayer` (the "player edit" policy: write allowlist for admins,
+  active squad staff otherwise) and `canReviewDm` (explicit `welfare`, NO
+  super short-circuit — the one right adminRights() must not imply).
+  PlayerForm and Roster gate player editing on `canWritePlayer`, so a
+  pitches-only admin stops seeing forms whose every write fails at RLS; the
+  Welfare portal greys for a super who has not self-ticked welfare (post-#556
+  their screens would be empty); the stale "rights gate screens, not data" /
+  "any admin can read a DM" doctrine comments now tell the post-Phase-4
+  truth. Invisible to every current admin — all hold `clubadmin`, which is
+  in every allowlist, pinned by fixture. `src/lib/scope.js`,
+  `src/lib/portals.js`, `src/screens/PlayerForm.jsx`,
+  `src/screens/Roster.jsx`, `tests/super-admin.test.js`,
+  `tests/admin-portals.test.jsx`, `tests/sidebar-submenu.test.jsx` + fixture
+  files. (SHA follows in the next changelog-touching PR.)
+- `fe07419` — **Grok item 4 SHIPPED — staff edit-gates require an ACTIVE membership.**
   `canEditTeam`'s squad-staff arm and Roster's `canEditAnything` gain the
   `isActiveMembership` check the SQL `can_edit_team` has always had, so a
   self-registered PENDING coach no longer sees edit controls whose every
@@ -21,7 +38,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   column is NOT NULL, so the status-less shape never existed in production
   and was exactly what let the old gate look correct.
   `src/lib/scope.js`, `src/screens/Roster.jsx`, `tests/scope.test.js` and
-  eleven fixture files. (SHA follows in the next changelog-touching PR.)
+  eleven fixture files.
 - `74bd367` — **Grok items 5 & 9 SHIPPED — silent-refusal chat writes throw, and view-as
   stops skipping the welfare audit.** `deleteConversation` and
   `resolveReport` gain the `.select('id')` + zero-rows-throws guard

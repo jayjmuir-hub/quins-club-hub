@@ -14,8 +14,9 @@ PR 1 ships now (Jay already holds `welfare`). `main` is production
   welfare audit; D5 default taken — unread badges left as-is).
 - **PR 5 — SHIPPED 30 Aug 2026** (item 4: staff edit-gates active-only; D6
   default taken — pending squads stay visible, now documented).
-- **PR 4 — SHIPPED 30 Aug 2026** (items 5 & 9: write-safety guards +
-  view-as welfare audit; D5 default taken — unread badges left as-is).
+- **PR 6 — SHIPPED 30 Aug 2026** (item 7 core: child-PII allowlist mirrors
+  wired into PlayerForm/Roster, Welfare portal explicit-only for supers,
+  doctrine comments rewritten; read-surface polish left on refuse-by-empty).
 
 ⚠️ **RE-VALIDATED 30 Aug 2026 after ~20 PRs merged** (see the same-day note in
 `claude/open-items.md`). All 18 items still stand; two fixes changed and the
