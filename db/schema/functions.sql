@@ -3371,6 +3371,37 @@ $function$
 ;
 
 -- ---------------------------------------------------------------------
+-- private.guard_last_admin()   (30 Aug 2026 — last_admin_guard, Grok item 8)
+-- proacl: null
+-- ---------------------------------------------------------------------
+-- BEFORE UPDATE OR DELETE on memberships: raises P0001 when the row is the
+-- club's last ACTIVE admin and the operation would remove that status.
+CREATE OR REPLACE FUNCTION private.guard_last_admin()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if old.role = 'admin' and old.status = 'active'
+     and (tg_op = 'DELETE' or new.role <> 'admin' or new.status <> 'active') then
+    if not exists (
+      select 1 from public.memberships m
+       where m.club_id = old.club_id
+         and m.id <> old.id
+         and m.role = 'admin'
+         and m.status = 'active'
+    ) then
+      raise exception 'This is the club''s only active admin. Make someone else an admin first.'
+        using errcode = 'P0001';
+    end if;
+  end if;
+  return coalesce(new, old);
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
 -- private.audit_membership()
 -- proacl: null
 -- ---------------------------------------------------------------------
