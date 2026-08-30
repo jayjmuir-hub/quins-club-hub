@@ -33,19 +33,26 @@ import {
 // it is the screen the pitch work exists for: a Saturday morning fits on one
 // view and a double booking reads as two amber cells without reading a word.
 //
-// ⚠️ IT OPENS ON THE MONTH, ANCHORED ON TODAY — Jay, 12 Aug 2026, asked
-// directly when offered the choice.
+// ⚠️ IT OPENS ON THE WEEK, ANCHORED ON TODAY — Jay, 30 Aug 2026. The week is the
+// planning horizon a coach actually opens this screen for; the month is one tab
+// away.
 //
-// ⚠️ THIS REPLACES THE 11 AUG "OPENS ON TODAY, IN DAY VIEW" RULING, AND THE WAY
-// IT WAS REPLACED IS THE POINT. That instruction was explicit, so the calendar
-// shipped with Day still the landing view and the question was put to Jay
-// rather than answered by whoever was typing. He changed it. A default nobody
-// asked about is a guess; this one is a decision, and the old ruling is
-// superseded rather than forgotten.
+// ⚠️ THIS SUPERSEDES THE 12 Aug "OPENS ON THE MONTH" DEFAULT, which itself
+// replaced the explicit 11 Aug "opens on today, in Day view" ruling. Each was a
+// decision Jay was asked for, not a guess — so the superseded ones are left
+// legible here rather than erased, the same way the month default kept the day
+// one. A default nobody asked about is a guess; these three were not.
 //
 // ⚠️ "ANCHORED ON TODAY" IS STILL TRUE AND STILL MATTERS. `day` is initialised
-// to clubToday(), so the month that opens is THIS month with today circled —
-// not January, and not the month of some remembered selection.
+// to clubToday(), so the week that opens is THIS week, today inside it — not
+// January, and not the week of some remembered selection.
+//
+// ⚠️ WEEK → DAY LANDS ON THE FIRST DAY OF THAT WEEK (Jay, 30 Aug 2026). `day` is
+// whatever anchor the week paged to — and that is often its LAST day, because
+// paging shifts `day` by 7 from today and today can be a Sunday — so switching
+// to Day without resetting it jumped to that anchor (the last day of the week).
+// The view switch now moves `day` to the week's Monday, so Day opens where the
+// week reads from. See the tablist onClick below.
 //
 // ⚠️ THE THREE VIEWS ANSWER DIFFERENT QUESTIONS, which is why all three exist:
 //   DAY    pitches × hours — "what is on this pitch at this hour", the grid you
@@ -162,10 +169,10 @@ export default function Allocation() {
   const [decideBusy, setDecideBusy] = useState(false)
   const [decideError, setDecideError] = useState(null)
   const [day, setDay] = useState(() => clubToday())
-  // Jay's call, 12 Aug 2026. See the header — this supersedes the 11 Aug
-  // "opens on today, in Day view" instruction, and it was asked rather than
-  // assumed.
-  const [view, setView] = useState('month')
+  // Jay's call, 30 Aug 2026. See the header — the week is the planning horizon
+  // this screen is opened for; this supersedes the 12 Aug month default (which
+  // superseded the 11 Aug Day one).
+  const [view, setView] = useState('week')
   const [events, setEvents] = useState([])
   const [pitches, setPitches] = useState([])
   const [loading, setLoading] = useState(true)
@@ -509,7 +516,15 @@ export default function Allocation() {
               type="button"
               role="tab"
               aria-selected={on}
-              onClick={() => setView(option.value)}
+              // ⚠️ WEEK → DAY OPENS THE WEEK'S FIRST DAY, not wherever `day`
+              // happened to be anchored. Paging weeks shifts `day` by 7 from
+              // today, so it is usually the week's LAST day (a Sunday) — the
+              // jump Jay reported (30 Aug 2026). Reset to the Monday so Day
+              // opens where the week reads from.
+              onClick={() => {
+                if (option.value === 'day' && view === 'week') setDay(weekDays(day)[0])
+                setView(option.value)
+              }}
               className={[
                 'rounded-[8px] px-3.5 py-1.5 text-[13px] font-bold transition',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1',
