@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -15,7 +15,8 @@ import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PitchMonth, PitchOccupancy, PitchWeek } from '../components/PitchCalendar.jsx'
 import { PitchDayCard, PitchWeekCard } from '../components/PitchShareCard.jsx'
 import { diagramSlots, diagramWeek } from '../lib/pitchOccupancy.js'
-import { shareElementAsImage } from '../lib/shareImage.js'
+import { shareCanvas } from '../lib/shareImage.js'
+import { drawPitchDayCanvas, drawPitchWeekCanvas } from '../lib/pitchShareCanvas.js'
 import EventDetail from './EventDetail.jsx'
 import {
   dayKey,
@@ -183,10 +184,9 @@ export default function Allocation() {
   const [approvedKeys, setApprovedKeys] = useState(() => new Set())
   const [approveBusy, setApproveBusy] = useState(false)
   const [approveError, setApproveError] = useState(null)
-  // The pitch-layout picture (day/week). The same card is shown on screen AND
-  // photographed for the share, so each view holds its own ref.
-  const dayCardRef = useRef(null)
-  const weekCardRef = useRef(null)
+  // The pitch-layout picture (day/week) is shown on screen as a DOM card and,
+  // for the share, DRAWN NATIVELY on a canvas from the same model — no ref, no
+  // html2canvas photograph (see shareVisual, and src/lib/pitchShareCanvas.js).
   const [shareBusy, setShareBusy] = useState(false)
   const [shareError, setShareError] = useState(null)
 
@@ -446,19 +446,22 @@ export default function Allocation() {
       view === 'month' ? shiftMonth(current, delta) : shiftDayParts(current, view === 'week' ? 7 * delta : delta),
     )
 
-  // Photograph the layout card and hand it to the OS share sheet — the same
-  // shareElementAsImage the match sheet uses (native file-share on a phone, a
-  // PNG download on desktop). A cancel is not an error; shareElementAsImage
-  // returns rather than throwing on it.
+  // DRAW the layout picture on a canvas and hand it to the OS share sheet
+  // (native file-share on a phone, a PNG download on desktop). ⚠️ NATIVE CANVAS,
+  // NOT html2canvas: html2canvas mangled the small squad codes into dashes, so
+  // the picture is drawn with the browser's own text engine (src/lib/
+  // pitchShareCanvas.js) from the same model the on-screen card renders. A cancel
+  // is not an error; shareCanvas returns rather than throwing on it.
   async function shareVisual() {
     const isDay = view === 'day'
-    const element = isDay ? dayCardRef.current : weekCardRef.current
-    if (!element) return
     setShareBusy(true)
     setShareError(null)
     try {
+      const canvas = isDay
+        ? drawPitchDayCanvas({ title: heading, slots: dayModel })
+        : drawPitchWeekCanvas({ title: heading, days: weekModel })
       const anchor = isDay ? day : weekDays(day)[0]
-      await shareElementAsImage(element, {
+      await shareCanvas(canvas, {
         filename: `pitch-${isDay ? 'day' : 'week'}-${dayKey(anchor)}.png`,
         title: 'Pitch allocation',
         text: `Pitch allocation · ${heading}`,
@@ -563,9 +566,9 @@ export default function Allocation() {
               whole page — the same overflow gate the week/month grids use. */}
           <div className="overflow-x-auto pb-1">
             {view === 'day' ? (
-              <PitchDayCard ref={dayCardRef} title={heading} slots={dayModel} />
+              <PitchDayCard title={heading} slots={dayModel} />
             ) : (
-              <PitchWeekCard ref={weekCardRef} title={heading} days={weekModel} />
+              <PitchWeekCard title={heading} days={weekModel} />
             )}
           </div>
         </div>

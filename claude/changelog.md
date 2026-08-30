@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **The shared pitch picture is legible — the real cause was a too-small font.**
+- **The shared pitch picture is now DRAWN NATIVELY on a canvas — crisp text at
+  any size, no html2canvas.** The 11px/widen fix below made the labels legible
+  but still rough: html2canvas re-implements its own text renderer and fuzzes
+  small glyphs however big you make them. The Share button now draws the day and
+  week pictures with the browser's own text engine (`fillText`/`fillRect`) from
+  the same occupancy model the on-screen card renders, so squad codes and
+  club-wide titles export sharp. The palette and the club-wide vs squad label
+  rules moved to a shared module so the two renderers can't drift; the DOM card
+  stays for the on-screen "visual representation". Verified live in the harness by
+  rendering the real export (`U12G`/`U14G`/`U14B` sharp where they were dashes).
+  New `src/lib/pitchShareCanvas.js`, `src/lib/pitchShareStyle.js`; the sharing tail
+  of `src/lib/shareImage.js` split into a reusable `shareCanvas`;
+  `src/screens/Allocation.jsx`, `src/components/PitchShareCard.jsx`,
+  `tests/pitch-share-canvas.test.js`. (SHA follows in the next changelog-touching PR.)
+- `b236710` — **The shared pitch picture is legible — the real cause was a too-small font.**
   #545 guessed the dashes came from negative letter-spacing and removed it; that
   did NOT fix it (verified by exporting the card in the harness and reading the
   pixels): html2canvas simply does not render text at ~8px — it collapses tiny
@@ -18,8 +32,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   fine all along. So the compact week codes are now **11px**, and the week share
   card is **widened** (1180→1540px) so `U12G`/`U14G` still fit a quarter bar at
   that size. The on-screen card gains bigger, clearer labels; the export finally
-  reads as text. `src/components/PitchShareCard.jsx`. (SHA follows in the next
-  changelog-touching PR.)
+  reads as text. `src/components/PitchShareCard.jsx`.
 - `8e78c2b` — **First attempt at the dashes: removed the compact bars' negative
   `letter-spacing`.** A real html2canvas hazard, but not THIS bug's cause — the
   labels still exported as dashes; see the font-size fix above.

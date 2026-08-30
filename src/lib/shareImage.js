@@ -43,6 +43,27 @@ export async function shareElementAsImage(element, { filename, title, text, url 
   // white background because the element may be transparent and a transparent
   // PNG renders black in some chat clients.
   const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' })
+  return shareCanvas(canvas, { filename, title, text, url })
+}
+
+/**
+ * Share a canvas that the caller drew itself — the same OS share sheet / desktop
+ * download as shareElementAsImage, but skipping html2canvas.
+ *
+ * ⚠️ THIS IS THE CRISP-TEXT PATH. html2canvas re-implements a text renderer and
+ * mangled the pitch-layout picture's small labels into dashes; the pitch share
+ * (src/screens/Allocation.jsx) draws its own canvas (src/lib/pitchShareCanvas.js)
+ * and hands it here, so the browser's native text engine draws the glyphs. The
+ * DOM callers (match sheet, lineup, session plan) still go through
+ * shareElementAsImage, which carries cross-origin images the canvas path does not.
+ *
+ * @param {HTMLCanvasElement} canvas  already-drawn artwork
+ * @param {{ filename: string, title?: string, text?: string, url?: string }} options
+ * @returns {Promise<ShareOutcome>}
+ */
+export async function shareCanvas(canvas, { filename, title, text, url } = {}) {
+  if (!canvas) throw new Error('There was nothing to share.')
+
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
   if (!blob) throw new Error('That could not be turned into an image.')
 
