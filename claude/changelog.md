@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **A shareable pitch-layout picture for the day and week.** The Allocation screen
+- **Whole-club events — one social on every calendar, all season.** An admin can
+  now add an event for the WHOLE CLUB, not a single squad: "Adult Tag, every Wed,
+  open to everyone" (Jay). It is a new scope — `team_id NULL` — visible to every
+  active member and repeatable as an ordinary series, so a season is ~30 rows,
+  not the hundreds a 15-squad fan-out would be. It SIDESTEPS the 5 Aug "no
+  multi-squad + repeat" guard rather than reversing it: a club-wide event is one
+  event, so nothing multiplies. Admin-only, and only for a social — the "Whole
+  club (everyone)" option appears in the Age group picker for an admin on a
+  social. Informational (no roster, no player RSVP — the availability section is
+  hidden for it); person-based RSVP is a later feature. Every fixture surface
+  reads "Whole club" where a squad name would go, and the calendar feed emits it
+  too. ⚠️ **Needs the migration applied first:**
+  `db/migrations/20260830_club_wide_events.sql` makes `team_id` nullable, adds
+  `private.is_member`, widens the two `events` policies and the feed function.
+  `src/screens/EventForm.jsx`, `src/screens/EventDetail.jsx`, `src/data/events.js`,
+  `src/screens/Schedule.jsx`, `src/screens/Dashboard.jsx`, `src/components/DaySheet.jsx`,
+  `src/components/ScheduleTable.jsx`, `claude/decisions/2026-08-30-club-wide-events.md`,
+  and their tests. (SHA follows in the next changelog-touching PR.)
+- `3ece798` — **A shareable pitch-layout picture for the day and week.** The Allocation screen
   showed WHERE bookings were but had no friendly "draw me the ground" view — each
   shared pitch carved into the portions its squads take, the spare its own segment
   (Jay). New "Pitch layout" card, shown for the Day and the Week above the grid,
@@ -20,7 +38,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/components/PitchCalendar.jsx`, no behaviour change) so the picture and the
   "Shared pitches" bar read the same numbers. `src/components/PitchShareCard.jsx`,
   `src/screens/Allocation.jsx`, `harness/main.jsx`, `tests/pitch-diagram.test.js`,
-  `tests/pitch-share-card.test.jsx`. (SHA follows in the next changelog-touching PR.)
+  `tests/pitch-share-card.test.jsx`.
 - `4e6ed59` — **Coaches can duplicate a session straight from Squad Hub.** Duplicate was
   deliberately kept off Squad Hub and left on the Full schedule, but coaches and
   managers run their squad from this page — so "re-run last week's session" meant

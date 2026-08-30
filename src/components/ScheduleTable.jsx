@@ -112,7 +112,7 @@ function EventRow({ event, teamsById, onSelect }) {
       </td>
 
       <td className={`${CELL} whitespace-nowrap text-ink-muted`}>
-        {teamsById.get(event.team_id)?.name ?? 'No age group'}
+        {event.team_id == null ? 'Whole club' : teamsById.get(event.team_id)?.name ?? 'No age group'}
       </td>
 
       <td className={`${CELL} font-semibold`}>

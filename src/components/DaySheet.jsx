@@ -40,7 +40,7 @@ export default function DaySheet({ day, events, teamsById, canManage, onClose, o
             <FixtureRow
               key={event.id}
               event={event}
-              teamName={teamsById.get(event.team_id)?.name}
+              teamName={event.team_id == null ? 'Whole club' : teamsById.get(event.team_id)?.name}
               onSelect={onSelectEvent}
             />
           ))}

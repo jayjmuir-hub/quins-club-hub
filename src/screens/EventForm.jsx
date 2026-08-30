@@ -111,7 +111,7 @@ const TOURNAMENTS = [
 ]
 const OTHER_TOURNAMENT = '__other_tournament__'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, visibleTeams } from '../lib/scope.js'
+import { canEditTeam, isAdmin, visibleTeams } from '../lib/scope.js'
 import {
   clubDateTimeInputs,
   clubToday,
@@ -240,6 +240,16 @@ function Segmented({ legend, name, options, value, onChange }) {
 // the calendar grid is built from numbers: a Date would re-read the browser's
 // zone and could land the event on the wrong day for a reader outside Abu
 // Dhabi. See CLUB_TIME_ZONE in src/lib/eventFormat.js.
+// ⚠️ THE "WHOLE CLUB" SENTINEL for the Age group dropdown — Jay, 30 Aug 2026. A
+// club-wide event has no squad (team_id NULL), so it needs a value the <select>
+// can hold that is not a real team id. It NEVER reaches the database: the payload
+// maps it to team_id null. Only offered to an admin, and only for a SOCIAL —
+// a whole-club match or training makes no sense, and gating it to social keeps
+// it clear of the league/score/minis logic that keys on the chosen squad. A
+// club-wide event is ONE event (no fan-out), so it repeats as an ordinary series
+// — none of the row-multiplication the fan-out+repeat guard exists to prevent.
+const CLUB_WIDE = '__club__'
+
 function initialValues(event, editableTeams, initialDate = null, duplicating = false, initialKind = null) {
   const teamIds = editableTeams.map((team) => team.id)
   const fallbackTeamId = teamIds[0] ?? ''
@@ -736,15 +746,26 @@ export default function EventForm({
   // that produced it (memberships reload and shrink), and on a first render
   // where teams hadn't loaded yet the initial value is ''. Either way the
   // select would show a squad it wasn't actually holding in state.
-  const teamId = editableTeams.some((team) => team.id === values.teamId)
-    ? values.teamId
-    : editableTeams[0]?.id ?? ''
+  // Whole-club events are admin-only and only make sense as a social (see
+  // CLUB_WIDE). `canClubWide` also decides whether the sentinel is allowed to
+  // survive: switch the type away from social and it falls back to a real squad
+  // below, so a match can never be left holding the club-wide sentinel.
+  const admin = isAdmin(memberships)
+  const canClubWide = admin && !editing && values.type === 'social'
+  const teamId =
+    canClubWide && values.teamId === CLUB_WIDE
+      ? CLUB_WIDE
+      : editableTeams.some((team) => team.id === values.teamId)
+        ? values.teamId
+        : editableTeams[0]?.id ?? ''
+  const clubWide = teamId === CLUB_WIDE
 
   // The squads offered as extras: everything editable except the one already
   // chosen in the dropdown. Recomputed from `teamId` every render, so moving
   // the dropdown to a squad that was ticked as an extra cannot leave it
-  // counted twice.
-  const otherTeams = editing ? [] : editableTeams.filter((team) => team.id !== teamId)
+  // counted twice. A whole-club event fans out to nobody — it IS everybody —
+  // so it offers no extras.
+  const otherTeams = editing || clubWide ? [] : editableTeams.filter((team) => team.id !== teamId)
   const extras = extraTeamIds.filter((id) => otherTeams.some((team) => team.id === id))
   // Primary first, then extras in the club's sort order — the row order the
   // insert will use, so what the button counts is what gets written.
@@ -1057,7 +1078,19 @@ export default function EventForm({
     // club_id comes from the team being written to, not from the primary
     // squad, so a fan-out stays correct if the club ever holds more than one
     // club_id (see the single-club assumption logged in state-of-play.md).
+    // ⚠️ A WHOLE-CLUB event has no team to take club_id from, so it comes from
+    // the admin's own membership (falling back to any editable team's — all one
+    // club here). events.club_id is NOT NULL, so this must always resolve.
+    const clubWideClubId =
+      memberships.find((m) => m.club_id)?.club_id ?? editableTeams[0]?.club_id ?? null
     const rowFor = (id) => {
+      if (id === CLUB_WIDE) {
+        return {
+          ...(clubWideClubId ? { club_id: clubWideClubId } : null),
+          ...common,
+          team_id: null,
+        }
+      }
       const team = editableTeams.find((candidate) => candidate.id === id)
       return {
         ...(team?.club_id ? { club_id: team.club_id } : null),
@@ -1645,12 +1678,21 @@ export default function EventForm({
             aria-invalid={invalid.teamId ? 'true' : undefined}
             className={inputClasses(invalid.teamId)}
           >
+            {/* Whole club — admin + social only (see CLUB_WIDE). One event, on
+                every member's calendar, no squad. */}
+            {canClubWide && <option value={CLUB_WIDE}>Whole club (everyone)</option>}
             {editableTeams.map((team) => (
               <option key={team.id} value={team.id}>
                 {team.name}
               </option>
             ))}
           </select>
+          {clubWide && (
+            <p className="mt-1.5 text-[12.5px] font-medium text-ink-muted">
+              Everyone in the club sees this on their calendar. Say who it&apos;s
+              for in the title or notes (e.g. &ldquo;U14 and above&rdquo;).
+            </p>
+          )}
         </div>
 
         {/* Extra age groups. Create-time only, and only when there is

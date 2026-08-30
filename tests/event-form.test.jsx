@@ -859,3 +859,58 @@ describe('EventDetail wiring', () => {
     expect(dialog).toBeInTheDocument()
   })
 })
+
+// --- whole club (club-wide events, 30 Aug 2026) --------------------------
+//
+// A club-wide event has no squad (team_id null): it lands on every member's
+// calendar. Admin-only, and only for a SOCIAL — a whole-club match or training
+// makes no sense, and the "__club__" sentinel in the Age group <select> is
+// mapped to team_id null in the payload. Because it is ONE event (no fan-out) it
+// may still repeat, unlike the multi-squad fan-out.
+describe('EventForm — whole club', () => {
+  it('offers Whole club to an admin on a social, and writes team_id null', async () => {
+    const user = userEvent.setup()
+    renderForm({ memberships: ADMIN })
+
+    await user.click(screen.getByRole('radio', { name: 'Social' }))
+    await user.selectOptions(screen.getByLabelText('Age group'), '__club__')
+    await user.type(screen.getByLabelText('Title'), 'Adult Tag')
+    await pickDate(user, '2026-07-30')
+    await user.type(screen.getByLabelText('Time'), '18:00')
+    await user.type(screen.getByLabelText('End time'), '19:00')
+    await user.click(screen.getByRole('button', { name: /add event/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({
+      team_id: null, // the whole-club marker — no squad
+      type: 'social',
+      title: 'Adult Tag',
+    })
+    // club_id is NOT NULL in the database, so it must still be present.
+    expect(upsertEventMock.mock.calls[0][0].club_id).toBeTruthy()
+  })
+
+  it('does not offer Whole club on a match, only on a social', async () => {
+    const user = userEvent.setup()
+    renderForm({ memberships: ADMIN }) // opens as a match
+
+    expect(
+      within(screen.getByLabelText('Age group')).queryByText(/whole club/i),
+    ).toBeNull()
+
+    await user.click(screen.getByRole('radio', { name: 'Social' }))
+    expect(
+      within(screen.getByLabelText('Age group')).getByText(/whole club/i),
+    ).toBeInTheDocument()
+  })
+
+  it('never offers Whole club to a coach, even on a social', async () => {
+    const user = userEvent.setup()
+    renderForm({ memberships: COACH_U12 })
+
+    await user.click(screen.getByRole('radio', { name: 'Social' }))
+    expect(
+      within(screen.getByLabelText('Age group')).queryByText(/whole club/i),
+    ).toBeNull()
+  })
+})

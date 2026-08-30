@@ -98,7 +98,7 @@ import { listMembershipAudit } from '../src/data/audit.js'
 // builder that only carried `data` could not express the shape countSeriesFrom
 // actually reads.
 function createQueryBuilder({ data = null, error = null, count = null } = {}) {
-  const calls = { select: [], in: [], is: [], gte: [], lte: [], eq: [], order: [], limit: [], range: [], insert: [], update: [], delete: [], upsert: [] }
+  const calls = { select: [], in: [], or: [], is: [], gte: [], lte: [], eq: [], order: [], limit: [], range: [], insert: [], update: [], delete: [], upsert: [] }
   const builder = {}
   const chain = (name) =>
     vi.fn((...args) => {
@@ -107,6 +107,9 @@ function createQueryBuilder({ data = null, error = null, count = null } = {}) {
     })
   builder.select = chain('select')
   builder.in = chain('in')
+  // `.or()` is how listEvents pulls the member's squads AND club-wide events
+  // (team_id null) in one request, since 30 Aug 2026.
+  builder.or = chain('or')
   // `.is()` is the null-test filter — listEvents ends its builder with
   // .is('tournament_id', null) to keep a tournament's games out of the schedule.
   builder.is = chain('is')
@@ -196,20 +199,30 @@ describe('listEvents', () => {
     expect(result).toEqual(rows)
   })
 
-  it('filters with .in("team_id", teamIds) when teamIds is a non-empty array', async () => {
+  it('pulls the member\'s squads AND club-wide events when teamIds is non-empty', async () => {
+    // ⚠️ 30 Aug 2026: `.or(team_id.in.(…),team_id.is.null)`, not `.in(…)`. A
+    // club-wide event (team_id null) belongs to everyone, so it rides along
+    // beside the member's own squads rather than being filtered out.
     const { builder, calls } = createQueryBuilder({ data: [] })
     supabase.from.mockReturnValue(builder)
 
     await listEvents({ teamIds: ['team-1', 'team-2'] })
 
-    expect(calls.in).toEqual([['team_id', ['team-1', 'team-2']]])
+    expect(calls.or).toEqual([['team_id.in.(team-1,team-2),team_id.is.null']])
+    expect(calls.in).toEqual([]) // never the bare .in — that would drop club-wide events
   })
 
-  it('does not query at all when teamIds is an empty array, and returns []', async () => {
-    const result = await listEvents({ teamIds: [] })
+  it('still fetches club-wide events when teamIds is an empty array', async () => {
+    // An empty squad list no longer means "nothing": a member with no squads may
+    // still have club-wide events, so it queries team_id IS NULL rather than
+    // short-circuiting to [].
+    const { builder, calls } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
 
-    expect(supabase.from).not.toHaveBeenCalled()
-    expect(result).toEqual([])
+    await listEvents({ teamIds: [] })
+
+    expect(supabase.from).toHaveBeenCalledWith('events')
+    expect(calls.is).toContainEqual(['team_id', null])
   })
 
   it('queries without a team filter when teamIds is undefined (omitted)', async () => {

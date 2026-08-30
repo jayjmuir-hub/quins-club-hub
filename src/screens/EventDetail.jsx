@@ -522,6 +522,10 @@ export default function EventDetail({
   // substitutes the calendar feed's per-type duration guess.
   const typeLabel = TYPE_LABELS[event.type] ?? 'Event'
   const played = hasResult(event)
+  // A club-wide event (30 Aug 2026) has no squad (team_id null): it reads
+  // "Whole club" for the age group and carries no roster RSVP — the availability
+  // section is player-based, and there is no roster to RSVP against.
+  const clubWide = event.team_id == null
   // ⚠️ NULL FOR EVERY SQUAD FROM U11 UP, and for a squad whose row has not
   // loaded — squadFormat fails open the same way isMinisTeam does, so a missing
   // `team` prop shows nothing rather than the wrong age group's format.
@@ -570,7 +574,7 @@ export default function EventDetail({
           {typeLabel}
           {event.type === 'match' ? ` · ${event.home ? 'Home' : 'Away'}` : ''}
         </KeyValue>
-        <KeyValue label="Age group">{team?.name ?? 'Not set'}</KeyValue>
+        <KeyValue label="Age group">{clubWide ? 'Whole club' : team?.name ?? 'Not set'}</KeyValue>
         {/* ⚠️ A SEPARATE ROW, NOT A REPLACEMENT FOR "Age group". The squad and
             the league team are different facts and this is the one screen with
             room for both: "U14B Contact" is who trains together, "ADHQ2 · Div B
@@ -682,7 +686,7 @@ export default function EventDetail({
             <span className="text-base font-extrabold text-ink">{resultScore(event)}</span>
           </div>
         </div>
-      ) : FEATURES.availability ? (
+      ) : FEATURES.availability && !clubWide ? (
         <div>
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Availability</h4>
           <AvailabilitySummary eventId={event.id} />

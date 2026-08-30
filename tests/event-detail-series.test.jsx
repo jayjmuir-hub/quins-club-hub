@@ -373,3 +373,21 @@ describe('EventDetail — the session plan', () => {
     expect(getSessionMock).not.toHaveBeenCalled()
   })
 })
+
+// --- whole club (club-wide events, 30 Aug 2026) --------------------------
+describe('EventDetail — whole club', () => {
+  it('reads "Whole club" and shows no roster RSVP for a squad-less event', () => {
+    // A club-wide event (team_id null) has no roster, so the player-based
+    // availability section is suppressed — it would render empty and confuse.
+    show({ ...ONE_OFF, team_id: null, type: 'social', title: 'Adult Tag' }, { team: null })
+    const ageRow = screen.getByText('Age group').closest('div')
+    expect(ageRow).toHaveTextContent('Whole club')
+    expect(screen.queryByRole('heading', { name: /availability/i })).not.toBeInTheDocument()
+  })
+
+  it('a normal squad social still shows the availability section', () => {
+    // The control: hiding RSVP is specific to club-wide, not to socials.
+    show({ ...ONE_OFF, type: 'social', title: 'Team dinner' })
+    expect(screen.getByRole('heading', { name: /availability/i })).toBeInTheDocument()
+  })
+})

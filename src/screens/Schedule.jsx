@@ -227,7 +227,7 @@ function FixtureList({ events, teamsById, onSelect, emptyMessage, revealKey }) {
               <FixtureRow
                 key={event.id}
                 event={event}
-                teamName={teamsById.get(event.team_id)?.name}
+                teamName={event.team_id == null ? 'Whole club' : teamsById.get(event.team_id)?.name}
                 onSelect={onSelect}
               />
             ))}
