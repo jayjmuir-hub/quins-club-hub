@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **The pitch portion is now staff-only, and reads "sharing ⅓".** #534 put the
+- **Coaches can duplicate a session straight from Squad Hub.** Duplicate was
+  deliberately kept off Squad Hub and left on the Full schedule, but coaches and
+  managers run their squad from this page — so "re-run last week's session" meant
+  leaving for another screen with no signpost, and read as though they could not
+  duplicate at all (Jay). The Duplicate action now shows on Squad Hub's event
+  sheet, opening the same EventForm in duplicate mode (which, per the duplicate
+  rules, resets the pitch to Pitch TBD). Delete stays on the Full schedule,
+  unchanged, so it is not confused with clearing the training plan / hour.
+  `src/screens/SquadHub.jsx`, `tests/squad-hub-event-sheet.test.jsx`. (SHA follows
+  in the next changelog-touching PR.)
+- `54c7e01` — **The pitch portion is now staff-only, and reads "sharing ⅓".** #534 put the
   portion on the event's Pitch row for everyone, and "D3 · Third" was confusing —
   it read like a second pitch, and a parent has no use for how the ground is
   carved up (Jay). A coach or admin now sees `D3 · sharing ⅓` — the fraction
@@ -19,7 +29,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   (no `canEdit`) sees just the pitch, so the pitch-management detail that only
   reads as noise to them is gone. Gated on the `canEdit` the sheet already
   carries; the staff-only pitch calendars are unaffected. `src/screens/EventDetail.jsx`,
-  `tests/event-detail-series.test.jsx`. (SHA follows in the next changelog-touching PR.)
+  `tests/event-detail-series.test.jsx`.
 - `1472a11` — **Duplicating an event no longer inherits the original's pitch.** A duplicate
   opened with the source fixture's pitch pre-filled and saved it silently, re-booking
   that pitch on the new date without going through allocation — the clash invisible

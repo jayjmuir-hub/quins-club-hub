@@ -132,11 +132,12 @@ async function openComingUp(user) {
   return screen.getByRole('dialog')
 }
 
-describe('Squad Hub event sheet — Edit and Delete', () => {
-  it('offers Edit to a coach and does not offer Delete', async () => {
+describe('Squad Hub event sheet — Edit, Duplicate and Delete', () => {
+  it('offers Edit and Duplicate to a coach, and does not offer Delete', async () => {
     const user = userEvent.setup()
     const dialog = await openComingUp(user)
     expect(within(dialog).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Duplicate' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
   })
 
@@ -149,10 +150,29 @@ describe('Squad Hub event sheet — Edit and Delete', () => {
     expect(screen.getByLabelText('Title')).toHaveValue('Tuesday training')
   })
 
-  it('⚠️ passes onEdit and withholds onDeleted — calendar delete stays on Full schedule', () => {
+  it('⚠️ Duplicate opens the form in duplicate mode, not edit', async () => {
+    // The whole point of adding it here: a coach can re-run a session from
+    // their own squad page. Duplicate mode is a CREATE — the sheet says
+    // "Duplicate event", the details carry, and (per the duplicate rules) the
+    // pitch resets to Pitch TBD. Editing in place is the other test above.
+    const user = userEvent.setup()
+    const dialog = await openComingUp(user)
+    await user.click(within(dialog).getByRole('button', { name: 'Duplicate' }))
+
+    expect(await screen.findByRole('heading', { name: 'Duplicate event' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Title')).toHaveValue('Tuesday training')
+  })
+
+  it('⚠️ passes onEdit and onDuplicate, withholds onDeleted — calendar delete stays on Full schedule', () => {
     const source = readFileSync(join(process.cwd(), 'src', 'screens', 'SquadHub.jsx'), 'utf8')
     expect(source, 'SquadHub must pass onEdit to EventDetail').toMatch(
       /onEdit=\{\(event\) => setFormState\(\{ event \}\)\}/,
+    )
+    expect(source, 'SquadHub must pass onDuplicate to EventDetail').toMatch(
+      /onDuplicate=\{\(event\) => setFormState\(\{ event, duplicate: true \}\)\}/,
+    )
+    expect(source, 'SquadHub must pass the duplicate flag through to EventForm').toMatch(
+      /duplicate=\{formState\.duplicate \?\? false\}/,
     )
     expect(source, 'SquadHub must not pass onDeleted to EventDetail').not.toMatch(/onDeleted=/)
     expect(source, 'SquadHub must mount EventForm from that handler').toMatch(/<EventForm/)
