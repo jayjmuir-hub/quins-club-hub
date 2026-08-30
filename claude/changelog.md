@@ -10,14 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Tidied the pitch-layout picture, and told coaches it's already saved.** Following
+- **A club-wide booking reads "Club" on the pitch layout, not "A".** A whole-club
+  social given a pitch showed up on the Allocation pitch-layout picture with no
+  squad, so it fell back to "A squad" — which the share card abbreviated to a bare
+  "A" (Jay). A squad-less booking now labels as "Club" there and in the "Shared
+  pitches" bar. `src/lib/pitchOccupancy.js`, `tests/pitch-diagram.test.js`. (SHA
+  follows in the next changelog-touching PR.)
+- `83eab00` — **Tidied the pitch-layout picture, and told coaches it's already saved.** Following
   the first cut: squad codes on the tight week bars sat against the segment dividers,
   so each now has side padding and a single-line ellipsis fallback, the week card
   widened so codes like `U12G`/`U14G` fit whole, and the columns got more air (Jay:
   "text is touching lines"). Both cards also carry a note — coaches and managers are
   told the pitches shown are already saved to each squad's training session, so the
-  picture is not a to-do. `src/components/PitchShareCard.jsx`. (SHA follows in the
-  next changelog-touching PR.)
+  picture is not a to-do. `src/components/PitchShareCard.jsx`.
 - `ceaa0d5` — **Whole-club events — one social on every calendar, all season.** An admin can
   now add an event for the WHOLE CLUB, not a single squad: "Adult Tag, every Wed,
   open to everyone" (Jay). It is a new scope — `team_id NULL` — visible to every

@@ -39,6 +39,16 @@ describe('pitchBar', () => {
     expect(bar.spoken).toContain('Full — nothing spare')
   })
 
+  it('labels a club-wide booking "Club", not the bare "A squad" fallback', () => {
+    // A whole-club event (team_id null, no squad) shows on the pitch layout when
+    // it has a pitch; without this it read "A squad" → the card abbreviated it to
+    // a bare "A" (Jay, 30 Aug 2026).
+    const bar = pitchBar('D4', [
+      ev('2026-09-02T14:00:00Z', 'D4', 'full', { id: 'club', team_name: null, team_id: null }),
+    ])
+    expect(bar.segments.map((s) => s.squad)).toEqual(['Club'])
+  })
+
   it('draws a quarter beside a half as ¾ used with a quarter spare, half first', () => {
     const bar = pitchBar('D2', [
       ev('2026-08-31T14:00:00Z', 'D2', 'quarter', { id: 'a', team_name: 'U8 Tag' }),
