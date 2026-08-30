@@ -3118,6 +3118,13 @@ GRANT EXECUTE ON FUNCTION public.set_my_photo(text) TO authenticated;
 -- NULL comes back only for a name with no alphanumerics at all, and a NULL key
 -- never matches anything, so that case fails OPEN. Right direction to fail: a
 -- missed duplicate is a tidy-up, a false block is a family that cannot register.
+-- ⚠️ RE-CAPTURED 2026-08-30 (20260830_name_match_key_accent_blind): the key is
+-- now ACCENT-BLIND. A U10 child was registered twice by their two parents, a
+-- cedilla apart, and [[:alnum:]] keeps `ç` so the 20260814 key never matched.
+-- Diacritics now fold via extensions.unaccent (explicit-dictionary form — the
+-- empty search_path makes the bare form throw); non-Latin scripts pass through
+-- unchanged, measured. IMMUTABLE kept despite unaccent's formal STABLE-ness:
+-- no index depends on this function, all callers are run-time guards.
 CREATE OR REPLACE FUNCTION private.name_match_key(_name text)
  RETURNS text
  LANGUAGE sql
@@ -3133,7 +3140,9 @@ AS $function$
   from (
     select nullif(
              regexp_split_to_array(
-               btrim(regexp_replace(lower(coalesce(_name, '')), '[^[:alnum:]]+', ' ', 'g')),
+               btrim(regexp_replace(
+                 lower(extensions.unaccent('extensions.unaccent', coalesce(_name, ''))),
+                 '[^[:alnum:]]+', ' ', 'g')),
                ' '
              ),
              array[]::text[]
