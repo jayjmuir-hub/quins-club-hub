@@ -11,6 +11,226 @@ the evidence, never by removing the line.
 
 Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
+## Grok full-sweep — recorded 30 Aug 2026, all NOT STARTED
+
+**Source:** Grok's 29 Aug 2026 read-only sweep, every item independently
+**verified by Claude** against the code on `main` and — for the two criticals —
+against the **live production database**. Remediation plan:
+`claude/plans/2026-08-30-grok-sweep-remediation.md` (10 dependency-ordered PRs;
+nothing authorised). Severities below are the **corrected** framing both
+reviewers agreed, not Grok's original labels. Written here BEFORE the first PR
+because a plan is superseded once shipped and this file is the register that
+survives; strike items through with evidence as they land, never delete them.
+
+⚠️ **Four framing corrections were agreed and are baked into the labels below:**
+(1) `canEditTeam` is **UX, not HIGH** — RLS already refuses the write. (2) The
+`push-send` `path` "open redirect" is a **non-issue** — `APP_URL + path` keeps
+`//host` same-origin; the real bug is attacker-chosen lock-screen title/body.
+(3) The push-endpoint SSRF is **blind** — the worker's `fetch` response never
+returns to the caller; the threat is outbound internal reachability, not
+exfil-to-client, so the fix is an endpoint allowlist, not response-hiding.
+(4) `chat_media_owner` unpinned would turn `db/tests/search-path.sql` **red on
+next run** — caught-on-run, not silently slipped (`social_idea_owner` IS pinned;
+Grok's sibling comparison was the only imprecise word and the substance holds).
+
+### Needs Jay (blocks specific PRs)
+
+- **Grant the `welfare` right to a safeguarding person — HARD PRECONDITION on
+  the welfare-close PR.** `private.can_review_dm` has **no super-admin
+  short-circuit** (deliberate, 28 Aug) and **nobody holds `welfare` today**, so
+  the moment the welfare directory/reports are moved off `is_admin` (below), the
+  Welfare dashboard and Reports go empty **for everyone, including a super**,
+  until the tick exists. That is the intended Phase-4 posture *after* the grant,
+  not a window in which minor-DM review is a total lockout. The SQL must not go
+  to `main` before/without the grant.
+- **Item 13 — rule on the `is_admin` matrix (S4–S8) before any of it is built.**
+  `private.is_admin` is still all-or-nothing; match sheets, lineups, attendance,
+  grades/positions/units, squad chat + chat-media, and availability override are
+  gated by `can_edit_team`/`can_see_team` (= any active admin), NOT a narrowed
+  right — so "names-read-only access to children" is true for DOB/contacts/photos
+  but **false** for those team surfaces. Sub-findings to fold in only if this
+  wave opens: the allowlist helpers `can_see_child_contacts` /
+  `can_edit_child_contacts`
+  (`db/migrations/20260828_child_contacts_allowlist.sql:49-68`) are **club-blind**
+  (no `club_id`), same class as `is_admin_anywhere`; and there is **no
+  sensitive-read (SELECT) audit** on `player_private`/`player_contacts`
+  (`welfare_access_log`, `db/schema/tables.sql:2187-2198`, logs DM opens only —
+  S10/Phase 0d specified, not built). **Do not start on the strength of the
+  matrix existing on paper.**
+
+### Critical — live in production right now
+
+- **`welfare_overview()` still gates on `is_admin`, not `can_review_dm`.**
+  Verified against prod (`pg_get_functiondef`, 30 Aug): body carries
+  `ok as (select private.is_admin(club.id) as yes from club)` and `where ok.yes`;
+  `can_review_dm` is absent. Any active admin — even one narrowed to e.g.
+  `['pitches']` — gets the **directory** of every reviewable conversation: both
+  parties' full names (`pa.full_name || ' · ' || pb.full_name`), the
+  "involves a minor" label, last activity, open-report counts. Message bodies
+  stay behind `admin_may_review`; the directory does not. Phase 4 repointed
+  `admin_may_review` and never touched this RPC.
+  Definition: `db/migrations/20260824_group_chats.sql:532-599`; caller
+  `src/data/messages.js`. `db/tests/dm-review-welfare.sql` never calls it.
+  **Fix:** `ok` → `private.can_review_dm(club.id)`; harness must call
+  `welfare_overview()` with a pitches-demoted admin (0 rows) AND a welfare
+  holder (rows).
+- **`message_reports` read/resolve still gate on `is_admin`.** Verified against
+  prod (`pg_policies`, 30 Aug): `report read` =
+  `reporter_id = auth.uid() OR private.is_admin(club_id)`; `report resolve`
+  (USING+CHECK) = `private.is_admin(club_id)`. A pitches-narrowed admin can list
+  every report (reason ≤500 chars, `message_id`, `reporter_id`) and mark it
+  resolved. Phase 4 narrowed the sibling `welfare log read` but left these two.
+  Definition: `db/migrations/20260823_squad_chat_phase3.sql:600-603`; callers
+  `resolveReport`/`listOpenReports` (`src/data/messages.js`).
+  **Fix:** both → `can_review_dm` (keep the reporter arm on read).
+
+### High — bites today, no narrowed grant required
+
+- **Tournament games leak into `pitch_occupancy` → false clashes.** `listEvents`
+  (`src/data/events.js:64`) and the token feed filter `tournament_id IS NULL`;
+  the `pitch_occupancy` RPC (`db/migrations/20260829_pitch_portion.sql:65-76`)
+  does not. Games inherit the container's pitch, carry no `ends_at`/`pitch_portion`
+  (`portionFraction(null)===1`, `src/lib/pitchPortion.js:41`), and the fan-out
+  exemption keys on `group_id` not `tournament_id` (`src/data/pitches.js:133-135`),
+  so on a home tournament day Allocation (reads `listEvents`) and Pitch Glance
+  (reads the RPC) disagree and the first game flags a false clash. #527/#528 are
+  FE/test-only and did **not** touch the RPC. **Fix:** add `and e.tournament_id
+  is null`. ⚠️ **Its harness is broken** — `db/tests/pitch-occupancy.sql:25-26`
+  `create or replace`s the OLD 8-col return type against the live 9-col
+  signature and would throw `cannot change return type`; repair it before it can
+  prove the fix.
+- **`deleteConversation` / `resolveReport` report RLS-refusal as success.**
+  `src/data/messages.js:197-200` and `:660-666` do `.delete()`/`.update()` +
+  `if (error) throw`, but PostgREST returns 200 + 0 rows when RLS refuses, so a
+  non-owner or a delete on a reported (frozen) thread "succeeds" and
+  `DirectMessages.jsx:94-101` navigates away showing "deleted for both of you" —
+  a lie; the row reappears on next load. `removeMessage` (`:187-189`) was patched
+  to `.select('id')` + throw on empty; these two siblings were not.
+  **Fix:** mirror `removeMessage`; add real data-layer tests in
+  `tests/messages-data.test.js` (which covers `removeMessage` only).
+- **PWA disk-caches children's chat and DOB.** `pwa-cache-rules.js:45-69`
+  excludes only three club-wide admin reads; everything else on
+  `GET /rest/v1/*` is NetworkFirst into the on-disk cache — including
+  `/rest/v1/messages`, `player_private` (DOB), squad-wide
+  `player_contacts`/`player_parents`, and `poll_votes` (named voters).
+  `apiCache.js` purges on user-change only. A shared/stolen **unlocked** device
+  serves the previous session offline. **Fix (D3):** drop those five paths in
+  `isCacheableRestGet`; pin in `tests/pwa-cache-rules.test.js` AND
+  `tests/pwa-build.test.js`. (The other REST caching is a documented offline
+  tradeoff — do not "stop caching REST".)
+- **Last-admin lockout is client-only.** `delete_my_account` raises in SQL, but
+  `updateMembershipRole`/`deleteMembership` (`src/data/members.js:945-950`,
+  `:1138-1149`) are **bare table writes** under `memb manage` (`is_admin`) with no
+  guard; the only demote/revoke protection is `Accounts.jsx`'s
+  `LAST_ADMIN_REFUSAL`. A second tab, a crafted PostgREST call, or a count race
+  can lock the club out of `/admin`. **Fix:** a `BEFORE UPDATE OR DELETE` trigger
+  on `memberships` (not an RPC edit — there is no RPC chokepoint), firing only on
+  the last-active-admin transition; harness covers non-last/team-only/non-admin
+  edits as controls.
+- **View-as skips the welfare audit.** `useDmThread.js` keys `reviewing` (`:261`)
+  and `logWelfareAccess` (`:182-185`) on the **synthetic** membership set
+  (`memberships`, `:54,56`), so an admin previewing as a parent opens a DM with
+  no banner and **no `logWelfareAccess` row** — the read still runs as the real
+  `auth.uid()`. Writes go as the real uid (no impersonation); the missing log is
+  the bug. **Fix:** key on `realMemberships`
+  (`src/lib/memberships.jsx:297-306` exposes it). Unread-badge filtering under
+  preview (`useDockBadges.js:67-68`, `ChatList.jsx:510-527`) is a separate D5
+  product call, default leave.
+- **`notify-unfinished-signup` is an open relay if the shared secret is known.**
+  `supabase/functions/notify-unfinished-signup/index.ts:117-144` mails whatever
+  addresses the request body carries — no DB re-read, no `signup_nudges` check,
+  no batch cap — unlike `notify-welcome` which loads recipients from the DB by
+  id. **Fix:** accept ids, load email/name from the DB, cap the batch.
+- **`push-send` `squad_push`/`availability_nudge` trust the body.**
+  `push-send/index.ts:584-616` sends body-supplied `title`/`body`/`tag`/`path`/
+  `category` verbatim (`escapeHtmlFree` is a pass-through). With the secret,
+  attacker-chosen lock-screen text to a whole squad. **Fix:** pass event/batch
+  ids and render in the function; tombstone cancellations in SQL. (Redirect
+  angle dropped per correction 2.)
+- **Push endpoint blind SSRF.** `register_push_subscription`
+  (`db/migrations/20260823_push_subscription_takeover.sql:59-67`) validates only
+  non-empty; any member inserts their own row; `push-send/index.ts:768-782` then
+  `fetch()`es that endpoint from a process holding `SERVICE_ROLE_KEY` + the VAPID
+  private key, with no scheme/host/range check. A member can register
+  `http://169.254.169.254/…` and trigger the outbound request on a real push.
+  Blind (no response read-back). **Fix:** require `https`, allowlist FCM/Apple/
+  Mozilla hosts, deny private/link-local/metadata ranges — in **SQL and** the
+  function; SQL harness. **Do item 12 before 10/11** — it needs no secret leak.
+
+### UX, not data (RLS already refuses the write)
+
+- **`canEditTeam` does not require `status='active'`.** `src/lib/scope.js:452-465`
+  (and Roster `canEditAnything`, `src/screens/Roster.jsx:306-310`) lack the
+  active check that `private.can_edit_team` enforces, so an active parent who has
+  *requested* to coach sees Edit / Add player / Availability override / Match
+  sheet / Squad Hub — every write then fails at RLS. Dead controls, no leak;
+  17 Aug was the opposite direction. **Fix:** add `isActiveMembership` on the
+  staff arm; `tests/scope.test.js` pending-coach + active-parent fixture.
+
+### Latent — bites only when a narrowed admin grant is issued (harmless today via the `clubadmin` backfill)
+
+- **Child-contact UI helpers unused; no photo/write mirror.**
+  `canSeeChildContacts`/`canEditChildContacts` (`src/lib/scope.js:368,374`) are
+  tested but imported by **no screen**; there is no
+  `canWriteChild`/`canSeeChildPhotos`/`canReviewDm`. `PlayerForm` gates on
+  `canEditTeam` (`:194-195`), true for every admin — so after a narrowed grant a
+  pitches admin gets an editable form with blank fields and a failing Save; a
+  welfare admin (read-only at RLS) gets a writable form that also fails Save.
+  Super `adminRights()` (`scope.js:335`) returns **every** right incl `welfare`,
+  so the UI offers the Welfare portal to a super who hasn't ticked it (server
+  denies; the client swallows the 42501 to `console.warn` + an empty thread — the
+  mismatch is real). The doctrine comment (`scope.js:211-241`, "rights gate
+  screens not data", "any admin can read a DM") describes pre-28-Aug and is
+  stale. **Fix:** wire the helpers into PlayerForm/PlayerDetail/Roster/Accounts,
+  add the three missing helpers, welfare → read-only fields, stop offering
+  Welfare to an un-ticked super, rewrite the comment.
+
+### Hygiene / process (medium-low)
+
+- **`db/schema/` not recaptured after 28 Aug.** `policies.sql` still shows
+  pre-allowlist bodies — player-private read via `can_edit_team`, player-photo
+  read via `can_see_team`, welfare-log read via `is_admin` — vs live; and the
+  `pitch_occupancy` signature in `functions.sql` predates the portion column.
+  Recapture in whichever PR touches each. **`private.chat_media_owner`
+  (`db/migrations/20260824_chat_round_2.sql:76-82`) is unpinned** (no
+  `set search_path`) and would turn `db/tests/search-path.sql:31` (exempts only
+  `squad_expects_gender`) red on next run — pin it or exempt with a reason.
+- **Edge-function hygiene.** No committed edge-function `config.toml` (none
+  under `supabase/`), so `verify_jwt:false`
+  lives only in the dashboard and an MCP deploy defaults it back to true
+  (functions silently 401 — availability, not bypass). `send-email` HMAC is solid
+  but stores no `webhook-id`, so a captured signed POST is replayable ~5 min.
+  Only `send-email`/`notify-unfinished-signup` check the POST method. No
+  idempotency after the secret check (welcome/feedback/invite re-mail, push
+  replay). Every `timingSafeEqual` early-returns on length mismatch → leaks
+  `len(secret)`. **Fix:** add `config.toml`; persist `webhook-id`; method checks;
+  dedupe on a request/batch id; hash-both-sides compare.
+- **`/calendar.ics` routing untested in the built worker.** `netlify.toml:66-75`
+  orders it above the SPA catch-all and `vite.config.js:175` denylists it from
+  `navigateFallback` — right shape — but `tests/pwa-build.test.js` never asserts
+  `calendar.ics` is in the generated `sw.js`; removing the denylist would make an
+  installed PWA serve `index.html` for a pasted feed URL (the failure the free
+  uptime check cannot see). Also: the ICS `UID` still uses the retired
+  `quins.adhjrt.com` (`supabase/functions/calendar/index.ts:326`) — correctness,
+  not auth. **Fix:** add the build assertion; correct the UID host. Stripping
+  coach-typed `notes` from the ICS `DESCRIPTION` is a D4 policy call, default
+  leave.
+- **Login `error_description` + raw PostgREST messages.** `RequireAuth.jsx:47-52`
+  renders `error_description` from the URL hash with no allow-list (React-escaped
+  text, not XSS, but attacker-controlled copy on the club origin); raw
+  `err.message` reaches parents on Chat/Availability/PersonCard/Notices/
+  DirectMessages/Welfare. The good pattern is `src/data/parents.js:208,240`
+  (whitelist `error.code` before showing `message`). **Fix:** allow-list the
+  hash copy; route parent-facing errors through code-mapped copy.
+
+### Residual (low, correctly ranked)
+
+- `isOwnPlayer` (`scope.js:516-521`) has no status check, matching SQL
+  `is_own_player` — a pending parent filling in their own child is intended; add
+  a one-line comment so a future "add status everywhere" pass doesn't "fix" it.
+- Parent tap on a tournament game → `/match-sheet/:id` (`Schedule.jsx:915`) they
+  usually cannot use — UX rough edge, not a leak.
+
 ## Needs Jay (account creations — Claude does not do these)
 
 - **Should a player with their OWN account still count as "no parent on
