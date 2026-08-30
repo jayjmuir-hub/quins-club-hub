@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Grok item 14 SHIPPED — `db/schema/policies.sql` re-captured to match
+- **Grok item 17 SHIPPED — what an error may SAY to a parent, plus the item-6
+  cache residue.** `RequireAuth` maps the login URL fragment through
+  `friendlyAuthError`: the fragment is attacker-writable (any link can end
+  `#error_description=…`), so Login now receives a sentence this app wrote,
+  never the raw text; known GoTrue shapes (otp_expired, access_denied,
+  invalid) keep specific copy. The flagged `setError(err.message)` sites
+  (Chat, DirectMessages, Notices, PersonCard, Welfare, WelfareReports) route
+  through a new `friendlyMessage` — an error this app threw shows verbatim, a
+  hand-written SECURITY DEFINER refusal (the trusted codes) shows verbatim,
+  raw PostgREST/constraint/network strings fall back to the screen's own
+  line. And the peer-caught item-6 residue: `apiCache` now sweeps the five
+  child-PII tables' entries once per device, so responses cached BEFORE the
+  #562 exclusions (which only stopped new writes) don't linger on a family
+  device that never switches user. `src/lib/friendlyError.js` (new),
+  `src/lib/apiCache.js`, `src/components/RequireAuth.jsx`, the six screens,
+  `tests/error-hygiene.test.jsx` (new), `tests/api-cache.test.js`,
+  `tests/require-auth.test.jsx`. (SHA follows in the next changelog-touching
+  PR.)
+- `bb3490d` — **Grok item 14 SHIPPED — `db/schema/policies.sql` re-captured to match
   live.** The 28 Aug admin-rights redesign turned four surfaces into real
   allowlist boundaries and this capture had lagged them by two days — the
   exact drift `db/schema/` exists to catch. Re-captured verbatim from
@@ -22,7 +40,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Phase 4). No live change — the database was already this; only the file
   moved. Closes the last of item 14 (the `pitch_occupancy` signature was
   recaptured in the PR-3 merge, `chat_media_owner` pinned by #552).
-  `db/schema/policies.sql`. (SHA follows in the next changelog-touching PR.)
+  `db/schema/policies.sql`.
 - `55d25e5` — **Grok items 10, 11 & 12 SHIPPED — the push/mail pipeline stops trusting
   its callers.** Item 12 (SSRF): `register_push_subscription` allowlists the
   endpoint — https + real push services only, built from the hosts measured

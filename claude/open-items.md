@@ -225,13 +225,15 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   domain as opaque; a loud do-not-fix comment guards it in
   `supabase/functions/calendar/index.ts`. D4 default taken: coach-typed
   `notes` stay in the ICS DESCRIPTION.
-- **Login `error_description` + raw PostgREST messages.** `RequireAuth.jsx:47-52`
-  renders `error_description` from the URL hash with no allow-list (React-escaped
-  text, not XSS, but attacker-controlled copy on the club origin); raw
-  `err.message` reaches parents on Chat/Availability/PersonCard/Notices/
-  DirectMessages/Welfare. The good pattern is `src/data/parents.js:208,240`
-  (whitelist `error.code` before showing `message`). **Fix:** allow-list the
-  hash copy; route parent-facing errors through code-mapped copy.
+- ✅ **Item 17 FIXED, 30 Aug 2026**: `RequireAuth` maps the login URL
+  fragment through `friendlyAuthError` (attacker-writable text never reaches
+  the DOM as copy; known GoTrue shapes keep specific sentences), and the
+  flagged `setError(err.message)` sites (Chat, DirectMessages, Notices,
+  PersonCard, Welfare, WelfareReports) route through the new
+  `friendlyMessage` — an error this app threw shows verbatim, a trusted
+  SECURITY DEFINER code (42501/22023/42710/22004/P0001) shows verbatim, raw
+  PostgREST / constraint / network strings fall back. Pinned in
+  `tests/error-hygiene.test.jsx` (incl. the hostile-fragment case).
 
 ### Residual (low, correctly ranked)
 
