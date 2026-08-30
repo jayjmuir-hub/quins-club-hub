@@ -159,7 +159,7 @@ describe('the rights vocabulary', () => {
       'Welfare',
       'Club Hub Admin',
       'Chat: Club Head Coaches',
-      'Chat: Club Managers',
+      'Chat: Club Age Group Managers',
       'Chat: Club Medics',
     ])
   })

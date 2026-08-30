@@ -28,7 +28,7 @@ describe('the role-channel vocabulary', () => {
 
   it('labels read as the channels Jay named', () => {
     expect(roleChannelLabel('headcoaches')).toBe('Club Head Coaches')
-    expect(roleChannelLabel('managers')).toBe('Club Managers')
+    expect(roleChannelLabel('managers')).toBe('Club Age Group Managers')
     expect(roleChannelLabel('medics')).toBe('Club Medics')
     expect(roleChannelLabel('welfare')).toBe('Welfare')
     expect(roleChannelLabel('clubstaff')).toBe('Club Staff')
@@ -58,7 +58,7 @@ describe('the chat-access admin rights', () => {
 
   it('label as channel access, not jobs', () => {
     expect(adminRightLabel('chat-headcoaches')).toBe('Chat: Club Head Coaches')
-    expect(adminRightLabel('chat-managers')).toBe('Chat: Club Managers')
+    expect(adminRightLabel('chat-managers')).toBe('Chat: Club Age Group Managers')
     expect(adminRightLabel('chat-medics')).toBe('Chat: Club Medics')
   })
 })

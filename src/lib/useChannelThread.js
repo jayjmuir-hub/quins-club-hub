@@ -5,6 +5,7 @@ import { removeChatPhoto, uploadChatPhoto, uploadChatVoice } from '../data/chatM
 import { listEvents } from '../data/events.js'
 import {
   channelMembers,
+  editMessage,
   getChannelSettings,
   listMentionablesFor,
   listMessages,
@@ -328,6 +329,12 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     await replyToMessage(parentId, body, opts)
     await load()
   }
+  // Author-only, 15 minutes — the database's rule (private.touch_message).
+  // Thrown refusals surface in the editor, in the database's own words.
+  async function onEdit(id, body) {
+    await editMessage(id, body)
+    await load()
+  }
   async function onReact(messageId, emoji, on) {
     try {
       await toggleReaction(messageId, selfId, emoji, on)
@@ -497,6 +504,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     fileRef,
     send,
     onReply,
+    onEdit,
     onReact,
     polls,
     vote,

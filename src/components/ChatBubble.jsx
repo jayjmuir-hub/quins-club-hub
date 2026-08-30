@@ -34,6 +34,27 @@ import { stampLabel } from '../lib/notices.js'
  * @param extra        fixture / read-stat / "N replies in full view"
  * @param onReact      omit (or null) when this surface cannot react
  */
+// An emoji-only message renders BIG — WhatsApp's rule, because a lone 👍 at
+// body-text size reads as an afterthought when it IS the message (Jay,
+// 30 Aug 2026). "Emoji-only" means 1–3 glyphs, every one pictographic:
+// grapheme clusters via Intl.Segmenter so 👍🏽 and 👨‍👩‍👧 count as ONE glyph
+// (a naive [...str] splits them and the skin tone fails the test). Plain
+// digits and *|# are Emoji in Unicode but NOT Extended_Pictographic, so "3"
+// stays text — the property choice is the whole correctness of this.
+// Exported for its test.
+const SEGMENTER = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter() : null
+export function emojiOnlyCount(body) {
+  const text = (body ?? '').trim()
+  // 24 chars comfortably holds three of the longest ZWJ families; anything
+  // longer is prose and skips the segmenter walk entirely.
+  if (!text || text.length > 24) return 0
+  const glyphs = (SEGMENTER ? [...SEGMENTER.segment(text)].map((s) => s.segment) : [...text]).filter(
+    (g) => g.trim().length > 0,
+  )
+  if (glyphs.length === 0 || glyphs.length > 3) return 0
+  return glyphs.every((g) => /\p{Extended_Pictographic}/u.test(g)) ? glyphs.length : 0
+}
+
 // WhatsApp's vocabulary, kept exactly because every parent already reads it:
 // one tick = sent, two grey = delivered to their device, two accent = viewed.
 // Colour alone is not the signal — aria-label says the word, and the
@@ -175,13 +196,29 @@ export default function ChatBubble({
                 <ChatPhoto path={photoPath} compact={photoCompact} />
               ))}
             {body?.trim() ? (
-              <p className={`whitespace-pre-wrap break-words text-[14.5px] leading-[1.4] ${menuItems.length ? 'pr-5' : ''}`}>
-                {body}
-                {edited && (
-                  <span className={`ml-1.5 text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>(edited)</span>
-                )}
-                {stamp}
-              </p>
+              (() => {
+                // A photo caption stays body-sized — the emoji annotates the
+                // picture rather than being the message.
+                const bigEmoji = photoPath ? 0 : emojiOnlyCount(body)
+                return (
+                  <p
+                    className={`whitespace-pre-wrap break-words ${
+                      bigEmoji === 1
+                        ? 'text-[44px] leading-[1.15]'
+                        : bigEmoji > 1
+                          ? 'text-[32px] leading-[1.2]'
+                          : 'text-[14.5px] leading-[1.4]'
+                    } ${menuItems.length ? 'pr-5' : ''}`}
+                    data-emoji-only={bigEmoji > 0 ? 'true' : undefined}
+                  >
+                    {body}
+                    {edited && (
+                      <span className={`ml-1.5 text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}>(edited)</span>
+                    )}
+                    {stamp}
+                  </p>
+                )
+              })()
             ) : (
               <p className="text-right leading-none">{stamp}</p>
             )}

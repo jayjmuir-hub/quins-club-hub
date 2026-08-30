@@ -8,6 +8,7 @@ import {
   listMyMessageReads,
   listMyStars,
   listReactions,
+  editMessage,
   getConversation,
   listDirectMessages,
   listGroupMembers,
@@ -360,6 +361,13 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     }
   }
 
+  // Author-only, 15 minutes — the database's rule (private.touch_message).
+  // Thrown refusals surface in the inline editor, in the database's words.
+  async function onEdit(id, body) {
+    await editMessage(id, body)
+    await load()
+  }
+
   async function onRemove(id) {
     try {
       const gone = messages?.find((m) => m.id === id)
@@ -523,6 +531,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     sendPoll,
     postingPoll,
     sendVoice,
+    onEdit,
     onRemove,
     onCopy,
     onPin,

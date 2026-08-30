@@ -12,7 +12,9 @@
 
 export const ROLE_CHANNELS = {
   headcoaches: { label: 'Club Head Coaches', glyph: '🎯' },
-  managers: { label: 'Club Managers', glyph: '📋' },
+  // 'Club Managers' for its first hours; Jay renamed it the same day — the
+  // people in it are the AGE GROUP managers, and the club's own vocabulary wins.
+  managers: { label: 'Club Age Group Managers', glyph: '📋' },
   medics: { label: 'Club Medics', glyph: '⚕️' },
   welfare: { label: 'Welfare', glyph: '🛟' },
   clubstaff: { label: 'Club Staff', glyph: '🏉' },

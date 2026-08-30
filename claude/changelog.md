@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Re-validated the Grok full-sweep against current `main` (docs only).** After
+- **Edit your own messages, emoji-only bubbles render BIG, and the managers
+  channel is "Club Age Group Managers".** Three at once, all in the SHARED
+  chat components so every surface (channels, replies, DMs, groups, the dock)
+  moves together. Edit: author-only inside the database's 15-minute rule
+  (private.touch_message — canStillEdit merely draws the door), one
+  MessageEditor rendering in place of the bubble, the existing "(edited)" tag
+  finally reachable. Big emoji: 1–3 pictographic glyphs sized up
+  WhatsApp-style, counted as grapheme clusters (a skin tone or 👨‍👩‍👧 is ONE
+  glyph; a digit is Emoji-but-not-pictographic and stays text). Rename: label
+  only — the 'managers' key survives everywhere so nothing already posted is
+  stranded; my_chats replaced in production and verified live.
+  `src/components/MessageEditor.jsx` (new), `ChatBubble.jsx`,
+  `MessageRow.jsx`, `DmThread.jsx`, `ChannelThread.jsx`,
+  `src/lib/useChannelThread.js`, `useDmThread.js`, `roleChannels.js`,
+  `scope.js`, `src/data/messages.js`, `src/lib/messageEdit.js` (new),
+  `db/migrations/20260830_rename_managers_channel.sql`,
+  `tests/message-edit-and-emoji.test.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `b626891` — **Re-validated the Grok full-sweep against current `main` (docs only).** After
   ~20 PRs merged (pitch rework, role channels #550/#551, hygiene #552), all
   findings still substantively stand except item 14's `chat_media_owner` pin
   (fixed by #552, proven live). Recorded the shifts in `claude/open-items.md`
@@ -20,7 +38,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `message_reports` metadata/deletion surface. Items 1 & 2 re-confirmed live
   (`welfare_overview` / `message_reports` still `is_admin`). No code changed.
   `claude/open-items.md`, `claude/plans/2026-08-30-grok-sweep-remediation.md`.
-  (SHA follows in the next changelog-touching PR.)
 - `9d71fb7` — **THE HARNESS AND THE TEST SUITE STOP TALKING TO PRODUCTION — measured, not
   assumed.** Supabase's dashboard showed ~94k requests/24h at a 21% success
   rate; the failures traced to Jay's own machines running this repo's tooling:
