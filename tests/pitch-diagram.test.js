@@ -39,14 +39,25 @@ describe('pitchBar', () => {
     expect(bar.spoken).toContain('Full — nothing spare')
   })
 
-  it('labels a club-wide booking "Club", not the bare "A squad" fallback', () => {
-    // A whole-club event (team_id null, no squad) shows on the pitch layout when
-    // it has a pitch; without this it read "A squad" → the card abbreviated it to
-    // a bare "A" (Jay, 30 Aug 2026).
-    const bar = pitchBar('D4', [
-      ev('2026-09-02T14:00:00Z', 'D4', 'full', { id: 'club', team_name: null, team_id: null }),
-    ])
-    expect(bar.segments.map((s) => s.squad)).toEqual(['Club'])
+  it('labels a club-wide booking by its title, flagged so the card does not clip it', () => {
+    // A whole-club event (team_id null, no squad) reads its own TITLE on the
+    // layout, not a squad code — Jay wanted "Adult Tag", not the bare "A" the
+    // "A squad" fallback abbreviated to. `clubWide` tells the card to skip the
+    // first-word clip so a two-word title survives (30 Aug 2026).
+    const [seg] = pitchBar('D4', [
+      ev('2026-09-02T14:00:00Z', 'D4', 'full', {
+        id: 'club', team_name: null, team_id: null, title: 'Adult Tag',
+      }),
+    ]).segments
+    expect(seg.squad).toBe('Adult Tag')
+    expect(seg.clubWide).toBe(true)
+  })
+
+  it('falls back to "Club" for a club-wide booking with no title', () => {
+    const [seg] = pitchBar('D4', [
+      ev('2026-09-02T14:00:00Z', 'D4', 'full', { id: 'c', team_name: null, team_id: null }),
+    ]).segments
+    expect(seg.squad).toBe('Club')
   })
 
   it('draws a quarter beside a half as ¾ used with a quarter spare, half first', () => {

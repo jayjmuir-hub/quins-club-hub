@@ -37,14 +37,19 @@ export function shareSegments(group) {
   return [...byOccupant.values()].sort((a, b) => b.fraction - a.fraction)
 }
 
-// ⚠️ A CLUB-WIDE event (team_id null, 30 Aug 2026) has no squad, so it reads
-// "Club" here rather than the "A squad" fallback — which the share card then
-// abbreviated to a bare "A". It is a real booking on a pitch (a whole-club
-// social), so it needs a name a coach can read on the layout.
+// ⚠️ A CLUB-WIDE event (team_id null, 30 Aug 2026) has no squad, so on the pitch
+// layout it reads its own TITLE ("Adult Tag") rather than a squad code — that is
+// the name a coach recognises, and Jay asked for it over the generic "Club". A
+// title-less one falls back to "Club". The share card does NOT abbreviate this
+// to a first word (see its `clubWide` flag) the way it clips a squad code, so a
+// two-word title survives.
 export const squadOf = (event, teamsById) =>
   event.team_name ??
   teamsById?.get(event.team_id)?.name ??
-  (event.team_id == null ? 'Club' : 'A squad')
+  // ⚠️ STRICT null — a real club-wide event's team_id is null; an event whose
+  // team_id is merely absent (a fixture, an unloaded row) is not one and keeps
+  // the "A squad" fallback.
+  (event.team_id === null ? (event.title ?? '').trim() || 'Club' : 'A squad')
 
 export const portionOf = (event) => portionLabel(event.pitch_portion) ?? 'Full pitch'
 
@@ -98,6 +103,10 @@ export function pitchBar(pitch, events, teamsById) {
   const segments = raw.map((seg) => ({
     key: seg.key,
     squad: squadOf(seg.event, teamsById),
+    // A club-wide booking's label is its title, not a squad code, so the tight
+    // week columns must NOT clip it to a first word (see PitchShareCard). Strict
+    // null: only a real whole-club event, never a fixture with team_id absent.
+    clubWide: seg.event.team_id === null,
     portionShort: portionShort(seg.event.pitch_portion) ?? 'full',
     portionLabel: portionOf(seg.event),
     fraction: seg.fraction,
