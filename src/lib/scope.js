@@ -455,13 +455,31 @@ export function canEditTeam(memberships, teamId) {
   // and the safe answer to "may I edit an unknown team?" is no — even for
   // an admin. This also blocks m.team_id === teamId from matching when both
   // sides happen to be null (e.g. a malformed coach row with no team_id).
-  // events.team_id and players.team_id are both NOT NULL in the schema, so
-  // no real record can reach this path — only a bug or a partial load can,
-  // and denying is the right call in both cases. Do not remove this guard.
+  // players.team_id is NOT NULL, and a SQUAD event's team_id is a real id — so
+  // a null here is an unresolved/partly-loaded id, and denying is right even for
+  // an admin. ⚠️ A CLUB-WIDE EVENT's team_id IS legitimately null (30 Aug 2026),
+  // and it must NOT come through here — it goes through canEditEvent, which knows
+  // a null event.team_id is the whole-club value, not an unknown one. Do not
+  // remove this guard, and do not "fix" it to admit null — that would wrongly
+  // grant a squad event whose id failed to load.
   if (teamId == null) return false
   if (!memberships) return false
   if (isAdmin(memberships)) return true
   return memberships.some((m) => isSquadStaffRole(m.role) && m.team_id === teamId)
+}
+
+/**
+ * May this user edit THIS event? Like canEditTeam(event.team_id) for a squad
+ * event, but a CLUB-WIDE event (team_id null, 30 Aug 2026) — which has no squad —
+ * is editable by ADMINS ONLY, mirroring the RLS `event edit` policy
+ * (`team_id is null and is_admin(club_id)`). Use this, not canEditTeam, wherever
+ * an EVENT's editability is decided (EventDetail's footer, EventForm's gate), so
+ * a whole-club social is not silently uneditable.
+ */
+export function canEditEvent(memberships, event) {
+  if (!event) return false
+  if (event.team_id == null) return isAdmin(memberships)
+  return canEditTeam(memberships, event.team_id)
 }
 
 /**

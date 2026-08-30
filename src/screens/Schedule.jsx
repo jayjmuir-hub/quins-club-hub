@@ -16,7 +16,7 @@ import EventKindChooser from '../components/EventKindChooser.jsx'
 import TournamentDetail, { isTournamentEvent } from './TournamentDetail.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, isAdmin, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
+import { canEditEvent, canEditTeam, isAdmin, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
 import {
   clubDayParts,
   clubToday,
@@ -670,7 +670,7 @@ export default function Schedule() {
   // deliberate refusal of a null/unresolvable team_id applies here too. RLS
   // is what actually enforces this; getting it wrong here can only hide a
   // control, never authorise a write.
-  const canEditSelected = selectedEvent ? canEditTeam(memberships, selectedEvent.team_id) : false
+  const canEditSelected = selectedEvent ? canEditEvent(memberships, selectedEvent) : false
   const refresh = () => setReloadToken((token) => token + 1)
 
   const persistFilter = (next) => {

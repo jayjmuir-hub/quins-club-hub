@@ -29,6 +29,19 @@ const WHITE = '#ffffff'
  *  columns where the full name will not fit a quarter-width segment. */
 const shortSquad = (name) => String(name ?? '').split(/\s+/)[0] || name
 
+/** A club-wide booking labels by its TITLE, which is free text and can be long.
+ *  Cap it so it stays readable and cannot dominate a tight segment — the CSS
+ *  ellipsis is the visual clip, this bounds the string the exporter measures. */
+const clip = (name, max) => {
+  const s = String(name ?? '').trim()
+  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s
+}
+
+/** The label a segment shows: a squad code (clipped to its leading token on the
+ *  tight week bars) or, for a club-wide booking, its capped title. */
+const segLabel = (seg, compact) =>
+  seg.clubWide ? clip(seg.squad, compact ? 16 : 30) : compact ? shortSquad(seg.squad) : seg.squad
+
 // ⚠️ A CAPTURE WIDTH, NOT A RESPONSIVE ONE. html2canvas photographs the element
 // at its rendered size, so a card squeezed onto a phone would produce a cramped
 // PNG. minWidth keeps the picture legible; the SCREEN wraps the card in an
@@ -176,7 +189,7 @@ function PitchBar({ bar, compact = false }) {
                 padding: compact ? '0 2px' : '0 6px',
               }}
             >
-              <span style={labelStyle}>{compact && !seg.clubWide ? shortSquad(seg.squad) : seg.squad}</span>
+              <span style={labelStyle}>{segLabel(seg, compact)}</span>
               {!compact && (
                 <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.9 }}>{seg.portionShort}</span>
               )}
@@ -235,7 +248,12 @@ export const PitchDayCard = forwardRef(function PitchDayCard({ title, slots }, r
 export const PitchWeekCard = forwardRef(function PitchWeekCard({ title, days }, ref) {
   return (
     <Shell title={title} innerRef={ref} minWidth={1180} maxWidth={1300}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10 }}>
+      {/* ⚠️ minmax(0, 1fr), NOT 1fr — a bare `1fr` column's min size is its
+          CONTENT, so a long label (a club-wide event's title) grew its own day
+          and stole width from the other six, shrinking them until even "U6"
+          ellipsised to dots (Jay, 30 Aug 2026). minmax(0, …) caps every column
+          at its share; the long label then just clips inside its own column. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 10 }}>
         {days.map((day) => (
           <div
             key={`${day.weekday}-${day.dayNum}`}

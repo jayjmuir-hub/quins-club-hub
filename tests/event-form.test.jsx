@@ -913,4 +913,27 @@ describe('EventForm — whole club', () => {
       within(screen.getByLabelText('Age group')).queryByText(/whole club/i),
     ).toBeNull()
   })
+
+  it('⚠️ EDITING a club-wide event keeps Whole club selected and team_id null', async () => {
+    // The edit bug (Jay): a club-wide event opened with a squad selected, so
+    // saving would silently reassign it to that squad. It must open on "Whole
+    // club" and stay squad-less.
+    const user = userEvent.setup()
+    const clubEvent = {
+      id: 'e-club',
+      team_id: null,
+      type: 'social',
+      title: 'Adult Tag',
+      venue: 'Zayed Sports City',
+      starts_at: '2026-09-02T14:00:00Z', // 18:00 Abu Dhabi
+      ends_at: '2026-09-02T15:00:00Z',
+    }
+    renderForm({ memberships: ADMIN, event: clubEvent })
+
+    expect(screen.getByLabelText('Age group')).toHaveValue('__club__')
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ id: 'e-club', team_id: null })
+  })
 })

@@ -364,7 +364,14 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     // another week, time still to be confirmed" is the ordinary case; clearing
     // it would demand a kick-off nobody knows yet.
     timeTbd: event.time_tbd === true,
-    teamId: teamIds.includes(event.team_id) ? event.team_id : fallbackTeamId,
+    // ⚠️ A club-wide event (team_id null) opens with the "Whole club" sentinel
+    // selected, so editing one does not silently reassign it to a squad.
+    teamId:
+      event.team_id === null
+        ? CLUB_WIDE
+        : teamIds.includes(event.team_id)
+          ? event.team_id
+          : fallbackTeamId,
     home: event.home !== false,
     venue: event.venue ?? '',
     pitch: duplicating ? PITCH_TBD : event.pitch ?? '',
@@ -751,7 +758,12 @@ export default function EventForm({
   // survive: switch the type away from social and it falls back to a real squad
   // below, so a match can never be left holding the club-wide sentinel.
   const admin = isAdmin(memberships)
-  const canClubWide = admin && !editing && values.type === 'social'
+  // Offered when CREATING a social, and kept available when EDITING an event
+  // that is ALREADY club-wide (so an admin can change its time/notes without it
+  // reverting to a squad). Not offered when editing a squad event — converting a
+  // squad social to whole-club is not a thing a routine edit should do silently.
+  const canClubWide =
+    admin && values.type === 'social' && (!editing || event?.team_id === null)
   const teamId =
     canClubWide && values.teamId === CLUB_WIDE
       ? CLUB_WIDE

@@ -35,7 +35,7 @@ import { pinnedNotices,
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
+import { canEditEvent, canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
 import { recordsScores, squadFormat } from '../lib/minis.js'
 import {
   clubDayParts,
@@ -1252,7 +1252,7 @@ export default function Dashboard() {
           event={selectedEvent}
           team={teamsById.get(selectedEvent.team_id)}
           onClose={closeEvent}
-          canEdit={canEditTeam(memberships, selectedEvent.team_id)}
+          canEdit={canEditEvent(memberships, selectedEvent)}
           onEdit={(event) => setFormState({ event })}
           // ⚠️ NOT OPTIONAL, AND THIS SCREEN IS THE REASON THE RULE EXISTS.
           // The Dashboard is the screen that forgot onOpenAvailability and
