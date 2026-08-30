@@ -65,5 +65,22 @@ export function isCacheableRestGet({ url, request }) {
     return false
   }
 
+  // ⚠️ CHILDREN'S PRIVATE DATA NEVER TOUCHES THE ON-DISK CACHE — 30 Aug 2026
+  // (Grok item 6, D3: all five). These are excluded BY TABLE, unlike the
+  // scoped/unscoped splits above, because no variant of them belongs on a
+  // shared or stolen unlocked device: chat messages (children's DMs included),
+  // player_private (DOB), squad-wide parent contacts, and poll_votes (named
+  // votes). NetworkFirst still serves them ONLINE at full speed — only the
+  // offline/cached copy goes away, and apiCache.js's owner-purge is unchanged.
+  if (
+    url.pathname === '/rest/v1/messages' ||
+    url.pathname === '/rest/v1/player_private' ||
+    url.pathname === '/rest/v1/player_contacts' ||
+    url.pathname === '/rest/v1/player_parents' ||
+    url.pathname === '/rest/v1/poll_votes'
+  ) {
+    return false
+  }
+
   return true
 }

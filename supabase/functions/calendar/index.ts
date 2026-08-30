@@ -323,6 +323,13 @@ function toVEvent(event: Event, stamp: string): string[] {
     'BEGIN:VEVENT',
     // Stable across refreshes: the client updates the existing entry instead
     // of creating a duplicate every time the feed is polled.
+    // ⚠️ THE DOMAIN PART IS FROZEN ON THE RETIRED adhjrt ALIAS, DELIBERATELY
+    // (ruled 30 Aug 2026, Grok item 16). A UID is an OPAQUE IDENTIFIER — RFC
+    // 5545 does not care that the domain no longer resolves, but every
+    // subscribed client keys the event's identity on it: change it and the
+    // whole season duplicates in 13 families' calendars, with the old copies
+    // never updating or cancelling again. A dead string nobody sees beats
+    // that. Do not "fix" this to the live origin.
     `UID:${event.id}@quins.adhjrt.com`,
     `DTSTAMP:${stamp}`,
     // ⚠️ `;VALUE=DATE` IS WHAT MAKES IT ALL-DAY, and both properties must carry

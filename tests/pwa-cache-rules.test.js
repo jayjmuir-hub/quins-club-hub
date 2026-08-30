@@ -53,10 +53,11 @@ describe('kept — what somebody needs on a touchline', () => {
     expect(call(`/rest/v1/availability?select=*&event_id=eq.${UID}`)).toBe(true)
   })
 
-  it("a player's own contact and parent rows", () => {
-    expect(call(`/rest/v1/player_contacts?select=*&player_id=eq.${UID}`)).toBe(true)
-    expect(call(`/rest/v1/player_parents?select=*&player_id=eq.${UID}`)).toBe(true)
-  })
+  // ⚠️ REVERSED 30 Aug 2026 (Grok item 6, D3): a player's own contact and
+  // parent rows USED to be kept for the touchline. Children's PII now never
+  // touches the on-disk cache, scoped or not — offline use is a non-goal
+  // (caching serves online speed), and the cost of a stolen unlocked device
+  // outweighs a blip-resilient contact card. See the dropped section below.
 
   // ⚠️ These two are load-bearing rather than nice-to-have: every screen reads
   // the caller's own memberships to know what they may see, and excluding them
@@ -110,6 +111,31 @@ describe('dropped — the club-wide admin reads', () => {
   it('a club-wide read that merely happens to filter on some OTHER id column', () => {
     expect(call(`/rest/v1/profiles?select=*&club_id=eq.${UID}`)).toBe(false)
     expect(call(`/rest/v1/memberships?select=*&club_id=eq.${UID}`)).toBe(false)
+  })
+})
+
+// ⚠️ ADDED 30 Aug 2026 (Grok item 6, D3: all five). By TABLE, deliberately —
+// no variant of children's chat, DOB, parent contacts or named votes belongs
+// in an on-disk cache a stolen unlocked device can read. NetworkFirst still
+// serves them online; only the cached copy goes away.
+describe('dropped — children\'s private data, scoped or not', () => {
+  it('chat messages, including DMs', () => {
+    expect(call(`/rest/v1/messages?select=*&conversation_id=eq.${UID}`)).toBe(false)
+    expect(call('/rest/v1/messages?select=*&channel=eq.squad')).toBe(false)
+  })
+
+  it('player_private (DOB)', () => {
+    expect(call(`/rest/v1/player_private?select=*&player_id=eq.${UID}`)).toBe(false)
+  })
+
+  it('parent contact rows, even scoped to one player', () => {
+    expect(call(`/rest/v1/player_contacts?select=*&player_id=eq.${UID}`)).toBe(false)
+    expect(call(`/rest/v1/player_parents?select=*&player_id=eq.${UID}`)).toBe(false)
+  })
+
+  it('named poll votes', () => {
+    expect(call('/rest/v1/poll_votes?select=*')).toBe(false)
+    expect(call(`/rest/v1/poll_votes?select=*&message_id=eq.${UID}`)).toBe(false)
   })
 })
 
