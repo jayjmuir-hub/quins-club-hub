@@ -176,7 +176,7 @@ function PitchBar({ bar, compact = false }) {
                 padding: compact ? '0 2px' : '0 6px',
               }}
             >
-              <span style={labelStyle}>{compact ? shortSquad(seg.squad) : seg.squad}</span>
+              <span style={labelStyle}>{compact && !seg.clubWide ? shortSquad(seg.squad) : seg.squad}</span>
               {!compact && (
                 <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.9 }}>{seg.portionShort}</span>
               )}
