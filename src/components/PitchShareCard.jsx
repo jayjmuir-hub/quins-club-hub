@@ -130,24 +130,25 @@ function PitchBar({ bar, compact = false }) {
   const load = bar.segments.reduce((sum, seg) => sum + seg.fraction, 0)
   const scale = Math.max(load, 1)
   const height = compact ? 30 : 46
-  // Horizontal breathing room inside each segment so a squad code can never sit
-  // against the white divider — 4px each side on the tight week bars, and a
-  // single-line ellipsis as the safety valve for a label that still will not fit
-  // (Jay, 30 Aug 2026: "text is touching lines").
+  // ⚠️ THE COMPACT LABELS MUST NOT BE TINY, AND HERE IS WHY — Jay, 30 Aug 2026.
+  // The SHARE picture is drawn by html2canvas, and html2canvas does not render
+  // small text: at the old 8px the white squad codes came out as a row of
+  // dashes/dots in the exported PNG while the live card looked perfect (black
+  // "D2" at 11px and the red time at 9.5px rendered fine — it is a size floor,
+  // ~10px, not the font or the colour). Confirmed by exporting the card in the
+  // harness and reading the pixels back. So the compact codes are 11px, and the
+  // week card is widened (see PitchWeekCard's Shell) so U12G/U14G still fit a
+  // quarter bar at that size. No negative letter-spacing and no text-shadow
+  // either — both are extra ways to make html2canvas mangle small text, and
+  // neither earns its keep on a share picture.
   const labelStyle = {
     width: '100%',
     textAlign: 'center',
-    fontSize: compact ? 8 : 13,
+    fontSize: compact ? 11 : 13,
     fontWeight: 800,
     lineHeight: 1.15,
-    // ⚠️ NO NEGATIVE LETTER-SPACING. It renders fine on screen, but the SHARE
-    // picture is drawn by html2canvas, which positions each glyph itself and
-    // OVERLAPS them under negative tracking — every label collapsed to a row of
-    // dashes/dots in the exported PNG while the live card looked perfect (Jay,
-    // 30 Aug 2026). Normal tracking; the codes fit without the squeeze.
     letterSpacing: 'normal',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   }
 
@@ -189,7 +190,6 @@ function PitchBar({ bar, compact = false }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: WHITE,
-                textShadow: '0 1px 1px rgba(0,0,0,.3)',
                 overflow: 'hidden',
                 padding: compact ? '0 2px' : '0 6px',
               }}
@@ -210,9 +210,9 @@ function PitchBar({ bar, compact = false }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: MUTED,
-                fontSize: compact ? 9 : 11.5,
+                fontSize: compact ? 11 : 11.5,
                 fontWeight: 700,
-                letterSpacing: 'normal', // see labelStyle — html2canvas mangles negative tracking
+                letterSpacing: 'normal',
                 overflow: 'hidden',
                 padding: '0 4px',
               }}
@@ -252,7 +252,7 @@ export const PitchDayCard = forwardRef(function PitchDayCard({ title, slots }, r
  */
 export const PitchWeekCard = forwardRef(function PitchWeekCard({ title, days }, ref) {
   return (
-    <Shell title={title} innerRef={ref} minWidth={1180} maxWidth={1300}>
+    <Shell title={title} innerRef={ref} minWidth={1540} maxWidth={1680}>
       {/* ⚠️ minmax(0, 1fr), NOT 1fr — a bare `1fr` column's min size is its
           CONTENT, so a long label (a club-wide event's title) grew its own day
           and stole width from the other six, shrinking them until even "U6"
