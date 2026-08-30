@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **A pitch can be booked as a third, not just a quarter/half/full.** Three
+- **The pitch calendar reads pitch by pitch, and shows the portion.** Four things
+  Jay asked for on the pitch-management calendar: (1) a booking in the WEEK view
+  now opens its details on click, the same details-first tap the day grid uses;
+  (2) the MONTH view lists the fixtures instead of a count and a dot ("just
+  showing dots"), the same change the Schedule month took in #524 — first few
+  then "+N more", the cell still a button to the day; (3) every assignment shows
+  how much of the pitch it takes — ¼/⅓/½/full — in the day grid, the week, the
+  month and the event detail sheet; (4) the WEEK view groups each day BY PITCH,
+  a heading per pitch and the fixtures on it sorted youngest age group first,
+  instead of one undifferentiated pile. New `portionShort` in
+  `src/lib/pitchPortion.js`; `src/components/PitchCalendar.jsx` (new `byPitch`,
+  reworked week/month), `src/screens/Allocation.jsx`, `src/screens/PitchGlance.jsx`,
+  `src/screens/EventDetail.jsx`, and `tests/pitch-week-grouping.test.js`,
+  `tests/allocation.test.jsx`, `tests/pitch-glance.test.jsx`,
+  `tests/event-detail-series.test.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `fad3ef9` — **A pitch can be booked as a third, not just a quarter/half/full.** Three
   squads sharing one pitch each take a third, and there was no way to say so — a
   third had to be rounded to a quarter or a half, which then mis-read as a clash
   or as free space (Jay). `third` (1/3) joins the portion picker between quarter
@@ -22,8 +38,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `db/migrations/20260830_pitch_portion_third.sql` (applied to production before
   this shipped) widens the `events_pitch_portion_check` CHECK. `src/lib/pitchPortion.js`,
   `src/components/PitchCalendar.jsx`, `tests/pitch-portion.test.js`,
-  `tests/pitch-clashes.test.js`, `tests/pitch-glance.test.jsx`. (SHA follows in
-  the next changelog-touching PR.)
+  `tests/pitch-clashes.test.js`, `tests/pitch-glance.test.jsx`.
 - `248511a` — **Recorded the Grok full-sweep findings + remediation plan (docs only).**
   Verification of the 29 Aug 2026 Grok security sweep — all 18 items confirmed
   against the code, the two criticals against the live database — written into

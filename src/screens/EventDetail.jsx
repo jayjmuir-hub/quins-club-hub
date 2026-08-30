@@ -6,6 +6,7 @@ import Spinner from '../components/Spinner.jsx'
 import Button from '../components/Button.jsx'
 import PitchRequest from '../components/PitchRequest.jsx'
 import { PITCH_TBD } from '../data/pitches.js'
+import { portionLabel } from '../lib/pitchPortion.js'
 import SessionPlan from '../components/SessionPlan.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { getEventThread } from '../data/messages.js'
@@ -580,7 +581,15 @@ export default function EventDetail({
             genuinely optional — a social has none, and every event created
             before this column existed has none either. A row reading
             "Pitch — " on all of them would be noise. */}
-        {pitch && <KeyValue label="Pitch">{pitch}</KeyValue>}
+        {pitch && (
+          <KeyValue label="Pitch">
+            {pitch}
+            {/* The PORTION when one is set — how much of the pitch this booking
+                takes (Jay, 30 Aug 2026). A whole/unset pitch shows nothing, as
+                the pitch name alone already means the whole thing. */}
+            {portionLabel(event.pitch_portion) ? ` · ${portionLabel(event.pitch_portion)}` : ''}
+          </KeyValue>
+        )}
         {/* ⚠️ `competition` ALONE IS NO LONGER ENOUGH TO RENDER THIS ROW.
             Since 12 Aug 2026 it holds the TOURNAMENT'S NAME and is null for a
             league fixture, so testing it the old way made every league match

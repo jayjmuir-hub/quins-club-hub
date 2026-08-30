@@ -5,7 +5,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
 import { listPitches, findPitchClashes, pitchShares, PITCH_TBD } from '../data/pitches.js'
 import { listShareApprovalKeys, approveShare, unapproveShare, shareKey } from '../data/pitchShareApprovals.js'
-import { PITCH_PORTIONS, defaultPitchPortion } from '../lib/pitchPortion.js'
+import { PITCH_PORTIONS, defaultPitchPortion, portionShort } from '../lib/pitchPortion.js'
 import { listPitchRequests, allocatePitch, declinePitch, setEventPitch } from '../data/pitchRequests.js'
 import { Sheet } from '../components/Sheet.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -476,6 +476,7 @@ export default function Allocation() {
           today={today}
           events={events}
           clashing={clashing}
+          teamsById={teamsById}
           onPickDay={(picked) => {
             setDay({ year: picked.year, month: picked.month, day: picked.day })
             setView('day')
@@ -492,6 +493,9 @@ export default function Allocation() {
             setDay({ year: picked.year, month: picked.month, day: picked.day })
             setView('day')
           }}
+          // A booking in the week view opens its details, the same details-first
+          // click the day grid uses (Jay, 30 Aug 2026).
+          onPickEvent={setDetailEvent}
         />
       ) : events.length === 0 ? (
         /* ⚠️ A SENTENCE, NOT AN EMPTY GRID. The screen opens on today (Jay's
@@ -569,6 +573,10 @@ export default function Allocation() {
                             )}
                             <span className="block text-[11px] font-semibold opacity-90">
                               {eventTimeLabel(event)}
+                              {/* The pitch is the row, so only the PORTION is
+                                  added here — how much of this pitch the booking
+                                  takes (Jay, 30 Aug 2026). */}
+                              {portionShort(event.pitch_portion) ? ` · ${portionShort(event.pitch_portion)}` : ''}
                               {clash ? ' · clash' : ''}
                             </span>
                           </button>

@@ -179,6 +179,7 @@ export default function PitchGlance() {
             today={today}
             events={events}
             clashing={clashing}
+            teamsById={teamsById}
             onPickDay={(day) => {
               setAnchor(day)
               setView('week')

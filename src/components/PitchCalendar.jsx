@@ -5,7 +5,8 @@ import { eventDate, eventTimeLabel, formatTableDate } from '../lib/eventFormat.j
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PITCH_TBD } from '../data/pitches.js'
 import { shareKey } from '../data/pitchShareApprovals.js'
-import { portionFraction, portionLabel } from '../lib/pitchPortion.js'
+import { portionFraction, portionLabel, portionShort } from '../lib/pitchPortion.js'
+import { ageBandFromTeamName } from '../lib/ageGroup.js'
 
 // The WEEK and MONTH views of the pitch calendar. The DAY view — pitches down
 // the side, hours across the top — stays in src/screens/Allocation.jsx, because
@@ -16,17 +17,19 @@ import { portionFraction, portionLabel } from '../lib/pitchPortion.js'
 // management dashboard". The day grid was the whole screen, so planning past
 // tomorrow meant pressing Next repeatedly and holding the answer in your head.
 //
-// ⚠️ THE MONTH VIEW IS A PLANNING SURFACE, NOT A LIST. It deliberately does not
-// try to name every fixture — at fifteen squads a Saturday cell would be a wall
-// of 6px text nobody reads. It shows COUNT and STATE (clash, waiting for a
-// pitch), which are the two things that decide whether a day needs attention,
-// and clicking a day opens the grid that shows the detail.
+// ⚠️ BOTH VIEWS NAME THE FIXTURES — Jay, 30 Aug 2026. The month used to show a
+// count and a dot per day ("just showing dots"); it now lists the fixtures like
+// the Schedule month grid (#524), first few then "+N more", the cell still a
+// button to the day. The WEEK groups each day by PITCH — a heading per pitch and
+// the fixtures on it, youngest squad first (byPitch) — instead of one flat pile,
+// and a booking opens its details on click (onPickEvent). Both carry the portion
+// (¼/⅓/½/full) so a shared pitch is legible.
 //
 // ⚠️ A DAY WITH A PROBLEM MUST NOT BE DISTINGUISHED BY COLOUR ALONE. Amber for
 // a clash reads as nothing at all to the ~8% of men with a colour vision
 // deficiency, and this club's volunteers are mostly men. Every state carries a
-// word or a shape as well: the clash count is written out, and the
-// waiting-for-a-pitch marker is a hollow ring against the clash's filled dot.
+// word too: a clash chip says "clash", a waiting booking sits under a "No pitch
+// yet" heading, and the month cell's aria-label sums the day.
 
 /** Groups events by their CLUB calendar day. See dayKeyOf for why that matters. */
 function byDay(events) {
@@ -48,36 +51,107 @@ const needsPitch = (event) => !(event.pitch ?? '').trim() || event.pitch === PIT
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-/** One fixture, as it appears in the week column. */
-function WeekEntry({ event, clash, label }) {
+// Youngest age group first — Jay, 30 Aug 2026: the week list was one
+// undifferentiated pile, and reading it pitch by pitch, U6 up to seniors, is how
+// you actually plan a session. A senior side or an unreadable name has no band,
+// so it sorts LAST (it is the oldest). ageGroup.js is the one place that parses a
+// squad name into an age.
+function ageBandOf(event, teamsById) {
+  const name = teamsById?.get(event.team_id)?.name ?? event.team_name ?? ''
+  const band = ageBandFromTeamName(name)
+  return band == null ? Infinity : band
+}
+
+/**
+ * A day's fixtures grouped by the PITCH they are on, each group sorted youngest
+ * age group first (then by time). Returns `[pitchName, events][]`, pitch groups
+ * in name order with the "waiting for a pitch" group (key '') last. This is what
+ * turns the week column from a flat list into "each pitch and what's on it".
+ */
+export function byPitch(list, teamsById) {
+  const groups = new Map()
+  for (const event of list) {
+    const key = needsPitch(event) ? '' : event.pitch
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(event)
+  }
+  for (const events of groups.values()) {
+    events.sort(
+      (a, b) =>
+        ageBandOf(a, teamsById) - ageBandOf(b, teamsById) ||
+        (eventDate(a)?.getTime() ?? 0) - (eventDate(b)?.getTime() ?? 0),
+    )
+  }
+  return [...groups.entries()].sort(([a], [b]) => {
+    if (a === '') return 1 // waiting-for-a-pitch group sits at the bottom
+    if (b === '') return -1
+    return a.localeCompare(b, undefined, { numeric: true })
+  })
+}
+
+// The pitch calendar named the pitch but not the portion, so a half booking and
+// a whole one looked identical (Jay, 30 Aug 2026). portionShort gives the
+// compact ¼/⅓/½/full tag (null for a whole pitch, which the name already implies).
+
+/** The pitch + its portion, as one string: "D2 · ½", or just "D2" when whole. */
+function pitchWithPortion(event) {
+  const tag = portionShort(event.pitch_portion)
+  return tag ? `${event.pitch} · ${tag}` : event.pitch
+}
+
+// One fixture's tone by state — a clash is amber, a booking still waiting for a
+// pitch is muted, an allocated one is brand. Shape/word carry it too (the
+// clash/waiting words below), never colour alone — the month/week accessibility
+// rule this file already follows.
+function entryTone(clash, waiting) {
+  if (clash) return 'border-l-warn bg-warn-bg text-warn-ink'
+  if (waiting) return 'border-l-line bg-surface-mute text-ink-muted'
+  return 'border-l-brand bg-danger-bg text-danger-ink'
+}
+
+/** One fixture, under its pitch's heading in the week column. The pitch is the
+ *  heading now (see byPitch), so the entry carries only the PORTION — how much of
+ *  that pitch this booking takes. Clickable when `onPickEvent` is given: the
+ *  pitch-assignment calendar opens the booking's details, the same details-first
+ *  click the day grid uses (Jay, 30 Aug 2026). */
+function WeekEntry({ event, clash, label, onPickEvent }) {
   const waiting = needsPitch(event)
-  return (
-    <li
-      data-testid={clash ? 'week-entry-clash' : 'week-entry'}
-      className={[
-        'rounded-[8px] border-l-[3px] px-2 py-1.5',
-        clash
-          ? 'border-l-warn bg-warn-bg text-warn-ink'
-          : waiting
-            ? 'border-l-line bg-surface-mute text-ink-muted'
-            : 'border-l-brand bg-danger-bg text-danger-ink',
-      ].join(' ')}
-    >
+  const tag = portionShort(event.pitch_portion)
+  const body = (
+    <>
       <span className="block text-[12px] font-extrabold leading-tight">{label}</span>
       <span className="block text-[11.5px] font-semibold leading-tight opacity-90">
         {eventTimeLabel(event)}
-        {/* The pitch is the point of this screen, so it is never omitted —
-            "waiting for a pitch" is a state somebody has to act on, and a blank
-            would read as "no pitch needed". */}
-        {' · '}
-        {waiting ? 'no pitch yet' : event.pitch}
+        {tag ? ` · ${tag}` : ''}
         {clash ? ' · clash' : ''}
       </span>
+    </>
+  )
+  return (
+    <li data-testid={clash ? 'week-entry-clash' : 'week-entry'}>
+      {onPickEvent ? (
+        <button
+          type="button"
+          onClick={() => onPickEvent(event)}
+          aria-label={`Details for ${label}`}
+          className={[
+            'block w-full rounded-[8px] border-l-[3px] px-2 py-1.5 text-left transition',
+            'hover:ring-2 hover:ring-brand/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+            entryTone(clash, waiting),
+          ].join(' ')}
+        >
+          {body}
+        </button>
+      ) : (
+        <div className={['rounded-[8px] border-l-[3px] px-2 py-1.5', entryTone(clash, waiting)].join(' ')}>
+          {body}
+        </div>
+      )}
     </li>
   )
 }
 
-export function PitchWeek({ anchor, today, events, clashing, teamsById, onPickDay }) {
+export function PitchWeek({ anchor, today, events, clashing, teamsById, onPickDay, onPickEvent }) {
   const days = weekDays(anchor)
   const grouped = byDay(events)
 
@@ -121,20 +195,37 @@ export function PitchWeek({ anchor, today, events, clashing, teamsById, onPickDa
               {list.length === 0 ? (
                 <p className="px-2.5 py-3 text-[11.5px] text-ink-faint">—</p>
               ) : (
-                <ul className="flex flex-col gap-1.5 p-1.5">
-                  {list.map((event) => (
-                    <WeekEntry
-                      key={event.id}
-                      event={event}
-                      clash={clashing.has(event.id)}
-                      label={fixtureLabel(
-                        event,
-                        event.league_team,
-                        teamsById.get(event.team_id)?.name ?? 'Fixture',
-                      )}
-                    />
+                <div className="flex flex-col gap-2.5 p-1.5">
+                  {/* One block per pitch — its name as a heading, then the
+                      fixtures on it, youngest squad first (byPitch). A booking
+                      still waiting for a pitch heads its own block, last. */}
+                  {byPitch(list, teamsById).map(([pitch, entries]) => (
+                    <div key={pitch || '__waiting__'} data-testid="week-pitch-group">
+                      <p className="flex items-center gap-1 px-1 pb-1 text-[10px] font-extrabold uppercase tracking-[.6px] text-ink-faint">
+                        <span
+                          aria-hidden="true"
+                          className={['h-1.5 w-1.5 rounded-full', pitch ? 'bg-brand' : 'bg-line'].join(' ')}
+                        />
+                        {pitch || 'No pitch yet'}
+                      </p>
+                      <ul className="flex flex-col gap-1.5">
+                        {entries.map((event) => (
+                          <WeekEntry
+                            key={event.id}
+                            event={event}
+                            clash={clashing.has(event.id)}
+                            onPickEvent={onPickEvent}
+                            label={fixtureLabel(
+                              event,
+                              event.league_team,
+                              teamsById.get(event.team_id)?.name ?? 'Fixture',
+                            )}
+                          />
+                        ))}
+                      </ul>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
             </div>
           )
@@ -144,108 +235,129 @@ export function PitchWeek({ anchor, today, events, clashing, teamsById, onPickDa
   )
 }
 
-export function PitchMonth({ anchor, today, events, clashing, onPickDay }) {
+const MAX_MONTH_EVENTS = 3
+
+/** One fixture as a chip in a month cell — time + name, toned by state. The cell
+ *  is too small for the pitch/portion inline, so it rides in the tooltip. */
+function MonthEntry({ event, clash, teamsById }) {
+  const waiting = needsPitch(event)
+  const name = fixtureLabel(event, event.league_team, teamsById?.get(event.team_id)?.name ?? 'Fixture')
+  const where = waiting ? 'no pitch yet' : pitchWithPortion(event)
+  return (
+    <span
+      title={`${eventTimeLabel(event)} · ${name} · ${where}${clash ? ' · clash' : ''}`}
+      className={[
+        'block truncate rounded-[5px] border-l-[3px] px-1.5 py-0.5 text-[10.5px] font-bold leading-tight',
+        entryTone(clash, waiting),
+      ].join(' ')}
+    >
+      <span className="opacity-90">{eventTimeLabel(event)}</span> {name}
+    </span>
+  )
+}
+
+// ⚠️ THE MONTH VIEW NOW SHOWS THE FIXTURES, NOT JUST A COUNT — Jay, 30 Aug 2026
+// ("the monthly view is just showing dots"), the same change the Schedule month
+// grid took on 24 Aug (#524). The old objection — fifteen squads make a Saturday
+// cell a wall of 6px text — is handled the way that grid handles it: the first
+// few fixtures show, the rest collapse to "+N more", and the whole cell is a
+// button that opens the day for the full picture. Colour still never stands
+// alone: each chip carries the time and name, a clash says "clash" in its
+// tooltip, and the aria-label sums the day. The grid scrolls inside its Card
+// (min-width) rather than crushing seven columns onto a phone.
+export function PitchMonth({ anchor, today, events, clashing, teamsById, onPickDay }) {
   const cells = monthGrid(anchor)
   const grouped = byDay(events)
 
   return (
-    <Card className="p-0">
-      <div className="grid grid-cols-7 border-b border-line">
-        {WEEKDAYS.map((name) => (
-          <span
-            key={name}
-            className="px-2 py-2 text-center text-[11px] font-extrabold uppercase tracking-[.6px] text-ink-muted"
-          >
-            {/* The initial on a phone, the short name from desktop up: seven
-                three-letter headings do not fit at 320px and truncating them
-                mid-word reads worse than one letter. */}
-            <span className="desktop:hidden">{name[0]}</span>
-            <span className="hidden desktop:inline">{name}</span>
-          </span>
-        ))}
-      </div>
-
-      <div data-testid="pitch-month" className="grid grid-cols-7">
-        {cells.map((cell) => {
-          const list = grouped.get(dayKey(cell)) ?? []
-          const clashes = list.filter((event) => clashing.has(event.id)).length
-          const waiting = list.filter(needsPitch).length
-          const isToday = sameDay(cell, today)
-
-          return (
-            <button
-              key={dayKey(cell)}
-              type="button"
-              data-testid="month-cell"
-              onClick={() => onPickDay(cell)}
-              // ⚠️ SAID OUT LOUD. The dot and the ring are invisible to a
-              // screen reader, and "does this day need me" is the only question
-              // this grid answers.
-              aria-label={[
-                `${cell.day}`,
-                list.length === 0
-                  ? 'nothing on'
-                  : `${list.length} ${list.length === 1 ? 'fixture' : 'fixtures'}`,
-                clashes > 0 ? `${clashes / 2} clash` : null,
-                waiting > 0 ? `${waiting} waiting for a pitch` : null,
-              ]
-                .filter(Boolean)
-                .join(', ')}
-              className={[
-                'group relative flex min-h-[76px] flex-col items-start gap-1 border-b border-r border-line p-1.5 text-left transition',
-                'hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-inset',
-                cell.inMonth ? '' : 'bg-surface-sunk',
-              ].join(' ')}
+    <Card className="overflow-x-auto p-0">
+      <div className="min-w-[760px]">
+        <div className="grid grid-cols-7 border-b border-line">
+          {WEEKDAYS.map((name) => (
+            <span
+              key={name}
+              className="px-2 py-2 text-center text-[11px] font-extrabold uppercase tracking-[.6px] text-ink-muted"
             >
-              <span
+              {name}
+            </span>
+          ))}
+        </div>
+
+        <div data-testid="pitch-month" className="grid grid-cols-7">
+          {cells.map((cell) => {
+            const list = grouped.get(dayKey(cell)) ?? []
+            const clashes = list.filter((event) => clashing.has(event.id)).length
+            const waiting = list.filter(needsPitch).length
+            const isToday = sameDay(cell, today)
+            const visible = list.slice(0, MAX_MONTH_EVENTS)
+            const overflow = list.length - visible.length
+
+            return (
+              <button
+                key={dayKey(cell)}
+                type="button"
+                data-testid="month-cell"
+                onClick={() => onPickDay(cell)}
+                // ⚠️ SAID OUT LOUD. The chips' tones are invisible to a screen
+                // reader, so the label sums what the day needs.
+                aria-label={[
+                  `${cell.day}`,
+                  list.length === 0
+                    ? 'nothing on'
+                    : `${list.length} ${list.length === 1 ? 'fixture' : 'fixtures'}`,
+                  clashes > 0 ? `${clashes / 2} clash` : null,
+                  waiting > 0 ? `${waiting} waiting for a pitch` : null,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
                 className={[
-                  'flex h-6 w-6 items-center justify-center rounded-full text-[12.5px] font-extrabold',
-                  isToday ? 'bg-brand text-ink-invert' : cell.inMonth ? 'text-ink' : 'text-ink-faint',
+                  'group flex min-h-[104px] flex-col items-stretch gap-1 overflow-hidden border-b border-r border-line p-1.5 text-left transition',
+                  'hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-inset',
+                  cell.inMonth ? '' : 'bg-surface-sunk',
                 ].join(' ')}
               >
-                {cell.day}
-              </span>
-
-              {list.length > 0 && (
-                <span className="flex flex-wrap items-center gap-1">
-                  <span className="rounded-pill bg-danger-bg px-1.5 py-0.5 text-[10.5px] font-extrabold text-danger-ink">
-                    {list.length}
-                  </span>
-                  {/* ⚠️ A FILLED DOT FOR A CLASH, A HOLLOW RING FOR WAITING —
-                      shape, not just colour. Amber against red reads as one
-                      thing to a red-green colour blind eye, and this club's
-                      volunteers are mostly men. */}
-                  {clashes > 0 && (
-                    <span
-                      aria-hidden="true"
-                      title="clash"
-                      className="h-2 w-2 rounded-full bg-warn"
-                    />
-                  )}
-                  {waiting > 0 && (
-                    <span
-                      aria-hidden="true"
-                      title="waiting for a pitch"
-                      className="h-2 w-2 rounded-full border-[1.5px] border-ink-muted"
-                    />
-                  )}
+                <span
+                  className={[
+                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12.5px] font-extrabold',
+                    isToday ? 'bg-brand text-ink-invert' : cell.inMonth ? 'text-ink' : 'text-ink-faint',
+                  ].join(' ')}
+                >
+                  {cell.day}
                 </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
 
-      {/* The key. Two marks is few enough that hiding it behind a tooltip would
-          be the only thing standing between a volunteer and the screen. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line px-3 py-2.5 text-[11.5px] font-semibold text-ink-muted">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-warn" /> clash
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="h-2 w-2 rounded-full border-[1.5px] border-ink-muted" />{' '}
-          waiting for a pitch
-        </span>
+                {list.length > 0 && (
+                  <span className="flex min-h-0 flex-col gap-[3px]">
+                    {visible.map((event) => (
+                      <MonthEntry
+                        key={event.id}
+                        event={event}
+                        clash={clashing.has(event.id)}
+                        teamsById={teamsById}
+                      />
+                    ))}
+                    {overflow > 0 && (
+                      <span className="px-1.5 text-[10px] font-bold text-ink-faint">+{overflow} more</span>
+                    )}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* The key — the chip tones. Kept because colour needs a word somewhere,
+            and a busy month is exactly where a reader needs it spelled out. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line px-3 py-2.5 text-[11.5px] font-semibold text-ink-muted">
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-3 w-1 rounded-full bg-brand" /> has a pitch
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-3 w-1 rounded-full bg-warn" /> clash
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-3 w-1 rounded-full bg-line" /> waiting for a pitch
+          </span>
+        </div>
       </div>
     </Card>
   )
