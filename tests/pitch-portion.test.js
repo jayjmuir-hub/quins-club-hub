@@ -15,6 +15,7 @@ import {
 describe('portionFraction', () => {
   it('maps each portion to its share of a pitch', () => {
     expect(portionFraction('quarter')).toBe(0.25)
+    expect(portionFraction('third')).toBe(1 / 3)
     expect(portionFraction('half')).toBe(0.5)
     expect(portionFraction('full')).toBe(1)
   })
@@ -22,9 +23,11 @@ describe('portionFraction', () => {
   it('⚠️ treats anything unset or unrecognised as a WHOLE pitch', () => {
     // The backward-compatibility hinge: a booking with no portion counts as a
     // full pitch, so clash detection over portion-less data behaves as it did.
+    // ⚠️ 'third' USED TO BE THE EXAMPLE HERE — it is a real portion since
+    // 30 Aug 2026, so an unrecognised value is now a made-up one.
     expect(portionFraction(null)).toBe(1)
     expect(portionFraction(undefined)).toBe(1)
-    expect(portionFraction('third')).toBe(1)
+    expect(portionFraction('fifth')).toBe(1)
     expect(portionFraction('')).toBe(1)
   })
 })
@@ -32,6 +35,7 @@ describe('portionFraction', () => {
 describe('portionLabel', () => {
   it('gives a human label, or null when unset', () => {
     expect(portionLabel('quarter')).toBe('Quarter')
+    expect(portionLabel('third')).toBe('Third')
     expect(portionLabel('full')).toBe('Full pitch')
     expect(portionLabel(null)).toBe(null)
     expect(portionLabel('nonsense')).toBe(null)
@@ -39,9 +43,9 @@ describe('portionLabel', () => {
 })
 
 describe('PITCH_PORTIONS', () => {
-  it('lists the three portions small → large with fractions', () => {
-    expect(PITCH_PORTIONS.map((p) => p.value)).toEqual(['quarter', 'half', 'full'])
-    expect(PITCH_PORTIONS.map((p) => p.fraction)).toEqual([0.25, 0.5, 1])
+  it('lists the four portions small → large with fractions', () => {
+    expect(PITCH_PORTIONS.map((p) => p.value)).toEqual(['quarter', 'third', 'half', 'full'])
+    expect(PITCH_PORTIONS.map((p) => p.fraction)).toEqual([0.25, 1 / 3, 0.5, 1])
   })
 })
 

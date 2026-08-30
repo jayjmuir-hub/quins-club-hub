@@ -14,15 +14,23 @@ import { ageBandFromTeamName } from './ageGroup.js'
 // ageGroup.js already follow, so a test and the clash detector can both read it
 // without pulling a component tree in.
 //
-// ⚠️ THE THREE PORTION VALUES ARE THE STORED VOCABULARY. `events.pitch_portion`
-// is text holding one of these, or NULL. NULL means "nobody split it" and is
-// treated as a FULL pitch everywhere — the conservative default that keeps
-// today's behaviour exactly: before any portion is entered, two overlapping
-// bookings on one pitch still clash. See portionFraction.
+// ⚠️ THESE PORTION VALUES ARE THE STORED VOCABULARY. `events.pitch_portion` is
+// text holding one of them, or NULL. NULL means "nobody split it" and is treated
+// as a FULL pitch everywhere — the conservative default that keeps today's
+// behaviour exactly: before any portion is entered, two overlapping bookings on
+// one pitch still clash. See portionFraction. The set is pinned by a CHECK
+// constraint on the column, so ADDING a value means a migration too — `third`
+// arrived in `db/migrations/20260830_pitch_portion_third.sql` (Jay, 30 Aug 2026:
+// three squads sharing a pitch each take a third).
 
 /** The pickable portions, small → large, for a picker beside the pitch field. */
 export const PITCH_PORTIONS = [
   { value: 'quarter', label: 'Quarter', fraction: 0.25 },
+  // ⚠️ A THIRD IS NOT DYADIC — 1/3 is 0.333… in floating point, so unlike the
+  // others its sums are not exact. That is deliberately fine: capacity in
+  // src/data/pitches.js carries an EPSILON precisely so three thirds
+  // (0.999…) still read as one whole pitch rather than an over-capacity clash.
+  { value: 'third', label: 'Third', fraction: 1 / 3 },
   { value: 'half', label: 'Half', fraction: 0.5 },
   { value: 'full', label: 'Full pitch', fraction: 1 },
 ]

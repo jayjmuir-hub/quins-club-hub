@@ -10,13 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Recorded the Grok full-sweep findings + remediation plan (docs only).**
+- **A pitch can be booked as a third, not just a quarter/half/full.** Three
+  squads sharing one pitch each take a third, and there was no way to say so — a
+  third had to be rounded to a quarter or a half, which then mis-read as a clash
+  or as free space (Jay). `third` (1/3) joins the portion picker between quarter
+  and half. It is the first non-dyadic portion, so its sums are not exact in
+  floating point — three thirds are 0.999… — but the capacity detector already
+  carried an EPSILON for exactly this, so three thirds still read as one whole
+  pitch, not an over-capacity clash. The occupancy panel now speaks thirds
+  instead of rounding them to the nearest quarter. Migration
+  `db/migrations/20260830_pitch_portion_third.sql` (applied to production before
+  this shipped) widens the `events_pitch_portion_check` CHECK. `src/lib/pitchPortion.js`,
+  `src/components/PitchCalendar.jsx`, `tests/pitch-portion.test.js`,
+  `tests/pitch-clashes.test.js`, `tests/pitch-glance.test.jsx`. (SHA follows in
+  the next changelog-touching PR.)
+- `248511a` — **Recorded the Grok full-sweep findings + remediation plan (docs only).**
   Verification of the 29 Aug 2026 Grok security sweep — all 18 items confirmed
   against the code, the two criticals against the live database — written into
   the durable register (`claude/open-items.md`, new "Grok full-sweep" section)
   with the agreed corrected framing, plus a 10-PR dependency-ordered remediation
   plan (`claude/plans/2026-08-30-grok-sweep-remediation.md`). No code changed;
-  nothing authorised. (SHA follows in the next changelog-touching PR.)
+  nothing authorised.
 - `81dd7b1` — **Home sits far left on the four-tab parent/player bar.** #530 centred Home
   on the dock, but on the narrow four-tab island the middle is no longer the
   thumb's resting slot and the centred Home read as stranded (Jay). Home now

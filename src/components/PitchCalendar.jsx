@@ -290,11 +290,19 @@ const portionOf = (event) => portionLabel(event.pitch_portion) ?? 'Full pitch'
 const peakEvent = (group) =>
   group.events.reduce((a, b) => ((eventDate(b)?.getTime() ?? 0) > (eventDate(a)?.getTime() ?? 0) ? b : a))
 
-/** A pitch fraction as words: 0.25 → "a quarter", 1.5 → "1½ pitches". */
+/** A pitch fraction as words: 0.25 → "a quarter", ⅓ → "a third", 1.5 → "1.5 pitches".
+ *  ⚠️ Portions are ¼, ⅓, ½ and 1, so any occupancy lands on a TWELFTH — the old
+ *  "round to quarters" turned a third into "a quarter". Quantise to twelfths,
+ *  name the fractions people actually say, and fall back to a rounded percentage
+ *  for an odd mixed twelfth (a ¼ beside a ⅓ is 7⁄12) rather than "seven twelfths". */
 function fractionWord(fraction) {
-  const words = { 0.25: 'a quarter', 0.5: 'a half', 0.75: 'three quarters', 1: 'a full pitch' }
-  const quarters = Math.round(fraction * 4) / 4
-  return words[quarters] ?? `${quarters} pitches`
+  const named = { 3: 'a quarter', 4: 'a third', 6: 'a half', 8: 'two thirds', 9: 'three quarters', 12: 'a full pitch' }
+  const twelfths = Math.round(fraction * 12)
+  if (twelfths <= 0) return 'nothing'
+  if (named[twelfths]) return named[twelfths]
+  if (twelfths % 12 === 0) return `${twelfths / 12} pitches`
+  if (fraction > 1) return `${Math.round(fraction * 100) / 100} pitches`
+  return `${Math.round(fraction * 100)}%`
 }
 
 function occupancyStatus(load) {

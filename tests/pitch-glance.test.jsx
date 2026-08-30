@@ -162,6 +162,23 @@ describe('the occupancy panel', () => {
     expect(row).toHaveTextContent(/a quarter free/i)
   })
 
+  it('⚠️ speaks thirds, not the nearest quarter', async () => {
+    // Two thirds sharing a pitch: ⅓ + ⅓ = ⅔ used, ⅓ free. The old fractionWord
+    // rounded to quarters and would have said "a half used · a half free" — a
+    // third is 0.333, which rounds to a quarter, not a half, either way it lied.
+    listPitchOccupancyMock.mockResolvedValue(
+      share(16, 'C1', [
+        { squad: 'U9 Reds', portion: 'third' },
+        { squad: 'U9 Blues', portion: 'third' },
+      ]),
+    )
+    renderScreen()
+    const panel = await screen.findByTestId('pitch-occupancy')
+    const row = within(panel).getByTestId('share-row')
+    expect(row).toHaveTextContent(/two thirds used/i)
+    expect(row).toHaveTextContent(/a third free/i)
+  })
+
   it('marks an overflowing share as over, and never shows a fan-out as a share', async () => {
     // The default rows: D2 is two full-pitch matches (over); A1 is a fan-out.
     renderScreen()
