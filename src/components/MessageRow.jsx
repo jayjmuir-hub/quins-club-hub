@@ -4,7 +4,7 @@ import ChatBubble from './ChatBubble.jsx'
 import FixtureCard from './FixtureCard.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
 import MessageEditor from './MessageEditor.jsx'
-import { canStillEdit } from '../data/messages.js'
+import { canStillEdit } from '../lib/messageEdit.js'
 import { labelForRole } from '../lib/scope.js'
 
 // One post in a channel, as a BUBBLE, with its replies. The bubble itself

@@ -14,7 +14,7 @@ import userEvent from '@testing-library/user-event'
 //   family ZWJ sequences count as one glyph.
 
 import { emojiOnlyCount } from '../src/components/ChatBubble.jsx'
-import { canStillEdit } from '../src/data/messages.js'
+import { canStillEdit } from '../src/lib/messageEdit.js'
 import ChatBubble from '../src/components/ChatBubble.jsx'
 import MessageEditor from '../src/components/MessageEditor.jsx'
 import MessageRow from '../src/components/MessageRow.jsx'

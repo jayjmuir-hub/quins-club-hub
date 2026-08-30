@@ -160,20 +160,6 @@ export async function getEventThread(eventId) {
   return { ...data, replies: count ?? 0 }
 }
 
-/**
- * True while the author may still edit this message — the CLIENT HINT for
- * offering the Edit control. The rule itself lives in private.touch_message
- * (author only, 15 minutes); this only decides whether to draw the door, so
- * a clock-skewed device that offers it a moment too long just sees the
- * database's own sentence ("a message can be edited for 15 minutes").
- */
-export function canStillEdit(message, now = new Date()) {
-  if (!message || message.deleted_at) return false
-  const created = new Date(message.created_at)
-  if (Number.isNaN(created.getTime())) return false
-  return now.getTime() - created.getTime() < 15 * 60 * 1000
-}
-
 /** Edits the body. Own row, within 15 minutes — the policy decides. */
 export async function editMessage(id, body) {
   const text = body?.trim()

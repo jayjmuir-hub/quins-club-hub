@@ -7,7 +7,7 @@ import Button from './Button.jsx'
 // where the words were, not in a detached sheet.
 //
 // ⚠️ WHO MAY EDIT, AND FOR HOW LONG, IS THE DATABASE'S RULE — author only,
-// 15 minutes (private.touch_message). canStillEdit (src/data/messages.js) is
+// 15 minutes (private.touch_message). canStillEdit (src/lib/messageEdit.js) is
 // the hint that draws the door; a refusal that slips through renders here as
 // the database's own sentence rather than being re-worded.
 
