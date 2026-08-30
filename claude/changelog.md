@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Grok items 6 & 16 SHIPPED — children's private data leaves the PWA disk
+- **One transient blip no longer paints "Couldn't load your account".** Jay's
+  phone showed it with "JWT issued at future"; the phone's clock was proven
+  EXACT against the server, and the edge logs held exactly ONE 401 at that
+  second — a freshly refreshed token judged by a Supabase gateway node whose
+  clock ran milliseconds behind the minting node. Sub-second, self-healing —
+  and the provider turned it into a full-page error card. The account load now
+  makes ONE quiet second attempt ~900ms later (covering ordinary pitch-side
+  network blips too); a second failure is a real outage and still gets the
+  honest card. `src/lib/memberships.jsx`, `tests/memberships.test.jsx`.
+  (SHA follows in the next changelog-touching PR.)
+- **Grok item 7 SHIPPED — the UI reads the child-PII allowlists that already
+- `a736d0c` — **Grok items 6 & 16 SHIPPED — children's private data leaves the PWA disk
   cache, and the ICS UID is ruled frozen.** `isCacheableRestGet` excludes
   `messages`, `player_private`, `player_contacts`, `player_parents` and
   `poll_votes` by TABLE (D3: all five — offline use is a non-goal, and no
@@ -24,7 +35,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   measured); RFC 5545 treats it as opaque. D4 default: notes stay.
   `pwa-cache-rules.js`, `tests/pwa-cache-rules.test.js`,
   `tests/pwa-build.test.js`, `supabase/functions/calendar/index.ts`
-  (comment only). (SHA follows in the next changelog-touching PR.)
+  (comment only).
 - `c2554eb` — **Grok item 7 SHIPPED — the UI reads the child-PII allowlists that already
   gate the data.** New client mirrors of the 28 Aug RLS boundaries:
   `canWriteChild`, `canSeeChildPhotos`, `canEditChildPhotos`,
