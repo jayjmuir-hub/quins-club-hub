@@ -37,8 +37,14 @@ export function shareSegments(group) {
   return [...byOccupant.values()].sort((a, b) => b.fraction - a.fraction)
 }
 
+// ⚠️ A CLUB-WIDE event (team_id null, 30 Aug 2026) has no squad, so it reads
+// "Club" here rather than the "A squad" fallback — which the share card then
+// abbreviated to a bare "A". It is a real booking on a pitch (a whole-club
+// social), so it needs a name a coach can read on the layout.
 export const squadOf = (event, teamsById) =>
-  event.team_name ?? teamsById?.get(event.team_id)?.name ?? 'A squad'
+  event.team_name ??
+  teamsById?.get(event.team_id)?.name ??
+  (event.team_id == null ? 'Club' : 'A squad')
 
 export const portionOf = (event) => portionLabel(event.pitch_portion) ?? 'Full pitch'
 
