@@ -3,6 +3,8 @@ import Button from './Button.jsx'
 import ChatBubble from './ChatBubble.jsx'
 import FixtureCard from './FixtureCard.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
+import MessageEditor from './MessageEditor.jsx'
+import { canStillEdit } from '../data/messages.js'
 import { labelForRole } from '../lib/scope.js'
 
 // One post in a channel, as a BUBBLE, with its replies. The bubble itself
@@ -29,13 +31,32 @@ function RolePill({ role, title }) {
   )
 }
 
-function Reply({ reply, selfId, canModerate, onRemove, onAuthor }) {
+function Reply({ reply, selfId, canModerate, onRemove, onEdit, onAuthor }) {
   const staff = isStaffRole(reply.author_role)
   const mine = reply.author_id === selfId
-  const menuItems =
-    !reply.deleted_at && (mine || canModerate)
-      ? [{ label: 'Delete', onClick: () => onRemove(reply.id), danger: true }]
-      : []
+  const [editing, setEditing] = useState(false)
+  const menuItems = reply.deleted_at
+    ? []
+    : [
+        // The 15-minute window is the database's rule; canStillEdit only
+        // decides whether to draw the door.
+        ...(mine && onEdit && canStillEdit(reply) ? [{ label: 'Edit', onClick: () => setEditing(true) }] : []),
+        ...(mine || canModerate ? [{ label: 'Delete', onClick: () => onRemove(reply.id), danger: true }] : []),
+      ]
+  if (editing) {
+    return (
+      <div className={`flex py-0.5 ${mine ? 'justify-end' : 'justify-start'}`}>
+        <MessageEditor
+          body={reply.body}
+          onCancel={() => setEditing(false)}
+          onSave={async (text) => {
+            await onEdit(reply.id, text)
+            setEditing(false)
+          }}
+        />
+      </div>
+    )
+  }
   return (
     <div className="py-0.5">
       <ChatBubble
@@ -84,6 +105,7 @@ export default function MessageRow({
   forceOpen = false,
   onReply,
   onRemove,
+  onEdit,
   onPin,
   onReport,
   // 27 Aug 2026: polls. `poll` is this message's poll (or null); vote/viewVotes
@@ -98,6 +120,7 @@ export default function MessageRow({
   onAuthor,
 }) {
   const [open, setOpen] = useState(forceOpen)
+  const [editing, setEditing] = useState(false)
   const [reporting, setReporting] = useState(false)
   const [reason, setReason] = useState('')
   const [draft, setDraft] = useState('')
@@ -136,6 +159,9 @@ export default function MessageRow({
   const menuItems = message.deleted_at
     ? []
     : [
+        ...(mine && onEdit && canStillEdit(message)
+          ? [{ label: 'Edit', onClick: () => setEditing(true) }]
+          : []),
         ...(onReply ? [{ label: 'Reply', onClick: () => setOpen((v) => !v) }] : []),
         ...(!mine && onReplyPrivately
           ? [{ label: 'Reply privately', onClick: () => onReplyPrivately(message) }]
@@ -144,6 +170,23 @@ export default function MessageRow({
         ...((mine || canModerate) && onRemove ? [{ label: 'Delete', onClick: () => onRemove(message.id), danger: true }] : []),
         ...(!mine && onReport ? [{ label: 'Report', onClick: () => setReporting((v) => !v), danger: true }] : []),
       ]
+
+  if (editing) {
+    return (
+      <article data-testid="message-row" data-mine="true">
+        <div className="flex justify-end">
+          <MessageEditor
+            body={message.body}
+            onCancel={() => setEditing(false)}
+            onSave={async (text) => {
+              await onEdit(message.id, text)
+              setEditing(false)
+            }}
+          />
+        </div>
+      </article>
+    )
+  }
 
   return (
     <article
@@ -253,7 +296,7 @@ export default function MessageRow({
       {open && (
         <div className={`mt-1 w-full max-w-[88%] border-l-2 border-line pl-3 ${mine ? 'ml-auto' : ''}`}>
           {replies.map((reply) => (
-            <Reply key={reply.id} reply={reply} selfId={selfId} canModerate={canModerate} onRemove={onRemove} onAuthor={onAuthor} />
+            <Reply key={reply.id} reply={reply} selfId={selfId} canModerate={canModerate} onRemove={onRemove} onEdit={onEdit} onAuthor={onAuthor} />
           ))}
           {onReply && (
             <form onSubmit={submitReply} className="mt-1.5 flex items-end gap-2">

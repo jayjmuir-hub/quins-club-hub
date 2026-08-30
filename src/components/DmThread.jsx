@@ -8,8 +8,9 @@ import PollComposer from './PollComposer.jsx'
 import PollVotes from './PollVotes.jsx'
 import Spinner from './Spinner.jsx'
 import VoiceComposer from './VoiceComposer.jsx'
+import MessageEditor from './MessageEditor.jsx'
 import { attachmentPreviewLabel } from '../data/chatMedia.js'
-import { receiptState } from '../data/messages.js'
+import { canStillEdit, receiptState } from '../data/messages.js'
 import { backgroundStyle } from '../lib/chatBackgrounds.js'
 import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
@@ -50,6 +51,7 @@ export default function DmThread({ thread, compact = false }) {
 
   const [pollOpen, setPollOpen] = useState(false)
   const [votesFor, setVotesFor] = useState(null)
+  const [editingId, setEditingId] = useState(null)
 
   return (
     <>
@@ -153,7 +155,12 @@ export default function DmThread({ thread, compact = false }) {
                 { label: stars.has(m.id) ? 'Unstar' : 'Star', onClick: () => thread.onStar(m) },
                 ...(isGroup && !mine ? [{ label: 'Reply privately', onClick: () => thread.onReplyPrivately(m) }] : []),
                 ...(mine
-                  ? [{ label: 'Delete', onClick: () => thread.onRemove(m.id), danger: true }]
+                  ? [
+                      // Author-only, 15 minutes — canStillEdit draws the door,
+                      // private.touch_message is the rule.
+                      ...(canStillEdit(m) ? [{ label: 'Edit', onClick: () => setEditingId(m.id) }] : []),
+                      { label: 'Delete', onClick: () => thread.onRemove(m.id), danger: true },
+                    ]
                   : [{ label: 'Report', onClick: () => thread.setReporting(m.id), danger: true }]),
               ]
           // The quote block. A HARD-deleted original nulls quoted_id
@@ -201,6 +208,18 @@ export default function DmThread({ thread, compact = false }) {
                   <span aria-hidden="true" className="h-px flex-1 bg-brand/40" />
                 </div>
               )}
+              {editingId === m.id ? (
+                <div className="flex justify-end">
+                  <MessageEditor
+                    body={m.body}
+                    onCancel={() => setEditingId(null)}
+                    onSave={async (text) => {
+                      await thread.onEdit(m.id, text)
+                      setEditingId(null)
+                    }}
+                  />
+                </div>
+              ) : (
               <ChatBubble
                 mine={mine}
                 messageId={m.id}
@@ -229,6 +248,7 @@ export default function DmThread({ thread, compact = false }) {
                 onVote={participant ? thread.vote : null}
                 onViewVotes={() => setVotesFor(thread.polls?.get(m.id) ?? null)}
               />
+              )}
             </Fragment>
           )
         })}

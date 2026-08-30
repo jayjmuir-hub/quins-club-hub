@@ -31,6 +31,14 @@ export async function listMentionables() {
 export async function getEventThread() {
   return null
 }
+// The real pure helper, not a throw — a stub that lied about the edit window
+// would draw the wrong menu in every harness screenshot.
+export function canStillEdit(message, now = new Date()) {
+  if (!message || message.deleted_at) return false
+  const created = new Date(message.created_at)
+  if (Number.isNaN(created.getTime())) return false
+  return now.getTime() - created.getTime() < 15 * 60 * 1000
+}
 export async function editMessage() {
   throw new Error('harness: editMessage is not stubbed')
 }

@@ -10,7 +10,7 @@ hand-ticked member list. Settled design, from the conversation of 30 Aug:
 | Channel | key | Who is in it |
 |---|---|---|
 | Club Head Coaches | `headcoaches` | coach memberships with `is_head_coach`, plus admins ticked `chat-headcoaches` |
-| Club Managers | `managers` | manager role anywhere, plus admins ticked `chat-managers` |
+| Club Age Group Managers | `managers` | manager role anywhere, plus admins ticked `chat-managers` |
 | Club Medics | `medics` | medic role, plus admins ticked `chat-medics` |
 | Welfare | `welfare` | admins holding the existing `welfare` right — the grant IS the membership |
 | Club Staff | `clubstaff` | any active staff role: coach, manager, medic, admin |

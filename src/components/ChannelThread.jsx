@@ -137,6 +137,7 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           forceOpen={openThreadId === m.id}
           onReply={thread.onReply}
           onRemove={thread.onRemove}
+          onEdit={thread.onEdit}
           onPin={thread.onPin}
           onReport={thread.onReport}
           onReplyPrivately={thread.onReplyPrivately}

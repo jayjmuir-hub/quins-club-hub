@@ -313,7 +313,7 @@ const ADMIN_RIGHT_LABELS = {
   clubadmin: 'Club Hub Admin',
   // Channel access, not jobs — each tick seats the admin in one role channel.
   'chat-headcoaches': 'Chat: Club Head Coaches',
-  'chat-managers': 'Chat: Club Managers',
+  'chat-managers': 'Chat: Club Age Group Managers',
   'chat-medics': 'Chat: Club Medics',
 }
 

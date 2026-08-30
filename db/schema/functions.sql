@@ -5343,7 +5343,7 @@ AS $function$
                and x.author_id <> me.id and x.created_at > now() - interval '14 days'
                and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
       from (values ('headcoaches','Club Head Coaches'),
-                   ('managers','Club Managers'),
+                   ('managers','Club Age Group Managers'),
                    ('medics','Club Medics'),
                    ('welfare','Welfare'),
                    ('clubstaff','Club Staff')) rc(key, label)
