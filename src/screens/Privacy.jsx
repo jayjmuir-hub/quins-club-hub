@@ -117,12 +117,14 @@ export default function Privacy() {
       {/* "Tokyo, Japan" named the region until 23 Aug 2026 — Jay: "we don't
           need to mention Tokyo, we will just say secure providers". The
           region is still a fact anyone can ask the club about; it is just
-          not a sentence this policy needs. */}
+          not a sentence this policy needs. The Google sentence and "who act
+          on the club's instructions only" were removed 30 Aug 2026 (Jay) —
+          Google sign-in is hidden (Login.jsx, SHOW_PASSWORDLESS=false since
+          8 Aug), so the sentence described a route nobody is offered. */}
       <P>
-        With secure, reputable hosting and email providers who act on the
-        club&apos;s instructions only. If the app breaks, an error report goes
-        to a monitoring service so it can be fixed. If you sign in with
-        Google, Google will know you did.
+        With secure, reputable hosting and email providers. If the app
+        breaks, an error report goes to a monitoring service so it can be
+        fixed.
       </P>
 
       {/* ⚠️ EVERY CLAIM BELOW IS A REAL, LIVE MEASURE, checked 30 Aug 2026:
@@ -137,13 +139,16 @@ export default function Privacy() {
       <P>
         Security was built into this app from the start, not added on. Every
         request is checked inside the database itself against who you are and
-        which squad you belong to — not just in the app — so no screen can
-        show you information you are not entitled to. A new account sees
-        nothing at all until the club has approved it. Everything travels
-        encrypted, the database is backed up every day, and independent
-        monitoring alerts the club the moment anything breaks. If you ever
-        notice something that does not look right, tell us at the address
-        above.
+        which squad you belong to — row-level security, enforced by the
+        database rather than the app — so no screen can show you information
+        you are not entitled to. A new account sees nothing at all until the
+        club has approved it. Everything travels over encrypted connections
+        (TLS), data is stored encrypted (AES-256), and passwords are never
+        stored — only one-way encrypted versions of them. The database is
+        backed up every day, independent monitoring alerts the club the
+        moment anything breaks, and club email is sender-authenticated so a
+        faked message from us fails verification. If you ever notice
+        something that does not look right, tell us at the address above.
       </P>
 
       <H2>Notifications and your device</H2>
