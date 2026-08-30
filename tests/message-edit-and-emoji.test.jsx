@@ -161,3 +161,74 @@ describe('MessageRow — the Edit door', () => {
     expect(screen.queryByRole('menuitem', { name: 'Edit' })).toBeNull()
   })
 })
+
+// A reply's author deserves the same private door a post's author has — the
+// nested bubbles were the one surface without it (Jay, 30 Aug 2026).
+describe('MessageRow — Reply privately on a nested reply', () => {
+  it('offers it on someone else’s reply and hands over THAT reply', async () => {
+    const theirReply = {
+      id: 'r-1',
+      author_id: 'them',
+      author_role: 'parent',
+      body: 'Can someone bring cones?',
+      deleted_at: null,
+      created_at: '2026-08-30T10:01:00Z',
+      author: { full_name: 'Zz Probe Parent' },
+    }
+    const message = {
+      id: 'msg-1',
+      author_id: 'me',
+      author_role: 'coach',
+      body: 'Training moves to pitch 3.',
+      pinned: false,
+      deleted_at: null,
+      created_at: '2026-08-30T10:00:00Z',
+      author: { full_name: 'Me' },
+      replies: [theirReply],
+    }
+    const onReplyPrivately = vi.fn()
+    render(
+      <MessageRow
+        message={message}
+        selfId="me"
+        forceOpen
+        onRemove={vi.fn()}
+        onReplyPrivately={onReplyPrivately}
+      />,
+    )
+    // Two chevrons: the post's and the reply's. The reply's is the second.
+    const menus = await screen.findAllByRole('button', { name: 'Message options' })
+    await userEvent.click(menus[1])
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Reply privately' }))
+    expect(onReplyPrivately).toHaveBeenCalledWith(theirReply)
+  })
+
+  it('never on my own reply — there is nobody to go private with', async () => {
+    const mineReply = {
+      id: 'r-2',
+      author_id: 'me',
+      author_role: 'coach',
+      body: 'I will.',
+      deleted_at: null,
+      created_at: new Date(Date.now() - 60 * 1000).toISOString(),
+      author: { full_name: 'Me' },
+    }
+    const message = {
+      id: 'msg-2',
+      author_id: 'them',
+      author_role: 'coach',
+      body: 'Anyone free Saturday?',
+      pinned: false,
+      deleted_at: null,
+      created_at: '2026-08-30T10:00:00Z',
+      author: { full_name: 'Them' },
+      replies: [mineReply],
+    }
+    render(<MessageRow message={message} selfId="me" forceOpen onRemove={vi.fn()} onEdit={vi.fn()} onReplyPrivately={vi.fn()} />)
+    const menus = await screen.findAllByRole('button', { name: 'Message options' })
+    await userEvent.click(menus[1])
+    expect(screen.queryByRole('menuitem', { name: 'Reply privately' })).toBeNull()
+    // Own fresh reply still edits — the two doors coexist correctly.
+    expect(screen.getByRole('menuitem', { name: 'Edit' })).toBeInTheDocument()
+  })
+})

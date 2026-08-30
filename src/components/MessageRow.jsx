@@ -31,7 +31,7 @@ function RolePill({ role, title }) {
   )
 }
 
-function Reply({ reply, selfId, canModerate, onRemove, onEdit, onAuthor }) {
+function Reply({ reply, selfId, canModerate, onRemove, onEdit, onAuthor, onReplyPrivately }) {
   const staff = isStaffRole(reply.author_role)
   const mine = reply.author_id === selfId
   const [editing, setEditing] = useState(false)
@@ -41,6 +41,12 @@ function Reply({ reply, selfId, canModerate, onRemove, onEdit, onAuthor }) {
         // The 15-minute window is the database's rule; canStillEdit only
         // decides whether to draw the door.
         ...(mine && onEdit && canStillEdit(reply) ? [{ label: 'Edit', onClick: () => setEditing(true) }] : []),
+        // A reply's author deserves the same private door a post's author has
+        // (Jay, 30 Aug 2026 — the nested bubbles were the one place without
+        // it). Whether the DM is ALLOWED stays open_conversation's call.
+        ...(!mine && onReplyPrivately
+          ? [{ label: 'Reply privately', onClick: () => onReplyPrivately(reply) }]
+          : []),
         ...(mine || canModerate ? [{ label: 'Delete', onClick: () => onRemove(reply.id), danger: true }] : []),
       ]
   if (editing) {
@@ -296,7 +302,7 @@ export default function MessageRow({
       {open && (
         <div className={`mt-1 w-full max-w-[88%] border-l-2 border-line pl-3 ${mine ? 'ml-auto' : ''}`}>
           {replies.map((reply) => (
-            <Reply key={reply.id} reply={reply} selfId={selfId} canModerate={canModerate} onRemove={onRemove} onEdit={onEdit} onAuthor={onAuthor} />
+            <Reply key={reply.id} reply={reply} selfId={selfId} canModerate={canModerate} onRemove={onRemove} onEdit={onEdit} onAuthor={onAuthor} onReplyPrivately={onReplyPrivately} />
           ))}
           {onReply && (
             <form onSubmit={submitReply} className="mt-1.5 flex items-end gap-2">
