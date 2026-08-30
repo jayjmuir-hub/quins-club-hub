@@ -467,8 +467,27 @@ describe('Chat — staff channel', () => {
     listStaffMessagesMock.mockResolvedValue([])
     renderAt('/chat/team-a?channel=staff')
     expect(await screen.findByRole('heading', { name: /ZZ Probe U12 · staff/ })).toBeInTheDocument()
-    expect(screen.getByTestId('chat-subtitle')).toHaveTextContent(/staff only/i)
+    // Since 30 Aug 2026 the staff subtitle is the MEMBER LINE, WhatsApp-style
+    // (Jay: "they don't appear under the channel name"). With no other
+    // mentionables mocked, that is the reader alone.
+    expect(screen.getByTestId('chat-subtitle')).toHaveTextContent('You')
     expect(screen.queryByRole('tab')).toBeNull()
+  })
+
+  it('the staff header wears its members and opens the sheet on tap', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    useAuthMock.mockReturnValue({ user: { id: 'coach-1' } })
+    listStaffMessagesMock.mockResolvedValue([])
+    listMentionablesMock.mockResolvedValue([
+      { profile_id: 'mgr-1', full_name: 'Zz Probe Manager' },
+      { profile_id: 'med-1', full_name: 'Aa Probe Medic' },
+    ])
+    renderAt('/chat/team-a?channel=staff')
+    await screen.findByRole('heading', { name: /ZZ Probe U12 · staff/ })
+    // First names, "You" first, the rest alphabetical.
+    expect(screen.getByTestId('chat-subtitle')).toHaveTextContent('You, Aa, Zz')
+    // The name block is the door to the member sheet — the WhatsApp gesture.
+    expect(screen.getByTestId('chat-header-info')).toBeInTheDocument()
   })
 
   it('?channel=staff reads the staff stream and posts to it, with staff mentionables', async () => {

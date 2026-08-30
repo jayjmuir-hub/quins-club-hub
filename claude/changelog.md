@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **ROLE CHANNELS — five club-wide chats whose membership is derived from
+- **Members appear UNDER the channel name — the header is the door.** Jay,
+  minutes after role channels shipped: "they don't appear under the channel
+  name, need to click the 3 dots". Role channels and squad STAFF channels now
+  wear their member line as the subtitle, WhatsApp-style ("You, Aran,
+  Bruno…" — first names, You first), matching what groups already did; the
+  title/subtitle block is now a button that opens the member sheet (ChatHeader
+  gains `onInfoClick`). The squad channel keeps its count (forty first names
+  is noise) and the club channel its wording (its sheet is admin-only). The ⋯
+  "View members" entry stays — two doors, one room. `src/components/
+  ChatHeader.jsx`, `src/screens/Chat.jsx`, `tests/chat.test.jsx`. (SHA follows
+  in the next changelog-touching PR.)
+- `4daaaec` — **ROLE CHANNELS — five club-wide chats whose membership is derived from
   roles, never stored.** Jay: group chats for staff circles without a
   hand-ticked list that goes stale. Club Head Coaches (head-coach flag), Club
   Managers, Club Medics, Welfare (the existing `welfare` grant IS the
@@ -32,8 +43,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/lib/useChannelThread.js`, `src/screens/Chat.jsx`,
   `src/screens/ChatList.jsx`, `src/data/messages.js`, `src/lib/scope.js`,
   `tests/role-channels.test.jsx`, plan
-  `claude/plans/2026-08-30-role-channels.md`. (SHA follows in the next
-  changelog-touching PR.)
+  `claude/plans/2026-08-30-role-channels.md`.
 - `751671e` — **The privacy policy tells the truth about older players, and gains a security
   section.** The Children section said "a child does not sign in" — false since
   11 Aug, when U13+ self-registration went live; a parent (Jay's report) read it

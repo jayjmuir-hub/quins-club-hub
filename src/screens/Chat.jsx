@@ -99,12 +99,33 @@ export default function Chat() {
 
   const roleChannel = roleKey ? ROLE_CHANNELS[roleKey] : null
   const title = roleChannel ? roleChannel.label : isClub ? 'Whole club' : team?.name ?? 'Squad'
+  // Role channels AND staff channels wear their MEMBERS as the subtitle,
+  // WhatsApp-style — "You, Aran, Bruno…" — because a small circle's whole
+  // identity is who is in it (Jay, 30 Aug 2026: "they don't appear under the
+  // channel name"). First names, self first as "You"; the header truncates
+  // the overflow, and tapping it opens the full sheet. The squad channel
+  // keeps its count — forty first names is noise, not information — and the
+  // club channel keeps its wording (its member sheet is admin-only).
+  const memberPreview =
+    roleChannel || staffChannel
+      ? [
+          // channel_members (role) includes the caller; chat_mentionables
+          // (staff) deliberately excludes them — a picker never offers you
+          // yourself. Either way the reader IS in the room they are reading.
+          'You',
+          ...mentionables
+            .filter((m) => m.profile_id !== thread.selfId)
+            .map((m) => (m.full_name ?? '').split(/\s+/)[0])
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b)),
+        ].join(', ')
+      : ''
   const subtitle = roleChannel
-    ? `${mentionables.length > 0 ? `${mentionables.length} people · ` : ''}by role — tap ⋯ for members`
+    ? memberPreview || 'By role — tap for members'
     : isClub
       ? 'Club-wide · admins post'
       : staffChannel
-        ? 'Staff only · coaches, managers and medics'
+        ? memberPreview || 'Staff only · coaches, managers and medics'
         : `${mentionables.length > 0 ? `${mentionables.length} members · ` : ''}${announceOnly ? 'announce-only' : 'open chat'}`
 
   // The member sheet: role channels for every member; a squad or staff channel
@@ -159,6 +180,9 @@ export default function Chat() {
         title={staffChannel ? `${title} · staff` : title}
         subtitle={subtitle}
         actions={headerActions}
+        // The WhatsApp gesture (Jay, 30 Aug): tap the name block, see the
+        // members. Same sheet the ⋯ menu offers; two doors, one room.
+        onInfoClick={canSeeMembers ? () => setShowingMembers(true) : undefined}
       />
 
       {clearing && (
