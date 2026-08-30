@@ -653,6 +653,73 @@ describe('the head-coach flag', () => {
   })
 })
 
+// ── The title↔flag LINK (30 Aug 2026) ────────────────────────────────────────
+// Two real coaches sat titled "Head Coach" with the flag off — out of the
+// approval emails and the Head Coaches channel, invisibly. The ruling "a title
+// is never permission" stands: the nudge OFFERS, the tap grants. The other
+// direction is free: the flag fills an EMPTY title, never overwrites one.
+describe('the title↔flag link', () => {
+  const headCoachBox = () => screen.getByRole('checkbox', { name: /head coach/i })
+
+  it('a Head Coach TITLE without the flag draws the nudge; the tap ticks it', async () => {
+    setMembershipHeadCoachMock.mockResolvedValue({ id: 'm-coach', is_head_coach: true })
+    const { user } = renderStaff()
+    await openEverySquad(user)
+
+    // The fixture is exactly the live mismatch: title claims, flag denies.
+    const nudge = screen.getByTestId('head-coach-nudge')
+    expect(nudge).toHaveTextContent(/isn.t ticked/i)
+
+    await user.click(within(nudge).getByRole('button', { name: 'Tick it' }))
+    await waitFor(() =>
+      expect(setMembershipHeadCoachMock).toHaveBeenCalledWith({
+        membershipId: 'm-coach',
+        isHeadCoach: true,
+      }),
+    )
+    // Granted: the nudge's reason is gone, and so is the nudge.
+    await waitFor(() => expect(screen.queryByTestId('head-coach-nudge')).toBeNull())
+    expect(headCoachBox()).toBeChecked()
+    // ⚠️ The custom title survives — the fill is for EMPTY titles only.
+    expect(setMembershipTitleMock).not.toHaveBeenCalled()
+  })
+
+  it('no nudge once the flag is on, and none for a plain title', async () => {
+    listSquadStaffMock.mockResolvedValue([
+      {
+        id: 't-u13',
+        name: 'U13 Mixed',
+        staff: [
+          { ...COACH, isHeadCoach: true },
+          { ...COACH, membershipId: 'm-c2', profileId: 'p-c2', name: 'Billie Ward', title: 'Forwards Coach' },
+        ],
+      },
+    ])
+    const { user } = renderStaff()
+    await openEverySquad(user)
+    expect(screen.queryByTestId('head-coach-nudge')).toBeNull()
+  })
+
+  it('ticking the flag on an UNTITLED coach fills the label in', async () => {
+    listSquadStaffMock.mockResolvedValue([
+      { id: 't-u13', name: 'U13 Mixed', staff: [{ ...COACH, title: null }] },
+    ])
+    setMembershipHeadCoachMock.mockResolvedValue({ id: 'm-coach', is_head_coach: true })
+    setMembershipTitleMock.mockResolvedValue({ id: 'm-coach', title: 'Head Coach' })
+    const { user } = renderStaff()
+    await openEverySquad(user)
+
+    await user.click(headCoachBox())
+    await waitFor(() =>
+      expect(setMembershipTitleMock).toHaveBeenCalledWith({
+        membershipId: 'm-coach',
+        title: 'Head Coach',
+      }),
+    )
+    expect(screen.getByLabelText('Title')).toHaveValue('Head Coach')
+  })
+})
+
 // The person card (claude/plans/2026-08-26-person-card.md): the staff member's
 // name on /admin/staff is a door to the card — the exact screen Jay
 // screenshotted asking for this.

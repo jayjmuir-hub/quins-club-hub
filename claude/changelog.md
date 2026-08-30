@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Edit your own messages, emoji-only bubbles render BIG, and the managers
+- **The head-coach TITLE and FLAG are linked on the staff screen — offer one
+  way, fill the other.** Two real coaches sat titled "Head Coach" with the
+  flag off, silently outside the approval emails and the Club Head Coaches
+  channel (both flagged by hand the same evening). The ruling "a title is
+  never permission" stands: a title claiming the job with the flag off draws
+  an advisory nudge whose one tap ticks the box — the TAP grants, never the
+  typing. The free direction: ticking the flag fills an EMPTY title with
+  "Head Coach"; a custom title is never overwritten, and a failed fill is a
+  missing label, not a broken flag. `src/screens/AdminStaff.jsx`,
+  `tests/admin-staff.test.jsx`. (SHA follows in the next changelog-touching
+  PR.)
+- `4da1d26` — **Edit your own messages, emoji-only bubbles render BIG, and the managers
   channel is "Club Age Group Managers".** Three at once, all in the SHARED
   chat components so every surface (channels, replies, DMs, groups, the dock)
   moves together. Edit: author-only inside the database's 15-minute rule
@@ -26,8 +37,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/lib/useChannelThread.js`, `useDmThread.js`, `roleChannels.js`,
   `scope.js`, `src/data/messages.js`, `src/lib/messageEdit.js` (new),
   `db/migrations/20260830_rename_managers_channel.sql`,
-  `tests/message-edit-and-emoji.test.jsx`. (SHA follows in the next
-  changelog-touching PR.)
+  `tests/message-edit-and-emoji.test.jsx`.
 - `b626891` — **Re-validated the Grok full-sweep against current `main` (docs only).** After
   ~20 PRs merged (pitch rework, role channels #550/#551, hygiene #552), all
   findings still substantively stand except item 14's `chat_media_owner` pin
