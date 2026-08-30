@@ -21,7 +21,7 @@ import { listPlayers, listPlayerPrivate } from '../data/players.js'
 // one that decides which squad a child belongs in.
 import { ageAt } from '../lib/ageGrade.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, isActiveMembership, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
+import { canWritePlayer, isActiveMembership, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
 import { GENDERS, genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
@@ -670,12 +670,13 @@ export default function Roster() {
     }
   }
 
-  // Whether the signed-in user may write to the OPEN player's squad. Asked
-  // per team through canEditTeam rather than inferred from the role, so its
-  // deliberate refusal of a null/unresolvable team_id applies here too. RLS
-  // is what actually enforces this; getting it wrong here can only hide a
-  // control, never authorise a write.
-  const canEditSelected = selectedPlayer ? canEditTeam(memberships, selectedPlayer.team_id) : false
+  // Whether the signed-in user may write to the OPEN player's squad — the
+  // client mirror of the "player edit" policy (canWritePlayer: the child
+  // write allowlist for admins, active squad staff otherwise), so a
+  // pitches-only admin gets no dead Edit button. RLS is what actually
+  // enforces this; getting it wrong here can only hide a control, never
+  // authorise a write.
+  const canEditSelected = selectedPlayer ? canWritePlayer(memberships, selectedPlayer.team_id) : false
   // A parent/player of THIS player, who is not already a coach of the squad.
   // Gates only whether the self-service form is offered; RLS and
   // set_own_player_photo() are what permit the writes.
@@ -930,7 +931,7 @@ export default function Roster() {
           players={visible}
           teams={scopedTeams}
           teamsById={teamsById}
-          canEditTeam={(teamId) => canEditTeam(memberships, teamId)}
+          canEditTeam={(teamId) => canWritePlayer(memberships, teamId)}
           onSelect={setSelectedPlayerId}
           onPatch={patchPlayer}
           photoUrls={photoUrls}

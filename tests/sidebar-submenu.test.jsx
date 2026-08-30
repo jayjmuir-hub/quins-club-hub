@@ -193,7 +193,11 @@ describe('Admin sub-menu', () => {
     expect(within(menu).queryByRole('link', { name: 'Pitch Management' })).toBeNull()
   })
 
-  it('a super admin sees every portal that has screens', () => {
+  it('a super admin sees every portal that has screens — except Welfare, until it is ticked', () => {
+    // ⚠️ Welfare is the deliberate exception since 30 Aug 2026 (Grok item 7):
+    // can_review_dm has no super short-circuit, so an unticked super would
+    // land on EMPTY welfare screens — the menu item waits for the explicit
+    // grant instead of offering a door onto a bare room.
     useMembershipsMock.mockReturnValue({
       memberships: [{ id: 'm1', role: 'admin', team_id: null, club_id: 'c1', status: 'active', is_super: true, admin_rights: [] }],
       teams: [],
@@ -201,6 +205,16 @@ describe('Admin sub-menu', () => {
     renderAt('/admin', { showAdmin: true })
     const menu = screen.getByTestId('submenu-admin')
     expect(within(menu).getByRole('link', { name: 'Pitch Management' })).toBeInTheDocument()
+    expect(within(menu).queryByRole('link', { name: 'Welfare' })).toBeNull()
+  })
+
+  it('a super admin who has ticked welfare sees the Welfare portal too', () => {
+    useMembershipsMock.mockReturnValue({
+      memberships: [{ id: 'm1', role: 'admin', team_id: null, club_id: 'c1', status: 'active', is_super: true, admin_rights: ['welfare'] }],
+      teams: [],
+    })
+    renderAt('/admin', { showAdmin: true })
+    const menu = screen.getByTestId('submenu-admin')
     expect(within(menu).getByRole('link', { name: 'Welfare' })).toBeInTheDocument()
   })
 

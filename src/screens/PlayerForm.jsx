@@ -10,7 +10,7 @@ import {
   upsertPlayer,
 } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditTeam, visibleTeams } from '../lib/scope.js'
+import { canWritePlayer, visibleTeams } from '../lib/scope.js'
 import { POSITIONS, POSITIONS_BY_UNIT } from '../lib/positions.js'
 import { isMinisTeam } from '../lib/minis.js'
 import { listPlayerGrades, listPlayerPositions, listPlayerUnits, savePlayerPositions, setPlayerGrade, setPlayerUnit, TIERS } from '../data/playerTiers.js'
@@ -37,13 +37,15 @@ import {
 // field: the club does not use squad numbers (see src/lib/playerFormat.js and
 // the §5.8 supersession note).
 //
-// Access control is NOT enforced here. Two RLS policies are the real
-// boundary, and they are separate on purpose:
-//   players.“player edit”          ALL, USING + WITH CHECK can_edit_team(team_id)
-//   player_contacts.“contact edit” ALL, USING + WITH CHECK can_edit_team(via player_id)
-// Everything this screen does with canEditTeam only narrows what it offers,
-// so a mistake here can hide a squad the user may edit but can never let a
-// write through that the database would refuse.
+// Access control is NOT enforced here. The RLS policies are the real
+// boundary — since the 28 Aug allowlists (Phase 1/S1):
+//   players.“player edit”          can_write_child() OR is_team_staff(team_id)
+//   player_contacts.“contact edit” the child-contacts EDIT allowlist
+// canWritePlayer mirrors the players policy, so a pitches-only admin (who
+// fails both arms) is refused the form instead of being handed dead fields.
+// Everything this screen does with it only narrows what it offers, so a
+// mistake here can hide a squad the user may edit but can never let a write
+// through that the database would refuse.
 //
 // SAFEGUARDING — the reason this file is not just EventForm with different
 // labels:
@@ -62,10 +64,10 @@ import {
 //    the contact read from being issued at all.
 // 3. A null contact row here can only mean "nothing recorded yet", never
 //    "withheld": this form renders only for someone who passes
-//    can_edit_team FOR THIS PLAYER'S TEAM — enforced by the `gated` check
-//    below, in this file, not by whoever opened it — and player_contacts'
-//    read policy is `can_edit_team(...) OR is_own_player(...)`, so edit
-//    access strictly implies read access. That local enforcement is what
+//    canWritePlayer FOR THIS PLAYER'S TEAM — enforced by the `gated` check
+//    below, in this file, not by whoever opened it — and the contacts READ
+//    allowlist is a strict superset of the WRITE one (welfare is the extra,
+//    read-only member), so edit access strictly implies read access. That local enforcement is what
 //    makes this paragraph true; without it a coach handed a player from
 //    another age group would see a null row RLS had withheld and read it as
 //    "nothing on file". So blank, editable fields are honest, and there is
@@ -162,13 +164,13 @@ function initialValues(player, editableTeams) {
 export default function PlayerForm({ player = null, onClose, onSaved }) {
   const { memberships, teams } = useMemberships()
 
-  // Teams this user may actually write to. For an admin that is every team;
-  // for a coach only the squads they coach. canEditTeam is asked per team
-  // rather than inferred from the role, so its deliberate null-team_id
-  // refusal applies here too — a team with no resolvable id never becomes a
+  // Teams this user may actually write to: every team for an admin on the
+  // child-write allowlist, the squads they staff for a coach. canWritePlayer
+  // is asked per team rather than inferred from the role, so its deliberate
+  // null-team_id refusal applies here too — a team with no resolvable id never becomes a
   // dropdown option.
   const editableTeams = useMemo(
-    () => visibleTeams(memberships, teams).filter((team) => canEditTeam(memberships, team.id)),
+    () => visibleTeams(memberships, teams).filter((team) => canWritePlayer(memberships, team.id)),
     [memberships, teams],
   )
 
@@ -191,7 +193,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   // U14 player gets the refusal, not blank contact fields over a null row that
   // RLS actually withheld.
   const noEditableTeams = editableTeams.length === 0
-  const notThisPlayer = Boolean(player) && !canEditTeam(memberships, player.team_id)
+  const notThisPlayer = Boolean(player) && !canWritePlayer(memberships, player.team_id)
   const gated = noEditableTeams || notThisPlayer
 
   const [values, setValues] = useState(() => initialValues(player, editableTeams))

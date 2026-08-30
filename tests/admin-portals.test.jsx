@@ -248,17 +248,32 @@ describe('PortalChooser', () => {
   // cards and one grey. It is rewritten rather than deleted because the claim
   // it makes is the durable one: a super admin holds every right implicitly,
   // so nothing is closed to them for want of a right.
-  it('⚠️ opens every portal for a SUPER admin, who holds every right implicitly', () => {
-    // ⚠️ `admin_rights: []` on purpose — a super must open all six, clubadmin
-    // included, WITHOUT holding any right literally. That is the invariant the
-    // backfill leans on: supers are never backfilled.
+  it('⚠️ opens every portal for a SUPER admin — except Welfare, the deliberate carve-out', () => {
+    // ⚠️ `admin_rights: []` on purpose — a super must open the others,
+    // clubadmin included, WITHOUT holding any right literally. That is the
+    // invariant the backfill leans on: supers are never backfilled.
+    // ⚠️ WELFARE IS THE EXCEPTION since 30 Aug 2026 (Grok item 7):
+    // can_review_dm has no super short-circuit, so an unticked super would
+    // land on EMPTY welfare screens — the card greys until welfare is
+    // explicitly self-ticked (an audited write).
     useMembershipsMock.mockReturnValue(memberships(admin([], { is_super: true, admin_rights: [] })))
+    renderAt('/admin')
+
+    expect(screen.getAllByTestId('portal-card-open')).toHaveLength(5)
+    const closed = screen.getAllByTestId('portal-card-closed')
+    expect(closed).toHaveLength(1)
+    expect(closed[0]).toHaveTextContent(/Welfare/)
+    expect(closed[0]).toHaveAttribute('data-reason', 'no-right')
+    expect(screen.getByRole('link', { name: /Social Media Management/ }))
+      .toHaveAttribute('href', '/admin/social')
+  })
+
+  it('opens all six for a super who has ticked welfare explicitly', () => {
+    useMembershipsMock.mockReturnValue(memberships(admin([], { is_super: true, admin_rights: ['welfare'] })))
     renderAt('/admin')
 
     expect(screen.getAllByTestId('portal-card-open')).toHaveLength(6)
     expect(screen.queryAllByTestId('portal-card-closed')).toHaveLength(0)
-    expect(screen.getByRole('link', { name: /Social Media Management/ }))
-      .toHaveAttribute('href', '/admin/social')
   })
 
   it('tells somebody without the job how to get it, which is a different message', () => {

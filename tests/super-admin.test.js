@@ -7,7 +7,12 @@ import {
   adminRightLabel,
   adminRights,
   canEditChildContacts,
+  canEditChildPhotos,
+  canReviewDm,
   canSeeChildContacts,
+  canSeeChildPhotos,
+  canWriteChild,
+  canWritePlayer,
   hasAdminRight,
   isAdmin,
   isSuperAdmin,
@@ -202,5 +207,80 @@ describe('canSeeChildContacts / canEditChildContacts', () => {
     expect(canSeeChildContacts([])).toBe(false)
     expect(canSeeChildContacts(null)).toBe(false)
     expect(canEditChildContacts(undefined)).toBe(false)
+  })
+})
+
+// The sibling allowlists (S1 write, S3 photos) and the DM-review gate —
+// client mirrors of can_write_child / can_see_child_photos /
+// can_edit_child_photos / can_review_dm, added 30 Aug 2026 (Grok item 7).
+describe('canWriteChild / canSeeChildPhotos / canEditChildPhotos', () => {
+  it('a super holds all three implicitly', () => {
+    const rows = [admin({ is_super: true })]
+    expect(canWriteChild(rows)).toBe(true)
+    expect(canSeeChildPhotos(rows)).toBe(true)
+    expect(canEditChildPhotos(rows)).toBe(true)
+  })
+
+  it('clubadmin/youth/media write, see and edit', () => {
+    for (const right of ['clubadmin', 'youth', 'media']) {
+      const rows = [admin({ admin_rights: [right] })]
+      expect(canWriteChild(rows)).toBe(true)
+      expect(canSeeChildPhotos(rows)).toBe(true)
+      expect(canEditChildPhotos(rows)).toBe(true)
+    }
+  })
+
+  it('⚠️ welfare sees photos but neither writes children nor edits photos', () => {
+    const rows = [admin({ admin_rights: ['welfare'] })]
+    expect(canSeeChildPhotos(rows)).toBe(true)
+    expect(canWriteChild(rows)).toBe(false)
+    expect(canEditChildPhotos(rows)).toBe(false)
+  })
+
+  it('⚠️ a pitches/training admin is refused all three', () => {
+    for (const right of ['pitches', 'training']) {
+      const rows = [admin({ admin_rights: [right] })]
+      expect(canWriteChild(rows)).toBe(false)
+      expect(canSeeChildPhotos(rows)).toBe(false)
+      expect(canEditChildPhotos(rows)).toBe(false)
+    }
+  })
+})
+
+describe('canReviewDm — the one right a super does NOT hold implicitly', () => {
+  it('⚠️ a SUPER without the explicit welfare grant is refused (spec §5.2 note ²)', () => {
+    expect(canReviewDm([admin({ is_super: true, admin_rights: [] })])).toBe(false)
+  })
+
+  it('an explicit welfare holder reviews — super or not', () => {
+    expect(canReviewDm([admin({ admin_rights: ['welfare'] })])).toBe(true)
+    expect(canReviewDm([admin({ is_super: true, admin_rights: ['welfare'] })])).toBe(true)
+  })
+
+  it('any other right, a pending admin, a coach and empty input are refused', () => {
+    expect(canReviewDm([admin({ admin_rights: ['clubadmin'] })])).toBe(false)
+    expect(canReviewDm([admin({ status: 'pending', admin_rights: ['welfare'] })])).toBe(false)
+    expect(canReviewDm([{ role: 'coach', status: 'active', admin_rights: ['welfare'] }])).toBe(false)
+    expect(canReviewDm([])).toBe(false)
+    expect(canReviewDm(null)).toBe(false)
+  })
+})
+
+describe('canWritePlayer — the client mirror of the "player edit" policy', () => {
+  it('an allowlisted admin writes any player; a pitches admin writes none', () => {
+    expect(canWritePlayer([admin({ admin_rights: ['clubadmin'] })], 'team-1')).toBe(true)
+    expect(canWritePlayer([admin({ admin_rights: ['pitches'] })], 'team-1')).toBe(false)
+  })
+
+  it('active squad staff write their own squad only; pending staff write nothing', () => {
+    const activeCoach = [{ role: 'coach', status: 'active', team_id: 'team-1' }]
+    expect(canWritePlayer(activeCoach, 'team-1')).toBe(true)
+    expect(canWritePlayer(activeCoach, 'team-2')).toBe(false)
+    expect(canWritePlayer([{ role: 'coach', status: 'pending', team_id: 'team-1' }], 'team-1')).toBe(false)
+  })
+
+  it('a null teamId is refused for staff but not for the allowlist (which is club-wide)', () => {
+    expect(canWritePlayer([{ role: 'coach', status: 'active', team_id: null }], null)).toBe(false)
+    expect(canWritePlayer([admin({ is_super: true })], null)).toBe(true)
   })
 })
