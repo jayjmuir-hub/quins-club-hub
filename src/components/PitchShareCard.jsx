@@ -73,6 +73,30 @@ function Shell({ title, children, innerRef, minWidth, maxWidth }) {
   )
 }
 
+/** The reassurance line coaches and managers get with the picture: the pitch
+ *  they can see here is already on their session in the app, so it is not a
+ *  to-do (Jay, 30 Aug 2026). Part of the shared PNG, so it travels with it. */
+function SavedNote() {
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        background: '#f4f6f8',
+        borderRadius: 8,
+        borderLeft: `3px solid ${BRAND}`,
+        padding: '9px 11px',
+        fontSize: 12,
+        color: INK,
+        fontWeight: 600,
+        lineHeight: 1.45,
+      }}
+    >
+      These pitches are already saved to each squad&apos;s training session — coaches and managers
+      will see them on the session in Club Hub, so there&apos;s nothing to add.
+    </div>
+  )
+}
+
 /** The status pill — brand for full, green for spare, amber for an overload. */
 function StatusChip({ over, spareFraction, text }) {
   const full = !over && spareFraction < 1e-9
@@ -92,19 +116,34 @@ function StatusChip({ over, spareFraction, text }) {
 function PitchBar({ bar, compact = false }) {
   const load = bar.segments.reduce((sum, seg) => sum + seg.fraction, 0)
   const scale = Math.max(load, 1)
-  const height = compact ? 26 : 46
+  const height = compact ? 30 : 46
+  // Horizontal breathing room inside each segment so a squad code can never sit
+  // against the white divider — 4px each side on the tight week bars, and a
+  // single-line ellipsis as the safety valve for a label that still will not fit
+  // (Jay, 30 Aug 2026: "text is touching lines").
+  const labelStyle = {
+    width: '100%',
+    textAlign: 'center',
+    fontSize: compact ? 8 : 13,
+    fontWeight: 800,
+    lineHeight: 1.15,
+    letterSpacing: compact ? '-0.04em' : 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  }
 
   return (
-    <div style={{ marginBottom: compact ? 6 : 12 }}>
+    <div style={{ marginBottom: compact ? 8 : 12 }}>
       {!compact && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
           <span style={{ fontWeight: 900, fontSize: 14, color: INK }}>{bar.pitch}</span>
           <StatusChip over={bar.over} spareFraction={bar.spareFraction} text={bar.statusText} />
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 5 : 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 6 : 0 }}>
         {compact && (
-          <span style={{ width: 26, flex: 'none', fontSize: 11, fontWeight: 900, color: INK }}>{bar.pitch}</span>
+          <span style={{ width: 24, flex: 'none', fontSize: 11, fontWeight: 900, color: INK }}>{bar.pitch}</span>
         )}
         <div
           role="img"
@@ -124,8 +163,9 @@ function PitchBar({ bar, compact = false }) {
               key={seg.key}
               style={{
                 width: `${(seg.fraction / scale) * 100}%`,
+                minWidth: 0,
                 background: bar.over ? OVER_FILL : FIELD[i % FIELD.length],
-                borderRight: `1.5px solid ${WHITE}`,
+                borderRight: `${compact ? 1 : 1.5}px solid ${WHITE}`,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -133,12 +173,10 @@ function PitchBar({ bar, compact = false }) {
                 color: WHITE,
                 textShadow: '0 1px 1px rgba(0,0,0,.3)',
                 overflow: 'hidden',
-                padding: '0 2px',
+                padding: compact ? '0 2px' : '0 6px',
               }}
             >
-              <span style={{ fontSize: compact ? 9.5 : 13, fontWeight: 800, lineHeight: 1.1, textAlign: 'center' }}>
-                {compact ? shortSquad(seg.squad) : seg.squad}
-              </span>
+              <span style={labelStyle}>{compact ? shortSquad(seg.squad) : seg.squad}</span>
               {!compact && (
                 <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.9 }}>{seg.portionShort}</span>
               )}
@@ -148,6 +186,7 @@ function PitchBar({ bar, compact = false }) {
             <div
               style={{
                 width: `${(bar.spareFraction / scale) * 100}%`,
+                minWidth: 0,
                 background: SPARE_FILL,
                 display: 'flex',
                 alignItems: 'center',
@@ -155,6 +194,9 @@ function PitchBar({ bar, compact = false }) {
                 color: MUTED,
                 fontSize: compact ? 9 : 11.5,
                 fontWeight: 700,
+                letterSpacing: compact ? '-0.02em' : 0,
+                overflow: 'hidden',
+                padding: '0 4px',
               }}
             >
               {compact ? 'spare' : 'Spare'}
@@ -181,6 +223,7 @@ export const PitchDayCard = forwardRef(function PitchDayCard({ title, slots }, r
           ))}
         </div>
       ))}
+      <SavedNote />
     </Shell>
   )
 })
@@ -191,12 +234,12 @@ export const PitchDayCard = forwardRef(function PitchDayCard({ title, slots }, r
  */
 export const PitchWeekCard = forwardRef(function PitchWeekCard({ title, days }, ref) {
   return (
-    <Shell title={title} innerRef={ref} minWidth={900} maxWidth={1120}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+    <Shell title={title} innerRef={ref} minWidth={1180} maxWidth={1300}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10 }}>
         {days.map((day) => (
           <div
             key={`${day.weekday}-${day.dayNum}`}
-            style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: '8px 7px', minHeight: 150, opacity: day.empty ? 0.5 : 1 }}
+            style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 9px', minHeight: 150, opacity: day.empty ? 0.5 : 1 }}
           >
             <div
               style={{
@@ -215,8 +258,8 @@ export const PitchWeekCard = forwardRef(function PitchWeekCard({ title, days }, 
               <div style={{ color: MUTED, fontSize: 18, textAlign: 'center', paddingTop: 20, fontWeight: 700 }}>—</div>
             ) : (
               day.slots.map((slot) => (
-                <div key={`${slot.timeMs}-${slot.timeLabel}`} style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 9.5, fontWeight: 800, color: BRAND, marginBottom: 5 }}>{slot.timeLabel}</div>
+                <div key={`${slot.timeMs}-${slot.timeLabel}`} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 800, color: BRAND, marginBottom: 6 }}>{slot.timeLabel}</div>
                   {slot.pitches.map((bar) => (
                     <PitchBar key={bar.pitch} bar={bar} compact />
                   ))}
@@ -229,6 +272,7 @@ export const PitchWeekCard = forwardRef(function PitchWeekCard({ title, days }, 
       <div style={{ fontSize: 11, color: MUTED, fontWeight: 600, marginTop: 6 }}>
         Each bar is one pitch, split by squad. Segment width = portion (¼, ⅓, ½).
       </div>
+      <SavedNote />
     </Shell>
   )
 })
