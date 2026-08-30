@@ -70,8 +70,10 @@ const TEAM = { id: 't-u14b', club_id: CLUB_ID, name: 'U14B Contact', sort_order:
 const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
 
 // A Tuesday training session with every detail somebody actually typed. This
-// is the fixture the whole feature is about: the venue, pitch, end time and
-// notes are the work, and re-entering them by hand is what Duplicate removes.
+// is the fixture the whole feature is about: the venue, end time and notes are
+// the work, and re-entering them by hand is what Duplicate removes. The pitch
+// (A2) is here to prove the OPPOSITE — it must NOT carry, because a pitch is a
+// dated booking, not a fixture detail (see the "re-enters allocation" test).
 const TRAINING = {
   id: 'e-tue',
   club_id: CLUB_ID,
@@ -135,7 +137,6 @@ describe('Duplicate — what carries over', () => {
     expect(saved.type).toBe('training')
     expect(saved.title).toBe('U14 Contact & Conditioning')
     expect(saved.venue).toBe('Zayed Sports City, Abu Dhabi')
-    expect(saved.pitch).toBe('A2')
     expect(saved.notes).toBe('Meet at the gate 30 minutes before. Bring both kits.')
     expect(saved.team_id).toBe('t-u14b')
   })
@@ -166,6 +167,35 @@ describe('Duplicate — what must NOT carry over', () => {
     await user.click(screen.getByRole('button', { name: /^add event$/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/highlighted fields/i)
     expect(upsertEventMock).not.toHaveBeenCalled()
+  })
+
+  it('⚠️ clears the pitch to "Pitch TBD" so it re-enters allocation', async () => {
+    // Reversed 30 Aug 2026 — it used to carry the pitch. A pitch is a scarce
+    // shared booking on a SPECIFIC date, not a detail of the fixture: carrying
+    // A2 onto a new date silently re-booked A2 then, skipping the allocation
+    // step every other booking goes through, and the clash it created was
+    // invisible until two squads turned up on the same grass. A duplicate now
+    // opens "not allocated yet" (the marker the Allocation screen lists as
+    // unallocated) and must be given a pitch afresh. The portion goes with it:
+    // a split with no pitch to split saves null.
+    const user = renderForm({ event: TRAINING, duplicate: true })
+    // The pitch <select> shows the TBD placeholder, not the source's A2, and
+    // the free-text "Pitch name" box (shown only for a real pitch) is absent.
+    expect(field('event-pitch')).toHaveValue('Pitch TBD')
+    expect(screen.queryByLabelText('Pitch name')).toBeNull()
+    await pickDateAndSave(user)
+
+    expect(TRAINING.pitch).toBe('A2')
+    expect(payload().pitch).toBe('Pitch TBD')
+    expect(payload().pitch_portion ?? null).toBeNull()
+  })
+
+  it('still carries the pitch when actually editing, not duplicating', () => {
+    // The discriminating half: clearing the pitch is a DUPLICATE rule. Editing
+    // the fixture in place must still open on its real pitch — with the list
+    // mocked empty, A2 falls to the free-text "Pitch name" box.
+    renderForm({ event: TRAINING })
+    expect(screen.getByLabelText('Pitch name')).toHaveValue('A2')
   })
 
   it('⚠️ does not join the original series', async () => {

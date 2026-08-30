@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **The pitch calendar reads pitch by pitch, and shows the portion.** Four things
+- **Duplicating an event no longer inherits the original's pitch.** A duplicate
+  opened with the source fixture's pitch pre-filled and saved it silently, re-booking
+  that pitch on the new date without going through allocation — the clash invisible
+  until two squads turned up on the same grass (Jay). A duplicate now opens at
+  `Pitch TBD` ("not allocated yet", the marker the Allocation screen lists as
+  unallocated) and must be given a pitch afresh; the portion resets with it (a split
+  with no pitch saves null). Reverses the 12 Aug choice to carry the pitch as "part
+  of the work" — a pitch is a dated booking, not a fixture detail.
+  `src/screens/EventForm.jsx`, `tests/duplicate-event.test.jsx`. (SHA follows in the
+  next changelog-touching PR.)
+- `e3ca6af` — **The pitch calendar reads pitch by pitch, and shows the portion.** Four things
   Jay asked for on the pitch-management calendar: (1) a booking in the WEEK view
   now opens its details on click, the same details-first tap the day grid uses;
   (2) the MONTH view lists the fixtures instead of a count and a dot ("just
@@ -24,8 +34,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   reworked week/month), `src/screens/Allocation.jsx`, `src/screens/PitchGlance.jsx`,
   `src/screens/EventDetail.jsx`, and `tests/pitch-week-grouping.test.js`,
   `tests/allocation.test.jsx`, `tests/pitch-glance.test.jsx`,
-  `tests/event-detail-series.test.jsx`. (SHA follows in the next
-  changelog-touching PR.)
+  `tests/event-detail-series.test.jsx`.
 - `fad3ef9` — **A pitch can be booked as a third, not just a quarter/half/full.** Three
   squads sharing one pitch each take a third, and there was no way to say so — a
   third had to be rounded to a quarter or a half, which then mis-read as a clash
