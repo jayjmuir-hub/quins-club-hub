@@ -129,6 +129,44 @@ beforeEach(() => {
   }
 })
 
+// ⚠️ NO TEST TALKS TO A REAL SUPABASE HOST. Same class of fix as the
+// QuietWebSocket above, one layer down: jsdom's fetch and the node-env files'
+// native fetch are genuine network clients, and a component whose data module
+// is not mocked makes a genuine request. Locally that reached the LIVE
+// project — measured 30 Aug 2026 on the Supabase dashboard as a steady
+// stream of 401s with a `node` user-agent and stub fixture ids in the
+// filters, traced to a long-lived vitest process. RLS refused everything, so
+// the cost was production noise, not disclosure; it is still production
+// traffic from a test suite.
+//
+// This wrapper rejects any fetch whose host ends in .supabase.co, instantly.
+// An unmocked data module now takes its `.catch`/error path at once — the
+// same observable behaviour the live 401 produced, minus the network. It
+// promises nothing else: per the 11 Aug note below, a global guard cannot
+// reliably surface an EXPLANATORY failure (components swallow the rejection),
+// so this one does not claim to. It only keeps the suite off the network.
+//
+// The integration run (VITEST_MODE=integration) is exempt — hitting the live
+// project is that suite's entire job, and it says so at the top of its file.
+if (process.env.VITEST_MODE !== 'integration' && typeof globalThis.fetch === 'function') {
+  const realFetch = globalThis.fetch.bind(globalThis)
+  globalThis.fetch = (input, init) => {
+    let host = ''
+    try {
+      const url = typeof input === 'string' ? input : (input && input.url) || String(input)
+      host = new URL(url, 'http://localhost').hostname
+    } catch {
+      // Unparseable input: let the real fetch produce its own error.
+    }
+    if (host === 'supabase.co' || host.endsWith('.supabase.co')) {
+      return Promise.reject(
+        new Error(`test tried to reach ${host} — mock the data module this component imports`),
+      )
+    }
+    return realFetch(input, init)
+  }
+}
+
 // ⚠️ UNIT TESTS MUST MOCK EVERY DATA MODULE THEIR COMPONENT IMPORTS.
 //
 // This is a working rule rather than an enforced one, and it has cost two

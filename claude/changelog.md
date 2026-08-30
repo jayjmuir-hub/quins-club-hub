@@ -10,7 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Members appear UNDER the channel name — the header is the door.** Jay,
+- **THE HARNESS AND THE TEST SUITE STOP TALKING TO PRODUCTION — measured, not
+  assumed.** Supabase's dashboard showed ~94k requests/24h at a 21% success
+  rate; the failures traced to Jay's own machines running this repo's tooling:
+  un-stubbed data modules in the screenshot harness (whose alias list stubs
+  one module at a time, and whose own comments predicted the escape) and
+  unmocked data modules in long-lived vitest processes, all firing the app's
+  stub fixture ids at the LIVE database. RLS refused every call — noise, not
+  disclosure. Three fixes: `harness/stubs/supabase.js`, an inert Proxy client
+  aliased under every un-stubbed module so the harness's "no network" promise
+  stops depending on the alias list being complete (verified live: scenarios
+  render on stub data, zero `*.supabase.co` requests); a quiet-fetch in
+  `src/test/setup.js` that rejects any test fetch to a Supabase host (the
+  QuietWebSocket pattern one layer down; integration mode exempt; promises
+  only network silence, per the 11 Aug tombstone about explanatory guards);
+  and `db/migrations/20260830_pin_private_helper_search_path.sql`, pinning
+  `search_path` on `private.squad_expects_gender` and
+  `private.chat_media_owner` — the security advisor's only two genuine
+  findings among 57 (the ~52 SECURITY DEFINER warnings are the app's access
+  model working as designed). Migration applied to production and proven by
+  `db/tests/private-helper-search-path.sql` (control first, then the pin,
+  then both helpers still answering correctly). `harness/vite.config.js`,
+  `tests/harness-stubs.test.js` — whose alias-count guard caught its seventh
+  unregistered alias, this once fixed in the same change.
+- `eda9774` — **Members appear UNDER the channel name — the header is the door.** Jay,
   minutes after role channels shipped: "they don't appear under the channel
   name, need to click the 3 dots". Role channels and squad STAFF channels now
   wear their member line as the subtitle, WhatsApp-style ("You, Aran,
@@ -19,8 +42,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   gains `onInfoClick`). The squad channel keeps its count (forty first names
   is noise) and the club channel its wording (its sheet is admin-only). The ⋯
   "View members" entry stays — two doors, one room. `src/components/
-  ChatHeader.jsx`, `src/screens/Chat.jsx`, `tests/chat.test.jsx`. (SHA follows
-  in the next changelog-touching PR.)
+  ChatHeader.jsx`, `src/screens/Chat.jsx`, `tests/chat.test.jsx`.
 - `4daaaec` — **ROLE CHANNELS — five club-wide chats whose membership is derived from
   roles, never stored.** Jay: group chats for staff circles without a
   hand-ticked list that goes stale. Club Head Coaches (head-coach flag), Club
