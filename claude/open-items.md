@@ -179,13 +179,13 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
 
 ### UX, not data (RLS already refuses the write)
 
-- **`canEditTeam` does not require `status='active'`.** `src/lib/scope.js:452-465`
-  (and Roster `canEditAnything`, `src/screens/Roster.jsx:306-310`) lack the
-  active check that `private.can_edit_team` enforces, so an active parent who has
-  *requested* to coach sees Edit / Add player / Availability override / Match
-  sheet / Squad Hub — every write then fails at RLS. Dead controls, no leak;
-  17 Aug was the opposite direction. **Fix:** add `isActiveMembership` on the
-  staff arm; `tests/scope.test.js` pending-coach + active-parent fixture.
+- ✅ **Item 4 FIXED, 30 Aug 2026**: `canEditTeam`'s staff arm and Roster's
+  `canEditAnything` require `isActiveMembership`, matching the SQL
+  `can_edit_team`. `visibleTeams` keeps pending squads visible per D6 and now
+  documents why; `isOwnPlayer` documents its deliberate status-blindness
+  (item 18's residual comment). Pending-coach + active-parent fixtures pinned
+  in `tests/scope.test.js`; every staff fixture in tests/ now carries a
+  status, the shape the schema requires.
 
 ### Latent — bites only when a narrowed admin grant is issued (harmless today via the `clubadmin` backfill)
 

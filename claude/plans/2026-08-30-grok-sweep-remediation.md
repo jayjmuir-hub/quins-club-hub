@@ -10,6 +10,10 @@ PR 1 ships now (Jay already holds `welfare`). `main` is production
   to prod, harness red-then-green, schema recaptured in-PR).
 - **PR 2 — SHIPPED 30 Aug 2026** (`20260830_last_admin_guard.sql`, applied to
   prod, harness red-then-green with dropped-trigger self-test).
+- **PR 4 — SHIPPED 30 Aug 2026** (items 5 & 9: write-safety guards + view-as
+  welfare audit; D5 default taken — unread badges left as-is).
+- **PR 5 — SHIPPED 30 Aug 2026** (item 4: staff edit-gates active-only; D6
+  default taken — pending squads stay visible, now documented).
 - **PR 4 — SHIPPED 30 Aug 2026** (items 5 & 9: write-safety guards +
   view-as welfare audit; D5 default taken — unread badges left as-is).
 

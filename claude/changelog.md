@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Grok items 5 & 9 SHIPPED — silent-refusal chat writes throw, and view-as
+- **Grok item 4 SHIPPED — staff edit-gates require an ACTIVE membership.**
+  `canEditTeam`'s squad-staff arm and Roster's `canEditAnything` gain the
+  `isActiveMembership` check the SQL `can_edit_team` has always had, so a
+  self-registered PENDING coach no longer sees edit controls whose every
+  write fails at RLS (dead controls, no leak). `visibleTeams` keeps pending
+  squads visible per D6 — visibility is not capability — and says so;
+  `isOwnPlayer` documents its deliberate status-blindness (mirrors the SQL).
+  Every staff fixture in tests/ that omitted `status` gains `'active'`: the
+  column is NOT NULL, so the status-less shape never existed in production
+  and was exactly what let the old gate look correct.
+  `src/lib/scope.js`, `src/screens/Roster.jsx`, `tests/scope.test.js` and
+  eleven fixture files. (SHA follows in the next changelog-touching PR.)
+- `74bd367` — **Grok items 5 & 9 SHIPPED — silent-refusal chat writes throw, and view-as
   stops skipping the welfare audit.** `deleteConversation` and
   `resolveReport` gain the `.select('id')` + zero-rows-throws guard
   `removeMessage` already carried — an RLS refusal came back as
@@ -21,8 +33,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   real `auth.uid()` throughout a preview). New hook test pins all three
   directions. `src/data/messages.js`, `src/lib/useDmThread.js`,
   `tests/messages-data.test.js`, `tests/dm-thread-view-as.test.jsx` (new),
-  `tests/direct-messages.test.jsx`. (SHA follows in the next
-  changelog-touching PR.)
+  `tests/direct-messages.test.jsx`.
 - `81a1536` — **Grok item 8 SHIPPED — the club's last active admin can be neither demoted
   nor deleted.** `updateMembershipRole`/`deleteMembership` are direct table
   writes with no RPC chokepoint, so the guard is a `BEFORE UPDATE OR DELETE`
