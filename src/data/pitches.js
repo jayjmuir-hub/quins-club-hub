@@ -218,6 +218,11 @@ function collectPitchShares(events) {
   for (const event of events) {
     const pitch = (event?.pitch ?? '').trim()
     if (!pitch || pitch === PITCH_TBD) continue
+    // A tournament GAME lives inside its container: the container occupies the
+    // pitch, the games must not count a second time. Both feeds already filter
+    // them (listEvents and, since 30 Aug, the pitch_occupancy RPC); this keeps
+    // the engine honest if a caller ever hands it an unfiltered list.
+    if (event.tournament_id) continue
     if (Number.isNaN(Date.parse(event.starts_at))) continue // rubbish start: skip, never throw
     if (!byPitch.has(pitch)) byPitch.set(pitch, [])
     byPitch.get(pitch).push(event)

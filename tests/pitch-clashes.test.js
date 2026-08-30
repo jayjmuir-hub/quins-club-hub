@@ -237,4 +237,27 @@ describe('findPitchClashes', () => {
       ]),
     ).toHaveLength(1)
   })
+
+  it('a tournament GAME never counts as an occupant — only its container does', () => {
+    // The container occupies the pitch for the day; its games inherit the
+    // pitch, carry no ends_at, and no pitch_portion (portionFraction(null)=1),
+    // so pre-fix each game read as a second full-pitch booking. Both feeds
+    // filter games out (listEvents, pitch_occupancy since 30 Aug); the engine
+    // ignores them too so an unfiltered caller cannot resurrect the false
+    // clash.
+    const events = [
+      at('2026-09-05T09:00:00Z', { id: 'container', ends_at: '2026-09-05T15:00:00Z' }),
+      at('2026-09-05T10:00:00Z', { id: 'game1', tournament_id: 'container' }),
+      at('2026-09-05T11:00:00Z', { id: 'game2', tournament_id: 'container' }),
+    ]
+    expect(findPitchClashes(events)).toHaveLength(0)
+
+    // A genuine second booking on the same pitch still clashes with the
+    // container — the exclusion is games-only, not tournament-day-wide.
+    const withRealClash = [
+      ...events,
+      at('2026-09-05T09:30:00Z', { id: 'intruder', ends_at: '2026-09-05T10:30:00Z' }),
+    ]
+    expect(flaggedIds(withRealClash)).toEqual(['container', 'intruder'])
+  })
 })

@@ -22,13 +22,19 @@ begin;
 
 -- Self-sufficient: (re)create the function exactly as the migration does, so
 -- the harness also serves as a pre-application rehearsal.
+-- ⚠️ REPAIRED 30 Aug 2026: this block re-created the OLD 8-column return type
+-- against the live 9-column (pitch_portion) function and threw `cannot change
+-- return type` on every run. Now the 20260830 body: 9 columns AND the
+-- tournament-game exclusion (Grok item 3).
+drop function if exists public.pitch_occupancy(timestamptz, timestamptz);
 create or replace function public.pitch_occupancy(_from timestamptz, _to timestamptz)
-returns table (id uuid, team_id uuid, team_name text, type text, starts_at timestamptz, ends_at timestamptz, pitch text, group_id uuid)
+returns table (id uuid, team_id uuid, team_name text, type text, starts_at timestamptz, ends_at timestamptz, pitch text, pitch_portion text, group_id uuid)
 language sql stable security definer set search_path to 'public'
 as $$
-  select e.id, e.team_id, t.name, e.type, e.starts_at, e.ends_at, e.pitch, e.group_id
+  select e.id, e.team_id, t.name, e.type, e.starts_at, e.ends_at, e.pitch, e.pitch_portion, e.group_id
   from events e join teams t on t.id = e.team_id
   where e.starts_at >= _from and e.starts_at < _to
+    and e.tournament_id is null
     and exists (select 1 from memberships m
       where m.profile_id = auth.uid() and m.status = 'active'
         and (m.role = 'admin' or (m.role in ('coach','manager','medic') and m.team_id is not null)));
@@ -65,6 +71,29 @@ select 'eee00000-0000-4000-8000-0000000000f1', club_id, id, 'match', 'HARNESS se
        now() + interval '3 days', now() + interval '3 days 90 minutes', 'D2'
 from teams order by sort_order offset 1 limit 1;
 
+-- A genuine same-pitch, same-slot double-booking on the SAME squad — the
+-- positive control that a real clash still comes out of the function.
+insert into events (id, club_id, team_id, type, title, starts_at, ends_at, pitch)
+select 'eee00000-0000-4000-8000-0000000000f5', club_id, id, 'training', 'HARNESS real clash',
+       now() + interval '3 days', now() + interval '3 days 60 minutes', 'D2'
+from teams order by sort_order offset 1 limit 1;
+
+-- A tournament CONTAINER on pitch D3 with two GAMES inside it (Grok item 3):
+-- the container occupies the pitch; the games inherit it, carry no ends_at,
+-- and must NOT come out of the function as extra full-pitch occupants.
+insert into events (id, club_id, team_id, type, competition_type, title, starts_at, ends_at, pitch)
+select 'eee00000-0000-4000-8000-0000000000f2', club_id, id, 'match', 'tournament', 'HARNESS tournament day',
+       now() + interval '4 days', now() + interval '4 days 6 hours', 'D3'
+from teams order by sort_order offset 1 limit 1;
+insert into events (id, club_id, team_id, type, competition_type, tournament_id, title, starts_at, pitch)
+select 'eee00000-0000-4000-8000-0000000000f3', club_id, id, 'match', 'tournament', 'eee00000-0000-4000-8000-0000000000f2', 'HARNESS game 1',
+       now() + interval '4 days 1 hour', 'D3'
+from teams order by sort_order offset 1 limit 1;
+insert into events (id, club_id, team_id, type, competition_type, tournament_id, title, starts_at, pitch)
+select 'eee00000-0000-4000-8000-0000000000f4', club_id, id, 'match', 'tournament', 'eee00000-0000-4000-8000-0000000000f2', 'HARNESS game 2',
+       now() + interval '4 days 2 hours', 'D3'
+from teams order by sort_order offset 1 limit 1;
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"c0000000-0000-4000-8000-0000000000a1","role":"authenticated"}';
 
@@ -73,6 +102,20 @@ insert into _r select 'coach sees other squad''s booking via the function',
 
 insert into _r select 'control: coach CANNOT read that event from the table',
   case when not exists (select 1 from events where id = 'eee00000-0000-4000-8000-0000000000f1') then 'PASS' else 'FAIL' end;
+
+insert into _r select 'a genuine same-pitch double-booking still comes out (both rows)',
+  case when (select count(*) from public.pitch_occupancy(now(), now() + interval '7 days')
+             where id in ('eee00000-0000-4000-8000-0000000000f1','eee00000-0000-4000-8000-0000000000f5')) = 2
+       then 'PASS' else 'FAIL' end;
+
+insert into _r select 'the tournament CONTAINER occupies its pitch',
+  case when exists (select 1 from public.pitch_occupancy(now(), now() + interval '7 days')
+                    where id = 'eee00000-0000-4000-8000-0000000000f2') then 'PASS' else 'FAIL' end;
+
+insert into _r select 'tournament GAMES are excluded (no false clashes)',
+  case when not exists (select 1 from public.pitch_occupancy(now(), now() + interval '7 days')
+                        where id in ('eee00000-0000-4000-8000-0000000000f3','eee00000-0000-4000-8000-0000000000f4'))
+       then 'PASS' else 'FAIL' end;
 
 set local request.jwt.claims = '{"sub":"c0000000-0000-4000-8000-0000000000a2","role":"authenticated"}';
 insert into _r select 'a parent gets zero rows from the function',
