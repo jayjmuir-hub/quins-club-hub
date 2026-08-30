@@ -251,6 +251,15 @@ describe('the screen', () => {
     expect(await screen.findByTestId('booking')).toHaveTextContent('U16B Contact')
   })
 
+  it('shows how much of the pitch a part-pitch booking takes', async () => {
+    // Item 3 (Jay, 30 Aug 2026): the pitch is the row, so the booking carries
+    // the PORTION — a half here shows "½", a whole pitch shows no tag.
+    listEventsMock.mockResolvedValue([ev({ pitch_portion: 'half' })])
+    const user = await setup()
+    await openDay(user)
+    expect(await screen.findByTestId('booking')).toHaveTextContent('½')
+  })
+
   it('⚠️ marks a clash, and counts it once rather than twice', async () => {
     listEventsMock.mockResolvedValue([
       ev({ id: 'a', starts_at: '2026-09-05T05:00:00Z', ends_at: '2026-09-05T07:00:00Z' }),

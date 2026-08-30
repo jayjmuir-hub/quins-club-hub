@@ -54,6 +54,16 @@ export function portionLabel(portion) {
   return PITCH_PORTIONS.find((p) => p.value === portion)?.label ?? null
 }
 
+/**
+ * A COMPACT symbol for a portion — ¼, ⅓, ½ or "full" — for the calendar cells
+ * and event chips that are too small for the word (Jay, 30 Aug 2026). NULL/unset
+ * returns null: nobody split it, so it is a whole pitch and needs no tag.
+ */
+const PORTION_SHORT = { quarter: '¼', third: '⅓', half: '½', full: 'full' }
+export function portionShort(portion) {
+  return PORTION_SHORT[portion] ?? null
+}
+
 // ── Age-based defaults ─────────────────────────────────────────────────────
 //
 // ⚠️ THESE ARE THEIR OWN NAMED BOUNDARIES, NOT BORROWED FROM minis.js. The

@@ -98,11 +98,19 @@ describe('the week', () => {
     const week = await screen.findByTestId('pitch-week')
     const clashes = within(week).getAllByTestId('week-entry-clash')
     expect(clashes).toHaveLength(2)
-    for (const entry of clashes) expect(entry).toHaveTextContent('D2')
     // The A1 fan-out pair renders as plain entries.
     const plain = within(week).getAllByTestId('week-entry')
     expect(plain).toHaveLength(2)
-    for (const entry of plain) expect(entry).toHaveTextContent('A1')
+    // ⚠️ THE PITCH IS THE GROUP HEADING NOW (30 Aug 2026), not repeated on every
+    // entry — the week groups by pitch. The clashing pair sits under D2, the
+    // fan-out under A1.
+    const groups = within(week).getAllByTestId('week-pitch-group')
+    const d2 = groups.find((g) => within(g).queryAllByTestId('week-entry-clash').length === 2)
+    expect(d2).toBeTruthy()
+    expect(d2).toHaveTextContent('D2')
+    const a1 = groups.find((g) => within(g).queryAllByTestId('week-entry').length === 2)
+    expect(a1).toBeTruthy()
+    expect(a1).toHaveTextContent('A1')
   })
 
   it('labels entries with the squad name — the only name the redacted row has', async () => {

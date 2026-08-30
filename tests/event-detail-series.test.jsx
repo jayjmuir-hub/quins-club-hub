@@ -131,6 +131,28 @@ describe('EventDetail — end time', () => {
   })
 })
 
+describe('EventDetail — pitch and portion', () => {
+  it('shows the portion beside the pitch when one is set', () => {
+    // Item 4 (Jay, 30 Aug 2026): a booking that takes part of a pitch says so.
+    show({ ...ONE_OFF, pitch: 'D2', pitch_portion: 'half' })
+    const row = screen.getByText('Pitch').closest('div')
+    expect(row).toHaveTextContent('D2')
+    expect(row).toHaveTextContent('Half')
+  })
+
+  it('shows the pitch alone when the portion is unset (a whole pitch)', () => {
+    show({ ...ONE_OFF, pitch: 'D2', pitch_portion: null })
+    const row = screen.getByText('Pitch').closest('div')
+    expect(row).toHaveTextContent('D2')
+    expect(row.textContent).not.toMatch(/quarter|third|half|full pitch/i)
+  })
+
+  it('shows no pitch row at all when there is no pitch', () => {
+    show(ONE_OFF)
+    expect(screen.queryByText('Pitch')).not.toBeInTheDocument()
+  })
+})
+
 describe('EventDetail — additional info', () => {
   it('shows the note when there is one', () => {
     show({ ...ONE_OFF, notes: 'Meet at the gate 30 minutes before.' })
