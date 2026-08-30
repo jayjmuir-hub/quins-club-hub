@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Coaches can duplicate a session straight from Squad Hub.** Duplicate was
+- **A shareable pitch-layout picture for the day and week.** The Allocation screen
+  showed WHERE bookings were but had no friendly "draw me the ground" view — each
+  shared pitch carved into the portions its squads take, the spare its own segment
+  (Jay). New "Pitch layout" card, shown for the Day and the Week above the grid,
+  with a Share button that photographs it via the existing `shareElementAsImage`
+  (native file-share on a phone, PNG download on desktop — the match sheet's
+  route). The occupancy maths moved to `src/lib/pitchOccupancy.js` (extracted from
+  `src/components/PitchCalendar.jsx`, no behaviour change) so the picture and the
+  "Shared pitches" bar read the same numbers. `src/components/PitchShareCard.jsx`,
+  `src/screens/Allocation.jsx`, `harness/main.jsx`, `tests/pitch-diagram.test.js`,
+  `tests/pitch-share-card.test.jsx`. (SHA follows in the next changelog-touching PR.)
+- `4e6ed59` — **Coaches can duplicate a session straight from Squad Hub.** Duplicate was
   deliberately kept off Squad Hub and left on the Full schedule, but coaches and
   managers run their squad from this page — so "re-run last week's session" meant
   leaving for another screen with no signpost, and read as though they could not
@@ -18,8 +29,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   sheet, opening the same EventForm in duplicate mode (which, per the duplicate
   rules, resets the pitch to Pitch TBD). Delete stays on the Full schedule,
   unchanged, so it is not confused with clearing the training plan / hour.
-  `src/screens/SquadHub.jsx`, `tests/squad-hub-event-sheet.test.jsx`. (SHA follows
-  in the next changelog-touching PR.)
+  `src/screens/SquadHub.jsx`, `tests/squad-hub-event-sheet.test.jsx`.
 - `54c7e01` — **The pitch portion is now staff-only, and reads "sharing ⅓".** #534 put the
   portion on the event's Pitch row for everyone, and "D3 · Third" was confusing —
   it read like a second pitch, and a parent has no use for how the ground is

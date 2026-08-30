@@ -5,8 +5,9 @@ import { eventDate, eventTimeLabel, formatTableDate } from '../lib/eventFormat.j
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PITCH_TBD } from '../data/pitches.js'
 import { shareKey } from '../data/pitchShareApprovals.js'
-import { portionFraction, portionLabel, portionShort } from '../lib/pitchPortion.js'
+import { portionShort } from '../lib/pitchPortion.js'
 import { ageBandFromTeamName } from '../lib/ageGroup.js'
+import { shareSegments, occupancyStatus, squadOf, portionOf, peakEvent } from '../lib/pitchOccupancy.js'
 
 // The WEEK and MONTH views of the pitch calendar. The DAY view — pitches down
 // the side, hours across the top — stays in src/screens/Allocation.jsx, because
@@ -377,52 +378,11 @@ export function PitchMonth({ anchor, today, events, clashing, teamsById, onPickD
 // the same information (design-system §accessibility, the same rule the clash
 // markers in the month view follow).
 
+// ⚠️ THE TONES ARE THE ONE PIECE THAT STAYED. shareSegments / occupancyStatus /
+// squadOf / portionOf / peakEvent moved to src/lib/pitchOccupancy.js on 30 Aug
+// 2026 so the pitch-layout pictures could reuse the identical occupancy reading;
+// SEG_TONES is Tailwind, not maths, so it belongs with the component that paints.
 const SEG_TONES = ['bg-brand', 'bg-accent', 'bg-brand/55', 'bg-accent/55']
-const OVER = 1 + 1e-9
-
-/** A share's segments, one per OCCUPANT — a fan-out (shared group_id) counts
- *  once, exactly as pitchLoad sums it, so the bar matches the load. Widest first. */
-function shareSegments(group) {
-  const byOccupant = new Map()
-  for (const event of group.events) {
-    const key = event.group_id ? `g:${event.group_id}` : `e:${event.id}`
-    const fraction = portionFraction(event.pitch_portion)
-    const existing = byOccupant.get(key)
-    if (!existing || fraction > existing.fraction) byOccupant.set(key, { key, event, fraction })
-  }
-  return [...byOccupant.values()].sort((a, b) => b.fraction - a.fraction)
-}
-
-const squadOf = (event, teamsById) =>
-  event.team_name ?? teamsById?.get(event.team_id)?.name ?? 'A squad'
-
-const portionOf = (event) => portionLabel(event.pitch_portion) ?? 'Full pitch'
-
-/** The instant a share peaks — its latest start, when everyone is present. */
-const peakEvent = (group) =>
-  group.events.reduce((a, b) => ((eventDate(b)?.getTime() ?? 0) > (eventDate(a)?.getTime() ?? 0) ? b : a))
-
-/** A pitch fraction as words: 0.25 → "a quarter", ⅓ → "a third", 1.5 → "1.5 pitches".
- *  ⚠️ Portions are ¼, ⅓, ½ and 1, so any occupancy lands on a TWELFTH — the old
- *  "round to quarters" turned a third into "a quarter". Quantise to twelfths,
- *  name the fractions people actually say, and fall back to a rounded percentage
- *  for an odd mixed twelfth (a ¼ beside a ⅓ is 7⁄12) rather than "seven twelfths". */
-function fractionWord(fraction) {
-  const named = { 3: 'a quarter', 4: 'a third', 6: 'a half', 8: 'two thirds', 9: 'three quarters', 12: 'a full pitch' }
-  const twelfths = Math.round(fraction * 12)
-  if (twelfths <= 0) return 'nothing'
-  if (named[twelfths]) return named[twelfths]
-  if (twelfths % 12 === 0) return `${twelfths / 12} pitches`
-  if (fraction > 1) return `${Math.round(fraction * 100) / 100} pitches`
-  return `${Math.round(fraction * 100)}%`
-}
-
-function occupancyStatus(load) {
-  if (load > OVER) return { over: true, text: `Over by ${fractionWord(load - 1)} — needs another pitch` }
-  const free = 1 - load
-  if (free < 1e-9) return { over: false, text: 'Full — nothing spare' }
-  return { over: false, text: `${fractionWord(load)} used · ${fractionWord(free)} free` }
-}
 
 /** One shared pitch, as a stacked bar plus a named legend. */
 function ShareRow({ group, teamsById, approved, canApprove, onApprove, onUndo, busy }) {

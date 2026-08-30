@@ -35,6 +35,9 @@ import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 import MatchSheet from '../src/screens/MatchSheet.jsx'
 import Lineup from '../src/screens/Lineup.jsx'
 import Allocation from '../src/screens/Allocation.jsx'
+import { PitchDayCard, PitchWeekCard } from '../src/components/PitchShareCard.jsx'
+import { diagramSlots, diagramWeek } from '../src/lib/pitchOccupancy.js'
+import { weekDays } from '../src/lib/calendarGrid.js'
 import PhotoPositioner, {
   PhotoDropZone,
   DEFAULT_FOCUS,
@@ -1221,6 +1224,77 @@ scenarios['squadhub-admin'] = () => (
     </RRoutes>
   </Shell>
 )
+
+// ⚠️ THE PITCH-LAYOUT PICTURE (30 Aug 2026) — the day and week SHARE CARDS,
+// rendered as pure-props components (like `notice-row`), so this needs no data
+// stub and no Supabase: diagramSlots/diagramWeek turn plain fixture events into
+// the carved-pitch model the cards draw. The squad names are the real club's
+// shape (U6 Tag / U12G QR / U14B — the suffix traps ageGroup.js already handles)
+// but NOBODY's personal data — a squad name is not a person. This is the only
+// place the cards can be eyeballed at real pixel size, which is where the
+// html2canvas capture and the segment widths actually get proven.
+scenarios['pitch-share-cards'] = () => {
+  const ev = (iso, pitch, portion, teamName, extra = {}) => ({
+    id: extra.id ?? `${pitch}-${teamName}-${iso}`,
+    starts_at: iso,
+    ends_at: null,
+    pitch,
+    pitch_portion: portion,
+    team_name: teamName,
+    ...extra,
+  })
+  const sixPm = (day) => `${day}T14:00:00Z` // 18:00 in Abu Dhabi (+04:00)
+  const mon = sixPm('2026-08-31')
+  const monEvents = [
+    ev(mon, 'D1', 'quarter', 'U6 Tag'),
+    ev(mon, 'D1', 'quarter', 'U7 Tag'),
+    ev(mon, 'D1', 'quarter', 'U8 Tag'),
+    ev(mon, 'D1', 'quarter', 'U9 Mixed'),
+    ev(mon, 'D2', 'quarter', 'U10 Mixed'),
+    ev(mon, 'D2', 'quarter', 'U11 Mixed'),
+    ev(mon, 'D2', 'quarter', 'U12G QR'),
+    ev(mon, 'D2', 'quarter', 'U14G QR'),
+    ev(mon, 'D3', 'third', 'U12 Mixed'),
+    ev(mon, 'D3', 'third', 'U13 Mixed'),
+    ev(mon, 'D3', 'third', 'U14B'),
+  ]
+  const tue = sixPm('2026-09-01')
+  const thu = sixPm('2026-09-03')
+  const fri = sixPm('2026-09-04')
+  const weekEvents = [
+    ...monEvents,
+    ev(tue, 'D1', 'half', 'U16G'), ev(tue, 'D1', 'half', 'U18G'),
+    ev(tue, 'D2', 'half', 'U16B'), ev(tue, 'D2', 'half', 'U18B'),
+    ev(thu, 'D1', 'half', 'U16G'), ev(thu, 'D1', 'half', 'U18G'),
+    ev(thu, 'D2', 'half', 'U16B'), ev(thu, 'D2', 'half', 'U18B'),
+    ...monEvents.map((e) => ev(fri, e.pitch, e.pitch_portion, e.team_name, { id: `fri-${e.id}` })),
+  ]
+  const days = weekDays({ year: 2026, month: 7, day: 31 })
+  const weekModel = diagramWeek(weekEvents, days, new Map()).map(({ dayParts, empty, slots }) => ({
+    weekday: new Date(Date.UTC(dayParts.year, dayParts.month, dayParts.day))
+      .toLocaleDateString('en-GB', { timeZone: 'UTC', weekday: 'short' })
+      .toUpperCase(),
+    dayNum: dayParts.day,
+    empty,
+    slots,
+  }))
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 24,
+        padding: 24,
+        alignItems: 'flex-start',
+        background: '#f3f4f6',
+        minHeight: '100vh',
+      }}
+    >
+      <PitchDayCard title="Monday 31 August" slots={diagramSlots(monEvents, new Map())} />
+      <PitchWeekCard title="Aug 31 – Sep 6" days={weekModel} />
+    </div>
+  )
+}
 
 const render = scenarios[scenario] || scenarios.login
 
