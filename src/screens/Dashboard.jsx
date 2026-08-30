@@ -898,7 +898,7 @@ export default function Dashboard() {
       {nextFixture && (
         <NextFixtureHero
           event={nextFixture}
-          teamName={teamsById.get(nextFixture.team_id)?.name}
+          teamName={nextFixture.team_id == null ? 'Whole club' : teamsById.get(nextFixture.team_id)?.name}
         />
       )}
 
@@ -1028,7 +1028,7 @@ export default function Dashboard() {
                 <FixtureRow
                   key={event.id}
                   event={event}
-                  teamName={teamsById.get(event.team_id)?.name}
+                  teamName={event.team_id == null ? 'Whole club' : teamsById.get(event.team_id)?.name}
                   onSelect={openEvent}
                   className="animate-rise-in"
                   style={{ animationDelay: `${Math.min(index, 6) * 40}ms` }}

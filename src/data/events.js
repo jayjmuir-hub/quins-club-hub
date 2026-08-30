@@ -20,7 +20,11 @@ import { fetchAllPages } from './limits.js'
  * queries normally, letting RLS decide what comes back.
  */
 export async function listEvents({ teamIds, from, to } = {}) {
-  if (Array.isArray(teamIds) && teamIds.length === 0) return []
+  // ⚠️ AN EMPTY teamIds NO LONGER MEANS "NOTHING" — club-wide events (team_id
+  // NULL, the whole-club scope, 30 Aug 2026) belong to everyone, so even a
+  // member with no squads may have events to see. `scoped` distinguishes "filter
+  // to these squads (plus club-wide)" from "no teamIds at all → RLS decides".
+  const scoped = Array.isArray(teamIds)
 
   // ⚠️ PAGED, NOT CAPPED, SINCE 10 Aug 2026. This used to be a single capped
   // request that THREW above 900 rows. That refusal was right in principle —
@@ -48,8 +52,13 @@ export async function listEvents({ teamIds, from, to } = {}) {
     let query = supabase
       .from('events')
       .select('*, league_team:league_teams(id, rcm_name, division)')
-    if (Array.isArray(teamIds) && teamIds.length > 0) {
-      query = query.in('team_id', teamIds)
+    if (scoped) {
+      // The member's own squads PLUS every club-wide event (team_id null). An
+      // empty squad list still gets the club-wide ones. `.or` groups as one AND
+      // term, so it composes with the date and tournament_id filters below.
+      query = teamIds.length > 0
+        ? query.or(`team_id.in.(${teamIds.join(',')}),team_id.is.null`)
+        : query.is('team_id', null)
     }
     if (from) query = query.gte('starts_at', from)
     if (to) query = query.lte('starts_at', to)
