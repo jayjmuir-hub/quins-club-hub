@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Grok item 8 SHIPPED — the club's last active admin can be neither demoted
+- **Grok items 5 & 9 SHIPPED — silent-refusal chat writes throw, and view-as
+  stops skipping the welfare audit.** `deleteConversation` and
+  `resolveReport` gain the `.select('id')` + zero-rows-throws guard
+  `removeMessage` already carried — an RLS refusal came back as
+  success-with-no-rows and the screens reported "deleted" / "resolved" while
+  nothing happened. `useDmThread` keys `admin` on `realMemberships`, so an
+  admin previewing as a parent who opens somebody's DM still gets the review
+  banner and still writes the `welfare_access_log` row (reads run as the
+  real `auth.uid()` throughout a preview). New hook test pins all three
+  directions. `src/data/messages.js`, `src/lib/useDmThread.js`,
+  `tests/messages-data.test.js`, `tests/dm-thread-view-as.test.jsx` (new),
+  `tests/direct-messages.test.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `81a1536` — **Grok item 8 SHIPPED — the club's last active admin can be neither demoted
   nor deleted.** `updateMembershipRole`/`deleteMembership` are direct table
   writes with no RPC chokepoint, so the guard is a `BEFORE UPDATE OR DELETE`
   trigger (`private.guard_last_admin`, P0001) firing only on the exact
@@ -20,7 +33,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   after, with a dropped-trigger self-test proving the checks bite.
   `db/migrations/20260830_last_admin_guard.sql`,
   `db/tests/last-admin-guard.sql` (new), `db/schema/triggers.sql`,
-  `db/schema/functions.sql`. (SHA follows in the next changelog-touching PR.)
+  `db/schema/functions.sql`.
 - `68388c4` — **"Reply privately" reaches the nested replies.** It has lived on others'
   top-level posts in every channel and in groups since 25 Aug; the bubbles
   INSIDE a channel thread were the one surface without it, so the person who

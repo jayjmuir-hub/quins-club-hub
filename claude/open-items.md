@@ -131,15 +131,10 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   `create or replace`s the OLD 8-col return type against the live 9-col
   signature and would throw `cannot change return type`; repair it before it can
   prove the fix.
-- **`deleteConversation` / `resolveReport` report RLS-refusal as success.**
-  `src/data/messages.js:197-200` and `:660-666` do `.delete()`/`.update()` +
-  `if (error) throw`, but PostgREST returns 200 + 0 rows when RLS refuses, so a
-  non-owner or a delete on a reported (frozen) thread "succeeds" and
-  `DirectMessages.jsx:94-101` navigates away showing "deleted for both of you" —
-  a lie; the row reappears on next load. `removeMessage` (`:187-189`) was patched
-  to `.select('id')` + throw on empty; these two siblings were not.
-  **Fix:** mirror `removeMessage`; add real data-layer tests in
-  `tests/messages-data.test.js` (which covers `removeMessage` only).
+- ✅ **Item 5 FIXED, 30 Aug 2026**: `deleteConversation` and `resolveReport`
+  carry the `.select('id')` + zero-rows-throws guard `removeMessage` already
+  had; both directions pinned in `tests/messages-data.test.js`, and both
+  screens already rendered the thrown copy.
 - **PWA disk-caches children's chat and DOB.** `pwa-cache-rules.js:45-69`
   excludes only three club-wide admin reads; everything else on
   `GET /rest/v1/*` is NetworkFirst into the on-disk cache — including
@@ -155,15 +150,12 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   `BEFORE UPDATE OR DELETE` trigger on `memberships` raises P0001 when the row
   is the club's last active admin and the operation would remove that status.
   Non-last, team-only and non-admin edits proven untouched.
-- **View-as skips the welfare audit.** `useDmThread.js` keys `reviewing` (`:261`)
-  and `logWelfareAccess` (`:182-185`) on the **synthetic** membership set
-  (`memberships`, `:54,56`), so an admin previewing as a parent opens a DM with
-  no banner and **no `logWelfareAccess` row** — the read still runs as the real
-  `auth.uid()`. Writes go as the real uid (no impersonation); the missing log is
-  the bug. **Fix:** key on `realMemberships`
-  (`src/lib/memberships.jsx:297-306` exposes it). Unread-badge filtering under
-  preview (`useDockBadges.js:67-68`, `ChatList.jsx:510-527`) is a separate D5
-  product call, default leave.
+- ✅ **Item 9 FIXED, 30 Aug 2026**: `useDmThread` keys `admin` (and so both
+  `reviewing` and `logWelfareAccess`) on `realMemberships` — an admin
+  previewing as a parent who opens a DM gets the banner and the audit row
+  exactly as outside the preview. Pinned in `tests/dm-thread-view-as.test.jsx`.
+  Unread-badge filtering under preview stays as-is per D5 (documented
+  non-boundary, default leave).
 - **`notify-unfinished-signup` is an open relay if the shared secret is known.**
   `supabase/functions/notify-unfinished-signup/index.ts:117-144` mails whatever
   addresses the request body carries — no DB re-read, no `signup_nudges` check,
