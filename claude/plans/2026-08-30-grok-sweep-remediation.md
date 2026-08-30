@@ -10,6 +10,8 @@ PR 1 ships now (Jay already holds `welfare`). `main` is production
   to prod, harness red-then-green, schema recaptured in-PR).
 - **PR 2 — SHIPPED 30 Aug 2026** (`20260830_last_admin_guard.sql`, applied to
   prod, harness red-then-green with dropped-trigger self-test).
+- **PR 4 — SHIPPED 30 Aug 2026** (items 5 & 9: write-safety guards +
+  view-as welfare audit; D5 default taken — unread badges left as-is).
 
 ⚠️ **RE-VALIDATED 30 Aug 2026 after ~20 PRs merged** (see the same-day note in
 `claude/open-items.md`). All 18 items still stand; two fixes changed and the

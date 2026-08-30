@@ -124,7 +124,7 @@ const dm = (id, author, body) => ({ id, conversation_id: 'c1', channel: 'dm', au
 beforeEach(() => {
   vi.clearAllMocks()
   useAuthMock.mockReturnValue({ user: { id: ME } })
-  useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: [] })
+  useMembershipsMock.mockReturnValue({ memberships: PARENT, realMemberships: PARENT, teams: [] })
   m.listMyConversations.mockResolvedValue([INBOX_ROW])
   m.listMyMessageReads.mockResolvedValue(new Set())
   m.listReactions.mockResolvedValue(new Map())
@@ -339,7 +339,7 @@ describe('DirectMessages — a thread', () => {
 
   it('an admin opening an adults-only conversation that is not reported gets the not-available card and nothing is logged', async () => {
     useAuthMock.mockReturnValue({ user: { id: 'admin-9' } })
-    useMembershipsMock.mockReturnValue({ memberships: ADMIN, teams: [] })
+    useMembershipsMock.mockReturnValue({ memberships: ADMIN, realMemberships: ADMIN, teams: [] })
     m.listMyConversations.mockResolvedValue([])
     m.getConversation.mockResolvedValue(null)   // RLS: no row for this reader
     m.listDirectMessages.mockResolvedValue([])
@@ -355,7 +355,7 @@ describe('DirectMessages — a thread', () => {
   // thread read-only, the notice says the open was recorded, and it WAS.
   it('an admin who is not in it reads only, sees the review notice, and the open is logged', async () => {
     useAuthMock.mockReturnValue({ user: { id: 'admin-9' } })
-    useMembershipsMock.mockReturnValue({ memberships: ADMIN, teams: [] })
+    useMembershipsMock.mockReturnValue({ memberships: ADMIN, realMemberships: ADMIN, teams: [] })
     m.listMyConversations.mockResolvedValue([])
     m.getConversation.mockResolvedValue({ ...CONV, involves_minor: true })
     renderAt('/chat/dm/c1')

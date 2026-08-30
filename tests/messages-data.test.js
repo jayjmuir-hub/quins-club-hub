@@ -12,6 +12,7 @@ vi.mock('../src/lib/supabase.js', () => ({
 import { supabase } from '../src/lib/supabase.js'
 import {
   countUnreadMessages,
+  deleteConversation,
   getChannelSettings,
   getEventThread,
   listMentionables,
@@ -21,6 +22,7 @@ import {
   postMessage,
   removeMessage,
   replyToMessage,
+  resolveReport,
   setAnnounceOnly,
   subscribeMessages,
 } from '../src/data/messages.js'
@@ -181,6 +183,38 @@ describe('writes', () => {
   it('surfaces the database error', async () => {
     supabase.from.mockReturnValue(builder({ data: null, error: { message: 'new row violates row-level security policy' } }).b)
     await expect(postMessage('team-a', 'x')).rejects.toMatchObject({ message: /row-level security/ })
+  })
+
+  // ⚠️ ADDED 30 Aug 2026 (Grok item 5): deleteConversation and resolveReport
+  // carried the pre-24-Aug shape — no .select(), so an RLS refusal read as
+  // success. Both directions pinned, the removeMessage pattern.
+  it('deleteConversation deletes by id and returns on rows', async () => {
+    const { b, calls } = builder({ data: [{ id: 'c1' }], error: null })
+    supabase.from.mockReturnValue(b)
+    await deleteConversation('c1')
+    expect(calls.delete).toHaveLength(1)
+    expect(calls.eq[0]).toEqual(['id', 'c1'])
+    expect(calls.select).toHaveLength(1)
+  })
+
+  it('deleteConversation throws when the delete touched nothing', async () => {
+    supabase.from.mockReturnValue(builder({ data: [], error: null }).b)
+    await expect(deleteConversation('c1')).rejects.toThrow(/not deleted/)
+  })
+
+  it('resolveReport stamps resolved_at and returns on rows', async () => {
+    const { b, calls } = builder({ data: [{ id: 'r1' }], error: null })
+    supabase.from.mockReturnValue(b)
+    await resolveReport('r1')
+    expect(calls.update).toHaveLength(1)
+    expect(calls.update[0][0]).toHaveProperty('resolved_at')
+    expect(calls.eq[0]).toEqual(['id', 'r1'])
+    expect(calls.select).toHaveLength(1)
+  })
+
+  it('resolveReport throws when the update touched nothing', async () => {
+    supabase.from.mockReturnValue(builder({ data: [], error: null }).b)
+    await expect(resolveReport('r1')).rejects.toThrow(/not resolved/)
   })
 })
 
