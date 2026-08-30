@@ -59,10 +59,10 @@ const TEAM_1XV = { id: 't-1xv', club_id: CLUB_ID, name: 'Senior Men 1st XV', sor
 const TEAMS = [TEAM_1XV, TEAM_U12, TEAM_U14] // deliberately unsorted
 
 const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
-const COACH_U12 = [{ id: 'm-c', role: 'coach', team_id: 't-u12' }]
+const COACH_U12 = [{ id: 'm-c', role: 'coach', status: 'active', team_id: 't-u12' }]
 const COACH_TWO = [
-  { id: 'm-c1', role: 'coach', team_id: 't-u12' },
-  { id: 'm-c2', role: 'coach', team_id: 't-u14' },
+  { id: 'm-c1', role: 'coach', status: 'active', team_id: 't-u12' },
+  { id: 'm-c2', role: 'coach', status: 'active', team_id: 't-u14' },
 ]
 const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u12', player_id: 'p1' }]
 

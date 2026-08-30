@@ -55,7 +55,7 @@ const PLAYERS = [
   { id: 'p3', team_id: 'team-u10', full_name: 'Cal Fletcher' },
 ]
 
-const COACH = [{ id: 'm1', role: 'coach', team_id: 'team-u10' }]
+const COACH = [{ id: 'm1', role: 'coach', status: 'active', team_id: 'team-u10' }]
 const PARENT = [{ id: 'm2', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
 
 function asRole(memberships) {

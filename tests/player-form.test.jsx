@@ -102,10 +102,10 @@ const TEAM_1XV = { id: 't-1xv', club_id: CLUB_ID, name: 'Senior Men 1st XV', sor
 const TEAMS = [TEAM_1XV, TEAM_U14, TEAM_U16] // deliberately unsorted
 
 const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
-const COACH_U14 = [{ id: 'm-c', role: 'coach', team_id: 't-u14' }]
+const COACH_U14 = [{ id: 'm-c', role: 'coach', status: 'active', team_id: 't-u14' }]
 const COACH_TWO = [
-  { id: 'm-c1', role: 'coach', team_id: 't-u14' },
-  { id: 'm-c2', role: 'coach', team_id: 't-u16' },
+  { id: 'm-c1', role: 'coach', status: 'active', team_id: 't-u14' },
+  { id: 'm-c2', role: 'coach', status: 'active', team_id: 't-u16' },
 ]
 const PARENT = [{ id: 'm-p', role: 'parent', team_id: 't-u14', player_id: 'p-1' }]
 
@@ -311,7 +311,7 @@ describe('PlayerForm — shape and scoping', () => {
     // which this form would otherwise read as "no contact on file" and render
     // as blank, editable fields. Enforced in the component rather than only in
     // Roster, so it holds whoever opens the form.
-    const coachOfOtherSquad = [{ id: 'm-c', role: 'coach', team_id: 't-u16' }]
+    const coachOfOtherSquad = [{ id: 'm-c', role: 'coach', status: 'active', team_id: 't-u16' }]
     renderForm({ memberships: coachOfOtherSquad, player: EXISTING_PLAYER })
 
     expect(screen.getByRole('alert')).toHaveTextContent(/can't change players in this age group/i)
@@ -1258,7 +1258,7 @@ describe('PlayerForm — parents', () => {
 
 describe('PlayerForm — the U13 own-contact boundary', () => {
   it('offers no player contact fields for an under-13 squad', async () => {
-    renderForm({ memberships: [{ id: 'm-c', role: 'coach', team_id: 't-u10' }], teams: [TEAM_U10] })
+    renderForm({ memberships: [{ id: 'm-c', role: 'coach', status: 'active', team_id: 't-u10' }], teams: [TEAM_U10] })
 
     await waitFor(() => expect(screen.getByLabelText('Age group')).toHaveValue('t-u10'))
     expect(screen.queryByLabelText('Player phone')).not.toBeInTheDocument()
@@ -1275,8 +1275,8 @@ describe('PlayerForm — the U13 own-contact boundary', () => {
     const user = userEvent.setup()
     renderForm({
       memberships: [
-        { id: 'm-c1', role: 'coach', team_id: 't-u10' },
-        { id: 'm-c2', role: 'coach', team_id: 't-u14' },
+        { id: 'm-c1', role: 'coach', status: 'active', team_id: 't-u10' },
+        { id: 'm-c2', role: 'coach', status: 'active', team_id: 't-u14' },
       ],
       teams: [TEAM_U10, TEAM_U14],
     })

@@ -52,7 +52,7 @@ import Roster from '../src/screens/Roster.jsx'
 const U16B = { id: 'team-u16b', name: 'U16B Contact', sort_order: 3 }
 const U14A = { id: 'team-u14a', name: 'U14A Contact', sort_order: 2 }
 
-const COACH = [{ id: 'm1', role: 'coach', team_id: 'team-u16b' }]
+const COACH = [{ id: 'm1', role: 'coach', status: 'active', team_id: 'team-u16b' }]
 const PARENT = [{ id: 'm2', role: 'parent', team_id: 'team-u16b' }]
 
 // One squad, one gender recorded on all of them — Jay's case exactly.

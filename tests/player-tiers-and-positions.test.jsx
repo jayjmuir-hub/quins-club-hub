@@ -56,7 +56,7 @@ import PlayerForm from '../src/screens/PlayerForm.jsx'
 
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const TEAM = { id: 't-u16', club_id: CLUB_ID, name: 'U16', sort_order: 11 }
-const COACH = [{ id: 'm-c', role: 'coach', team_id: 't-u16' }]
+const COACH = [{ id: 'm-c', role: 'coach', status: 'active', team_id: 't-u16' }]
 // All three name columns, as a real row carries them — the split pair is what
 // the form's two name boxes bind to, and a fixture with only full_name renders
 // them empty, which the form then refuses to save.
