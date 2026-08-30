@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Grok item 1 & 2 SHIPPED — the welfare directory and DM/group reports move
+- **"Reply privately" reaches the nested replies.** It has lived on others'
+  top-level posts in every channel and in groups since 25 Aug; the bubbles
+  INSIDE a channel thread were the one surface without it, so the person who
+  answered in a thread could not be taken private from where they spoke
+  (Jay, 30 Aug 2026). Same quote-into-a-DM behaviour, same rule: whether the
+  DM is allowed stays open_conversation's call. `src/components/
+  MessageRow.jsx`, `tests/message-edit-and-emoji.test.jsx`. (SHA follows in
+  the next changelog-touching PR.)
+- `ecc1484` — **Grok item 1 & 2 SHIPPED — the welfare directory and DM/group reports move
   behind the explicit `welfare` grant.** `welfare_overview()` gated on
   `private.can_review_dm` (was `is_admin` — a pitches-only admin could
   enumerate every reviewable child conversation by calling the RPC; measured
