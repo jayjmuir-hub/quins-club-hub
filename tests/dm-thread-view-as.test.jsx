@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 // Grok item 9: an admin PREVIEWING as a parent who opens somebody else's DM
@@ -70,18 +70,14 @@ import useDmThread from '../src/lib/useDmThread.js'
 const ADMIN_ROWS = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: 'club-1' }]
 const SYNTHETIC_PARENT = [{ id: 'view-as', role: 'parent', status: 'active', team_id: 't1', club_id: 'club-1' }]
 
-let hookState
-function Probe() {
-  hookState = useDmThread('c1')
-  return null
-}
-
 function mount() {
-  return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <Probe />
-    </MemoryRouter>,
-  )
+  return renderHook(() => useDmThread('c1'), {
+    wrapper: ({ children }) => (
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        {children}
+      </MemoryRouter>
+    ),
+  })
 }
 
 beforeEach(() => {
@@ -95,9 +91,9 @@ describe('useDmThread under view-as', () => {
       memberships: SYNTHETIC_PARENT,
       realMemberships: ADMIN_ROWS,
     })
-    mount()
+    const { result } = mount()
     await waitFor(() => expect(logWelfareAccess).toHaveBeenCalledWith('c1'))
-    expect(hookState.reviewing).toBeTruthy()
+    expect(result.current.reviewing).toBeTruthy()
   })
 
   it('a REAL parent opening a DM they are not in logs nothing', async () => {
@@ -105,10 +101,10 @@ describe('useDmThread under view-as', () => {
       memberships: SYNTHETIC_PARENT,
       realMemberships: SYNTHETIC_PARENT,
     })
-    mount()
-    await waitFor(() => expect(hookState.conversation).toBeTruthy())
+    const { result } = mount()
+    await waitFor(() => expect(result.current.conversation).toBeTruthy())
     expect(logWelfareAccess).not.toHaveBeenCalled()
-    expect(hookState.reviewing).toBeFalsy()
+    expect(result.current.reviewing).toBeFalsy()
   })
 
   it('a participant admin is not reviewing their own chat', async () => {
@@ -117,9 +113,9 @@ describe('useDmThread under view-as', () => {
       memberships: ADMIN_ROWS,
       realMemberships: ADMIN_ROWS,
     })
-    mount()
-    await waitFor(() => expect(hookState.conversation).toBeTruthy())
+    const { result } = mount()
+    await waitFor(() => expect(result.current.conversation).toBeTruthy())
     expect(logWelfareAccess).not.toHaveBeenCalled()
-    expect(hookState.reviewing).toBeFalsy()
+    expect(result.current.reviewing).toBeFalsy()
   })
 })
