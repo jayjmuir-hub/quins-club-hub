@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -13,8 +13,12 @@ import { hasAdminRight, isAdmin, visibleTeams } from '../lib/scope.js'
 import { CLUB_TIME_ZONE, clubToday, eventDate, eventEndDate, eventTimeLabel, eventTitle, formatTime } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { PitchMonth, PitchOccupancy, PitchWeek } from '../components/PitchCalendar.jsx'
+import { PitchDayCard, PitchWeekCard } from '../components/PitchShareCard.jsx'
+import { diagramSlots, diagramWeek } from '../lib/pitchOccupancy.js'
+import { shareElementAsImage } from '../lib/shareImage.js'
 import EventDetail from './EventDetail.jsx'
 import {
+  dayKey,
   monthGrid,
   sameDay,
   shiftMonth,
@@ -172,6 +176,12 @@ export default function Allocation() {
   const [approvedKeys, setApprovedKeys] = useState(() => new Set())
   const [approveBusy, setApproveBusy] = useState(false)
   const [approveError, setApproveError] = useState(null)
+  // The pitch-layout picture (day/week). The same card is shown on screen AND
+  // photographed for the share, so each view holds its own ref.
+  const dayCardRef = useRef(null)
+  const weekCardRef = useRef(null)
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareError, setShareError] = useState(null)
 
   const teamIds = useMemo(() => visibleTeams(memberships, teams).map((team) => team.id), [memberships, teams])
   const teamsById = useMemo(() => new Map((teams ?? []).map((team) => [team.id, team])), [teams])
@@ -240,6 +250,40 @@ export default function Allocation() {
 
   // Every shared pitch on screen, for the occupancy panel below the grid.
   const shares = useMemo(() => pitchShares(events), [events])
+
+  // ── The pitch-layout picture ────────────────────────────────────────────
+  // The on-screen "visual representation" and the day/week share images are one
+  // card. Built from BOOKED events only: the diagram takes a real pitch name,
+  // and the TBD placeholder — which this screen owns — is not one, so it is
+  // filtered here rather than teaching the pure builder the data layer's constant.
+  const bookedEvents = useMemo(
+    () =>
+      events.filter((event) => {
+        const name = (event.pitch ?? '').trim()
+        return name && name !== PITCH_TBD
+      }),
+    [events],
+  )
+  const dayModel = useMemo(
+    () => (view === 'day' ? diagramSlots(bookedEvents, teamsById) : []),
+    [view, bookedEvents, teamsById],
+  )
+  const weekModel = useMemo(() => {
+    if (view !== 'week') return []
+    return diagramWeek(bookedEvents, weekDays(day), teamsById).map(({ dayParts, empty, slots }) => ({
+      // The reader's own locale, formatted from the day's PARTS in UTC — the
+      // same carrier-date trick the heading uses, so the label matches the date
+      // it labels regardless of the browser's zone.
+      weekday: new Date(Date.UTC(dayParts.year, dayParts.month, dayParts.day))
+        .toLocaleDateString(undefined, { timeZone: 'UTC', weekday: 'short' })
+        .toUpperCase(),
+      dayNum: dayParts.day,
+      empty,
+      slots,
+    }))
+  }, [view, bookedEvents, day, teamsById])
+  const hasLayout =
+    view === 'day' ? dayModel.length > 0 : view === 'week' ? weekModel.some((entry) => !entry.empty) : false
 
   // ⚠️ AWAY MATCHES ARE NOT WAITING FOR ANYTHING — somebody else's ground,
   // no pitch of ours to give (Jay, 24 Aug 2026). Strict `=== false`, the
@@ -395,6 +439,30 @@ export default function Allocation() {
       view === 'month' ? shiftMonth(current, delta) : shiftDayParts(current, view === 'week' ? 7 * delta : delta),
     )
 
+  // Photograph the layout card and hand it to the OS share sheet — the same
+  // shareElementAsImage the match sheet uses (native file-share on a phone, a
+  // PNG download on desktop). A cancel is not an error; shareElementAsImage
+  // returns rather than throwing on it.
+  async function shareVisual() {
+    const isDay = view === 'day'
+    const element = isDay ? dayCardRef.current : weekCardRef.current
+    if (!element) return
+    setShareBusy(true)
+    setShareError(null)
+    try {
+      const anchor = isDay ? day : weekDays(day)[0]
+      await shareElementAsImage(element, {
+        filename: `pitch-${isDay ? 'day' : 'week'}-${dayKey(anchor)}.png`,
+        title: 'Pitch allocation',
+        text: `Pitch allocation · ${heading}`,
+      })
+    } catch (failure) {
+      setShareError(failure)
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
   return (
     <section>
       <div className="mb-3.5 mt-1 flex flex-wrap items-start justify-between gap-3">
@@ -453,6 +521,40 @@ export default function Allocation() {
           )
         })}
       </div>
+
+      {/* ── The pitch-layout picture, and its Share button ────────────────
+          The "visual representation" Jay asked for (30 Aug 2026): each pitch
+          drawn as the ground carved into the portions its squads take. Shown for
+          the DAY and the WEEK — the two things worth sending — above the
+          interactive grid, and the Share button photographs this very card.
+          Hidden in the month view and when nothing is booked, where a picture of
+          an empty ground says nothing. */}
+      {!loading && !error && hasLayout && (view === 'day' || view === 'week') && (
+        <div className="mb-3.5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">Pitch layout</h3>
+            <div className="flex items-center gap-2">
+              {shareError && (
+                <span role="alert" className="text-[12px] font-semibold text-danger-ink">
+                  {shareError.message || 'That could not be shared.'}
+                </span>
+              )}
+              <Button size="sm" variant="secondary" disabled={shareBusy} onClick={shareVisual}>
+                {shareBusy ? 'Preparing…' : view === 'day' ? 'Share day' : 'Share week'}
+              </Button>
+            </div>
+          </div>
+          {/* The card scrolls inside this box on a phone rather than widening the
+              whole page — the same overflow gate the week/month grids use. */}
+          <div className="overflow-x-auto pb-1">
+            {view === 'day' ? (
+              <PitchDayCard ref={dayCardRef} title={heading} slots={dayModel} />
+            ) : (
+              <PitchWeekCard ref={weekCardRef} title={heading} days={weekModel} />
+            )}
+          </div>
+        </div>
+      )}
 
       {loading && events.length === 0 ? (
         <div role="status" className="flex flex-1 items-center justify-center py-20">
