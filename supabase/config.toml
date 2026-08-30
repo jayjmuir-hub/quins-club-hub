@@ -1,0 +1,43 @@
+# Pins each Edge Function's verify_jwt so a CLI or MCP deploy cannot silently
+# flip it (Grok item 15, 30 Aug 2026). Every function here implements its own
+# authentication — a shared secret header, or (calendar) a capability URL —
+# and NONE of them receives a Supabase JWT:
+#   - calendar is fetched by calendar clients on a timer, no headers at all;
+#   - the notify-* / push-send / send-email workers are called by pg_net from
+#     SECURITY DEFINER functions with the x-approval-secret header.
+# Flipping any of these to true does not add security; it 401s the worker and
+# the failure is silent (pg_net swallows it). Measured against the live
+# dashboard 30 Aug 2026: all eleven were false.
+
+[functions.calendar]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.notify-approval]
+verify_jwt = false
+
+[functions.notify-pitch-request]
+verify_jwt = false
+
+[functions.notify-access-request]
+verify_jwt = false
+
+[functions.backup-player-photos]
+verify_jwt = false
+
+[functions.notify-invite]
+verify_jwt = false
+
+[functions.notify-feedback]
+verify_jwt = false
+
+[functions.push-send]
+verify_jwt = false
+
+[functions.notify-unfinished-signup]
+verify_jwt = false
+
+[functions.notify-welcome]
+verify_jwt = false
