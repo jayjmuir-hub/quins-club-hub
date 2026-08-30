@@ -10,14 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **"Reply privately" reaches the nested replies.** It has lived on others'
+- **Grok item 8 SHIPPED — the club's last active admin can be neither demoted
+  nor deleted.** `updateMembershipRole`/`deleteMembership` are direct table
+  writes with no RPC chokepoint, so the guard is a `BEFORE UPDATE OR DELETE`
+  trigger (`private.guard_last_admin`, P0001) firing only on the exact
+  last-active-admin transition; team moves, rights edits and non-last
+  demotions pass untouched, and `Accounts.jsx`'s `LAST_ADMIN_REFUSAL` stays
+  as the friendly first line. Applied to prod; harness red pre-apply, green
+  after, with a dropped-trigger self-test proving the checks bite.
+  `db/migrations/20260830_last_admin_guard.sql`,
+  `db/tests/last-admin-guard.sql` (new), `db/schema/triggers.sql`,
+  `db/schema/functions.sql`. (SHA follows in the next changelog-touching PR.)
+- `68388c4` — **"Reply privately" reaches the nested replies.** It has lived on others'
   top-level posts in every channel and in groups since 25 Aug; the bubbles
   INSIDE a channel thread were the one surface without it, so the person who
   answered in a thread could not be taken private from where they spoke
   (Jay, 30 Aug 2026). Same quote-into-a-DM behaviour, same rule: whether the
   DM is allowed stays open_conversation's call. `src/components/
-  MessageRow.jsx`, `tests/message-edit-and-emoji.test.jsx`. (SHA follows in
-  the next changelog-touching PR.)
+  MessageRow.jsx`, `tests/message-edit-and-emoji.test.jsx`.
 - `ecc1484` — **Grok item 1 & 2 SHIPPED — the welfare directory and DM/group reports move
   behind the explicit `welfare` grant.** `welfare_overview()` gated on
   `private.can_review_dm` (was `is_admin` — a pitches-only admin could
@@ -33,8 +43,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `welfare` so nothing went dark.
   `db/migrations/20260830_welfare_review_gate.sql`,
   `db/tests/dm-review-welfare.sql` (extended: overview gate, report split,
-  self-test 2), `db/schema/policies.sql`, `db/schema/functions.sql`. (SHA
-  follows in the next changelog-touching PR.)
+  self-test 2), `db/schema/policies.sql`, `db/schema/functions.sql`.
 - `6f49559` — **The head-coach TITLE and FLAG are linked on the staff screen — offer one
   way, fill the other.** Two real coaches sat titled "Head Coach" with the
   flag off, silently outside the approval emails and the Club Head Coaches

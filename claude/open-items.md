@@ -150,15 +150,11 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   `isCacheableRestGet`; pin in `tests/pwa-cache-rules.test.js` AND
   `tests/pwa-build.test.js`. (The other REST caching is a documented offline
   tradeoff — do not "stop caching REST".)
-- **Last-admin lockout is client-only.** `delete_my_account` raises in SQL, but
-  `updateMembershipRole`/`deleteMembership` (`src/data/members.js:945-950`,
-  `:1138-1149`) are **bare table writes** under `memb manage` (`is_admin`) with no
-  guard; the only demote/revoke protection is `Accounts.jsx`'s
-  `LAST_ADMIN_REFUSAL`. A second tab, a crafted PostgREST call, or a count race
-  can lock the club out of `/admin`. **Fix:** a `BEFORE UPDATE OR DELETE` trigger
-  on `memberships` (not an RPC edit — there is no RPC chokepoint), firing only on
-  the last-active-admin transition; harness covers non-last/team-only/non-admin
-  edits as controls.
+- ✅ **Item 8 FIXED, 30 Aug 2026** (`20260830_last_admin_guard.sql`, applied to
+  prod, harness red-then-green with a dropped-trigger self-test): a
+  `BEFORE UPDATE OR DELETE` trigger on `memberships` raises P0001 when the row
+  is the club's last active admin and the operation would remove that status.
+  Non-last, team-only and non-admin edits proven untouched.
 - **View-as skips the welfare audit.** `useDmThread.js` keys `reviewing` (`:261`)
   and `logWelfareAccess` (`:182-185`) on the **synthetic** membership set
   (`memberships`, `:54,56`), so an admin previewing as a parent opens a DM with
