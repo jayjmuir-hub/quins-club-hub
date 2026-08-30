@@ -692,9 +692,12 @@ export default function SquadHub() {
 
       {/* The same drill-in Dashboard and Schedule use. Edit opens the same
           EventForm (title, time, pitch) via the shared onEdit → setFormState
-          handler. Delete is withheld: calendar delete stays on Full schedule
-          so staff do not confuse it with clearing the training plan / hour.
-          Duplicate is not offered here either. */}
+          handler; Duplicate opens it in duplicate mode via the same handler
+          with the duplicate flag — coaches re-run a session from their own
+          squad page, so it belongs here (Jay, 30 Aug 2026), not only on the
+          Full schedule. Delete is STILL withheld: calendar delete stays on
+          Full schedule so staff do not confuse it with clearing the training
+          plan / hour. */}
       {selectedEvent && !formState && !availabilityOpen && !registerOpen && (
         <EventDetail
           event={selectedEvent}
@@ -702,6 +705,7 @@ export default function SquadHub() {
           onClose={closeEvent}
           canEdit={mayView}
           onEdit={(event) => setFormState({ event })}
+          onDuplicate={(event) => setFormState({ event, duplicate: true })}
           onOpenAvailability={() => setAvailabilityOpen(true)}
           onOpenRegister={() => setRegisterOpen(true)}
           onOpenMatchSheet={(fixture) => navigate(`/match-sheet/${fixture.id}`)}
@@ -717,6 +721,7 @@ export default function SquadHub() {
       {formState && (
         <EventForm
           event={formState.event}
+          duplicate={formState.duplicate ?? false}
           onClose={() => {
             setFormState(null)
             closeEvent()
