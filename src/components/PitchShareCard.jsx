@@ -1,46 +1,38 @@
 import { forwardRef } from 'react'
+import {
+  FIELD,
+  OVER_FILL,
+  SPARE_FILL,
+  BRAND,
+  INK,
+  MUTED,
+  LINE,
+  WHITE,
+  FONT_STACK,
+  statusChipColours,
+  segLabel,
+} from '../lib/pitchShareStyle.js'
 
-// The pitch-layout PICTURE — the day and week share cards, and the on-screen
-// "visual representation" they double as (Jay, 30 Aug 2026).
+// The pitch-layout PICTURE, on-screen form — the day and week cards as the
+// "visual representation" Jay asked for (30 Aug 2026).
 //
-// ⚠️ FIXED LIGHT PALETTE, ON PURPOSE, AND THAT IS WHY THE COLOURS ARE INLINE
-// RATHER THAN design-system TOKENS. This element is photographed by html2canvas
-// (src/lib/shareImage.js) and sent to WhatsApp, so it has to render the same on
-// a phone, a desktop, and in a dark-themed browser — a token that flips in dark
-// mode would produce light text on the forced white background and an unreadable
-// PNG. It is a document, like the match sheet, not app chrome. Solid fills only
-// for the same reason: html2canvas is unreliable with repeating-gradient hatching.
+// ⚠️ THIS RENDERS ON SCREEN; THE SHARED PNG IS DRAWN NATIVELY, NOT PHOTOGRAPHED.
+// Until 30 Aug 2026 this very element was the html2canvas target too, and that
+// exporter mangled the small squad codes into dashes. The Share button now draws
+// the picture on a <canvas> instead (src/lib/pitchShareCanvas.js), which renders
+// crisp text at any scale. Both renderers read the same numbers (pitchOccupancy)
+// and the same palette and label rules (pitchShareStyle), so the on-screen card
+// and the sent picture stay in step.
+//
+// ⚠️ FIXED LIGHT PALETTE, NOT design-system TOKENS — imported from
+// pitchShareStyle. This card doubles as the reference for the shared document, so
+// it has to look the same on a phone, a desktop, and in a dark-themed browser; a
+// token that flips in dark mode would break that. Solid fills only.
 //
 // ⚠️ COLOUR IS NEVER THE ONLY SIGNAL (design-system §accessibility, the club is
 // mostly men and ~8% have a colour-vision deficiency). Every segment is named in
 // text inside or beside it, every pitch carries its "full / free / over" status
 // in words, and each pitch bar is role="img" with a spoken label.
-
-const FIELD = ['#2f7d4f', '#3a8a5c'] // alternating greens for adjacent squads
-const OVER_FILL = '#c2410c' // amber-brown: an overloaded pitch, said in words too
-const SPARE_FILL = '#e6eaee'
-const BRAND = '#c8102e'
-const INK = '#15181c'
-const MUTED = '#5b626b'
-const LINE = '#e6e8eb'
-const WHITE = '#ffffff'
-
-/** The leading token of a squad name — "U12G QR" → "U12G" — for the tight week
- *  columns where the full name will not fit a quarter-width segment. */
-const shortSquad = (name) => String(name ?? '').split(/\s+/)[0] || name
-
-/** A club-wide booking labels by its TITLE, which is free text and can be long.
- *  Cap it so it stays readable and cannot dominate a tight segment — the CSS
- *  ellipsis is the visual clip, this bounds the string the exporter measures. */
-const clip = (name, max) => {
-  const s = String(name ?? '').trim()
-  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s
-}
-
-/** The label a segment shows: a squad code (clipped to its leading token on the
- *  tight week bars) or, for a club-wide booking, its capped title. */
-const segLabel = (seg, compact) =>
-  seg.clubWide ? clip(seg.squad, compact ? 16 : 30) : compact ? shortSquad(seg.squad) : seg.squad
 
 // ⚠️ A CAPTURE WIDTH, NOT A RESPONSIVE ONE. html2canvas photographs the element
 // at its rendered size, so a card squeezed onto a phone would produce a cramped
@@ -58,7 +50,7 @@ function Shell({ title, children, innerRef, minWidth, maxWidth }) {
         color: INK,
         minWidth,
         maxWidth,
-        fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
+        fontFamily: FONT_STACK,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -112,9 +104,7 @@ function SavedNote() {
 
 /** The status pill — brand for full, green for spare, amber for an overload. */
 function StatusChip({ over, spareFraction, text }) {
-  const full = !over && spareFraction < 1e-9
-  const bg = over ? '#fbe4d8' : full ? '#fbe1e6' : '#e2f0e8'
-  const fg = over ? '#9a3412' : full ? BRAND : '#1f6b41'
+  const { bg, fg } = statusChipColours({ over, spareFraction })
   return (
     <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 8px', borderRadius: 999, background: bg, color: fg }}>
       {over ? '⚠ ' : ''}
@@ -130,17 +120,12 @@ function PitchBar({ bar, compact = false }) {
   const load = bar.segments.reduce((sum, seg) => sum + seg.fraction, 0)
   const scale = Math.max(load, 1)
   const height = compact ? 30 : 46
-  // ⚠️ THE COMPACT LABELS MUST NOT BE TINY, AND HERE IS WHY — Jay, 30 Aug 2026.
-  // The SHARE picture is drawn by html2canvas, and html2canvas does not render
-  // small text: at the old 8px the white squad codes came out as a row of
-  // dashes/dots in the exported PNG while the live card looked perfect (black
-  // "D2" at 11px and the red time at 9.5px rendered fine — it is a size floor,
-  // ~10px, not the font or the colour). Confirmed by exporting the card in the
-  // harness and reading the pixels back. So the compact codes are 11px, and the
-  // week card is widened (see PitchWeekCard's Shell) so U12G/U14G still fit a
-  // quarter bar at that size. No negative letter-spacing and no text-shadow
-  // either — both are extra ways to make html2canvas mangle small text, and
-  // neither earns its keep on a share picture.
+  // The compact week labels are 11px and the week card is widened (see
+  // PitchWeekCard's Shell) so U12G/U14G still fit a quarter bar. This sizing is
+  // now only about on-screen legibility: the SHARED picture is drawn natively on
+  // a canvas (src/lib/pitchShareCanvas.js), which stays crisp at any size, so the
+  // ~10px html2canvas floor that once forced these choices no longer applies. The
+  // sizes match the drawn picture so the on-screen card previews what gets sent.
   const labelStyle = {
     width: '100%',
     textAlign: 'center',
