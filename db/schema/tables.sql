@@ -2417,6 +2417,28 @@ ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX push_subscriptions_profile_id_idx ON public.push_subscriptions USING btree (profile_id);
 
+-- push_outbox  (30 Aug 2026 — 20260830_push_hardening, Grok item 11). The
+-- rendered copy of a squad push, written by the SECURITY DEFINER sender and
+-- consumed (deleted) by push-send — the HTTP body carries only the id, so the
+-- shared secret alone can no longer write lock-screen text. NO policies and NO
+-- authenticated/anon grants ON PURPOSE: only definer functions write it and
+-- only the service role (RLS-exempt) reads it. Single-use → replay-inert.
+CREATE TABLE public.push_outbox (
+  id         uuid        NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  club_id    uuid        NOT NULL,
+  team_id    uuid,
+  actor_id   uuid,
+  category   text        NOT NULL DEFAULT 'fixture',
+  title      text        NOT NULL,
+  body       text        NOT NULL,
+  path       text        NOT NULL DEFAULT '/',
+  tag        text,
+  CONSTRAINT push_outbox_pkey PRIMARY KEY (id),
+  CONSTRAINT push_outbox_path_is_a_path CHECK ((path LIKE '/%'))
+);
+ALTER TABLE public.push_outbox ENABLE ROW LEVEL SECURITY;
+
 -- signup_nudges  (20 Aug 2026 — who was chased about an unfinished sign-up)
 CREATE TABLE public.signup_nudges (
   profile_id  uuid        NOT NULL,

@@ -3907,7 +3907,7 @@ CREATE OR REPLACE FUNCTION private.send_fixture_push(_club uuid, _team uuid, _ac
  SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-declare endpoint text; secret text; squad text; detail text; whenish text;
+declare endpoint text; secret text; squad text; detail text; whenish text; outbox uuid;
 begin
   select decrypted_secret into endpoint from vault.decrypted_secrets where name = 'push_notify_url';
   select decrypted_secret into secret   from vault.decrypted_secrets where name = 'approval_notify_secret';
@@ -3926,16 +3926,21 @@ begin
     case when _event.type = 'match' and _event.opponent is not null then 'v ' || _event.opponent end,
     nullif(_event.title, ''), initcap(_event.type));
 
+  -- ⚠️ Copy via the OUTBOX since 30 Aug 2026 (20260830_push_hardening, item
+  -- 11): the HTTP body carries only the outbox id; push-send renders from the
+  -- row and consumes it. Note the declare list grew `outbox uuid`.
+  insert into public.push_outbox (club_id, team_id, actor_id, category, title, body, path, tag)
+  values (_club, _team, _actor, 'fixture',
+          _headline || coalesce(' — ' || squad, ''),
+          detail || ' · ' || whenish,
+          '/schedule',
+          'fixture-' || _event.id)
+  returning id into outbox;
+
   perform net.http_post(
     url     := endpoint,
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-approval-secret', secret),
-    body    := jsonb_build_object('squad_push', jsonb_build_object(
-                 'club_id', _club, 'team_id', _team, 'actor_id', _actor,
-                 'category', 'fixture',
-                 'title', _headline || coalesce(' — ' || squad, ''),
-                 'body',  detail || ' · ' || whenish,
-                 'path',  '/schedule',
-                 'tag',   'fixture-' || _event.id)));
+    body    := jsonb_build_object('squad_push', jsonb_build_object('outbox_id', outbox)));
 exception when others then
   raise warning 'send_fixture_push: %', sqlerrm;
 end;
@@ -3971,8 +3976,11 @@ begin
   end if;
 
   foreach step in array array[1, 2] loop
+    -- ⚠️ IDS ONLY since 30 Aug 2026 (20260830_push_hardening, item 10):
+    -- notify-unfinished-signup loads email/first_name by id and caps the
+    -- batch; the body never carries an address.
     select coalesce(jsonb_agg(jsonb_build_object(
-             'email', c.email, 'first_name', c.first_name, 'nudge_no', step)), '[]'::jsonb),
+             'profile_id', c.profile_id, 'nudge_no', step)), '[]'::jsonb),
            count(*)
       into people, n
       from private.unfinished_signup_candidates(step) as c;
@@ -5604,6 +5612,9 @@ $function$
 -- upsert, which RLS refused the first time a phone changed hands. The
 -- service_role execute arrives via default privileges, as with
 -- pitch_occupancy below. Harness: db/tests/push-subscription-takeover.sql.
+-- ⚠️ ENDPOINT ALLOWLISTED 30 Aug 2026 (20260830_push_hardening, Grok item 12):
+-- https + a recognised push service only, via private.push_endpoint_allowed
+-- directly below. Harness: db/tests/push-endpoint-allowlist.sql.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.register_push_subscription(_endpoint text, _p256dh text, _auth text)
  RETURNS void
@@ -5620,6 +5631,9 @@ begin
   if _endpoint is null or btrim(_endpoint) = '' then
     raise exception 'endpoint required' using errcode = '22023';
   end if;
+  if not private.push_endpoint_allowed(_endpoint) then
+    raise exception 'endpoint is not a recognised push service' using errcode = '22023';
+  end if;
 
   -- The takeover. Whoever held this device before no longer does.
   delete from public.push_subscriptions where endpoint = _endpoint;
@@ -5627,6 +5641,32 @@ begin
   insert into public.push_subscriptions (profile_id, endpoint, p256dh, auth)
   values (_me, _endpoint, _p256dh, _auth);
 end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.push_endpoint_allowed(text)   (30 Aug 2026 — push_hardening, item 12)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- ---------------------------------------------------------------------
+-- The endpoint is a URL push-send will POST to from inside the edge runtime;
+-- only real browser push services pass. Mirrored in push-send's own
+-- pushEndpointAllowed (belt and braces). Built from the hosts measured live:
+-- web.push.apple.com, fcm.googleapis.com, jmt17.google.com, plus the Mozilla
+-- and Windows (WNS wildcard) families.
+CREATE OR REPLACE FUNCTION private.push_endpoint_allowed(_endpoint text)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  select _endpoint like 'https://%'
+     and (
+       _endpoint like 'https://fcm.googleapis.com/%'
+       or _endpoint like 'https://web.push.apple.com/%'
+       or _endpoint like 'https://updates.push.services.mozilla.com/%'
+       or _endpoint similar to 'https://[a-z0-9.-]+\.notify\.windows\.com/%'
+       or _endpoint similar to 'https://[a-z0-9.-]+\.google\.com/%'
+       or _endpoint similar to 'https://[a-z0-9.-]+\.push\.apple\.com/%'
+     );
 $function$
 ;
 

@@ -21,16 +21,14 @@
 //                       (AFTER INSERT on public.messages, staff top-level
 //                        posts only — the trigger decides, 23 Aug 2026)
 //
-// ⚠️ `squad_push` AND `availability_nudge` ARRIVE FULLY FORMED — title, body,
-// tag and all — WHICH THE OTHER THREE DO NOT, AND A CANCELLATION IS WHY. By the
-// time this function runs, a cancelled fixture no longer exists; there is
-// nothing left to read. So those triggers build the text and this only
-// resolves the audience and encrypts.
-//
-// ⚠️ THE COUNT IN THE LINE ABOVE SAID "TWO" WHILE THREE WERE LISTED, from
-// 19 Aug 2026 until the fifth was added the same day. The sixth (23 Aug)
-// changed the number. If you add a seventh, change it again — a header
-// nobody maintains is worse than no header.
+// ⚠️ NO TRIGGER'S TEXT ARRIVES IN THE BODY ANY MORE (Grok item 11, 30 Aug
+// 2026 — 20260830_push_hardening.sql). `squad_push` used to arrive fully
+// formed because a cancelled fixture no longer exists to read; the copy now
+// travels through public.push_outbox (the sender snapshots the strings while
+// the row still exists, this function loads them by id and CONSUMES the row —
+// single-use, replay-inert). `availability_nudge` is re-derived here from
+// event_id. So holding the shared secret is no longer enough to write
+// lock-screen text; everything this function sends comes from the database.
 //
 // ⚠️ ONE FUNCTION RATHER THAN TWO, AND THE REASON IS THE CRYPTO. A second
 // function would mean a SECOND COPY of hand-rolled ECDH, HKDF, AES-128-GCM and
@@ -141,13 +139,45 @@ function concatBytes(...parts: Uint8Array[]): Uint8Array {
 }
 
 // !! CONSTANT TIME, same as notify-feedback and send-email.
-function timingSafeEqual(a: string, b: string): boolean {
-  const ea = new TextEncoder().encode(a)
-  const eb = new TextEncoder().encode(b)
-  if (ea.length !== eb.length) return false
+// ⚠️ HASH BOTH SIDES, THEN COMPARE THE DIGESTS (Grok item 15, 30 Aug 2026).
+// The old compare returned early on a length mismatch, which leaked the
+// secret's LENGTH through response timing. Digests are fixed-size, so the
+// comparison runs the same number of steps whatever was presented.
+async function secretMatches(presented: string, expected: string): Promise<boolean> {
+  const enc = new TextEncoder()
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(presented)),
+    crypto.subtle.digest('SHA-256', enc.encode(expected)),
+  ])
+  const ua = new Uint8Array(a)
+  const ub = new Uint8Array(b)
   let diff = 0
-  for (let i = 0; i < ea.length; i++) diff |= ea[i] ^ eb[i]
+  for (let i = 0; i < ua.length; i++) diff |= ua[i] ^ ub[i]
   return diff === 0
+}
+
+// ⚠️ THE SAME ALLOWLIST private.push_endpoint_allowed ENFORCES AT REGISTRATION
+// (Grok item 12, 20260830_push_hardening.sql) — belt and braces. This function
+// POSTs signed requests wherever a subscription row points; a row that predates
+// the SQL gate, or one written by any future path around it, must still never
+// aim the runtime at an internal host.
+function pushEndpointAllowed(endpoint: string): boolean {
+  let u: URL
+  try {
+    u = new URL(endpoint)
+  } catch {
+    return false
+  }
+  if (u.protocol !== 'https:') return false
+  const h = u.hostname
+  return (
+    h === 'fcm.googleapis.com' ||
+    h === 'web.push.apple.com' ||
+    h === 'updates.push.services.mozilla.com' ||
+    h.endsWith('.notify.windows.com') ||
+    h.endsWith('.google.com') ||
+    h.endsWith('.push.apple.com')
+  )
 }
 
 /* ---------------- VAPID (RFC 8292) ---------------- */
@@ -306,6 +336,18 @@ async function db(path: string): Promise<any[]> {
     throw new Error(`db read failed (${response.status}) on ${path}: ${await response.text()}`)
   }
   return await response.json()
+}
+
+// Single-use outbox rows (Grok item 11): consumed the moment they are read,
+// so a replayed request finds nothing to send.
+async function deleteOutboxRow(id: string): Promise<void> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/push_outbox?id=eq.${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+  })
+  if (!response.ok) {
+    console.error(`push-send: could not consume outbox row ${id}: ${response.status}`)
+  }
 }
 
 async function deleteSubscription(id: string): Promise<void> {
@@ -515,13 +557,14 @@ const STATUS_WORD: Record<string, string> = {
 /* ---------------- handler ---------------- */
 
 Deno.serve(async (request) => {
+  if (request.method !== 'POST') return new Response('method not allowed', { status: 405 })
   if (!NOTIFY_SECRET) {
     console.error('APPROVAL_NOTIFY_SECRET is unset - refusing.')
     return new Response('not configured', { status: 503 })
   }
 
   const presented = request.headers.get('x-approval-secret') ?? ''
-  if (!timingSafeEqual(presented, NOTIFY_SECRET)) {
+  if (!(await secretMatches(presented, NOTIFY_SECRET))) {
     return new Response('forbidden', { status: 403 })
   }
 
@@ -582,36 +625,64 @@ Deno.serve(async (request) => {
         subscriptions,
       }
     } else if (squad) {
-      if (!squad.club_id || !squad.team_id || !squad.title) {
-        return new Response('bad request', { status: 400 })
-      }
+      // ⚠️ THE COPY COMES FROM THE OUTBOX, NEVER THE BODY (Grok item 11,
+      // 20260830_push_hardening.sql). The request carries only an id; the
+      // rendered strings were written by the SECURITY DEFINER sender into
+      // public.push_outbox, which members cannot touch. The row is deleted
+      // before sending — single-use, so a replayed request notifies nobody.
+      const outboxId = String(squad.outbox_id ?? '')
+      if (!outboxId) return new Response('bad request', { status: 400 })
+      const rows = await db(
+        `push_outbox?id=eq.${encodeURIComponent(outboxId)}&select=id,club_id,team_id,actor_id,category,title,body,path,tag`,
+      )
+      const out = rows?.[0]
+      if (!out) return new Response('not found', { status: 404 })
+      await deleteOutboxRow(out.id)
       job = {
-        title: escapeHtmlFree(squad.title),
-        body: escapeHtmlFree(squad.body).slice(0, 200),
-        // ⚠️ A PATH, NOT A URL. The trigger names the screen; the origin is
-        // this function's business. A caller that could set the whole url
-        // could send somebody anywhere from a notification.
-        url: `${APP_URL}${squad.path && squad.path.startsWith('/') ? squad.path : '/'}`,
-        tag: escapeHtmlFree(squad.tag) || `squad-${squad.team_id}`,
+        title: escapeHtmlFree(out.title),
+        body: escapeHtmlFree(out.body).slice(0, 200),
+        // ⚠️ A PATH, NOT A URL — the outbox CHECK constraint enforces the
+        // leading slash too; the origin stays this function's business.
+        url: `${APP_URL}${out.path && out.path.startsWith('/') ? out.path : '/'}`,
+        tag: escapeHtmlFree(out.tag ?? '') || `squad-${out.team_id}`,
         subscriptions: await squadTargets(
-          squad.club_id, squad.team_id, squad.actor_id ?? null, squad.category || 'fixture',
+          out.club_id, out.team_id, out.actor_id ?? null, out.category || 'fixture',
         ),
       }
     } else if (nudge) {
-      if (!nudge.event_id || !nudge.batch_id || !nudge.title) {
+      // ⚠️ DERIVED FROM THE DATABASE, NOT THE BODY (Grok item 11). The event
+      // still exists at nudge time, so title/body/tag are rebuilt here from
+      // event_id — any text the request carried is ignored.
+      if (!nudge.event_id || !nudge.batch_id) {
         return new Response('bad request', { status: 400 })
       }
+      const rows = await db(
+        `events?id=eq.${encodeURIComponent(nudge.event_id)}&select=id,title,opponent,starts_at,time_tbd,teams(name)`,
+      )
+      const ev = rows?.[0]
+      if (!ev) return new Response('not found', { status: 404 })
+      const squadName = ev?.teams?.name ?? null
+      const starts = new Date(ev.starts_at)
+      const dateParts = new Intl.DateTimeFormat('en-GB', {
+        weekday: 'short', day: '2-digit', month: 'short', timeZone: 'Asia/Dubai',
+      }).formatToParts(starts)
+      const part = (type: string) =>
+        dateParts.find((p) => p.type === type)?.value ?? ''
+      const whenDate = `${part('weekday')} ${part('day')} ${part('month').slice(0, 3)}`
+      const whenTime = new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Dubai',
+      }).format(starts)
+      const whenish = ev.time_tbd ? `${whenDate}, time TBC` : `${whenDate}, ${whenTime}`
+      const detail = ev.opponent ? `v ${ev.opponent}` : (ev.title || 'Match')
       job = {
-        title: escapeHtmlFree(nudge.title),
-        body: escapeHtmlFree(nudge.body).slice(0, 200),
-        // ⚠️ A PATH, NOT A URL — same rule as squad_push. A caller that could
-        // set the whole url could send somebody anywhere from a notification.
-        url: `${APP_URL}${nudge.path && nudge.path.startsWith('/') ? nudge.path : '/'}`,
+        title: `Availability needed${squadName ? ` — ${squadName}` : ''}`,
+        body: escapeHtmlFree(`${detail} · ${whenish}`).slice(0, 200),
+        url: `${APP_URL}/schedule`,
         // Per MATCH, so a second nudge about the same fixture replaces the
         // first rather than stacking. It should never happen — the ledger is
         // what prevents it — but the tag means a bug in the ledger costs a
         // notification the tray collapses rather than one the family sees.
-        tag: escapeHtmlFree(nudge.tag) || `availability-${nudge.event_id}`,
+        tag: `availability-${ev.id}`,
         subscriptions: await availabilityTargets(nudge.event_id, nudge.batch_id),
       }
     } else if (approvalMembershipId) {
@@ -765,6 +836,12 @@ Deno.serve(async (request) => {
 
     for (const subscription of job.subscriptions) {
       try {
+        // Belt and braces with the SQL allowlist (Grok item 12): never POST
+        // outside the known push services, whatever a row says.
+        if (!pushEndpointAllowed(subscription.endpoint)) {
+          console.error(`push-send: refusing off-allowlist endpoint for subscription ${subscription.id}`)
+          continue
+        }
         const endpointUrl = new URL(subscription.endpoint)
         const audience = `${endpointUrl.protocol}//${endpointUrl.host}`
         const jwt = await vapidJwt(signingKey, audience)
