@@ -140,7 +140,12 @@ function PitchBar({ bar, compact = false }) {
     fontSize: compact ? 8 : 13,
     fontWeight: 800,
     lineHeight: 1.15,
-    letterSpacing: compact ? '-0.04em' : 0,
+    // ⚠️ NO NEGATIVE LETTER-SPACING. It renders fine on screen, but the SHARE
+    // picture is drawn by html2canvas, which positions each glyph itself and
+    // OVERLAPS them under negative tracking — every label collapsed to a row of
+    // dashes/dots in the exported PNG while the live card looked perfect (Jay,
+    // 30 Aug 2026). Normal tracking; the codes fit without the squeeze.
+    letterSpacing: 'normal',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -207,7 +212,7 @@ function PitchBar({ bar, compact = false }) {
                 color: MUTED,
                 fontSize: compact ? 9 : 11.5,
                 fontWeight: 700,
-                letterSpacing: compact ? '-0.02em' : 0,
+                letterSpacing: 'normal', // see labelStyle — html2canvas mangles negative tracking
                 overflow: 'hidden',
                 padding: '0 4px',
               }}

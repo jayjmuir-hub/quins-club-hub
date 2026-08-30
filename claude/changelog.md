@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Club-wide events are editable again, and a long one no longer wrecks the
+- **The shared pitch picture is legible again — every label was rendering as
+  dashes.** The share PNG is drawn by html2canvas, which positions each glyph
+  itself and OVERLAPS them under the compact bars' negative `letter-spacing`
+  (`-0.04em`, added when the codes were tightened to fit) — so on the exported
+  image every squad code collapsed to a row of dashes/dots while the live card
+  looked perfect (Jay). Removed the negative tracking (the codes fit at normal
+  spacing); the on-screen card is unchanged. `src/components/PitchShareCard.jsx`.
+  (SHA follows in the next changelog-touching PR.)
+- `cd59f9f` — **Club-wide events are editable again, and a long one no longer wrecks the
   pitch picture.** Two faults in the whole-club feature Jay hit: (1) clicking a
   club-wide event showed NO edit option — `canEditTeam` deliberately refuses a
   null team (an unresolved squad id), which now also described a real club-wide
@@ -22,8 +30,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   their content. `minmax(0, 1fr)` caps each column, and the club title is length-
   capped, so a long one just clips inside its own day. `src/lib/scope.js`,
   `src/screens/EventForm.jsx`, `src/screens/Schedule.jsx`, `src/screens/Dashboard.jsx`,
-  `src/components/PitchShareCard.jsx`, and their tests. (SHA follows in the next
-  changelog-touching PR.)
+  `src/components/PitchShareCard.jsx`, and their tests.
 - `1ca802f` — **A club-wide booking reads its own TITLE on the pitch layout.** Following the
   "Club" fix below, Jay wanted the whole-club booking to say what it is — "Adult
   Tag" — not a generic "Club". A squad-less event now labels by its event title
