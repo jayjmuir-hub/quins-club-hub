@@ -22,6 +22,53 @@ reviewers agreed, not Grok's original labels. Written here BEFORE the first PR
 because a plan is superseded once shipped and this file is the register that
 survives; strike items through with evidence as they land, never delete them.
 
+⚠️ **RE-VALIDATED 30 Aug 2026, after ~20 PRs merged (pitch rework #533-#547,
+role channels #550/#551, whole-club events, hygiene #552).** Every item still
+substantively stands EXCEPT one half of item 14, fixed below — but five things
+moved, and the detail lines below have NOT all been re-numbered (scope.js and
+messages.js grew; trust the symbol name over the line number). Items 1 & 2
+re-confirmed against prod (`pg_get_functiondef` / `pg_policy`): `welfare_overview`
+gate still `is_admin`, `report read`/`report resolve` still `is_admin`. What
+changed:
+
+0. **Item 14's `chat_media_owner` unpinned half is FIXED by #552** — proven
+   live, `proconfig = search_path=""` (so is `squad_expects_gender` and
+   `social_idea_owner`). `db/tests/search-path.sql` is no longer at risk of
+   going red. The OTHER half of item 14 — the stale `db/schema/policies.sql`
+   bodies (player-private read via `can_edit_team`, photo read via
+   `can_see_team`, welfare-log read via `is_admin`) — still stands and still
+   needs a recapture.
+
+1. **Item 3 is now PARTIAL — Pitch Glance only.** The pitch rework incidentally
+   fixed the ALLOCATION path (it reads `listEvents`, which filters
+   `tournament_id IS NULL`, `src/data/events.js:73`). **Pitch Glance still
+   leaks** — it reads `listPitchOccupancy` → the `pitch_occupancy` RPC
+   (`db/migrations/20260829_pitch_portion.sql:44-77`), which STILL has no
+   `tournament_id` filter. The new `src/lib/pitchOccupancy.js` is display math
+   only and did not touch this. The harness is still broken (return-type
+   mismatch, now worse). Fix unchanged (RPC filter), impact narrowed to Pitch
+   Glance.
+2. **Item 2's fix is no longer a simple predicate swap.** Role channels
+   (`db/migrations/20260830_role_channels.sql`) made "report handling is an
+   admin duty" explicit, and `message_reports` is ONE table gating every report
+   type (minor-DM, squad-chat moderation, AND role-channel). A flat
+   `is_admin → can_review_dm` would over-restrict *general chat moderation* to
+   welfare holders only. The fix must **distinguish minor/DM reports (welfare)
+   from general channel-moderation reports (admin)**, or Jay rules that report
+   handling is a welfare function wholesale. Decide before writing PR 1.
+3. **New adjacent surface from role channels — bounded.** `welfare_overview` is
+   NEUTRAL (not touched; its report joins are filtered to `channel in
+   ('squad','staff')`, so a narrowed admin gains no role-channel counts there).
+   But because `message_reports` read/resolve are still `is_admin`, a narrowed
+   admin can now also **see a role-channel report exists and delete the reported
+   message** — content stays protected (`in_role_channel` gates reads; Welfare
+   requires the `welfare` right). The items-1/2 fix closes the metadata half too.
+4. **Item 7 comment partially self-corrected** (a CHILD-CONTACTS ALLOWLIST note
+   was added to `scope.js` ~:364-377), but the flat "a right withholds nothing"
+   line still reads as written; and **item 9's unconditional ChatList pass now
+   also swallows the five role channels** (`headcoaches`/`managers`/`medics`/
+   `welfare`/`clubstaff`), unfiltered under view-as. Both still stand.
+
 ⚠️ **Four framing corrections were agreed and are baked into the labels below:**
 (1) `canEditTeam` is **UX, not HIGH** — RLS already refuses the write. (2) The
 `push-send` `path` "open redirect" is a **non-issue** — `APP_URL + path` keeps
@@ -191,10 +238,10 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   pre-allowlist bodies — player-private read via `can_edit_team`, player-photo
   read via `can_see_team`, welfare-log read via `is_admin` — vs live; and the
   `pitch_occupancy` signature in `functions.sql` predates the portion column.
-  Recapture in whichever PR touches each. **`private.chat_media_owner`
-  (`db/migrations/20260824_chat_round_2.sql:76-82`) is unpinned** (no
-  `set search_path`) and would turn `db/tests/search-path.sql:31` (exempts only
-  `squad_expects_gender`) red on next run — pin it or exempt with a reason.
+  Recapture in whichever PR touches each. ✅ ~~**`private.chat_media_owner` is
+  unpinned**~~ — **PINNED by #552** (`20260830_pin_private_helper_search_path.sql`,
+  proven live `search_path=""`), so `db/tests/search-path.sql` is no longer at
+  risk. The stale-policy-capture half above still stands.
 - **Edge-function hygiene.** No committed edge-function `config.toml` (none
   under `supabase/`), so `verify_jwt:false`
   lives only in the dashboard and an MCP deploy defaults it back to true

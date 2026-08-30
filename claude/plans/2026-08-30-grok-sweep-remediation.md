@@ -4,6 +4,17 @@
 on Jay's explicit "go" for that slice. `main` is production
 (https://adhquins-clubhub.com); every PR is a live release.
 
+⚠️ **RE-VALIDATED 30 Aug 2026 after ~20 PRs merged** (see the same-day note in
+`claude/open-items.md`). All 18 items still stand; two fixes changed and the
+`file:line` refs below have drifted (scope.js/messages.js grew — trust the
+symbol name). **(a) PR 3 (item 3) is now Pitch-Glance-only** — the pitch rework
+fixed the Allocation path (`listEvents` filters `tournament_id`); the
+`pitch_occupancy` RPC still leaks, so Pitch Glance still shows false clashes.
+**(b) PR 1's item-2 fix is no longer a flat `is_admin → can_review_dm` swap** —
+role channels made general report-handling an admin duty, and `message_reports`
+gates every report type through one table; a flat swap would over-restrict
+squad-chat moderation to welfare holders. See the amended PR 1 and PR 3 below.
+
 This plans the fixes for the items Claude **confirmed** from the 29 Aug Grok
 sweep (verified against the code and, for the RLS items, against the live
 database). Item severities and the confirmed evidence live in the review
@@ -97,6 +108,21 @@ independently shippable.
   - `"report read"`: `reporter_id = auth.uid() OR private.can_review_dm(club_id)`
     (keep the reporter arm so a reporter still sees their own report).
   - `"report resolve"` (USING + WITH CHECK): `private.can_review_dm(club_id)`.
+  ⚠️ **RE-VALIDATION 30 Aug: this is the point that needs a decision, not a
+  swap.** `message_reports` is one table gating EVERY report — minor-DM,
+  squad-chat moderation, and (since role channels) role-channel reports. A flat
+  `→ can_review_dm` narrows *all* report handling to welfare holders, which
+  over-restricts ordinary squad-chat moderation that any admin is meant to do
+  (role_channels.sql's comment: "report handling is an admin duty"). Two ways
+  out, Jay's call: (i) report handling IS a welfare function wholesale → the
+  flat swap is correct; or (ii) split — a report on a minor DM (or a
+  reviewable/minor conversation) requires `can_review_dm`, other reports stay
+  `is_admin`. Option (ii) keys the read/resolve on the reported message's
+  context (its conversation/channel), which is more predicate but preserves
+  moderation. Settle this before writing the migration. Whichever wins, also
+  reconcile the role-channel reported-message DELETE
+  (`role_channels.sql:196-208`, currently `is_admin`) so "can delete" and "can
+  see/resolve the report" don't diverge.
 - New migration file `db/migrations/20260830_welfare_review_gate.sql`. It must
   `drop policy … ; create policy …` for the two report policies and
   `create or replace function` for the overview.
@@ -176,10 +202,18 @@ independently shippable.
 
 ### PR 3 — SQL: tournament games out of `pitch_occupancy` (item 3) + harness repair
 
+⚠️ **RE-VALIDATION 30 Aug: scope is now Pitch Glance ONLY.** The pitch rework
+(#533-#547) made the Allocation path clean — it feeds clash detection from
+`listEvents` (`src/data/events.js:73`), which filters `tournament_id IS NULL`.
+Pitch Glance still reads `listPitchOccupancy` → the `pitch_occupancy` RPC, which
+still leaks. So this fix removes the FALSE CLASHES that remain in Pitch Glance;
+Allocation no longer disagrees because it was already fixed. `src/lib/
+pitchOccupancy.js` is display math only and is not the fix site.
+
 **Change**
-- `pitch_occupancy` (currently `db/migrations/20260829_pitch_portion.sql:65-76`):
-  add `and e.tournament_id is null` to the WHERE, matching `listEvents`
-  (`src/data/events.js:64`) and the token feed
+- `pitch_occupancy` (currently `db/migrations/20260829_pitch_portion.sql:44-77`,
+  WHERE at ~`:68-76`): add `and e.tournament_id is null` to the WHERE, matching
+  `listEvents` (`src/data/events.js:73`) and the token feed
   (`20260829_calendar_feed_exclude_tournament_games.sql`).
 - New `db/migrations/20260830_pitch_occupancy_exclude_tournament_games.sql`
   (`drop function` first, then re-create — the live signature already carries
@@ -205,8 +239,8 @@ independently shippable.
 - Real clashes, the `group_id` fan-out exemption, `Pitch TBD`, and nullable
   `ends_at` are all preserved (only tournament *games* are excluded, matching
   the two calendar reads).
-- Allocation (uses `listEvents`) and Pitch Glance (uses the RPC) stop disagreeing
-  on tournament days.
+- Pitch Glance (uses the RPC) stops showing false clashes on tournament days;
+  Allocation (uses `listEvents`) was already clean, so the two now agree.
 - Recapture `db/schema/functions.sql` occupancy signature (item 14, partial).
 
 ---
@@ -412,16 +446,14 @@ first within this PR.
 **Change**
 - Finish the `db/schema/` recapture if any PR above left a gap
   (`policies.sql` player-private/photo/welfare-log bodies, `functions.sql`
-  signatures). Pin `private.chat_media_owner`
-  (`db/migrations/20260824_chat_round_2.sql:76-82`) with `set search_path`, or
-  exempt it in `db/tests/search-path.sql:31` with a reason — it is currently
-  unpinned and `db:check` will flag it.
+  signatures). ⚠️ **RE-VALIDATION 30 Aug: the `chat_media_owner` pin is DONE**
+  (#552, `20260830_pin_private_helper_search_path.sql`, proven live) — drop that
+  sub-task; only the stale `policies.sql` recapture remains.
 - Item 18 UX residual: `Schedule.jsx:915` parent-taps-tournament-game →
   `/match-sheet/:id` they can't use. Product/UX, low — fix only if Jay wants
   (route parents to the game's detail view instead).
 
 **Tests**
-- `db/tests/search-path.sql` green (chat_media_owner pinned or exempted).
 - `db:check` and `docs:check` green.
 
 ---

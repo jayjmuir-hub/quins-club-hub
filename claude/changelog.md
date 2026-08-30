@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **THE HARNESS AND THE TEST SUITE STOP TALKING TO PRODUCTION — measured, not
+- **Re-validated the Grok full-sweep against current `main` (docs only).** After
+  ~20 PRs merged (pitch rework, role channels #550/#551, hygiene #552), all
+  findings still substantively stand except item 14's `chat_media_owner` pin
+  (fixed by #552, proven live). Recorded the shifts in `claude/open-items.md`
+  and the plan: item 3 is now Pitch-Glance-only (Allocation was incidentally
+  fixed), item 2's fix is no longer a flat `is_admin → can_review_dm` swap (role
+  channels made report-handling an admin duty), and role channels added a bounded
+  `message_reports` metadata/deletion surface. Items 1 & 2 re-confirmed live
+  (`welfare_overview` / `message_reports` still `is_admin`). No code changed.
+  `claude/open-items.md`, `claude/plans/2026-08-30-grok-sweep-remediation.md`.
+  (SHA follows in the next changelog-touching PR.)
+- `9d71fb7` — **THE HARNESS AND THE TEST SUITE STOP TALKING TO PRODUCTION — measured, not
   assumed.** Supabase's dashboard showed ~94k requests/24h at a 21% success
   rate; the failures traced to Jay's own machines running this repo's tooling:
   un-stubbed data modules in the screenshot harness (whose alias list stubs
