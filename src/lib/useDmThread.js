@@ -52,9 +52,14 @@ import useStayPinnedToBottom from './useStayPinnedToBottom.js'
 // `scrollRef` points pin-to-bottom at the dock's panel instead of the page.
 export default function useDmThread(conversationId, { openDm, consumeReplyState = true, scrollRef } = {}) {
   const { user } = useAuth()
-  const { memberships } = useMemberships()
+  const { realMemberships } = useMemberships()
   const selfId = user?.id ?? null
-  const admin = isAdmin(memberships)
+  // ⚠️ REAL memberships, not the view-as synthetic set (Grok item 9). The
+  // database reads still run as the real auth.uid(), so an admin previewing
+  // as a parent who opens a DM is REVIEWING it — the welfare log and the
+  // banner must fire exactly as if they were not previewing. Keying this on
+  // the synthetic set skipped both.
+  const admin = isAdmin(realMemberships)
 
   const [conversation, setConversation] = useState(null)
   // The database answered and there is no such conversation FOR THIS READER —

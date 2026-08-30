@@ -195,8 +195,14 @@ export async function removeMessage(id) {
  * which case an admin. Messages cascade; the welfare access log survives.
  */
 export async function deleteConversation(conversationId) {
-  const { error } = await supabase.from('conversations').delete().eq('id', conversationId)
+  // ⚠️ .select() so a zero-row delete is an error, not a shrug — the same
+  // guard removeMessage carries. RLS refusing (a reported conversation, a
+  // non-participant) comes back as success-with-no-rows, and the screen would
+  // otherwise navigate away claiming "deleted for both of you" while the
+  // thread sat untouched.
+  const { data, error } = await supabase.from('conversations').delete().eq('id', conversationId).select('id')
   if (error) throw error
+  if (!data?.length) throw new Error('The conversation was not deleted — you may not have the right to, or it is already gone.')
 }
 
 /**
@@ -719,11 +725,17 @@ export async function listOpenReports() {
 }
 
 export async function resolveReport(reportId) {
-  const { error } = await supabase
+  // ⚠️ .select() so a zero-row update is an error, not a shrug — RLS refusing
+  // (since 30 Aug a DM/group report needs the welfare grant) comes back as
+  // success-with-no-rows, and the screen would tick the report off while it
+  // stayed open.
+  const { data, error } = await supabase
     .from('message_reports')
     .update({ resolved_at: new Date().toISOString() })
     .eq('id', reportId)
+    .select('id')
   if (error) throw error
+  if (!data?.length) throw new Error('The report was not resolved — you may not have the right to.')
 }
 
 /** The Welfare dashboard rows. Admins only; the function returns nothing to anybody else. */
