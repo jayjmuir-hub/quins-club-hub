@@ -430,4 +430,9 @@ CREATE TRIGGER audit_membership AFTER INSERT OR DELETE OR UPDATE ON public.membe
 
 CREATE TRIGGER pending_membership_push AFTER INSERT ON public.memberships FOR EACH ROW WHEN ((new.status = 'pending'::text)) EXECUTE FUNCTION private.notify_pending_membership_push();
 
+-- Added 30 Aug 2026 (20260830_last_admin_guard, Grok item 8): the club's last
+-- ACTIVE admin can be neither demoted nor deleted — raises P0001. The client
+-- LAST_ADMIN_REFUSAL banner is the friendly first line; this is the real one.
+CREATE TRIGGER last_admin_guard BEFORE UPDATE OR DELETE ON public.memberships FOR EACH ROW EXECUTE FUNCTION private.guard_last_admin();
+
 CREATE TRIGGER messages_quote_guard BEFORE INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION private.messages_quote_guard();
