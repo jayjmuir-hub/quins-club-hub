@@ -27,6 +27,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // without a line here the new stub simply is not checked, so the aliased-module
 // count is asserted too.
 const ALIASES = [
+  // ⚠️ SEVENTH CATCH (30 Aug 2026), and this list was updated in the same
+  // change for once. The inert client — the safety net under every rule
+  // below, added after un-stubbed data modules were measured firing ~36k
+  // requests at the LIVE database from harness runs. Aliased from two
+  // specifier depths like auth.jsx below, so it appears twice.
+  ['harness/stubs/supabase.js', 'src/lib/supabase.js'],
+  ['harness/stubs/supabase.js', 'src/lib/supabase.js'],
   // The Squad Hub pair, added 21 Aug 2026 with the dark-mode repro scenario.
   ['harness/stubs/attendance.js', 'src/data/attendance.js'],
   // Online presence, 26 Aug 2026 — a lib stub, not a data one: the real

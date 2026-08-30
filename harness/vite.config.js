@@ -38,6 +38,23 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
+      // ⚠️ THE SAFETY NET, FIRST AND LOAD-BEARING (30 Aug 2026). Every rule
+      // below this one stubs a single data module, and the list's own comments
+      // admit the failure mode: an importer the list doesn't know about gets
+      // the REAL module. For most modules that costs a broken scenario; for
+      // src/lib/supabase.js it cost ~36,000 failed requests against the LIVE
+      // database in 24h — every data module nobody aliased (leagueTeams,
+      // trainingPlans, polls, nicknames, activity…) reached production with
+      // stub fixture ids, measured on the Supabase dashboard 30 Aug 2026 and
+      // traced to harness runs. RLS refused all of it; the harness's "no
+      // network access" promise was still broken.
+      //
+      // So the CLIENT is aliased to an inert stand-in (stubs/supabase.js) and
+      // the promise stops depending on the list being complete. Both
+      // specifier depths, extensionless and .js — src/ imports it all four
+      // ways (40× '../lib/supabase', 5× '../lib/supabase.js', 2× each './').
+      { find: /^\.\.\/lib\/supabase(\.js)?$/, replacement: path.resolve(__dirname, 'stubs/supabase.js') },
+      { find: /^\.\/supabase(\.js)?$/, replacement: path.resolve(__dirname, 'stubs/supabase.js') },
       { find: /^\.\.\/lib\/auth\.jsx$/, replacement: path.resolve(__dirname, 'stubs/auth.jsx') },
       { find: /^\.\.\/data\/attendance\.js$/, replacement: path.resolve(__dirname, 'stubs/attendance.js') },
       { find: /^\.\.\/data\/announcements\.js$/, replacement: path.resolve(__dirname, 'stubs/announcements.js') },
