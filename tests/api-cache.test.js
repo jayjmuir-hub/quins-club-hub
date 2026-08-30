@@ -169,3 +169,80 @@ describe('syncApiCacheOwner', () => {
     setItem.mockRestore()
   })
 })
+
+// ⚠️ THE ONE-TIME CHILD-PII SWEEP (Grok item 6 residue, 30 Aug 2026). The
+// pwa-cache-rules exclusions stop NEW writes, but entries cached BEFORE that
+// deploy sit on disk until eviction — and this module purges on owner-change
+// only, so a family device that never switches user would keep children's
+// chat and DOB cached indefinitely. syncApiCacheOwner now sweeps those five
+// tables' entries once per device.
+describe('the one-time child-PII sweep', () => {
+  const REST = 'https://lusmshimxdcxpnrktlgz.supabase.co/rest/v1'
+
+  /** A Cache Storage stub whose open() serves a cache with the given urls. */
+  function stubOpenableCache(urls) {
+    const deletedRequests = []
+    const cache = {
+      keys: vi.fn(async () => urls.map((u) => ({ url: u }))),
+      delete: vi.fn(async (request) => {
+        deletedRequests.push(new URL(request.url).pathname)
+        return true
+      }),
+    }
+    globalThis.caches = {
+      open: vi.fn(async () => cache),
+      delete: vi.fn(async () => true),
+    }
+    return deletedRequests
+  }
+
+  it('deletes pre-existing entries for the five tables and leaves the rest', async () => {
+    const deletedRequests = stubOpenableCache([
+      `${REST}/messages?select=*&conversation_id=eq.x`,
+      `${REST}/player_private?select=*&player_id=eq.x`,
+      `${REST}/player_contacts?select=*&player_id=eq.x`,
+      `${REST}/player_parents?select=*&player_id=eq.x`,
+      `${REST}/poll_votes?select=*`,
+      `${REST}/teams?select=*`,
+      `${REST}/events?select=*`,
+    ])
+    window.localStorage.setItem(OWNER_KEY, 'user-a')
+
+    await syncApiCacheOwner('user-a')
+
+    expect(deletedRequests.sort()).toEqual([
+      '/rest/v1/messages',
+      '/rest/v1/player_contacts',
+      '/rest/v1/player_parents',
+      '/rest/v1/player_private',
+      '/rest/v1/poll_votes',
+    ])
+  })
+
+  it('runs once — the second load does not reopen the cache', async () => {
+    stubOpenableCache([`${REST}/messages?select=*`])
+    window.localStorage.setItem(OWNER_KEY, 'user-a')
+
+    await syncApiCacheOwner('user-a')
+    expect(globalThis.caches.open).toHaveBeenCalledTimes(1)
+
+    await syncApiCacheOwner('user-a')
+    expect(globalThis.caches.open).toHaveBeenCalledTimes(1)
+  })
+
+  it('a sweep that throws leaves the marker unwritten, so the next load retries', async () => {
+    globalThis.caches = {
+      open: vi.fn(async () => {
+        throw new Error('storage unavailable')
+      }),
+      delete: vi.fn(async () => true),
+    }
+    window.localStorage.setItem(OWNER_KEY, 'user-a')
+
+    await syncApiCacheOwner('user-a')
+    expect(window.localStorage.getItem('quins.apiCache.childPiiPurged.v1')).toBeNull()
+
+    await syncApiCacheOwner('user-a')
+    expect(globalThis.caches.open).toHaveBeenCalledTimes(2)
+  })
+})

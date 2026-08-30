@@ -110,7 +110,50 @@ export async function clearCachedApiResponses() {
  *
  * @returns {Promise<boolean>} whether the cache is now clear and claimed.
  */
+// ⚠️ ONE-TIME SWEEP FOR ENTRIES THAT PREDATE THE 30 Aug 2026 EXCLUSIONS
+// (Grok item 6, peer-review catch on #562). pwa-cache-rules.js stops NEW
+// writes of the five child-PII tables, but a Workbox runtime cache keeps its
+// EXISTING entries until eviction — and apiCache purges on owner-change only,
+// so a family device that never switches user would keep children's chat and
+// DOB on disk indefinitely. This deletes any already-cached response for
+// those tables, once per device (localStorage marker), then costs one
+// localStorage read forever after.
+const CHILD_PII_PURGE_KEY = 'quins.apiCache.childPiiPurged.v1'
+const CHILD_PII_PATHS = new Set([
+  '/rest/v1/messages',
+  '/rest/v1/player_private',
+  '/rest/v1/player_contacts',
+  '/rest/v1/player_parents',
+  '/rest/v1/poll_votes',
+])
+
+async function purgeChildPiiResponsesOnce() {
+  try {
+    if (window.localStorage.getItem(CHILD_PII_PURGE_KEY)) return
+  } catch {
+    // Unreadable storage: fall through and sweep — wasteful, never unsafe.
+  }
+  if (typeof caches !== 'undefined') {
+    try {
+      const cache = await caches.open(API_CACHE_NAME)
+      for (const request of await cache.keys()) {
+        if (CHILD_PII_PATHS.has(new URL(request.url).pathname)) await cache.delete(request)
+      }
+    } catch {
+      // A sweep that could not run leaves the marker unwritten, so the next
+      // load tries again — same convention as clearCachedApiResponses.
+      return
+    }
+  }
+  try {
+    window.localStorage.setItem(CHILD_PII_PURGE_KEY, '1')
+  } catch {
+    // Next load sweeps again over an already-clean cache. Harmless.
+  }
+}
+
 export async function syncApiCacheOwner(userId) {
+  await purgeChildPiiResponsesOnce()
   const owner = readOwner()
   if (owner && owner === userId) return false
 

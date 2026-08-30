@@ -1,4 +1,5 @@
 import { AccentTitle, Kicker } from '../components/Editorial.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -74,7 +75,7 @@ function Receipts({ notice, onClose }) {
         if (mounted) setRows(data)
       })
       .catch((err) => {
-        if (mounted) setError(err.message || 'Could not load who has seen this.')
+        if (mounted) setError(friendlyMessage(err, 'Could not load who has seen this.'))
       })
     return () => {
       mounted = false
@@ -232,7 +233,7 @@ export default function Notices() {
         setStats(new Map())
       }
     } catch (err) {
-      setError(err.message || 'We could not load the notices just now.')
+      setError(friendlyMessage(err, 'We could not load the notices just now.'))
     }
   }, [])
 
@@ -291,7 +292,7 @@ export default function Notices() {
       await deleteNotice(notice.id)
       await load()
     } catch (err) {
-      setError(err.message || 'That notice could not be removed.')
+      setError(friendlyMessage(err, 'That notice could not be removed.'))
     }
   }
 

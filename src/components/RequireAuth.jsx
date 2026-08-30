@@ -2,6 +2,25 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 import Login from '../screens/Login.jsx'
 
+/**
+ * The sentence Login shows for a failed sign-in fragment. GoTrue's known
+ * shapes get specific copy; everything else — including anything an attacker
+ * typed into a link — gets the generic line. Exported for the test only.
+ */
+export function friendlyAuthError(errorCode, error, description) {
+  const probe = `${errorCode ?? ''} ${error ?? ''} ${description ?? ''}`
+  if (/otp_expired|expired/i.test(probe)) {
+    return 'That sign-in link has expired. Request a fresh one below and use it within an hour.'
+  }
+  if (/access_denied/i.test(probe)) {
+    return 'That sign-in attempt was cancelled or refused. Try again below.'
+  }
+  if (/invalid/i.test(probe)) {
+    return 'That sign-in link is no longer valid. Request a fresh one below.'
+  }
+  return 'That sign-in link did not work. Request a fresh one below.'
+}
+
 // Gates its children behind an authenticated session: shows a loading
 // indicator while the initial session check is in flight, the Login screen
 // when there is none, and the children once a session exists. It renders in
@@ -48,7 +67,12 @@ export default function RequireAuth({ children }) {
     const description = params.get('error_description')
     if (!description) return
 
-    setAuthError(description)
+    // ⚠️ MAPPED, NEVER RENDERED RAW (Grok item 17, 30 Aug 2026). The fragment
+    // is attacker-writable — anyone can send a link ending
+    // #error_description=<anything> and have this app print it on the club's
+    // own origin, above the login form, wearing the club's chrome. So the
+    // fragment picks a sentence WE wrote; the raw text never reaches the DOM.
+    setAuthError(friendlyAuthError(params.get('error_code'), params.get('error'), description))
     window.history.replaceState(null, '', window.location.pathname + window.location.search)
   }, [])
 

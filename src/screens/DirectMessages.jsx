@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react'
+import { friendlyMessage } from '../lib/friendlyError.js'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -87,7 +88,7 @@ function Thread({ conversationId }) {
       else await blockDm(other.id)
       await reload()
     } catch (err) {
-      setError(err.message || 'Could not change that.')
+      setError(friendlyMessage(err, 'Could not change that.'))
     }
   }
 
@@ -96,7 +97,7 @@ function Thread({ conversationId }) {
       await deleteConversation(conversationId)
       navigate('/chat')
     } catch (err) {
-      setError(err.message || 'Could not delete this chat.')
+      setError(friendlyMessage(err, 'Could not delete this chat.'))
       setDeleting(false)
     }
   }
@@ -109,7 +110,7 @@ function Thread({ conversationId }) {
       setRenaming(false)
       await reload()
     } catch (err) {
-      setError(err.message || 'Could not rename the group.')
+      setError(friendlyMessage(err, 'Could not rename the group.'))
     }
   }
 
@@ -118,7 +119,7 @@ function Thread({ conversationId }) {
       await leaveGroup(conversationId)
       navigate('/chat')
     } catch (err) {
-      setError(err.message || 'Could not leave the group.')
+      setError(friendlyMessage(err, 'Could not leave the group.'))
       setLeaving(false)
     }
   }
@@ -131,7 +132,7 @@ function Thread({ conversationId }) {
       setNicknaming(false)
       setNicknames(await listMyNicknames())
     } catch (err) {
-      setError(err.message || 'Could not save the nickname.')
+      setError(friendlyMessage(err, 'Could not save the nickname.'))
     }
   }
 
