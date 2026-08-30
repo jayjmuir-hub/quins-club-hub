@@ -58,6 +58,16 @@ export async function listStaffMessages() {
 export async function postStaffMessage() {
   throw new Error('harness: postStaffMessage is not stubbed')
 }
+// Role channels (20260830).
+export async function listRoleMessages() {
+  return []
+}
+export async function postRoleMessage() {
+  throw new Error('harness: postRoleMessage is not stubbed')
+}
+export async function channelMembers() {
+  return []
+}
 export async function listMentionablesFor() {
   return []
 }

@@ -482,6 +482,67 @@ export async function listStaffMessages(teamId, { limit = 50 } = {}) {
   return heads.slice().reverse().map((m) => ({ ...m, replies: byParent.get(m.id) ?? [] }))
 }
 
+// ── Role channels (db/migrations/20260830_role_channels.sql) ────────────────
+// Club-wide chats keyed by messages.channel — membership is derived from
+// roles by private.in_role_channel, so whether the caller MAY read or post is
+// entirely the policy's decision; these are plain reads/inserts.
+
+/** The stream for one role channel, same thread shape as listMessages. */
+export async function listRoleMessages(channelKey, { limit = 50 } = {}) {
+  const { data: heads, error } = await supabase
+    .from('messages')
+    .select(SELECT)
+    .is('parent_id', null)
+    .eq('channel', channelKey)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  if (!heads?.length) return []
+  const { data: replies, error: replyError } = await supabase
+    .from('messages')
+    .select(SELECT)
+    .in('parent_id', heads.map((m) => m.id))
+    .order('created_at', { ascending: true })
+  if (replyError) throw replyError
+  const byParent = new Map()
+  for (const r of replies ?? []) {
+    if (!byParent.has(r.parent_id)) byParent.set(r.parent_id, [])
+    byParent.get(r.parent_id).push(r)
+  }
+  return heads.slice().reverse().map((m) => ({ ...m, replies: byParent.get(m.id) ?? [] }))
+}
+
+/** Posts to a role channel. Members only — the policy decides. */
+export async function postRoleMessage(channelKey, body, { mentions = [], attachmentPath = null, forwarded = false } = {}) {
+  const text = body?.trim() ?? ''
+  if (!text && !attachmentPath) throw new Error('Write something first.')
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      channel: channelKey,
+      body: text,
+      mentions,
+      ...(attachmentPath ? { attachment_path: attachmentPath } : {}),
+      ...(forwarded ? { forwarded: true } : {}),
+    })
+    .select(SELECT)
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
+ * Who is in a channel, and why — the member sheet behind every channel
+ * header. `channel` is 'squad' / 'staff' (with a team), 'club' (admins only —
+ * the RPC refuses others; names are squad-scoped for everyone else), or a
+ * role-channel key. Rows: { profile_id, full_name, reason }.
+ */
+export async function channelMembers(channel, teamId = null) {
+  const { data, error } = await supabase.rpc('channel_members', { _channel: channel, _team: teamId })
+  if (error) throw error
+  return data ?? []
+}
+
 /** Posts to the squad's staff channel. Staff only — the policy decides. */
 export async function postStaffMessage(teamId, body, { mentions = [], attachmentPath = null, forwarded = false } = {}) {
   const text = body?.trim() ?? ''
@@ -723,6 +784,13 @@ export function chatPath(row) {
       return '/chat/club'
     case 'staff':
       return `/chat/${row.team_id}?channel=staff`
+    // Role channels (20260830): the kind IS the route param, like 'club'.
+    case 'headcoaches':
+    case 'managers':
+    case 'medics':
+    case 'welfare':
+    case 'clubstaff':
+      return `/chat/${row.kind}`
     default:
       return `/chat/${row.team_id}`
   }

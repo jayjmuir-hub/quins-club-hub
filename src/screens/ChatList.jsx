@@ -17,6 +17,7 @@ import {
   subscribeMessages,
 } from '../data/messages.js'
 import { dotState, usePresence } from '../lib/presence.js'
+import { ROLE_CHANNELS, isRoleChannel } from '../lib/roleChannels.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
@@ -50,12 +51,18 @@ export function RowAvatar({ row, presence = null }) {
       </span>
     )
   }
-  const glyph = row.kind === 'club' ? '🏉' : row.kind === 'staff' ? '🛡' : shortBand(row.label)
+  const glyph = isRoleChannel(row.kind)
+    ? ROLE_CHANNELS[row.kind].glyph
+    : row.kind === 'club'
+      ? '🏉'
+      : row.kind === 'staff'
+        ? '🛡'
+        : shortBand(row.label)
   return (
     <span
       aria-hidden="true"
       className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-[12px] font-extrabold ${
-        row.kind === 'club' ? 'bg-surface-mute text-ink' : 'bg-brand text-ink-invert'
+        row.kind === 'club' || isRoleChannel(row.kind) ? 'bg-surface-mute text-ink' : 'bg-brand text-ink-invert'
       }`}
     >
       {glyph}
@@ -245,7 +252,13 @@ export default function ChatList() {
     [shown, filter, prefs, searching],
   )
   const squadRows = useMemo(
-    () => (filter === 'dms' ? [] : unreadFirst(filtered.filter((r) => r.kind === 'squad' || r.kind === 'staff'))),
+    // Role channels (20260830) sit with the squads: they are channels, and a
+    // head coach expects Club Head Coaches beside their squad rows, not among
+    // their DMs.
+    () =>
+      filter === 'dms'
+        ? []
+        : unreadFirst(filtered.filter((r) => r.kind === 'squad' || r.kind === 'staff' || isRoleChannel(r.kind))),
     [filtered, filter],
   )
   const dmRows = useMemo(

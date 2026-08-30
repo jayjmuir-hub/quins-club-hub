@@ -118,7 +118,8 @@ function DockDmThread({ row, initialReplyTo, onOpenDm }) {
 function DockChannelThread({ row, onOpenDm }) {
   const scrollRef = useRef(null)
   const thread = useChannelThread(
-    { param: row.kind === 'club' ? 'club' : row.team_id, wantStaff: row.kind === 'staff' },
+    // A role channel's kind IS its param (20260830), exactly like 'club'.
+    { param: row.kind === 'club' ? 'club' : row.team_id ?? row.kind, wantStaff: row.kind === 'staff' },
     { openDm: onOpenDm, scrollRef },
   )
   return (

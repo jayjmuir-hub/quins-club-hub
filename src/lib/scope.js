@@ -239,7 +239,15 @@ export function parentPreviewTeamIds(memberships) {
 // every DM, the reports queue. It is NOT a data permission: any admin can read
 // a DM (Jay's ruling, db/migrations/20260823_squad_chat_phase3.sql). It exists
 // so one named person sees the whole picture without holding every other job.
-export const ADMIN_RIGHTS = ['youth', 'media', 'pitches', 'training', 'welfare', 'clubadmin']
+// ⚠️ The three `chat-*` rights (30 Aug 2026) are CHANNEL ACCESS, not a
+// dashboard: each puts the ticked admin into one role channel
+// (db/migrations/20260830_role_channels.sql — private.in_role_channel is the
+// enforcement; this list only draws the checkbox). Welfare's channel needs no
+// new right: the existing `welfare` grant IS its membership.
+export const ADMIN_RIGHTS = [
+  'youth', 'media', 'pitches', 'training', 'welfare', 'clubadmin',
+  'chat-headcoaches', 'chat-managers', 'chat-medics',
+]
 
 // Job titles for squad staff — what `memberships.title` is usually set to.
 //
@@ -303,6 +311,10 @@ const ADMIN_RIGHT_LABELS = {
   // string on the portal, so the two had one home the moment the portal gained
   // a `right`. Change this and you rename the card.
   clubadmin: 'Club Hub Admin',
+  // Channel access, not jobs — each tick seats the admin in one role channel.
+  'chat-headcoaches': 'Chat: Club Head Coaches',
+  'chat-managers': 'Chat: Club Managers',
+  'chat-medics': 'Chat: Club Medics',
 }
 
 /** The human label for a right, or the raw value if it is one we do not know. */

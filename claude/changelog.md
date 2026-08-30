@@ -10,7 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **The privacy policy tells the truth about older players, and gains a security
+- **ROLE CHANNELS — five club-wide chats whose membership is derived from
+  roles, never stored.** Jay: group chats for staff circles without a
+  hand-ticked list that goes stale. Club Head Coaches (head-coach flag), Club
+  Managers, Club Medics, Welfare (the existing `welfare` grant IS the
+  membership — deliberately not all admins), Club Staff (any staff role).
+  Admins enter the first three only by a per-admin tick — three new
+  `chat-*` admin rights in the existing super-only, audited editor. One
+  helper (`private.in_role_channel`) answers membership for all four messages
+  policies, `can_reply_to` and `my_chats`; its enumerating twin feeds the
+  mention filter and the new **member sheet** — every channel's header now
+  offers "View members": who is in, WHY they are in ("Head coach — U10
+  Mixed"), tap to start a DM. The club channel's sheet is admin-only (names
+  stay squad-scoped for everyone else, as the privacy policy promises).
+  Migration applied to production and proven by a new 14-step harness run
+  live and rolled back (`db/tests/role-channels.sql`) — every refusal beside
+  the access it guards. The re-capture also caught `set_message_provenance`'s
+  capture missing the 25 Aug group-chat rewrite; corrected.
+  `db/migrations/20260830_role_channels.sql`, schema captures,
+  `src/lib/roleChannels.js`, `src/components/ChannelMembersSheet.jsx`,
+  `src/lib/useChannelThread.js`, `src/screens/Chat.jsx`,
+  `src/screens/ChatList.jsx`, `src/data/messages.js`, `src/lib/scope.js`,
+  `tests/role-channels.test.jsx`, plan
+  `claude/plans/2026-08-30-role-channels.md`. (SHA follows in the next
+  changelog-touching PR.)
+- `751671e` — **The privacy policy tells the truth about older players, and gains a security
   section.** The Children section said "a child does not sign in" — false since
   11 Aug, when U13+ self-registration went live; a parent (Jay's report) read it
   against reality. It now says younger children do not sign in, U13+ may hold
@@ -21,8 +45,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   transit, daily backups, live monitoring — each checked live before being
   written down, no guarantees claimed. The pinning tests now pin the corrected
   facts and the security claims. `src/screens/Privacy.jsx`,
-  `tests/account-deletion.test.jsx`. (SHA follows in the next
-  changelog-touching PR.)
+  `tests/account-deletion.test.jsx`.
 - `f19c99c` — **The duplicate-registration guard is ACCENT-BLIND — a cedilla defeated it and
   put one U10 child on the roster twice.** Both parents of one child registered
   separately; the second spelt the surname with a `ç`, and the 20260814 guard's

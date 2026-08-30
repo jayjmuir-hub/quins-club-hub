@@ -1464,6 +1464,7 @@ create policy "session block manage" on public.training_session_blocks for all
 -- ⚠️ REPLACED by 20260823_adult_dms_private: an admin reaches a DM only through
 -- private.admin_may_review — a minor in it, or a reported message. Captured from live.
 -- ⚠️ REPLACED by 20260824_chat_list (the Chats list; delete a message / a chat).
+-- ⚠️ REPLACED by 20260830_role_channels: five role-channel arms, one helper.
 CREATE POLICY "message read" ON public.messages
   FOR SELECT USING (
 CASE channel
@@ -1476,6 +1477,11 @@ CASE channel
     END
     WHEN 'staff'::text THEN private.can_edit_team(team_id)
     WHEN 'dm'::text THEN ((private.in_conversation(conversation_id) AND (created_at > COALESCE(private.cleared_before(conversation_id), '-infinity'::timestamp with time zone))) OR private.admin_may_review(conversation_id))
+    WHEN 'headcoaches'::text THEN private.in_role_channel(channel, club_id)
+    WHEN 'managers'::text    THEN private.in_role_channel(channel, club_id)
+    WHEN 'medics'::text      THEN private.in_role_channel(channel, club_id)
+    WHEN 'welfare'::text     THEN private.in_role_channel(channel, club_id)
+    WHEN 'clubstaff'::text   THEN private.in_role_channel(channel, club_id)
     ELSE false
 END);
 -- ⚠️ REPLACED by 20260823_squad_chat_phase3: three channels. 'staff' is the
@@ -1496,7 +1502,10 @@ CASE channel
     END))
     WHEN 'staff'::text THEN private.can_edit_team(team_id)
     WHEN 'dm'::text THEN private.in_conversation(conversation_id)
-    ELSE false
+    -- 20260830_role_channels: members post; replies via can_reply_to.
+    ELSE (channel IN ('headcoaches','managers','medics','welfare','clubstaff')
+          AND (((parent_id IS NOT NULL) AND private.can_reply_to(parent_id))
+            OR ((parent_id IS NULL) AND private.in_role_channel(channel, club_id))))
 END);
 -- ⚠️ REPLACED by 20260823_squad_chat_phase3. The 'dm' arm only agrees with the
 -- trigger, which has already refused a non-participant and any pair can_dm
@@ -1506,9 +1515,11 @@ END);
 -- private.admin_may_review — a minor in it, or a reported message. Captured from live.
 -- ⚠️ REPLACED by 20260824_chat_list (the Chats list; delete a message / a chat).
 -- The author may REMOVE at any time; the 15-minute limit on EDITING words moved into private.touch_message.
+-- ⚠️ REPLACED by 20260830_role_channels: a role-channel moderator is an admin
+-- WHO IS A MEMBER — a non-member admin cannot even read Welfare.
 CREATE POLICY "message edit" ON public.messages
-  FOR UPDATE USING (((author_id = ( SELECT auth.uid() AS uid)) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.admin_may_review(conversation_id))))
-  WITH CHECK ((channel = ANY (ARRAY['squad'::text, 'staff'::text, 'dm'::text])));
+  FOR UPDATE USING (((author_id = ( SELECT auth.uid() AS uid)) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.admin_may_review(conversation_id)) OR ((channel IN ('headcoaches','managers','medics','welfare','clubstaff')) AND private.in_role_channel(channel, club_id) AND private.is_admin(club_id))))
+  WITH CHECK ((channel = ANY (ARRAY['squad'::text, 'staff'::text, 'dm'::text, 'headcoaches'::text, 'managers'::text, 'medics'::text, 'welfare'::text, 'clubstaff'::text])));
 -- ⚠️ REPLACED by 20260823_squad_chat_phase3. An admin may UPDATE a DM row — to
 -- REMOVE it (deleted_at; the trigger blanks the body). touch_message refuses a
 -- body change from anybody but the author, so this grants removal, not editing.
@@ -1553,7 +1564,7 @@ CASE
         WHEN 'dm'::text THEN private.admin_may_review(conversation_id)
         ELSE private.is_admin(club_id)
     END
-    ELSE ((author_id = ( SELECT auth.uid() AS uid)) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.admin_may_review(conversation_id)))
+    ELSE ((author_id = ( SELECT auth.uid() AS uid)) OR ((channel = ANY (ARRAY['squad'::text, 'staff'::text])) AND (team_id IS NOT NULL) AND private.can_edit_team(team_id)) OR ((channel = 'squad'::text) AND (team_id IS NULL) AND private.is_admin(club_id)) OR ((channel = 'dm'::text) AND private.admin_may_review(conversation_id)) OR ((channel IN ('headcoaches','managers','medics','welfare','clubstaff')) AND private.in_role_channel(channel, club_id) AND private.is_admin(club_id)))
 END);
 
 -- Re-captured 25 Aug 2026 (group-chat rewrite): membership is

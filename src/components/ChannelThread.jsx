@@ -220,7 +220,7 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
                   <path d="m21 15-4.5-4.5L7 20" />
                 </svg>
               </button>
-              {mayPost && (
+              {mayPost && thread.allowPolls !== false && (
                 <button
                   type="button"
                   aria-label="Create a poll"

@@ -2046,7 +2046,10 @@ CREATE TABLE public.messages (
   attachment_path text
 );
 ALTER TABLE public.messages ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
-ALTER TABLE public.messages ADD CONSTRAINT messages_channel_check CHECK (channel IN ('squad', 'staff', 'dm'));
+-- Re-captured 30 Aug 2026 (20260830_role_channels): five role-channel values,
+-- each club-wide (the shape check below pins team/conversation/event to NULL).
+ALTER TABLE public.messages ADD CONSTRAINT messages_channel_check CHECK (channel IN ('squad', 'staff', 'dm', 'headcoaches', 'managers', 'medics', 'welfare', 'clubstaff'));
+ALTER TABLE public.messages ADD CONSTRAINT messages_role_channel_shape CHECK (channel NOT IN ('headcoaches', 'managers', 'medics', 'welfare', 'clubstaff') OR (team_id IS NULL AND conversation_id IS NULL AND event_id IS NULL));
 -- Re-captured 25 Aug 2026: rewritten by chat round 2 — a photo with no text
 -- is a legal message, so the >= 1 arm now yields to attachment_path.
 ALTER TABLE public.messages ADD CONSTRAINT messages_body_check CHECK (((length(btrim(body)) <= 2000) AND ((length(btrim(body)) >= 1) OR (attachment_path IS NOT NULL))));
