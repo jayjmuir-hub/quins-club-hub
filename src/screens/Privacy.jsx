@@ -26,20 +26,30 @@ import { Link } from 'react-router-dom'
 // every field. This one says what kind of thing is held, why, who sees it,
 // where it is, and what you can do — one short paragraph each.
 //
-// ⚠️ FOUR SENTENCES ARE LOAD-BEARING AND PINNED BY tests/account-deletion.test.jsx,
+// ⚠️ THE LOAD-BEARING SENTENCES ARE PINNED BY tests/account-deletion.test.jsx,
 // because each is a fact the policy once got wrong or could easily omit:
 //   - that it is held by providers on the club's instructions (the region
 //     was named until 23 Aug 2026; Jay asked for "secure providers" instead);
-//   - that a child does not sign in;
+//   - that YOUNGER children do not sign in, and that OLDER players (U13 up)
+//     may hold their own account — the 23 Aug text said "a child does not
+//     sign in", full stop, and that was FALSE: self-registration for U13+
+//     has been live since 11 Aug (teams.self_registration_allowed, measured
+//     against the live table on 30 Aug — U13 and every squad above it allow
+//     it, U12 and below do not). Corrected 30 Aug 2026, Jay's report;
 //   - that squad members see each other's names, photographs and
 //     availability (the 7 Aug policy said "own children only", which was
 //     false) — "minimal" must not become "misleading";
+//   - the security section's claims, each of which is a real measure (RLS in
+//     the database, club approval before any access, encrypted transit, daily
+//     backups, live monitoring) — added 30 Aug 2026 at Jay's request. If a
+//     measure is ever switched off, this section must change in the same
+//     commit, for the same reason the rest of the policy must;
 //   - the link to /delete-account, because the policy promises it.
 // ⚠️ AND TWO THINGS CHANGED SINCE 7 Aug that the old text contradicted: Sentry
 // error reporting is live (so "no third-party scripts" was no longer true),
 // and the app now sends push notifications you opt into and holds chat
 // messages you post.
-const LAST_UPDATED = '23 August 2026'
+const LAST_UPDATED = '30 August 2026'
 
 function H2({ children }) {
   return (
@@ -86,9 +96,12 @@ export default function Privacy() {
 
       <H2>Children</H2>
       <P>
-        Most players are under 18. A child does not sign in; accounts are held
-        by parents, guardians, coaches and club staff. Photographs are optional
-        and can be removed at any time on request.
+        Most players are under 18. Younger children do not sign in — their
+        accounts are held by parents, guardians, coaches and club staff. From
+        U13 upwards, players are allowed to hold their own accounts, and a
+        parent or carer is still kept on record for them. Every account,
+        whoever holds it, sees nothing until the club has approved it.
+        Photographs are optional and can be removed at any time on request.
       </P>
 
       <H2>Who can see what</H2>
@@ -104,12 +117,38 @@ export default function Privacy() {
       {/* "Tokyo, Japan" named the region until 23 Aug 2026 — Jay: "we don't
           need to mention Tokyo, we will just say secure providers". The
           region is still a fact anyone can ask the club about; it is just
-          not a sentence this policy needs. */}
+          not a sentence this policy needs. The Google sentence and "who act
+          on the club's instructions only" were removed 30 Aug 2026 (Jay) —
+          Google sign-in is hidden (Login.jsx, SHOW_PASSWORDLESS=false since
+          8 Aug), so the sentence described a route nobody is offered. */}
       <P>
-        With secure, reputable hosting and email providers who act on the
-        club&apos;s instructions only. If the app breaks, an error report goes
-        to a monitoring service so it can be fixed. If you sign in with
-        Google, Google will know you did.
+        With secure, reputable hosting and email providers. If the app
+        breaks, an error report goes to a monitoring service so it can be
+        fixed.
+      </P>
+
+      {/* ⚠️ EVERY CLAIM BELOW IS A REAL, LIVE MEASURE, checked 30 Aug 2026:
+          RLS on every table enforced in Postgres itself; the pending-approval
+          model (memberships start 'pending' and read policies require
+          'active'); HTTPS via Netlify; daily backups (Supabase Pro, 13 Aug);
+          Better Stack uptime monitors and Sentry error reporting, both live
+          (claude/runbooks/monitoring.md). If any of these is switched off,
+          this section changes in the same commit. No guarantees are made on
+          purpose — "how we protect it", never "cannot be breached". */}
+      <H2>How we protect it</H2>
+      <P>
+        Security was built into this app from the start, not added on. Every
+        request is checked inside the database itself against who you are and
+        which squad you belong to — row-level security, enforced by the
+        database rather than the app — so no screen can show you information
+        you are not entitled to. A new account sees nothing at all until the
+        club has approved it. Everything travels over encrypted connections
+        (TLS), data is stored encrypted (AES-256), and passwords are never
+        stored — only one-way encrypted versions of them. The database is
+        backed up every day, independent monitoring alerts the club the
+        moment anything breaks, and club email is sender-authenticated so a
+        faked message from us fails verification. If you ever notice
+        something that does not look right, tell us at the address above.
       </P>
 
       <H2>Notifications and your device</H2>

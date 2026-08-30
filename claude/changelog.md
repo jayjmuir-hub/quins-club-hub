@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **The duplicate-registration guard is ACCENT-BLIND — a cedilla defeated it and
+- **The privacy policy tells the truth about older players, and gains a security
+  section.** The Children section said "a child does not sign in" — false since
+  11 Aug, when U13+ self-registration went live; a parent (Jay's report) read it
+  against reality. It now says younger children do not sign in, U13+ may hold
+  their own account with a parent or carer still on record (club practice — the
+  app advises but does not yet enforce the parent row), and no account sees
+  anything before club approval. New "How we protect it" section states the real
+  measures — RLS enforced in the database, the pending-approval model, encrypted
+  transit, daily backups, live monitoring — each checked live before being
+  written down, no guarantees claimed. The pinning tests now pin the corrected
+  facts and the security claims. `src/screens/Privacy.jsx`,
+  `tests/account-deletion.test.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `f19c99c` — **The duplicate-registration guard is ACCENT-BLIND — a cedilla defeated it and
   put one U10 child on the roster twice.** Both parents of one child registered
   separately; the second spelt the surname with a `ç`, and the 20260814 guard's
   match key keeps `ç` (deliberately — `[[:alnum:]]` so non-Latin names survive),
@@ -26,7 +39,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `db/migrations/20260830_name_match_key_accent_blind.sql`,
   `db/tests/registration-guards.sql`, `db/schema/functions.sql` re-captured from
   live. The duplicate pair itself is a separate club decision, not a migration
-  side effect. (SHA follows in the next changelog-touching PR.)
+  side effect — reconciled the same day on Jay's instruction: the second
+  parent's access repointed to the original child row, contact email moved, the
+  empty duplicate deleted, zero orphans (verified live).
 - `a678263` — **The shared pitch picture is now DRAWN NATIVELY on a canvas — crisp text at
   any size, no html2canvas.** The 11px/widen fix below made the labels legible
   but still rough: html2canvas re-implements its own text renderer and fuzzes
