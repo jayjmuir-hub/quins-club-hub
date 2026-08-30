@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Whole-club events — one social on every calendar, all season.** An admin can
+- **Tidied the pitch-layout picture, and told coaches it's already saved.** Following
+  the first cut: squad codes on the tight week bars sat against the segment dividers,
+  so each now has side padding and a single-line ellipsis fallback, the week card
+  widened so codes like `U12G`/`U14G` fit whole, and the columns got more air (Jay:
+  "text is touching lines"). Both cards also carry a note — coaches and managers are
+  told the pitches shown are already saved to each squad's training session, so the
+  picture is not a to-do. `src/components/PitchShareCard.jsx`. (SHA follows in the
+  next changelog-touching PR.)
+- `ceaa0d5` — **Whole-club events — one social on every calendar, all season.** An admin can
   now add an event for the WHOLE CLUB, not a single squad: "Adult Tag, every Wed,
   open to everyone" (Jay). It is a new scope — `team_id NULL` — visible to every
   active member and repeatable as an ordinary series, so a season is ~30 rows,
@@ -27,7 +35,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/screens/EventForm.jsx`, `src/screens/EventDetail.jsx`, `src/data/events.js`,
   `src/screens/Schedule.jsx`, `src/screens/Dashboard.jsx`, `src/components/DaySheet.jsx`,
   `src/components/ScheduleTable.jsx`, `claude/decisions/2026-08-30-club-wide-events.md`,
-  and their tests. (SHA follows in the next changelog-touching PR.)
+  and their tests.
 - `3ece798` — **A shareable pitch-layout picture for the day and week.** The Allocation screen
   showed WHERE bookings were but had no friendly "draw me the ground" view — each
   shared pitch carved into the portions its squads take, the spare its own segment
