@@ -107,29 +107,14 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
 
 ### Critical — live in production right now
 
-- **`welfare_overview()` still gates on `is_admin`, not `can_review_dm`.**
-  Verified against prod (`pg_get_functiondef`, 30 Aug): body carries
-  `ok as (select private.is_admin(club.id) as yes from club)` and `where ok.yes`;
-  `can_review_dm` is absent. Any active admin — even one narrowed to e.g.
-  `['pitches']` — gets the **directory** of every reviewable conversation: both
-  parties' full names (`pa.full_name || ' · ' || pb.full_name`), the
-  "involves a minor" label, last activity, open-report counts. Message bodies
-  stay behind `admin_may_review`; the directory does not. Phase 4 repointed
-  `admin_may_review` and never touched this RPC.
-  Definition: `db/migrations/20260824_group_chats.sql:532-599`; caller
-  `src/data/messages.js`. `db/tests/dm-review-welfare.sql` never calls it.
-  **Fix:** `ok` → `private.can_review_dm(club.id)`; harness must call
-  `welfare_overview()` with a pitches-demoted admin (0 rows) AND a welfare
-  holder (rows).
-- **`message_reports` read/resolve still gate on `is_admin`.** Verified against
-  prod (`pg_policies`, 30 Aug): `report read` =
-  `reporter_id = auth.uid() OR private.is_admin(club_id)`; `report resolve`
-  (USING+CHECK) = `private.is_admin(club_id)`. A pitches-narrowed admin can list
-  every report (reason ≤500 chars, `message_id`, `reporter_id`) and mark it
-  resolved. Phase 4 narrowed the sibling `welfare log read` but left these two.
-  Definition: `db/migrations/20260823_squad_chat_phase3.sql:600-603`; callers
-  `resolveReport`/`listOpenReports` (`src/data/messages.js`).
-  **Fix:** both → `can_review_dm` (keep the reporter arm on read).
+- ✅ **Items 1 & 2 FIXED, 30 Aug 2026** (`20260830_welfare_review_gate.sql`,
+  applied to prod, harness proven red-then-green): `welfare_overview()` now
+  gates on `private.can_review_dm`, and `message_reports` read/resolve are
+  SPLIT BY CONTEXT per Jay's ruling — a report on a conversation message
+  (DM/group) is welfare-only, a report on a channel message stays any-admin
+  (matching the reported-message arm of "message delete"), and the reporter
+  keeps sight of their own report. New classifier
+  `private.report_on_conversation`. Jay holds `welfare`, so nothing went dark.
 
 ### High — bites today, no narrowed grant required
 

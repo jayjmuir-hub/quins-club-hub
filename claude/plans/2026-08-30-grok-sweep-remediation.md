@@ -1,8 +1,13 @@
 # Remediation plan — Grok full-sweep (30 Aug 2026)
 
-**Status: NOT STARTED. Nothing here is authorised.** Each numbered PR ships only
-on Jay's explicit "go" for that slice. `main` is production
+**Status: IN PROGRESS — Jay's blanket "go" given 30 Aug 2026** ("you will pick
+up the security and bug review fix"), with two rulings: report handling SPLITS
+BY CONTEXT (conversation reports → welfare, channel reports → any admin), and
+PR 1 ships now (Jay already holds `welfare`). `main` is production
 (https://adhquins-clubhub.com); every PR is a live release.
+
+- **PR 1 — SHIPPED 30 Aug 2026** (`20260830_welfare_review_gate.sql`, applied
+  to prod, harness red-then-green, schema recaptured in-PR).
 
 ⚠️ **RE-VALIDATED 30 Aug 2026 after ~20 PRs merged** (see the same-day note in
 `claude/open-items.md`). All 18 items still stand; two fixes changed and the

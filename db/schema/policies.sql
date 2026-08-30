@@ -1603,10 +1603,22 @@ CREATE POLICY "report create" ON public.message_reports
   FOR INSERT WITH CHECK ((EXISTS ( SELECT 1
    FROM messages m
   WHERE (m.id = message_reports.message_id))));
+-- Split by context since 30 Aug 2026 (20260830_welfare_review_gate): a report
+-- on a CONVERSATION message (DM/group) is welfare-only; a report on a CHANNEL
+-- message stays any-admin; the reporter always reads their own. Mirrors the
+-- reported-message arm of "message delete" (20260830_role_channels).
 CREATE POLICY "report read" ON public.message_reports
-  FOR SELECT USING (((reporter_id = ( SELECT auth.uid() AS uid)) OR private.is_admin(club_id)));
+  FOR SELECT USING (((reporter_id = ( SELECT auth.uid() AS uid)) OR
+    CASE WHEN private.report_on_conversation(message_id)
+         THEN private.can_review_dm(club_id)
+         ELSE private.is_admin(club_id) END));
 CREATE POLICY "report resolve" ON public.message_reports
-  FOR UPDATE USING (private.is_admin(club_id)) WITH CHECK (private.is_admin(club_id));
+  FOR UPDATE USING (CASE WHEN private.report_on_conversation(message_id)
+                         THEN private.can_review_dm(club_id)
+                         ELSE private.is_admin(club_id) END)
+  WITH CHECK (CASE WHEN private.report_on_conversation(message_id)
+                   THEN private.can_review_dm(club_id)
+                   ELSE private.is_admin(club_id) END);
 
 CREATE POLICY "welfare log read" ON public.welfare_access_log
   FOR SELECT USING (private.is_admin(club_id));
