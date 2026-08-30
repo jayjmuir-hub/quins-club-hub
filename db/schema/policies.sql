@@ -91,6 +91,18 @@
 -- EXCEPTION: the two `storage.objects` policies at the end are TO
 -- authenticated, not {public}. That is deliberate — on a storage bucket
 -- the anon role is a real caller, not a theoretical one.
+--
+-- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 (Grok item 14). The 28 Aug admin-rights
+-- redesign turned four surfaces into real allowlist boundaries and this file
+-- lagged them by two days — the exact drift this capture exists to catch.
+-- All six re-captured verbatim from pg_get_expr, each with a dated marker at
+-- its block: player_contacts / player_parents / player_private replaced their
+-- read/edit pairs with four per-verb policies keyed on can_see_child_contacts
+-- / can_edit_child_contacts (S2); players "player edit" moved to
+-- can_write_child OR is_team_staff (S1); the player-photos storage read/write
+-- moved to can_see_child_photos / can_edit_child_photos (S3); welfare_access_log
+-- "welfare log read" narrowed is_admin → super + can_review_dm (Phase 4). No
+-- live change here — the DATABASE was already this; the FILE now matches it.
 -- =====================================================================
 
 
@@ -600,26 +612,32 @@ CREATE POLICY "memb no self promotion" ON public.memberships
 --   AS PERMISSIVE FOR SELECT TO public
 --   USING ((private.can_edit_team(...) OR private.is_own_player(player_id)));
 
--- Self-service, added 4 Aug 2026: the OWNER (a parent of this player, or the
--- player themselves) may edit their own contact row. PERMISSIVE, so it ORs
--- with "contact edit" above rather than narrowing it.
---
--- WITH CHECK repeats the predicate deliberately: without it an owner could
--- UPDATE their row and set player_id to another child, moving their contact
--- details onto somebody else's record.
-CREATE POLICY "contact edit own" ON public.player_contacts
-  AS PERMISSIVE FOR ALL TO public
-  USING (private.is_own_player(player_id))
-  WITH CHECK (private.is_own_player(player_id));
-
-CREATE POLICY "contact edit" ON public.player_contacts
-  AS PERMISSIVE FOR ALL TO public
-  USING (private.can_edit_team(( SELECT players.team_id
+-- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 (Grok item 14). The two ALL policies
+-- were REPLACED by the 28 Aug allowlist migration
+-- (20260828_child_contacts_allowlist) with four per-verb policies keyed on the
+-- S2 allowlists: READ = can_see_child_contacts (super or
+-- {clubadmin,youth,media,welfare}), WRITE = can_edit_child_contacts (welfare
+-- read-only), each OR'd with squad staff on the child's team and the owner.
+-- The capture lagged live by two days; this block is verbatim pg_get_expr.
+CREATE POLICY "contact read" ON public.player_contacts
+  FOR SELECT USING ((private.can_see_child_contacts() OR private.is_team_staff(( SELECT players.team_id
    FROM players
-  WHERE (players.id = player_contacts.player_id))))
-  WITH CHECK (private.can_edit_team(( SELECT players.team_id
+  WHERE (players.id = player_contacts.player_id))) OR private.is_own_player(player_id)));
+CREATE POLICY "contact insert" ON public.player_contacts
+  FOR INSERT WITH CHECK ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
    FROM players
-  WHERE (players.id = player_contacts.player_id))));
+  WHERE (players.id = player_contacts.player_id))) OR private.is_own_player(player_id)));
+CREATE POLICY "contact update" ON public.player_contacts
+  FOR UPDATE USING ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_contacts.player_id))) OR private.is_own_player(player_id)))
+  WITH CHECK ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_contacts.player_id))) OR private.is_own_player(player_id)));
+CREATE POLICY "contact delete" ON public.player_contacts
+  FOR DELETE USING ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_contacts.player_id))) OR private.is_own_player(player_id)));
 
 
 -- ---------------------------------------------------------------------
@@ -637,22 +655,28 @@ CREATE POLICY "contact edit" ON public.player_contacts
 --   AS PERMISSIVE FOR SELECT TO public
 --   USING ((private.can_edit_team(...) OR private.is_own_player(player_id)));
 
--- Same self-service addition, same reasoning, on the parent rows. A parent
--- keeping their own household's details current is the most common correction
--- anyone will make in this app.
-CREATE POLICY "parent edit own" ON public.player_parents
-  AS PERMISSIVE FOR ALL TO public
-  USING (private.is_own_player(player_id))
-  WITH CHECK (private.is_own_player(player_id));
-
-CREATE POLICY "parent edit" ON public.player_parents
-  AS PERMISSIVE FOR ALL TO public
-  USING (private.can_edit_team(( SELECT p.team_id
-   FROM players p
-  WHERE (p.id = player_parents.player_id))))
-  WITH CHECK (private.can_edit_team(( SELECT p.team_id
-   FROM players p
-  WHERE (p.id = player_parents.player_id))));
+-- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 — same replacement as player_contacts
+-- directly above (20260828_child_contacts_allowlist), same four per-verb
+-- shapes, byte-for-byte mirror preserved.
+CREATE POLICY "parent read" ON public.player_parents
+  FOR SELECT USING ((private.can_see_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_parents.player_id))) OR private.is_own_player(player_id)));
+CREATE POLICY "parent insert" ON public.player_parents
+  FOR INSERT WITH CHECK ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_parents.player_id))) OR private.is_own_player(player_id)));
+CREATE POLICY "parent update" ON public.player_parents
+  FOR UPDATE USING ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_parents.player_id))) OR private.is_own_player(player_id)))
+  WITH CHECK ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_parents.player_id))) OR private.is_own_player(player_id)));
+CREATE POLICY "parent delete" ON public.player_parents
+  FOR DELETE USING ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_parents.player_id))) OR private.is_own_player(player_id)));
 
 
 -- ---------------------------------------------------------------------
@@ -669,10 +693,16 @@ CREATE POLICY "player read" ON public.players
   AS PERMISSIVE FOR SELECT TO public
   USING ((private.can_see_team(team_id) OR private.is_own_player(id)));
 
+-- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 (Grok item 14). The 28 Aug S1 write
+-- allowlist (20260828_child_write_allowlist) replaced can_edit_team with
+-- can_write_child (super or {clubadmin,youth,media}) OR is_team_staff — a
+-- narrowed admin no longer writes a player row on the strength of being any
+-- admin. READ ("player read" above) is untouched: Pitch/Training still see the
+-- roster's names. The capture lagged live.
 CREATE POLICY "player edit" ON public.players
   AS PERMISSIVE FOR ALL TO public
-  USING (private.can_edit_team(team_id))
-  WITH CHECK (private.can_edit_team(team_id));
+  USING ((private.can_write_child() OR private.is_team_staff(team_id)))
+  WITH CHECK ((private.can_write_child() OR private.is_team_staff(team_id)));
 
 
 -- ---------------------------------------------------------------------
@@ -806,14 +836,19 @@ CREATE POLICY "team manage" ON public.teams
 -- as the player id — the "<player_id>/<timestamp>.<ext>" key format is
 -- load-bearing security, not a naming convention. See functions.sql.
 -- ---------------------------------------------------------------------
+-- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 (Grok item 14). The 28 Aug S3 photos
+-- allowlist (20260828_child_photos_allowlist) replaced the read arm
+-- can_see_team → can_see_child_photos OR is_on_team, and the write arm
+-- can_edit_team → can_edit_child_photos OR is_team_staff (owner arm kept).
+-- The capture lagged live by two days.
 CREATE POLICY "player photo read" ON storage.objects
   AS PERMISSIVE FOR SELECT TO authenticated
-  USING (((bucket_id = 'player-photos'::text) AND private.can_see_team(private.photo_team(name))));
+  USING (((bucket_id = 'player-photos'::text) AND (private.can_see_child_photos() OR private.is_on_team(private.photo_team(name)))));
 
 CREATE POLICY "player photo write" ON storage.objects
   AS PERMISSIVE FOR ALL TO authenticated
-  USING (((bucket_id = 'player-photos'::text) AND (private.can_edit_team(private.photo_team(name)) OR private.is_own_player(private.photo_player(name)))))
-  WITH CHECK (((bucket_id = 'player-photos'::text) AND (private.can_edit_team(private.photo_team(name)) OR private.is_own_player(private.photo_player(name)))));
+  USING (((bucket_id = 'player-photos'::text) AND (private.can_edit_child_photos() OR private.is_team_staff(private.photo_team(name)) OR private.is_own_player(private.photo_player(name)))))
+  WITH CHECK (((bucket_id = 'player-photos'::text) AND (private.can_edit_child_photos() OR private.is_team_staff(private.photo_team(name)) OR private.is_own_player(private.photo_player(name)))));
 
 
 -- ---------------------------------------------------------------------
@@ -1237,25 +1272,31 @@ CREATE POLICY "announcement mark read" ON public.announcement_reads
 --   parent updates team-mate 0 rows
 --   coach of the squad       2
 -- ---------------------------------------------------------------------
+-- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 (Grok item 14). The 28 Aug allowlist
+-- replaced the read/edit pair with four per-verb policies:
+-- READ = can_see_child_contacts (super or {clubadmin,youth,media,welfare}),
+-- WRITE = can_edit_child_contacts (welfare read-only), each OR'd with squad
+-- staff on the child's team and the owner. player_private carries DOB, the
+-- under-13 gate's input — the capture lagged live by two days.
 CREATE POLICY "player private read" ON public.player_private
-  AS PERMISSIVE FOR SELECT TO public
-  USING ((private.can_edit_team(( SELECT p.team_id
-     FROM players p
-    WHERE (p.id = player_private.player_id))) OR private.is_own_player(player_id)));
-
-CREATE POLICY "player private edit own" ON public.player_private
-  AS PERMISSIVE FOR ALL TO public
-  USING (private.is_own_player(player_id))
-  WITH CHECK (private.is_own_player(player_id));
-
-CREATE POLICY "player private edit" ON public.player_private
-  AS PERMISSIVE FOR ALL TO public
-  USING (private.can_edit_team(( SELECT p.team_id
-     FROM players p
-    WHERE (p.id = player_private.player_id))))
-  WITH CHECK (private.can_edit_team(( SELECT p.team_id
-     FROM players p
-    WHERE (p.id = player_private.player_id))));
+  FOR SELECT USING ((private.can_see_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_private.player_id))) OR private.is_own_player(player_id)));
+CREATE POLICY "player private insert" ON public.player_private
+  FOR INSERT WITH CHECK ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_private.player_id))) OR private.is_own_player(player_id)));
+CREATE POLICY "player private update" ON public.player_private
+  FOR UPDATE USING ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_private.player_id))) OR private.is_own_player(player_id)))
+  WITH CHECK ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_private.player_id))) OR private.is_own_player(player_id)));
+CREATE POLICY "player private delete" ON public.player_private
+  FOR DELETE USING ((private.can_edit_child_contacts() OR private.is_team_staff(( SELECT players.team_id
+   FROM players
+  WHERE (players.id = player_private.player_id))) OR private.is_own_player(player_id)));
 
 
 -- ---------------------------------------------------------------------
@@ -1620,8 +1661,13 @@ CREATE POLICY "report resolve" ON public.message_reports
                    THEN private.can_review_dm(club_id)
                    ELSE private.is_admin(club_id) END);
 
+-- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 (Grok item 14). Narrowed from
+-- is_admin to super + welfare by the 28 Aug Phase-4 migration
+-- (20260828_dm_review_welfare) — the reviewer is reviewed by supers, and a
+-- welfare holder sees their own opens; an ordinary admin no longer reads the
+-- who-opened-which-DM log. The capture lagged live.
 CREATE POLICY "welfare log read" ON public.welfare_access_log
-  FOR SELECT USING (private.is_admin(club_id));
+  FOR SELECT USING ((private.is_super_admin() OR private.can_review_dm(club_id)));
 
 
 -- =====================================================================

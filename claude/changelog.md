@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Grok items 10, 11 & 12 SHIPPED — the push/mail pipeline stops trusting
+- **Grok item 14 SHIPPED — `db/schema/policies.sql` re-captured to match
+  live.** The 28 Aug admin-rights redesign turned four surfaces into real
+  allowlist boundaries and this capture had lagged them by two days — the
+  exact drift `db/schema/` exists to catch. Re-captured verbatim from
+  `pg_get_expr`: `player_contacts` / `player_parents` / `player_private`
+  (read/edit pairs → four per-verb policies on the S2 contacts allowlists),
+  `players` "player edit" (→ `can_write_child` OR squad staff, S1), the
+  `player-photos` storage read/write (→ the S3 photos allowlists), and
+  `welfare_access_log` "welfare log read" (`is_admin` → super + welfare,
+  Phase 4). No live change — the database was already this; only the file
+  moved. Closes the last of item 14 (the `pitch_occupancy` signature was
+  recaptured in the PR-3 merge, `chat_media_owner` pinned by #552).
+  `db/schema/policies.sql`. (SHA follows in the next changelog-touching PR.)
+- `55d25e5` — **Grok items 10, 11 & 12 SHIPPED — the push/mail pipeline stops trusting
   its callers.** Item 12 (SSRF): `register_push_subscription` allowlists the
   endpoint — https + real push services only, built from the hosts measured
   live (Apple 25, FCM 12, one legacy jmt17.google.com, plus the Mozilla and
@@ -32,7 +45,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `db/tests/push-endpoint-allowlist.sql` (new), `supabase/config.toml`
   (new), `supabase/functions/push-send/index.ts`,
   `supabase/functions/notify-unfinished-signup/index.ts`, `db/schema/*`.
-  (SHA follows in the next changelog-touching PR.)
 - `bcacf6c` — **One transient blip no longer paints "Couldn't load your account".** Jay's
   phone showed it with "JWT issued at future"; the phone's clock was proven
   EXACT against the server, and the edge logs held exactly ONE 401 at that
