@@ -194,14 +194,14 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
 
 ### Hygiene / process (medium-low)
 
-- **`db/schema/` not recaptured after 28 Aug.** `policies.sql` still shows
-  pre-allowlist bodies — player-private read via `can_edit_team`, player-photo
-  read via `can_see_team`, welfare-log read via `is_admin` — vs live; and the
-  `pitch_occupancy` signature in `functions.sql` predates the portion column.
-  Recapture in whichever PR touches each. ✅ ~~**`private.chat_media_owner` is
-  unpinned**~~ — **PINNED by #552** (`20260830_pin_private_helper_search_path.sql`,
-  proven live `search_path=""`), so `db/tests/search-path.sql` is no longer at
-  risk. The stale-policy-capture half above still stands.
+- ✅ **Item 14 FIXED, 30 Aug 2026.** `db/schema/policies.sql` re-captured
+  from live for every drifted body: `player_contacts`, `player_parents`,
+  `player_private` (the 28 Aug S2 read/write allowlists, four per-verb
+  policies each), `players` "player edit" (S1 write allowlist), the
+  `player-photos` storage read/write (S3), and `welfare_access_log`
+  "welfare log read" (Phase-4 super+welfare). `pitch_occupancy`'s signature
+  in `functions.sql` was recaptured in PR 3, `chat_media_owner` pinned by
+  #552 — so `db/schema/` diffs true against live again.
 - **Edge-function hygiene (item 15) — CORE DONE 30 Aug 2026, residuals
   accepted.** ✅ `supabase/config.toml` pins `verify_jwt=false` for all eleven
   functions (measured against the dashboard first). ✅ `push-send` and

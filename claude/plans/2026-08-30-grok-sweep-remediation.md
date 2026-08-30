@@ -1,10 +1,25 @@
 # Remediation plan — Grok full-sweep (30 Aug 2026)
 
-**Status: IN PROGRESS — Jay's blanket "go" given 30 Aug 2026** ("you will pick
-up the security and bug review fix"), with two rulings: report handling SPLITS
-BY CONTEXT (conversation reports → welfare, channel reports → any admin), and
-PR 1 ships now (Jay already holds `welfare`). `main` is production
-(https://adhquins-clubhub.com); every PR is a live release.
+**Status: COMPLETE — 30 Aug 2026.** Every confirmed item (1–12, 14, 16, 17)
+shipped to production across PRs #556–#565; the item-15 residuals and the
+item-18 UX residual are the only carry-forwards, both accepted and recorded
+in `claude/open-items.md`. Item 13 (S4–S8 matrix) remains HELD for Jay's D2
+ruling and is not part of this sweep. Two rulings settled it: report handling
+SPLITS BY CONTEXT (conversation reports → welfare, channel reports → any
+admin), and PR 1 shipped immediately (Jay already held `welfare`). `main` is
+production (https://adhquins-clubhub.com); every PR was a live release.
+
+- **PR 3 — SHIPPED 30 Aug 2026** (item 3: tournament games out of
+  `pitch_occupancy`; harness repaired + red-then-green with a genuine-clash
+  positive control; client engine ignores `tournament_id` too).
+- **PR 6 — SHIPPED 30 Aug 2026** (item 7 core: child-PII allowlist mirrors).
+- **PR 9 — SHIPPED 30 Aug 2026** (item 17: attacker-writable login fragment
+  mapped to our copy; the flagged `setError(err.message)` sites gated through
+  `friendlyMessage`; plus the item-6 residue a peer caught — apiCache sweeps
+  pre-deploy child-PII entries once per device).
+- **PR 10 — SHIPPED 30 Aug 2026** (item 14 remainder: `db/schema/policies.sql`
+  re-captured for the 28 Aug child-PII allowlists and the Phase-4 welfare log
+  read, which had lagged live by two days).
 
 - **PR 1 — SHIPPED 30 Aug 2026** (`20260830_welfare_review_gate.sql`, applied
   to prod, harness red-then-green, schema recaptured in-PR).
