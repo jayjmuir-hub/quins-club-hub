@@ -135,16 +135,12 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   carry the `.select('id')` + zero-rows-throws guard `removeMessage` already
   had; both directions pinned in `tests/messages-data.test.js`, and both
   screens already rendered the thrown copy.
-- **PWA disk-caches children's chat and DOB.** `pwa-cache-rules.js:45-69`
-  excludes only three club-wide admin reads; everything else on
-  `GET /rest/v1/*` is NetworkFirst into the on-disk cache — including
-  `/rest/v1/messages`, `player_private` (DOB), squad-wide
-  `player_contacts`/`player_parents`, and `poll_votes` (named voters).
-  `apiCache.js` purges on user-change only. A shared/stolen **unlocked** device
-  serves the previous session offline. **Fix (D3):** drop those five paths in
-  `isCacheableRestGet`; pin in `tests/pwa-cache-rules.test.js` AND
-  `tests/pwa-build.test.js`. (The other REST caching is a documented offline
-  tradeoff — do not "stop caching REST".)
+- ✅ **Item 6 FIXED, 30 Aug 2026** (D3: all five, by TABLE — scoped variants
+  included, since offline use is a non-goal and caching serves online speed):
+  `isCacheableRestGet` excludes `messages`, `player_private`,
+  `player_contacts`, `player_parents` and `poll_votes`; pinned in the unit
+  test AND against the built `sw.js`. The other REST caching stays — the
+  documented tradeoff is unchanged.
 - ✅ **Item 8 FIXED, 30 Aug 2026** (`20260830_last_admin_guard.sql`, applied to
   prod, harness red-then-green with a dropped-trigger self-test): a
   `BEFORE UPDATE OR DELETE` trigger on `memberships` raises P0001 when the row
@@ -221,16 +217,17 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   replay). Every `timingSafeEqual` early-returns on length mismatch → leaks
   `len(secret)`. **Fix:** add `config.toml`; persist `webhook-id`; method checks;
   dedupe on a request/batch id; hash-both-sides compare.
-- **`/calendar.ics` routing untested in the built worker.** `netlify.toml:66-75`
-  orders it above the SPA catch-all and `vite.config.js:175` denylists it from
-  `navigateFallback` — right shape — but `tests/pwa-build.test.js` never asserts
-  `calendar.ics` is in the generated `sw.js`; removing the denylist would make an
-  installed PWA serve `index.html` for a pasted feed URL (the failure the free
-  uptime check cannot see). Also: the ICS `UID` still uses the retired
-  `quins.adhjrt.com` (`supabase/functions/calendar/index.ts:326`) — correctness,
-  not auth. **Fix:** add the build assertion; correct the UID host. Stripping
-  coach-typed `notes` from the ICS `DESCRIPTION` is a D4 policy call, default
-  leave.
+- ✅ **Item 16 RESOLVED, 30 Aug 2026 — half fixed, half RULED.** The missing
+  build assertion is added: `tests/pwa-build.test.js` now asserts the built
+  `sw.js` carries `denylist` + `calendar\.ics` (measured in the worker:
+  `denylist:[/^\/calendar\.ics$/]`). The UID host is deliberately **FROZEN**
+  on the retired `quins.adhjrt.com` — peer-review catch: a UID is the event's
+  IDENTITY to every subscribed client, and changing the domain would
+  duplicate the whole season in 13 families' calendars (13 live tokens,
+  measured) with the old copies never updating again. RFC 5545 treats the
+  domain as opaque; a loud do-not-fix comment guards it in
+  `supabase/functions/calendar/index.ts`. D4 default taken: coach-typed
+  `notes` stay in the ICS DESCRIPTION.
 - **Login `error_description` + raw PostgREST messages.** `RequireAuth.jsx:47-52`
   renders `error_description` from the URL hash with no allow-list (React-escaped
   text, not XSS, but attacker-controlled copy on the club origin); raw

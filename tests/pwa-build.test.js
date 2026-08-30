@@ -227,4 +227,29 @@ describe('PWA production build output', () => {
     expect(sw).toContain('[?&]profile_id=eq')
     expect(sw).toContain('[?&]id=eq')
   })
+
+  // ⚠️ ADDED 30 Aug 2026 (Grok item 6): the five child-PII exclusions must
+  // actually reach the built worker — this file is where a Workbox regression
+  // would show, not the unit test on the config.
+  it('service worker carries the child-PII table exclusions', () => {
+    const sw = readFileSync(path.join(outDir, 'sw.js'), 'utf-8')
+    expect(sw).toContain('/rest/v1/messages')
+    expect(sw).toContain('/rest/v1/player_private')
+    expect(sw).toContain('/rest/v1/player_contacts')
+    expect(sw).toContain('/rest/v1/player_parents')
+    expect(sw).toContain('/rest/v1/poll_votes')
+  })
+
+  // ⚠️ ADDED 30 Aug 2026 (Grok item 16's test gap): the calendar feed must
+  // never be answered by the SPA shell — a subscribed client asking for
+  // /calendar.ics and getting index.html is the failure the free uptime
+  // check cannot see (CLAUDE.md, monitoring runbook).
+  it('service worker keeps calendar.ics out of the SPA navigate fallback', () => {
+    const sw = readFileSync(path.join(outDir, 'sw.js'), 'utf-8')
+    // The serialized source of vite.config.js's navigateFallbackDenylist
+    // regex — substring, not toMatch, for the same escaping reason as above.
+    // Measured in the built worker: `denylist:[/^\/calendar\.ics$/]`.
+    expect(sw).toContain('denylist')
+    expect(sw).toContain('calendar\\.ics')
+  })
 })
