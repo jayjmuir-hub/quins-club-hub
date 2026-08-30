@@ -4,10 +4,13 @@ import { listAvailabilityForEvents } from '../data/availability.js'
 import { removeChatPhoto, uploadChatPhoto, uploadChatVoice } from '../data/chatMedia.js'
 import { listEvents } from '../data/events.js'
 import {
+  channelMembers,
   getChannelSettings,
   listMentionablesFor,
   listMessages,
+  listRoleMessages,
   listStaffMessages,
+  postRoleMessage,
   postStaffMessage,
   reportMessage,
   listMyMessageReads,
@@ -29,6 +32,7 @@ import { createPoll, listPollsFor, setPollVote, subscribePollVotes } from '../da
 import { useAuth } from './auth.jsx'
 import { DEFAULT_BACKGROUND, resolveBackground } from './chatBackgrounds.js'
 import { useMemberships } from './memberships.jsx'
+import { isRoleChannel } from './roleChannels.js'
 import { canEditTeam, isAdmin, visibleTeams } from './scope.js'
 import useStayPinnedToBottom from './useStayPinnedToBottom.js'
 
@@ -71,11 +75,16 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   const myTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
   const admin = isAdmin(memberships)
   const isClub = param === CLUB
-  const teamId = isClub ? null : param ?? null
+  // A role channel rides the same param the club sentinel does (20260830) —
+  // a key can never collide with a team id, which is a uuid. Whether the
+  // caller BELONGS is the database's call (private.in_role_channel); the list
+  // only offers channels my_chats returned, and a pasted URL just reads empty.
+  const roleKey = isRoleChannel(param) ? param : null
+  const teamId = isClub || roleKey ? null : param ?? null
   const team = teamId ? myTeams.find((t) => t.id === teamId) : null
-  const canModerate = isClub ? admin : canEditTeam(memberships, teamId)
+  const canModerate = isClub || roleKey ? admin : canEditTeam(memberships, teamId)
   const clubId = memberships?.find((m) => m.club_id)?.club_id ?? team?.club_id ?? null
-  const staffChannel = wantStaff && !isClub && canModerate
+  const staffChannel = wantStaff && !isClub && !roleKey && canModerate
 
   const [messages, setMessages] = useState(null)
   const [reads, setReads] = useState(() => new Set())
@@ -109,13 +118,17 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   const fileRef = useRef(null)
 
   // A squad the reader is not on: the screen redirects; do not fetch for it.
-  const unknownTeam = !isClub && myTeams.length > 0 && !team
+  const unknownTeam = !isClub && !roleKey && myTeams.length > 0 && !team
 
   // My wallpaper for THIS chat — chat_prefs, keyed by the list's own row key
   // (rowKey in ChatList.jsx). Decoration: a failure paints the default, never
   // an error. `staffChannel` can flip from false to true when memberships
   // land, so the key is a dependency, not a constant.
-  const chatKey = isClub ? 'club-club' : `${staffChannel ? 'staff' : 'squad'}-${teamId}`
+  const chatKey = roleKey
+    ? `${roleKey}-club`
+    : isClub
+      ? 'club-club'
+      : `${staffChannel ? 'staff' : 'squad'}-${teamId}`
   useEffect(() => {
     if (!param || unknownTeam) return
     let stale = false
@@ -141,9 +154,10 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     setError(null)
     try {
       const [rows, mine, channel] = await Promise.all([
-        staffChannel ? listStaffMessages(teamId) : listMessages(teamId),
+        roleKey ? listRoleMessages(roleKey) : staffChannel ? listStaffMessages(teamId) : listMessages(teamId),
         listMyMessageReads(),
-        getChannelSettings(teamId),
+        // A role channel has no settings row — open chat by construction.
+        roleKey ? Promise.resolve(null) : getChannelSettings(teamId),
       ])
       if (newFromRef.current === undefined) {
         openReadsRef.current = mine
@@ -193,7 +207,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     } catch (err) {
       setError(err.message || 'We could not load the chat just now.')
     }
-  }, [param, teamId, canModerate, staffChannel, unknownTeam, selfId])
+  }, [param, teamId, canModerate, staffChannel, roleKey, unknownTeam, selfId])
 
   useEffect(() => {
     load()
@@ -207,12 +221,19 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   // Both allowed to fail: the composer still works without either.
   useEffect(() => {
     if (!param) return
+    // A role channel's audience IS its member list — channel_members returns
+    // the same {profile_id, full_name} shape the mention picker reads, plus
+    // the reason string the member sheet shows.
+    if (roleKey) {
+      channelMembers(roleKey).then(setMentionables).catch(() => setMentionables([]))
+      return
+    }
     listMentionablesFor(teamId, staffChannel ? 'staff' : 'squad').then(setMentionables).catch(() => setMentionables([]))
     if (!teamId) return
     const from = new Date()
     const to = new Date(from.getTime() + 60 * 24 * 3600 * 1000)
     listEvents({ teamIds: [teamId], from, to }).then(setUpcoming).catch(() => setUpcoming([]))
-  }, [param, teamId, staffChannel])
+  }, [param, teamId, staffChannel, roleKey])
 
   // Mark what is on screen read on arrival — posts AND their replies, since
   // 24 Aug 2026: the list's unread badge counts both.
@@ -245,7 +266,9 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   )
 
   const announceOnly = settings?.announce_only ?? true
-  const mayPost = canModerate || (!isClub && !announceOnly)
+  // A role channel is open chat among peers by construction — no
+  // announce-only, and every member (the policy's definition) may post.
+  const mayPost = roleKey ? true : canModerate || (!isClub && !announceOnly)
   const pinned = (messages ?? []).filter((m) => m.pinned && !m.deleted_at)
   const threadedEventIds = new Set((messages ?? []).filter((m) => m.event_id && !m.deleted_at).map((m) => m.event_id))
   const attachable = upcoming.filter((e) => !threadedEventIds.has(e.id))
@@ -286,7 +309,8 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       const kept = draftMentions.filter((m) => draft.includes(`@${m.full_name}`)).map((m) => m.profile_id)
       // Photo first, message second — WhatsApp order, same as the DM thread.
       const attachmentPath = photo ? await uploadChatPhoto(selfId, photo) : null
-      if (staffChannel) await postStaffMessage(teamId, draft, { mentions: kept, attachmentPath })
+      if (roleKey) await postRoleMessage(roleKey, draft, { mentions: kept, attachmentPath })
+      else if (staffChannel) await postStaffMessage(teamId, draft, { mentions: kept, attachmentPath })
       else await postMessage(teamId, draft, { eventId: attachEventId || null, mentions: kept, attachmentPath })
       setDraft('')
       setDraftMentions([])
@@ -331,7 +355,8 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     setSendError(null)
     try {
       const attachmentPath = await uploadChatVoice(selfId, blob, ext)
-      if (staffChannel) await postStaffMessage(teamId, '', { attachmentPath })
+      if (roleKey) await postRoleMessage(roleKey, '', { attachmentPath })
+      else if (staffChannel) await postStaffMessage(teamId, '', { attachmentPath })
       else await postMessage(teamId, '', { eventId: attachEventId || null, attachmentPath })
       await load()
     } catch (err) {
@@ -345,6 +370,9 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   // attached, exactly as a text post here would (send() above).
   async function sendPoll({ question, options, allowMultiple }) {
     if (postingPoll) return false
+    // Polls are squad/staff plumbing (create_poll takes a team) — not wired
+    // for role channels in v1. The composer hides the button (allowPolls).
+    if (roleKey) return false
     setPostingPoll(true)
     setSendError(null)
     try {
@@ -423,6 +451,8 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     selfId,
     param,
     isClub,
+    roleKey,
+    allowPolls: !roleKey,
     teamId,
     team,
     myTeams,

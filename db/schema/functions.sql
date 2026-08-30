@@ -4363,7 +4363,10 @@ AS $function$
                      and m.club_id = p.club_id and m.status = 'active')
                 else private.can_see_team(p.team_id) end
          when 'staff' then private.can_edit_team(p.team_id)
-         else false
+         -- 20260830_role_channels: replies reach role channels via the
+         -- membership helper; a dm can never be a parent (refused upstream).
+         when 'dm' then false
+         else private.in_role_channel(p.channel, p.club_id)
        end);
 $function$
 ;
@@ -4413,18 +4416,28 @@ begin
     new.conversation_id := null;
     new.pinned   := false;
   elsif new.conversation_id is not null then
-    -- A direct message. The conversation decides everything else, and the
-    -- rule is re-checked on EVERY message — a DM that was allowed stops
-    -- accepting messages the day it is not.
+    -- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 — the group arm (25 Aug rewrite)
+    -- was MISSING from this capture; the header's selective-recapture warning
+    -- struck again. The conversation decides everything else. For a DM the
+    -- pair rule is re-checked on EVERY message; for a group, membership is
+    -- the whole rule (24 Aug ruling).
     select * into conv from conversations where id = new.conversation_id;
     if conv.id is null then
       raise exception 'no such conversation' using errcode = 'P0002';
     end if;
-    if new.author_id not in (conv.profile_a, conv.profile_b) then
-      raise exception 'not your conversation' using errcode = '42501';
-    end if;
-    if not private.can_dm(case when conv.profile_a = new.author_id then conv.profile_b else conv.profile_a end) then
-      raise exception 'you cannot message this person' using errcode = '42501';
+    if conv.kind = 'group' then
+      if not exists (select 1 from conversation_members gm
+                      where gm.conversation_id = conv.id
+                        and gm.profile_id = new.author_id) then
+        raise exception 'not your conversation' using errcode = '42501';
+      end if;
+    else
+      if new.author_id not in (conv.profile_a, conv.profile_b) then
+        raise exception 'not your conversation' using errcode = '42501';
+      end if;
+      if not private.can_dm(case when conv.profile_a = new.author_id then conv.profile_b else conv.profile_a end) then
+        raise exception 'you cannot message this person' using errcode = '42501';
+      end if;
     end if;
     new.channel  := 'dm';
     new.team_id  := null;
@@ -4448,10 +4461,14 @@ begin
     raise exception 'a staff channel belongs to a squad' using errcode = '23514';
   end if;
 
+  -- 20260830_role_channels: a role-channel author's badge is their best role
+  -- ANYWHERE — a head coach has only a team-scoped row, which the team match
+  -- below would miss for a team-less message.
   select m.role, m.title into new.author_role, new.author_title
     from memberships m
    where m.profile_id = new.author_id and m.status = 'active'
-     and (m.team_id = new.team_id or m.team_id is null)
+     and (m.team_id = new.team_id or m.team_id is null
+          or new.channel in ('headcoaches','managers','medics','welfare','clubstaff'))
    order by case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
                         when 'medic' then 3 else 9 end,
             m.team_id nulls last
@@ -4475,7 +4492,11 @@ begin
          select profile_id from private.notice_audience(new.club_id, new.team_id) as aud(profile_id)
           where new.channel = 'squad'
          union
-         select profile_id from private.staff_audience(new.team_id) where new.channel = 'staff');
+         select profile_id from private.staff_audience(new.team_id) where new.channel = 'staff'
+         -- 20260830_role_channels: the audience is the derived membership.
+         union
+         select rca.profile_id from private.role_channel_audience(new.channel, new.club_id) rca
+          where new.channel in ('headcoaches','managers','medics','welfare','clubstaff'));
   end if;
 
   new.edited_at  := null;
@@ -5311,6 +5332,26 @@ AS $function$
       left join lateral (select created_at, body, author_id, attachment_path from messages x
                           where x.club_id = club.id and x.channel = 'squad' and x.team_id is null and x.deleted_at is null
                           order by x.created_at desc limit 1) lm on true
+    union all
+    -- 20260830_role_channels: a row per role channel the caller belongs to;
+    -- detail carries the live member count.
+    select rc.key, null, null, rc.label,
+           (select count(*) from private.role_channel_audience(rc.key, club.id))::text || ' people',
+           lm.created_at, lm.body, lm.author_id, lm.attachment_path,
+           (select count(*) from messages x cross join me
+             where x.club_id = club.id and x.channel = rc.key and x.deleted_at is null
+               and x.author_id <> me.id and x.created_at > now() - interval '14 days'
+               and not exists (select 1 from message_reads r where r.message_id = x.id and r.profile_id = me.id))
+      from (values ('headcoaches','Club Head Coaches'),
+                   ('managers','Club Managers'),
+                   ('medics','Club Medics'),
+                   ('welfare','Welfare'),
+                   ('clubstaff','Club Staff')) rc(key, label)
+      cross join club cross join me
+      left join lateral (select created_at, body, author_id, attachment_path from messages x
+                          where x.club_id = club.id and x.channel = rc.key and x.deleted_at is null
+                          order by x.created_at desc limit 1) lm on true
+     where private.in_role_channel(rc.key, club.id)
     union all
     select 'dm', null, c.id, pr.full_name,
            coalesce((select labelled.l from (
@@ -6513,3 +6554,187 @@ AS $function$
           and me.club_id = o.club_id
      )
 $function$
+;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 2026-08-30 — ROLE CHANNELS (20260830_role_channels.sql). Three NEW
+-- functions, captured verbatim from the migration the day it was applied and
+-- verified by db/tests/role-channels.sql against live (14 steps, all green).
+-- The same migration REPLACED can_reply_to, set_message_provenance and
+-- my_chats above — each carries a 20260830 marker at its edit — and also
+-- surfaced that this capture had MISSED the 25 Aug group-chat rewrite of
+-- set_message_provenance (now corrected at that entry).
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- private.in_role_channel(_channel, _club) — is the CALLER in this role
+-- channel? The single membership rule: called by all four messages policies,
+-- can_reply_to and my_chats. proacl: authenticated only.
+CREATE OR REPLACE FUNCTION private.in_role_channel(_channel text, _club uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select case _channel
+    when 'clubstaff' then exists (
+      select 1 from public.memberships m
+       where m.profile_id = (select auth.uid())
+         and m.club_id = _club and m.status = 'active'
+         and m.role in ('coach','manager','medic','admin'))
+    when 'headcoaches' then exists (
+      select 1 from public.memberships m
+       where m.profile_id = (select auth.uid())
+         and m.club_id = _club and m.status = 'active'
+         and ((m.role = 'coach' and m.is_head_coach)
+           or (m.role = 'admin' and 'chat-headcoaches' = any(m.admin_rights))))
+    when 'managers' then exists (
+      select 1 from public.memberships m
+       where m.profile_id = (select auth.uid())
+         and m.club_id = _club and m.status = 'active'
+         and (m.role = 'manager'
+           or (m.role = 'admin' and 'chat-managers' = any(m.admin_rights))))
+    when 'medics' then exists (
+      select 1 from public.memberships m
+       where m.profile_id = (select auth.uid())
+         and m.club_id = _club and m.status = 'active'
+         and (m.role = 'medic'
+           or (m.role = 'admin' and 'chat-medics' = any(m.admin_rights))))
+    when 'welfare' then exists (
+      select 1 from public.memberships m
+       where m.profile_id = (select auth.uid())
+         and m.club_id = _club and m.status = 'active'
+         and m.role = 'admin' and 'welfare' = any(m.admin_rights))
+    else false
+  end;
+$function$
+;
+
+-- private.role_channel_audience(_channel, _club) — every member, with the
+-- reason they are in ("Head coach — U10 Mixed", "Admin — chat access").
+-- Feeds the mention filter and channel_members. proacl: authenticated only.
+CREATE OR REPLACE FUNCTION private.role_channel_audience(_channel text, _club uuid)
+ RETURNS TABLE(profile_id uuid, reason text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  with rows as (
+    select m.profile_id,
+           case
+             when _channel = 'headcoaches' and m.role = 'coach' and m.is_head_coach
+               then 'Head coach — ' || t.name
+             when _channel = 'managers' and m.role = 'manager'
+               then 'Manager — ' || t.name
+             when _channel = 'medics' and m.role = 'medic'
+               then 'Medic' || coalesce(' — ' || t.name, '')
+             when _channel = 'welfare' and m.role = 'admin' and 'welfare' = any(m.admin_rights)
+               then 'Welfare'
+             when _channel = 'clubstaff' and m.role in ('coach','manager','medic')
+               then initcap(m.role) || coalesce(' — ' || t.name, '')
+             when _channel = 'clubstaff' and m.role = 'admin'
+               then 'Club admin'
+             when _channel in ('headcoaches','managers','medics') and m.role = 'admin'
+                  and ('chat-' || _channel) = any(m.admin_rights)
+               then 'Admin — chat access'
+           end as reason
+      from public.memberships m
+      left join public.teams t on t.id = m.team_id
+     where m.club_id = _club and m.status = 'active'
+  )
+  select r.profile_id, string_agg(distinct r.reason, ' · ' order by r.reason)
+    from rows r
+   where r.reason is not null
+   group by r.profile_id;
+$function$
+;
+
+-- public.channel_members(_channel, _team) — the member sheet behind every
+-- channel header: (profile_id, full_name, reason) for any channel the caller
+-- can read. Each arm re-applies the channel's own read rule; the CLUB arm is
+-- ADMIN-ONLY on purpose (names are squad-scoped for everyone else — see the
+-- migration's note). proacl: authenticated only. Body: the migration,
+-- verbatim — db/migrations/20260830_role_channels.sql §"The member sheet".
+CREATE OR REPLACE FUNCTION public.channel_members(_channel text, _team uuid DEFAULT NULL::uuid)
+ RETURNS TABLE(profile_id uuid, full_name text, reason text)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  my_club uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'not signed in' using errcode = '42501';
+  end if;
+  select m.club_id into my_club from memberships m
+   where m.profile_id = auth.uid() and m.status = 'active'
+   order by m.created_at limit 1;
+  if my_club is null then
+    raise exception 'no active membership' using errcode = '42501';
+  end if;
+
+  if _channel = 'squad' and _team is not null then
+    if not private.can_see_team(_team) then
+      raise exception 'not your squad' using errcode = '42501';
+    end if;
+    return query
+      select p.id, p.full_name,
+             string_agg(distinct
+               case m.role when 'admin' then 'Club admin'
+                           when 'coach' then case when m.is_head_coach then 'Head coach' else 'Coach' end
+                           when 'manager' then 'Manager' when 'medic' then 'Medic'
+                           when 'parent' then 'Parent' when 'player' then 'Player'
+                           else initcap(m.role) end, ' · ')
+        from private.notice_audience((select t.club_id from teams t where t.id = _team), _team) aud(pid)
+        join profiles p on p.id = aud.pid
+        left join memberships m on m.profile_id = p.id and m.status = 'active'
+                                and (m.team_id = _team or m.role = 'admin')
+       group by p.id, p.full_name;
+  elsif _channel = 'staff' and _team is not null then
+    if not private.can_edit_team(_team) then
+      raise exception 'not your staff channel' using errcode = '42501';
+    end if;
+    return query
+      select p.id, p.full_name,
+             string_agg(distinct
+               case m.role when 'admin' then 'Club admin'
+                           when 'coach' then case when m.is_head_coach then 'Head coach' else 'Coach' end
+                           when 'manager' then 'Manager' when 'medic' then 'Medic'
+                           else initcap(m.role) end, ' · ')
+        from private.staff_audience(_team) aud(pid)
+        join profiles p on p.id = aud.pid
+        left join memberships m on m.profile_id = p.id and m.status = 'active'
+                                and (m.team_id = _team or m.role = 'admin')
+       group by p.id, p.full_name;
+  elsif _channel = 'club' then
+    if not private.is_admin(my_club) then
+      raise exception 'not your channel' using errcode = '42501';
+    end if;
+    return query
+      select p.id, p.full_name,
+             string_agg(distinct
+               case m.role when 'admin' then 'Club admin'
+                           when 'coach' then 'Coach' when 'manager' then 'Manager'
+                           when 'medic' then 'Medic' when 'parent' then 'Parent'
+                           when 'player' then 'Player' else initcap(m.role) end, ' · ')
+        from memberships m join profiles p on p.id = m.profile_id
+       where m.club_id = my_club and m.status = 'active'
+       group by p.id, p.full_name;
+  elsif _channel in ('headcoaches','managers','medics','welfare','clubstaff') then
+    if not private.in_role_channel(_channel, my_club) then
+      raise exception 'not your channel' using errcode = '42501';
+    end if;
+    return query
+      select p.id, p.full_name, rca.reason
+        from private.role_channel_audience(_channel, my_club) rca
+        join profiles p on p.id = rca.profile_id;
+  else
+    raise exception 'no such channel' using errcode = '22023';
+  end if;
+end;
+$function$
+;
+
+REVOKE ALL ON FUNCTION public.channel_members(text, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.channel_members(text, uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.channel_members(text, uuid) TO authenticated;

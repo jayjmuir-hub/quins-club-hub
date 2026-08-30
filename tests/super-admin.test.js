@@ -143,8 +143,14 @@ describe('the rights vocabulary', () => {
   // Admin right (redesign Phase 0a) — still a screen-gate in 0a, gating the
   // Club Hub Admin portal. Its label MUST read 'Club Hub Admin' because the
   // portal card now borrows it (src/lib/portals.js).
-  it('is the four Jay named, plus welfare and clubadmin', () => {
-    expect(ADMIN_RIGHTS).toEqual(['youth', 'media', 'pitches', 'training', 'welfare', 'clubadmin'])
+  it('is the four Jay named, plus welfare, clubadmin, and the three chat-access ticks', () => {
+    // The chat-* rights (30 Aug 2026) seat a ticked admin in one role channel
+    // (db/migrations/20260830_role_channels.sql). No chat-welfare on purpose:
+    // the Welfare channel rides the existing welfare grant.
+    expect(ADMIN_RIGHTS).toEqual([
+      'youth', 'media', 'pitches', 'training', 'welfare', 'clubadmin',
+      'chat-headcoaches', 'chat-managers', 'chat-medics',
+    ])
     expect(ADMIN_RIGHTS.map(adminRightLabel)).toEqual([
       'Club Youth Manager',
       'Social Media Management',
@@ -152,6 +158,9 @@ describe('the rights vocabulary', () => {
       'Rugby Performance Director',
       'Welfare',
       'Club Hub Admin',
+      'Chat: Club Head Coaches',
+      'Chat: Club Managers',
+      'Chat: Club Medics',
     ])
   })
 })

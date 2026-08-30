@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
+import ChannelMembersSheet from '../components/ChannelMembersSheet.jsx'
 import ChannelThread from '../components/ChannelThread.jsx'
 import ChatHeader from '../components/ChatHeader.jsx'
 import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
 import { clearChannel } from '../data/messages.js'
+import { ROLE_CHANNELS } from '../lib/roleChannels.js'
 import useChannelThread, { tallyByEvent as tallyByEventImpl } from '../lib/useChannelThread.js'
 import { shortBand } from './ChatList.jsx'
 
@@ -55,7 +57,9 @@ export default function Chat() {
   const thread = useChannelThread({ param, wantStaff })
   const {
     isClub,
+    roleKey,
     team,
+    admin,
     canModerate,
     staffChannel,
     unknownTeam,
@@ -70,6 +74,7 @@ export default function Chat() {
 
   const [clearing, setClearing] = useState(false)
   const [pickingBackground, setPickingBackground] = useState(false)
+  const [showingMembers, setShowingMembers] = useState(false)
   const threadParam = searchParams.get('thread')
   const eventParam = searchParams.get('event')
 
@@ -92,12 +97,21 @@ export default function Chat() {
     return <Navigate to="/chat" replace />
   }
 
-  const title = isClub ? 'Whole club' : team?.name ?? 'Squad'
-  const subtitle = isClub
-    ? 'Club-wide · admins post'
-    : staffChannel
-      ? 'Staff only · coaches, managers and medics'
-      : `${mentionables.length > 0 ? `${mentionables.length} members · ` : ''}${announceOnly ? 'announce-only' : 'open chat'}`
+  const roleChannel = roleKey ? ROLE_CHANNELS[roleKey] : null
+  const title = roleChannel ? roleChannel.label : isClub ? 'Whole club' : team?.name ?? 'Squad'
+  const subtitle = roleChannel
+    ? `${mentionables.length > 0 ? `${mentionables.length} people · ` : ''}by role — tap ⋯ for members`
+    : isClub
+      ? 'Club-wide · admins post'
+      : staffChannel
+        ? 'Staff only · coaches, managers and medics'
+        : `${mentionables.length > 0 ? `${mentionables.length} members · ` : ''}${announceOnly ? 'announce-only' : 'open chat'}`
+
+  // The member sheet: role channels for every member; a squad or staff channel
+  // for anyone reading it; the club channel for admins only (channel_members
+  // enforces that server-side — names are squad-scoped for everyone else).
+  const canSeeMembers = Boolean(roleKey) || Boolean(team) || (isClub && admin)
+  const membersChannel = roleKey ?? (isClub ? 'club' : staffChannel ? 'staff' : 'squad')
 
   function pickBackground(key) {
     thread.pickBackground(key)
@@ -105,13 +119,17 @@ export default function Chat() {
   }
 
   const headerActions = [
+    // The WhatsApp gesture: see who reads this, and why (role channels carry
+    // the reason each person is in). Tap a member to start a DM.
+    ...(canSeeMembers ? [{ label: 'View members', onClick: () => setShowingMembers(true) }] : []),
     { label: 'Chat background', onClick: () => setPickingBackground(true) },
-    ...(canModerate && !isClub && !staffChannel && settings
+    ...(canModerate && !isClub && !roleKey && !staffChannel && settings
       ? [{ label: announceOnly ? 'Turn announce-only off' : 'Turn announce-only on', onClick: toggleAnnounceOnly }]
       : []),
     // Staff only. Deletes every post in THIS channel for good; the channel
-    // stays — it is the squad. Reported posts stay (evidence).
-    ...(canModerate ? [{ label: 'Clear chat', onClick: () => setClearing(true), danger: true }] : []),
+    // stays — it is the squad. Reported posts stay (evidence). Not offered on
+    // role channels in v1 — clear_channel is squad/club plumbing.
+    ...(canModerate && !roleKey ? [{ label: 'Clear chat', onClick: () => setClearing(true), danger: true }] : []),
   ]
 
   async function clearChat() {
@@ -135,7 +153,7 @@ export default function Chat() {
               isClub ? 'bg-surface-mute text-ink' : 'bg-brand text-ink-invert'
             }`}
           >
-            {isClub ? '🏉' : staffChannel ? '🛡' : shortBand(title)}
+            {roleChannel ? roleChannel.glyph : isClub ? '🏉' : staffChannel ? '🛡' : shortBand(title)}
           </span>
         }
         title={staffChannel ? `${title} · staff` : title}
@@ -161,6 +179,15 @@ export default function Chat() {
       )}
 
       <ChatBackgroundPicker open={pickingBackground} onClose={() => setPickingBackground(false)} current={thread.background} onPick={pickBackground} />
+
+      <ChannelMembersSheet
+        open={showingMembers}
+        onClose={() => setShowingMembers(false)}
+        channel={membersChannel}
+        teamId={thread.teamId}
+        selfId={thread.selfId}
+        onOpenDm={thread.openDmWith}
+      />
 
       {/* Announce-only lives in the header's ⋯ menu since 24 Aug 2026; this
           line keeps the state visible to staff (data-testid kept for the tests). */}

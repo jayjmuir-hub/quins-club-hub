@@ -454,7 +454,11 @@ describe('Chat — staff channel', () => {
     await screen.findByTestId('message-row')
     await user.click(screen.getByRole('button', { name: 'Chat options' }))
     const items = screen.getAllByRole('menuitem').map((el) => el.textContent)
-    expect(items).toEqual(['Chat background'])
+    // 'View members' joined 30 Aug 2026 (role channels): the squad member
+    // sheet shows squad-scoped names, which a parent already sees on the team
+    // sheet — the intent this test guards is unchanged: no MODERATION reaches
+    // a parent (no announce-only, no clear chat).
+    expect(items).toEqual(['View members', 'Chat background'])
   })
 
   it('?channel=staff is titled as the staff channel, and a parent never gets it', async () => {
