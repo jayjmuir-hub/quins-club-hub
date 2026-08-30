@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { friendlyMessage } from '../lib/friendlyError.js'
 import { useNavigate } from 'react-router-dom'
 import Sheet from './Sheet.jsx'
 import IdentityBadges from './IdentityBadges.jsx'
@@ -55,7 +56,7 @@ function PersonCardBody({ profileId, onClose }) {
         else setError('Could not find this person.')
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || 'Could not load their details.')
+        if (!cancelled) setError(friendlyMessage(err, 'Could not load their details.'))
       })
     return () => {
       cancelled = true

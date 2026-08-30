@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { friendlyMessage } from '../lib/friendlyError.js'
 import { Link } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { AccentTitle, Kicker } from '../components/Editorial.jsx'
@@ -66,7 +67,7 @@ function Overview() {
         setRows(overview)
         setLog(accessLog)
       })
-      .catch((err) => mounted && setError(err.message || 'We could not load the overview.'))
+      .catch((err) => mounted && setError(friendlyMessage(err, 'We could not load the overview.')))
     return () => {
       mounted = false
     }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { friendlyMessage } from '../lib/friendlyError.js'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -159,7 +160,7 @@ export default function Chat() {
       setClearing(false)
       await reload()
     } catch (err) {
-      setError(err.message || 'Could not clear this chat.')
+      setError(friendlyMessage(err, 'Could not clear this chat.'))
       setClearing(false)
     }
   }

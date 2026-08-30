@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { friendlyMessage } from '../lib/friendlyError.js'
 import { Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
@@ -38,7 +39,7 @@ function Queue() {
     try {
       setRows(await listOpenReports())
     } catch (err) {
-      setError(err.message || 'We could not load the reports.')
+      setError(friendlyMessage(err, 'We could not load the reports.'))
     }
   }, [])
   useEffect(() => {
@@ -58,7 +59,7 @@ function Queue() {
       if (remove && report.message) await removeMessage(report.message.id)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not do that.')
+      setError(friendlyMessage(err, 'Could not do that.'))
     }
   }
 

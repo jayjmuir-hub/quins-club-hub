@@ -120,7 +120,7 @@ describe('RequireAuth access_token cleanup (success path, needs a session)', () 
 })
 
 describe('RequireAuth auth error capture (failure path, no session ever exists)', () => {
-  it('captures and decodes an error_description fragment with no session, passes it to Login, and strips the hash', () => {
+  it('captures an error fragment with no session, passes MAPPED copy to Login, and strips the hash', () => {
     window.history.pushState(
       {},
       '',
@@ -134,11 +134,12 @@ describe('RequireAuth auth error capture (failure path, no session ever exists)'
       </RequireAuth>,
     )
 
-    // Asserts both '+' and '%20' decode to spaces (URLSearchParams handles
-    // form-encoding correctly; manual decodeURIComponent would leave '+' as
-    // a literal plus sign).
+    // ⚠️ MAPPED SINCE 30 Aug 2026 (Grok item 17): the fragment is
+    // attacker-writable, so Login receives a sentence this app wrote —
+    // otp_expired maps to the expiry copy — never the raw description.
+    // tests/error-hygiene.test.jsx pins the hostile case.
     expect(screen.getByTestId('passed-auth-error')).toHaveTextContent(
-      'Email link is invalid or has expired',
+      'That sign-in link has expired',
     )
     expect(window.location.pathname).toBe('/')
     expect(window.location.search).toBe('?redirect=1')
