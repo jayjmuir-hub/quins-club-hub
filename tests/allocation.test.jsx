@@ -176,39 +176,55 @@ describe('the screen', () => {
     return userEvent.setup()
   }
 
-  // ⚠️ THE SCREEN OPENS ON MONTH SINCE 12 Aug 2026 (Jay's call, replacing the
-  // 11 Aug "opens on today, in Day view"). Every test below that exercises the
-  // pitches x hours GRID has to get there first — they are not testing the
-  // default, they are testing the grid, and conflating the two is how a
-  // default change turns into five confusing failures.
+  // ⚠️ THE SCREEN OPENS ON WEEK SINCE 30 Aug 2026 (Jay's call, replacing the
+  // 12 Aug month default). Every test below that exercises the pitches x hours
+  // GRID has to get there first — they are not testing the default, they are
+  // testing the grid, and conflating the two is how a default change turns into
+  // a fistful of confusing failures.
   async function openDay(user) {
     await user.click(await screen.findByRole('tab', { name: 'Day' }))
   }
 
-  it('⚠️ opens on the MONTH, anchored on today', async () => {
-    // Jay asked for this directly when offered the choice. It supersedes the
-    // 11 Aug ruling; see the header of src/screens/Allocation.jsx.
+  it('⚠️ opens on the WEEK, anchored on today', async () => {
+    // Jay's call, 30 Aug 2026 — the week is the planning horizon this screen is
+    // opened for. Supersedes the 12 Aug month default; see the header of
+    // src/screens/Allocation.jsx.
     await setup()
-    expect(await screen.findByTestId('pitch-month')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Month' })).toHaveAttribute('aria-selected', 'true')
-    // Anchored on TODAY: the heading is this month, not January.
-    const now = new Date()
-    const month = now.toLocaleDateString(undefined, { month: 'long' })
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(month)
+    expect(await screen.findByTestId('pitch-week')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('⚠️ Week → Day opens the FIRST day of that week, not the last', async () => {
+    // The bug (Jay, 30 Aug 2026): paging weeks anchors `day` on the week's LAST
+    // day — paging shifts `day` by 7 from today, which can be a Sunday — so
+    // switching to Day jumped there. It must land on the week's Monday instead.
+    const user = await setup()
+    await screen.findByTestId('pitch-week')
+    // Page to a different week first so "today" cannot coincide with the Monday.
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('tab', { name: 'Day' }))
+    // The week starts on Monday, so the day heading names a Monday whatever the
+    // date — that is the whole point: first day, deterministically.
+    expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent(/Monday/)
   })
 
   it('⚠️ a month view asks for the WHOLE month, not one day', async () => {
     // The fetch window follows the view. If it did not, the month grid would
     // render six empty weeks around a single populated day and look broken.
-    await setup()
+    // The screen opens on Week now, so switch to Month first and read the LAST
+    // fetch — the month's window.
+    const user = await setup()
+    await user.click(await screen.findByRole('tab', { name: 'Month' }))
     await waitFor(() => expect(listEventsMock).toHaveBeenCalled())
-    const args = listEventsMock.mock.calls[0][0]
+    const args = listEventsMock.mock.calls.at(-1)[0]
     const span = Date.parse(args.to) - Date.parse(args.from)
     expect(span).toBeGreaterThan(27 * 24 * 60 * 60 * 1000)
   })
 
   it('clicking a day in the month opens that day in the grid', async () => {
     const user = await setup()
+    // The screen opens on Week now, so reach the month grid first.
+    await user.click(await screen.findByRole('tab', { name: 'Month' }))
     await screen.findByTestId('pitch-month')
     const cells = screen.getAllByTestId('month-cell')
     await user.click(cells[10])
@@ -225,8 +241,8 @@ describe('the screen', () => {
     // confusing failures instead of one that names the cause. That is exactly
     // how this file failed in CI while passing here.
     expect(listPitchesMock, 'the pitches module is not mocked').toHaveBeenCalled()
-    // ⚠️ THE LAST call, not the first: the screen opens on Month and refetches
-    // when the view changes, so calls[0] is the month's window.
+    // ⚠️ THE LAST call, not the first: the screen opens on Week and refetches
+    // when the view changes, so calls[0] is the week's window, not the day's.
     const args = listEventsMock.mock.calls.at(-1)[0]
     expect(args.from).toBeTruthy()
     expect(args.to).toBeTruthy()
@@ -235,12 +251,13 @@ describe('the screen', () => {
   })
 
   it('⚠️ says so in a sentence when the day is empty, rather than drawing a blank grid', async () => {
-    // It opens on TODAY (Jay's call) and today is often a quiet Tuesday.
-    // Fifteen empty rows read as the app failing to load.
+    // A quiet day is common, and fifteen empty rows read as the app failing to
+    // load. Week → Day lands on the week's Monday (30 Aug 2026), which is only
+    // "today" when today is a Monday — so accept either wording.
     listEventsMock.mockResolvedValue([])
     const user = await setup()
     await openDay(user)
-    expect(await screen.findByText(/nothing on today/i)).toBeInTheDocument()
+    expect(await screen.findByText(/nothing on (today|this day)/i)).toBeInTheDocument()
     expect(screen.queryByTestId('allocation-grid')).not.toBeInTheDocument()
   })
 
@@ -397,7 +414,10 @@ describe('direct assignment', () => {
     expect(await screen.findByText('Waiting for a pitch')).toBeInTheDocument()
 
     listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD', home: false })])
-    await first.click(screen.getByRole('tab', { name: 'Week' }))
+    // Switch view to force a refetch — the screen opens on Week now, so
+    // re-clicking Week would be a no-op. Month refetches; the away twin must
+    // not appear in the waiting list.
+    await first.click(screen.getByRole('tab', { name: 'Month' }))
     await waitFor(() => expect(screen.queryByText('Waiting for a pitch')).not.toBeInTheDocument())
   })
 

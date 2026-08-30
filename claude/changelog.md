@@ -10,12 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **A club-wide booking reads "Club" on the pitch layout, not "A".** A whole-club
+- **The Allocation screen opens on the week, and Week → Day no longer jumps to the
+  last day.** Two things off Pitch Management (Jay): the screen now opens on the WEEK
+  — the planning horizon it is opened for — rather than the month; and switching from
+  Week to Day now opens the FIRST day of that week (its Monday) instead of the last.
+  Paging weeks shifts the anchor by 7 from today, so it usually sat on a Sunday, and
+  switching to Day jumped there. `src/screens/Allocation.jsx`, `tests/allocation.test.jsx`.
+  (SHA follows in the next changelog-touching PR.)
+- `b102084` — **A club-wide booking reads "Club" on the pitch layout, not "A".** A whole-club
   social given a pitch showed up on the Allocation pitch-layout picture with no
   squad, so it fell back to "A squad" — which the share card abbreviated to a bare
   "A" (Jay). A squad-less booking now labels as "Club" there and in the "Shared
-  pitches" bar. `src/lib/pitchOccupancy.js`, `tests/pitch-diagram.test.js`. (SHA
-  follows in the next changelog-touching PR.)
+  pitches" bar. `src/lib/pitchOccupancy.js`, `tests/pitch-diagram.test.js`.
 - `83eab00` — **Tidied the pitch-layout picture, and told coaches it's already saved.** Following
   the first cut: squad codes on the tight week bars sat against the segment dividers,
   so each now has side padding and a single-line ellipsis fallback, the week card
