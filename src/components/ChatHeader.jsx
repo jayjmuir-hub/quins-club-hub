@@ -10,12 +10,15 @@ import { Link } from 'react-router-dom'
 // Every thread says, in its header, exactly who can read what is typed below.
 
 /**
- * @param avatar   a node (Avatar / glyph)
- * @param title    string
- * @param subtitle string
- * @param actions  [{ label, onClick, danger? }] — the ⋯ menu; omit for none
+ * @param avatar      a node (Avatar / glyph)
+ * @param title       string
+ * @param subtitle    string
+ * @param actions     [{ label, onClick, danger? }] — the ⋯ menu; omit for none
+ * @param onInfoClick tap the title/subtitle block — the WhatsApp gesture
+ *                    (30 Aug 2026: opens the channel's member sheet). Omitted,
+ *                    the block stays plain text.
  */
-export default function ChatHeader({ avatar, title, subtitle, actions = [] }) {
+export default function ChatHeader({ avatar, title, subtitle, actions = [], onInfoClick }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -49,10 +52,23 @@ export default function ChatHeader({ avatar, title, subtitle, actions = [] }) {
         </svg>
       </Link>
       {avatar}
-      <div className="min-w-0 flex-1">
-        <h2 className="truncate text-[16px] font-extrabold leading-tight text-ink">{title}</h2>
-        {subtitle && <p className="truncate text-[12px] text-ink-muted" data-testid="chat-subtitle">{subtitle}</p>}
-      </div>
+      {onInfoClick ? (
+        <button
+          type="button"
+          onClick={onInfoClick}
+          className="min-w-0 flex-1 rounded-[8px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          aria-label={`${title} — view members`}
+          data-testid="chat-header-info"
+        >
+          <h2 className="truncate text-[16px] font-extrabold leading-tight text-ink">{title}</h2>
+          {subtitle && <p className="truncate text-[12px] text-ink-muted" data-testid="chat-subtitle">{subtitle}</p>}
+        </button>
+      ) : (
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-[16px] font-extrabold leading-tight text-ink">{title}</h2>
+          {subtitle && <p className="truncate text-[12px] text-ink-muted" data-testid="chat-subtitle">{subtitle}</p>}
+        </div>
+      )}
       {actions.length > 0 && (
         <div className="relative" ref={ref}>
           <button
