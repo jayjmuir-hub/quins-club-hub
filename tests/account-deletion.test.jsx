@@ -180,7 +180,30 @@ describe('/privacy', () => {
     expect(
       screen.getByText(/do not sell it, share it outside the club, advertise, or track you/i),
     ).toBeInTheDocument()
-    expect(screen.getByText(/a child does not sign in/i)).toBeInTheDocument()
+    // ⚠️ "A child does not sign in" was the pin until 30 Aug 2026, and it was
+    // FALSE: self-registration for U13+ has been live since 11 Aug
+    // (teams.self_registration_allowed — measured against the live table, U13
+    // and above allow it, U12 and below do not). The corrected facts: younger
+    // children do not sign in, older players may, a parent or carer stays on
+    // record either way, and nothing is visible before club approval.
+    expect(screen.queryByText(/a child does not sign in/i)).toBeNull()
+    expect(screen.getByText(/younger children do not sign in/i)).toBeInTheDocument()
+    expect(screen.getByText(/from u13 upwards/i)).toBeInTheDocument()
+    expect(screen.getByText(/parent or carer is still kept on record/i)).toBeInTheDocument()
+    expect(screen.getByText(/sees nothing until the club has approved it/i)).toBeInTheDocument()
+  })
+
+  it('states the security measures, each of which is real and live', () => {
+    // Added 30 Aug 2026 (Jay). Each sentence is a measure that actually
+    // exists: RLS enforced in Postgres, the pending-approval model, HTTPS,
+    // daily backups (Supabase Pro), live uptime and error monitoring. If one
+    // is ever switched off, the policy must change — and this pin makes the
+    // removal a deliberate act rather than a drift.
+    renderScreen(<Privacy />)
+
+    expect(screen.getByText(/checked inside the database itself/i)).toBeInTheDocument()
+    expect(screen.getByText(/backed up every day/i)).toBeInTheDocument()
+    expect(screen.getByText(/independent monitoring alerts the club/i)).toBeInTheDocument()
   })
 
   it('describes squad visibility truthfully, not as "own children only"', () => {
