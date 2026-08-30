@@ -10,12 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Home sits far left on the four-tab parent/player bar.** #530 centred Home
+- **Recorded the Grok full-sweep findings + remediation plan (docs only).**
+  Verification of the 29 Aug 2026 Grok security sweep — all 18 items confirmed
+  against the code, the two criticals against the live database — written into
+  the durable register (`claude/open-items.md`, new "Grok full-sweep" section)
+  with the agreed corrected framing, plus a 10-PR dependency-ordered remediation
+  plan (`claude/plans/2026-08-30-grok-sweep-remediation.md`). No code changed;
+  nothing authorised. (SHA follows in the next changelog-touching PR.)
+- `81dd7b1` — **Home sits far left on the four-tab parent/player bar.** #530 centred Home
   on the dock, but on the narrow four-tab island the middle is no longer the
   thumb's resting slot and the centred Home read as stranded (Jay). Home now
   keeps its natural NAV_ITEMS lead on the four-tab bar; the wide five-tab
   squad-staff bar still centres it. `src/components/Nav.jsx`, `tests/nav.test.jsx`,
-  `claude/specs/design-system.md`. (SHA follows in the next changelog-touching PR.)
+  `claude/specs/design-system.md`.
 - `b8b635c` — **Pitch sharing: the "it's fine" override.** The last piece — an admin can
   mark a genuine over-capacity share as OK, and the clash marker clears across
   the calendar. `pitch_share_approvals`
