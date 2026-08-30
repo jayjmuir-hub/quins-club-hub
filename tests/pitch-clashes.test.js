@@ -189,6 +189,33 @@ describe('findPitchClashes', () => {
     ).toEqual([])
   })
 
+  it('⚠️ three thirds share a pitch cleanly — the non-dyadic case', () => {
+    // ⅓ + ⅓ + ⅓ sums to 0.999… in floating point, NOT exactly 1, so without the
+    // capacity EPSILON this legitimate full-pitch share would read as an
+    // over-capacity clash. This is the reason the epsilon exists (Jay, 30 Aug
+    // 2026 — thirds are the first non-dyadic portion).
+    expect(
+      findPitchClashes([
+        at('2026-09-05T09:00:00Z', { id: 'a', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'third' }),
+        at('2026-09-05T09:00:00Z', { id: 'b', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'third' }),
+        at('2026-09-05T09:00:00Z', { id: 'c', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'third' }),
+      ]),
+    ).toEqual([])
+  })
+
+  it('two thirds and a half overtop one pitch', () => {
+    // ⅓ + ⅓ + ½ = 1⅙ pitches — over capacity, so all three are flagged.
+    const events = [
+      at('2026-09-05T09:00:00Z', { id: 'a', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'third' }),
+      at('2026-09-05T09:00:00Z', { id: 'b', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'third' }),
+      at('2026-09-05T09:00:00Z', { id: 'c', ends_at: '2026-09-05T10:00:00Z', pitch_portion: 'half' }),
+    ]
+    const clashes = findPitchClashes(events)
+    expect(clashes).toHaveLength(1)
+    expect(clashes[0].load).toBeCloseTo(7 / 6)
+    expect(flaggedIds(events)).toEqual(['a', 'b', 'c'])
+  })
+
   it('portions that overtop one pitch ARE a clash, and name everyone on it', () => {
     // ¼ + ½ + ½ = 1¼ pitches: it no longer fits, and all three are involved.
     const events = [
