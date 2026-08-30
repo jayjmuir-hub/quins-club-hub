@@ -10,7 +10,30 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **One transient blip no longer paints "Couldn't load your account".** Jay's
+- **Grok items 10, 11 & 12 SHIPPED — the push/mail pipeline stops trusting
+  its callers.** Item 12 (SSRF): `register_push_subscription` allowlists the
+  endpoint — https + real push services only, built from the hosts measured
+  live (Apple 25, FCM 12, one legacy jmt17.google.com, plus the Mozilla and
+  WNS families) — so a member can never aim push-send's signed POSTs at
+  `http://169.254.169.254/`; push-send carries the same allowlist before its
+  fetch. Item 11 (body-trust): squad-push copy travels through a new
+  `public.push_outbox` table — the HTTP body carries only the id, push-send
+  renders from the row and consumes it (single-use, replay-inert; the row is
+  also the cancellation tombstone) — and availability nudges are re-derived
+  from `event_id`; holding the shared secret no longer writes lock-screen
+  text. Item 10 (open relay): signup nudges travel as profile ids; the
+  function loads addresses itself, refuses email-bearing bodies, caps at
+  100. Item-15 core: `supabase/config.toml` pins `verify_jwt=false` for all
+  eleven functions; both touched functions hash-both-sides and check POST.
+  Applied + deployed (push-send v12, notify-unfinished-signup v2); allowlist
+  harness red-then-green with a revert self-test; outbox proven LIVE with a
+  zero-audience probe (row → id-only POST → consumed → 200).
+  `db/migrations/20260830_push_hardening.sql`,
+  `db/tests/push-endpoint-allowlist.sql` (new), `supabase/config.toml`
+  (new), `supabase/functions/push-send/index.ts`,
+  `supabase/functions/notify-unfinished-signup/index.ts`, `db/schema/*`.
+  (SHA follows in the next changelog-touching PR.)
+- `bcacf6c` — **One transient blip no longer paints "Couldn't load your account".** Jay's
   phone showed it with "JWT issued at future"; the phone's clock was proven
   EXACT against the server, and the edge logs held exactly ONE 401 at that
   second — a freshly refreshed token judged by a Supabase gateway node whose
@@ -19,8 +42,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   makes ONE quiet second attempt ~900ms later (covering ordinary pitch-side
   network blips too); a second failure is a real outage and still gets the
   honest card. `src/lib/memberships.jsx`, `tests/memberships.test.jsx`.
-  (SHA follows in the next changelog-touching PR.)
-- **Grok item 7 SHIPPED — the UI reads the child-PII allowlists that already
 - `a736d0c` — **Grok items 6 & 16 SHIPPED — children's private data leaves the PWA disk
   cache, and the ICS UID is ruled frozen.** `isCacheableRestGet` excludes
   `messages`, `player_private`, `player_contacts`, `player_parents` and

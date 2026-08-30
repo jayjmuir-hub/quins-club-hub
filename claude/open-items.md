@@ -152,26 +152,21 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   exactly as outside the preview. Pinned in `tests/dm-thread-view-as.test.jsx`.
   Unread-badge filtering under preview stays as-is per D5 (documented
   non-boundary, default leave).
-- **`notify-unfinished-signup` is an open relay if the shared secret is known.**
-  `supabase/functions/notify-unfinished-signup/index.ts:117-144` mails whatever
-  addresses the request body carries — no DB re-read, no `signup_nudges` check,
-  no batch cap — unlike `notify-welcome` which loads recipients from the DB by
-  id. **Fix:** accept ids, load email/name from the DB, cap the batch.
-- **`push-send` `squad_push`/`availability_nudge` trust the body.**
-  `push-send/index.ts:584-616` sends body-supplied `title`/`body`/`tag`/`path`/
-  `category` verbatim (`escapeHtmlFree` is a pass-through). With the secret,
-  attacker-chosen lock-screen text to a whole squad. **Fix:** pass event/batch
-  ids and render in the function; tombstone cancellations in SQL. (Redirect
-  angle dropped per correction 2.)
-- **Push endpoint blind SSRF.** `register_push_subscription`
-  (`db/migrations/20260823_push_subscription_takeover.sql:59-67`) validates only
-  non-empty; any member inserts their own row; `push-send/index.ts:768-782` then
-  `fetch()`es that endpoint from a process holding `SERVICE_ROLE_KEY` + the VAPID
-  private key, with no scheme/host/range check. A member can register
-  `http://169.254.169.254/…` and trigger the outbound request on a real push.
-  Blind (no response read-back). **Fix:** require `https`, allowlist FCM/Apple/
-  Mozilla hosts, deny private/link-local/metadata ranges — in **SQL and** the
-  function; SQL harness. **Do item 12 before 10/11** — it needs no secret leak.
+- ✅ **Items 10, 11 & 12 FIXED, 30 Aug 2026**
+  (`20260830_push_hardening.sql` applied; `push-send` v12 and
+  `notify-unfinished-signup` v2 deployed). Item 12: `register_push_subscription`
+  allowlists the endpoint (https + FCM/Apple/Mozilla/WNS/legacy-Google, built
+  from the hosts measured live; harness
+  `db/tests/push-endpoint-allowlist.sql`, red-then-green with a revert
+  self-test), and push-send carries the same allowlist before its fetch.
+  Item 11: squad-push copy travels through `public.push_outbox` (body carries
+  only the id; push-send renders from the row and CONSUMES it — single-use,
+  replay-inert; the row doubles as the cancellation tombstone), and
+  availability nudges are re-derived from `event_id` in the function. Proven
+  live end-to-end with a zero-audience probe (row written → id-only POST →
+  v12 consumed it → 200 'ok (no subscriptions)'). Item 10: nudges travel as
+  profile ids; the function loads addresses itself, refuses email-bearing
+  bodies, caps the batch at 100.
 
 ### UX, not data (RLS already refuses the write)
 
@@ -207,16 +202,18 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   unpinned**~~ — **PINNED by #552** (`20260830_pin_private_helper_search_path.sql`,
   proven live `search_path=""`), so `db/tests/search-path.sql` is no longer at
   risk. The stale-policy-capture half above still stands.
-- **Edge-function hygiene.** No committed edge-function `config.toml` (none
-  under `supabase/`), so `verify_jwt:false`
-  lives only in the dashboard and an MCP deploy defaults it back to true
-  (functions silently 401 — availability, not bypass). `send-email` HMAC is solid
-  but stores no `webhook-id`, so a captured signed POST is replayable ~5 min.
-  Only `send-email`/`notify-unfinished-signup` check the POST method. No
-  idempotency after the secret check (welcome/feedback/invite re-mail, push
-  replay). Every `timingSafeEqual` early-returns on length mismatch → leaks
-  `len(secret)`. **Fix:** add `config.toml`; persist `webhook-id`; method checks;
-  dedupe on a request/batch id; hash-both-sides compare.
+- **Edge-function hygiene (item 15) — CORE DONE 30 Aug 2026, residuals
+  accepted.** ✅ `supabase/config.toml` pins `verify_jwt=false` for all eleven
+  functions (measured against the dashboard first). ✅ `push-send` and
+  `notify-unfinished-signup` hash-both-sides on the secret compare and check
+  POST; squad-push replay is now inert by construction (single-use outbox).
+  ⚠️ **Accepted residuals, deliberately not done tonight**: `send-email`
+  still stores no `webhook-id` (~5-min replay of a captured signed POST);
+  the other seven secret-guarded functions lack an explicit POST check
+  (their `request.json()` already 400s a GET — hygiene, not a hole) and keep
+  the length-leaking compare; no dedupe on welcome/feedback/invite re-mail.
+  Each is a small change but a separate function deploy — batch them with
+  the next edge-function PR rather than seven deploys for comments.
 - ✅ **Item 16 RESOLVED, 30 Aug 2026 — half fixed, half RULED.** The missing
   build assertion is added: `tests/pwa-build.test.js` now asserts the built
   `sw.js` carries `denylist` + `calendar\.ics` (measured in the worker:

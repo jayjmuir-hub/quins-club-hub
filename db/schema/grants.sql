@@ -282,6 +282,13 @@
 --   player_contacts   anon, authenticated, postgres, service_role   ALL 8
 --   player_parents    anon, authenticated, postgres, service_role   ALL 8
 --   players           anon, authenticated, postgres, service_role   ALL 8
+--   push_outbox       postgres, service_role                        ALL 8
+--   push_outbox       anon, authenticated                           ← NOTHING AT ALL
+--                     ⚠️ ADDED 30 Aug 2026 (20260830_push_hardening, item 11).
+--                     Members never touch it: SECURITY DEFINER senders write
+--                     it, the service role (RLS-exempt) reads and consumes it.
+--                     RLS is enabled with NO policies, so even a stray grant
+--                     would read nothing.
 --   push_subscriptions authenticated, postgres, service_role        ALL 8
 --   push_subscriptions anon                                         ← NOTHING AT ALL
 --                     ⚠️ ADDED 18 Aug 2026 — `anon` NOTHING, same shape as
