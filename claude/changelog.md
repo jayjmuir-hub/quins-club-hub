@@ -10,14 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **A club-wide booking reads its own TITLE on the pitch layout.** Following the
+- **Club-wide events are editable again, and a long one no longer wrecks the
+  pitch picture.** Two faults in the whole-club feature Jay hit: (1) clicking a
+  club-wide event showed NO edit option — `canEditTeam` deliberately refuses a
+  null team (an unresolved squad id), which now also described a real club-wide
+  event, so it was silently uneditable. New `canEditEvent` lets an admin edit a
+  squad-less event (mirroring the RLS policy), and EventForm opens one on "Whole
+  club" so a save can't reassign it to a squad. (2) A long club-wide TITLE on the
+  week share picture grew its own day column and stole width from the other six,
+  shrinking every label to dots — the `repeat(7, 1fr)` grid sized columns to
+  their content. `minmax(0, 1fr)` caps each column, and the club title is length-
+  capped, so a long one just clips inside its own day. `src/lib/scope.js`,
+  `src/screens/EventForm.jsx`, `src/screens/Schedule.jsx`, `src/screens/Dashboard.jsx`,
+  `src/components/PitchShareCard.jsx`, and their tests. (SHA follows in the next
+  changelog-touching PR.)
+- `1ca802f` — **A club-wide booking reads its own TITLE on the pitch layout.** Following the
   "Club" fix below, Jay wanted the whole-club booking to say what it is — "Adult
   Tag" — not a generic "Club". A squad-less event now labels by its event title
   (falling back to "Club" if untitled), and the tight week columns no longer clip
   it to a first word the way they abbreviate a squad code; the segment's
   `overflow:hidden` + ellipsis keeps a long title from ever spilling.
   `src/lib/pitchOccupancy.js`, `src/components/PitchShareCard.jsx`,
-  `tests/pitch-diagram.test.js`. (SHA follows in the next changelog-touching PR.)
+  `tests/pitch-diagram.test.js`.
 - `a1479b0` — **The Allocation screen opens on the week, and Week → Day no longer jumps to the
   last day.** Two things off Pitch Management (Jay): the screen now opens on the WEEK
   — the planning horizon it is opened for — rather than the month; and switching from

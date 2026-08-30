@@ -6,6 +6,7 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   visibleTeams,
   canEditTeam,
+  canEditEvent,
   isAdmin,
   roleLabel,
   childPlayerIds,
@@ -214,6 +215,34 @@ describe('canEditTeam', () => {
     const memberships = [membership({ role: 'coach', team_id: null })]
 
     expect(canEditTeam(memberships, null)).toBe(false)
+  })
+})
+
+describe('canEditEvent', () => {
+  const admin = [membership({ role: 'admin', status: 'active', team_id: null })]
+  const coach = [membership({ role: 'coach', team_id: U12.id })]
+  const parent = [membership({ role: 'parent', team_id: U12.id })]
+
+  it('delegates to canEditTeam for a squad event', () => {
+    expect(canEditEvent(coach, { team_id: U12.id })).toBe(true)
+    expect(canEditEvent(coach, { team_id: U6.id })).toBe(false)
+    expect(canEditEvent(admin, { team_id: U6.id })).toBe(true)
+  })
+
+  it('⚠️ a CLUB-WIDE event (team_id null) is editable by an admin, unlike canEditTeam', () => {
+    // The whole point: canEditTeam(null) is false by design, so a club-wide
+    // event would be silently uneditable without this helper. An admin may edit
+    // it (matching the RLS event-edit policy); a coach or parent may not.
+    expect(canEditEvent(admin, { team_id: null })).toBe(true)
+    expect(canEditEvent(coach, { team_id: null })).toBe(false)
+    expect(canEditEvent(parent, { team_id: null })).toBe(false)
+    // And canEditTeam still refuses null, so the two do not agree here.
+    expect(canEditTeam(admin, null)).toBe(false)
+  })
+
+  it('is false for no event', () => {
+    expect(canEditEvent(admin, null)).toBe(false)
+    expect(canEditEvent(admin, undefined)).toBe(false)
   })
 })
 
