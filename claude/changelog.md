@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **The shared pitch picture is now DRAWN NATIVELY on a canvas — crisp text at
+- **The duplicate-registration guard is ACCENT-BLIND — a cedilla defeated it and
+  put one U10 child on the roster twice.** Both parents of one child registered
+  separately; the second spelt the surname with a `ç`, and the 20260814 guard's
+  match key keeps `ç` (deliberately — `[[:alnum:]]` so non-Latin names survive),
+  so the keys differed by one character and the "already registered" refusal
+  never fired. `private.name_match_key` now folds diacritics via
+  `extensions.unaccent` (explicit-dictionary form, since the function pins an
+  empty search_path) — measured on the live rows before and after: the two
+  spellings now produce one key, Arabic names pass through untouched. One
+  function, three guards fixed at once: register_my_player's duplicate and
+  self-name checks plus the pre-signup duplicate check. Migration applied to
+  production and the `registration-guards` harness extended with the diacritic
+  step (9 steps, all green, rolled back).
+  `db/migrations/20260830_name_match_key_accent_blind.sql`,
+  `db/tests/registration-guards.sql`, `db/schema/functions.sql` re-captured from
+  live. The duplicate pair itself is a separate club decision, not a migration
+  side effect. (SHA follows in the next changelog-touching PR.)
+- `a678263` — **The shared pitch picture is now DRAWN NATIVELY on a canvas — crisp text at
   any size, no html2canvas.** The 11px/widen fix below made the labels legible
   but still rough: html2canvas re-implements its own text renderer and fuzzes
   small glyphs however big you make them. The Share button now draws the day and
@@ -23,7 +40,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   New `src/lib/pitchShareCanvas.js`, `src/lib/pitchShareStyle.js`; the sharing tail
   of `src/lib/shareImage.js` split into a reusable `shareCanvas`;
   `src/screens/Allocation.jsx`, `src/components/PitchShareCard.jsx`,
-  `tests/pitch-share-canvas.test.js`. (SHA follows in the next changelog-touching PR.)
+  `tests/pitch-share-canvas.test.js`.
 - `b236710` — **The shared pitch picture is legible — the real cause was a too-small font.**
   #545 guessed the dashes came from negative letter-spacing and removed it; that
   did NOT fix it (verified by exporting the card in the harness and reading the

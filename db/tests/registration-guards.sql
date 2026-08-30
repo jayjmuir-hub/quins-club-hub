@@ -33,7 +33,7 @@
 
 begin;
 
-create temporary table _r (seq int, stage text, detail text) on commit drop;
+create temporary table _r (seq numeric, stage text, detail text) on commit drop;
 grant select, insert on _r to authenticated;
 
 -- ⚠️ A MIXED squad, chosen deliberately. On a single-gender squad the gender
@@ -96,9 +96,22 @@ exception when others then
   insert into _r values (3, 'same child, middle name and different case', 'refused ('||sqlstate||')');
 end $$;
 
+-- ── 3b. The same child, an ACCENT apart — the U10 case of 30 Aug 2026. ────
+-- Both parents registered one child; the second spelt the surname with a
+-- cedilla and the 20260814 guard never fired, because [[:alnum:]] keeps `ç`
+-- (deliberately — non-Latin names must survive) so the keys differed by one
+-- character. 20260830_name_match_key_accent_blind folds diacritics via
+-- unaccent; this row is the proof it stays folded.
+do $$ begin
+  perform public.register_my_player('Wilberforce Ttestingtön', (select id from _team), null, false);
+  insert into _r values (3.5, 'same child, a diacritic apart', 'ALLOWED <<< WRONG');
+exception when others then
+  insert into _r values (3.5, 'same child, a diacritic apart', 'refused ('||sqlstate||')');
+end $$;
+
 -- ── 4. A DIFFERENT child. MUST work. ──────────────────────────────────────
--- ⚠️ THE CONTROL FOR GUARD 1. Without it, rows 2 and 3 are equally explained
--- by "nothing can be registered at all".
+-- ⚠️ THE CONTROL FOR GUARD 1. Without it, rows 2, 3 and 3b are equally
+-- explained by "nothing can be registered at all".
 do $$ begin
   perform public.register_my_player('Perpetua Ttestington', (select id from _team), null, false);
   insert into _r values (4, 'a sibling — different first name', 'allowed');
@@ -157,8 +170,8 @@ declare
   _d text;
   _bad text;
 begin
-  if (select count(*) from _r) <> 8 then
-    raise exception 'FAIL: expected 8 recorded steps, got %.', (select count(*) from _r);
+  if (select count(*) from _r) <> 9 then
+    raise exception 'FAIL: expected 9 recorded steps, got %.', (select count(*) from _r);
   end if;
 
   select string_agg(seq || ': ' || stage || ' -> ' || detail, ' | ') into _bad
@@ -177,6 +190,11 @@ begin
     raise exception 'FAIL: a middle name defeated the duplicate check (got %). private.name_match_key should compare FIRST and LAST token only — this is the exact real spelling variant.', _d;
   end if;
 
+  select detail into _d from _r where seq = 3.5;
+  if _d not like 'refused (42710)%' then
+    raise exception 'FAIL: a diacritic defeated the duplicate check (got %). This is the U10 case of 30 Aug 2026 — both parents registered one child, a cedilla apart. name_match_key must fold accents (20260830_name_match_key_accent_blind).', _d;
+  end if;
+
   select detail into _d from _r where seq = 5;
   if _d not like 'refused (42809)%' then
     raise exception 'FAIL: the registrant registered their OWN name as a child and was not refused with 42809 (got %). This is the U14 case that put a parent on the roster.', _d;
@@ -187,17 +205,18 @@ begin
     raise exception 'FAIL: the DUPLICATE tick forgave the SELF-NAME mistake (got %). The two confirmations have been collapsed into one, and a parent confirming "a different child with the same name" now silently also confirms "I am registering myself as my own child".', _d;
   end if;
 
-  raise notice 'SELF-TEST PASSED — 8 steps: 4 refusals with the right codes, 4 legitimate registrations still allowed, and the two ticks independent.';
+  raise notice 'SELF-TEST PASSED — 9 steps: 5 refusals with the right codes, 4 legitimate registrations still allowed, and the two ticks independent.';
 end $$;
 
 rollback;
 
 -- ══════════════════════════════════════════════════════════════════════════
---  EXPECTED — measured live 14 Aug 2026
---    1  a genuinely new child                               allowed
---    2  the same child a second time                        refused (42710)
---    3  same child, middle name and different case          refused (42710)
---    4  a sibling — different first name                    allowed
+--  EXPECTED — measured live 14 Aug 2026; step 3.5 added and measured 30 Aug 2026
+--    1    a genuinely new child                             allowed
+--    2    the same child a second time                      refused (42710)
+--    3    same child, middle name and different case        refused (42710)
+--    3.5  same child, a diacritic apart                     refused (42710)
+--    4    a sibling — different first name                  allowed
 --    5  own name, declared as a child                       refused (42809)
 --    6  own name, declared as SELF                          allowed
 --    7  duplicate WITH the duplicate tick                   allowed
