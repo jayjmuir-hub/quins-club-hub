@@ -297,6 +297,10 @@ function StaffPhoto({ member, onPhoto }) {
   )
 }
 
+/** Does this title CLAIM the head-coach job? Loose on purpose — "Head Coach",
+ *  "head coach", "Head Coach / Forwards" all claim it. */
+const titleSaysHeadCoach = (value) => /head\s*coach/i.test(value ?? '')
+
 function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = null, selfId = null }) {
   const [title, setTitle] = useState(member.title ?? '')
   const [busy, setBusy] = useState(false)
@@ -306,6 +310,16 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = nul
   const [headError, setHeadError] = useState(null)
 
   const roleLabel = labelForRole(member.role)
+
+  // ── The title↔flag LINK (Jay, 30 Aug 2026) ────────────────────────────────
+  // Two coaches sat titled "Head Coach" with the flag off, invisible to
+  // everything the flag drives (approval emails, the Club Head Coaches
+  // channel). The ruling "a title is never permission" STANDS: typing the
+  // title still grants nothing — it surfaces a one-tap OFFER, and the tap is
+  // the explicit act. The other direction is free: ticking the flag fills an
+  // EMPTY title with the label, because permission may imply decoration —
+  // never the reverse. A custom title is never overwritten.
+  const offerFlag = canHoldHeadCoachFlag(member.role) && titleSaysHeadCoach(title) && !headCoach && !headBusy
 
   // ⚠️ THE BOX GOES BACK ON A FAILURE, and that is the whole point of doing
   // this here rather than letting the checkbox own its own state. The commonest
@@ -322,6 +336,18 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = nul
       })
       setHeadCoach(saved.is_head_coach === true)
       onHeadCoachSaved(member.membershipId, saved.is_head_coach === true)
+      // The link's free direction: a freshly-flagged coach with NO title gets
+      // the label filled in. Decoration from permission — never overwriting a
+      // custom title, and a failure here is a missing label, not a broken flag.
+      if (next && saved.is_head_coach === true && !title.trim()) {
+        try {
+          const titled = await setMembershipTitle({ membershipId: member.membershipId, title: 'Head Coach' })
+          setTitle(titled.title ?? '')
+          onSaved(member.membershipId, titled.title ?? null)
+        } catch {
+          // The flag saved; the label can be typed. Nothing to revert.
+        }
+      }
     } catch (err) {
       setHeadCoach(member.isHeadCoach === true)
       setHeadError(err.message)
@@ -435,6 +461,26 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = nul
               {headError}
             </span>
           )}
+        </div>
+      )}
+
+      {/* The title CLAIMS the job the flag does not carry — the exact drift
+          that left two squads' head coaches out of the approval emails and
+          the Head Coaches channel (30 Aug 2026). Advisory, one tap: the TAP
+          grants, never the typing — "a title is never permission" stands. */}
+      {offerFlag && (
+        <div
+          className="mt-2 flex flex-wrap items-center gap-2 rounded-[9px] bg-warn-bg px-2.5 py-1.5"
+          data-testid="head-coach-nudge"
+          role="status"
+        >
+          <span className="text-[12.5px] font-semibold text-ink">
+            The title says Head Coach, but the head-coach box isn&apos;t ticked — so they miss the
+            approval emails and the Head Coaches chat.
+          </span>
+          <Button size="sm" variant="secondary" onClick={() => saveHeadCoach(true)}>
+            Tick it
+          </Button>
         </div>
       )}
     </div>
