@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // src/screens/EventDetail.jsx — what the sheet SHOWS for the three things
@@ -132,19 +132,37 @@ describe('EventDetail — end time', () => {
 })
 
 describe('EventDetail — pitch and portion', () => {
-  it('shows the portion beside the pitch when one is set', () => {
-    // Item 4 (Jay, 30 Aug 2026): a booking that takes part of a pitch says so.
-    show({ ...ONE_OFF, pitch: 'D2', pitch_portion: 'half' })
+  it('shows the share to staff — "sharing ⅓" — when a booking takes part of a pitch', () => {
+    // Item 4, refined 30 Aug 2026: a shared pitch reads "D2 · sharing ½" so a
+    // coach knows the pitch is split. The glyph (½), not the word "Half", which
+    // read like a second pitch.
+    show({ ...ONE_OFF, pitch: 'D2', pitch_portion: 'half' }) // `show` passes canEdit
     const row = screen.getByText('Pitch').closest('div')
     expect(row).toHaveTextContent('D2')
-    expect(row).toHaveTextContent('Half')
+    expect(row).toHaveTextContent('sharing ½')
   })
 
-  it('shows the pitch alone when the portion is unset (a whole pitch)', () => {
-    show({ ...ONE_OFF, pitch: 'D2', pitch_portion: null })
+  it('⚠️ hides the share from a parent or player (cannot edit)', () => {
+    // How the ground is carved up is a pitch-management detail — noise to a
+    // parent, and the confusion this whole change is about. No canEdit, no share.
+    show({ ...ONE_OFF, pitch: 'D2', pitch_portion: 'half' }, { canEdit: false })
     const row = screen.getByText('Pitch').closest('div')
     expect(row).toHaveTextContent('D2')
-    expect(row.textContent).not.toMatch(/quarter|third|half|full pitch/i)
+    expect(row.textContent).not.toMatch(/sharing|½|half/i)
+  })
+
+  it('shows the pitch alone when it is a whole pitch (full or unset)', () => {
+    // A full/unset pitch is nobody's share, so even staff see just the pitch.
+    show({ ...ONE_OFF, pitch: 'D2', pitch_portion: 'full' })
+    const full = screen.getByText('Pitch').closest('div')
+    expect(full).toHaveTextContent('D2')
+    expect(full.textContent).not.toMatch(/sharing/i)
+
+    cleanup()
+    show({ ...ONE_OFF, pitch: 'D2', pitch_portion: null })
+    const unset = screen.getByText('Pitch').closest('div')
+    expect(unset).toHaveTextContent('D2')
+    expect(unset.textContent).not.toMatch(/sharing|¼|⅓|½/)
   })
 
   it('shows no pitch row at all when there is no pitch', () => {

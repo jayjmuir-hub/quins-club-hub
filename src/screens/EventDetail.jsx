@@ -6,7 +6,7 @@ import Spinner from '../components/Spinner.jsx'
 import Button from '../components/Button.jsx'
 import PitchRequest from '../components/PitchRequest.jsx'
 import { PITCH_TBD } from '../data/pitches.js'
-import { portionLabel } from '../lib/pitchPortion.js'
+import { portionShort } from '../lib/pitchPortion.js'
 import SessionPlan from '../components/SessionPlan.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { getEventThread } from '../data/messages.js'
@@ -26,6 +26,15 @@ import {
   resultScore,
   eventPitchLabel,
 } from '../lib/eventFormat.js'
+
+// The compact share tag (¼/⅓/½) ONLY when a booking takes part of a pitch. A
+// full or unset pitch is the whole thing — nobody is sharing it — so it returns
+// null and the Pitch row stays plain. portionShort gives 'full' for an explicit
+// full pitch, which is not a share, hence the guard.
+function sharedPortion(portion) {
+  const tag = portionShort(portion)
+  return tag && tag !== 'full' ? tag : null
+}
 
 // The event detail sheet (design-system.md §5.5): a branded hero, a set of
 // key/value rows, and then either the score (for a fixture that has one) or
@@ -584,10 +593,14 @@ export default function EventDetail({
         {pitch && (
           <KeyValue label="Pitch">
             {pitch}
-            {/* The PORTION when one is set — how much of the pitch this booking
-                takes (Jay, 30 Aug 2026). A whole/unset pitch shows nothing, as
-                the pitch name alone already means the whole thing. */}
-            {portionLabel(event.pitch_portion) ? ` · ${portionLabel(event.pitch_portion)}` : ''}
+            {/* The SHARE, and only to staff — Jay, 30 Aug 2026. When this booking
+                takes only part of the pitch (¼/⅓/½), a coach or admin sees
+                "· sharing ⅓" so they know the pitch is split and how much is
+                theirs; a parent or player (no `canEdit`) sees just the pitch,
+                because how the ground is carved up is a pitch-management detail
+                that only reads as noise to them — the exact confusion this hides.
+                A whole pitch (full/unset) is never "shared", so it shows nothing. */}
+            {canEdit && sharedPortion(event.pitch_portion) ? ` · sharing ${sharedPortion(event.pitch_portion)}` : ''}
           </KeyValue>
         )}
         {/* ⚠️ `competition` ALONE IS NO LONGER ENOUGH TO RENDER THIS ROW.
