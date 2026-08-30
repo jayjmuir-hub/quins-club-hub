@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 30 Aug 2026
 
-- **Grok item 7 SHIPPED — the UI reads the child-PII allowlists that already
+- **Grok items 6 & 16 SHIPPED — children's private data leaves the PWA disk
+  cache, and the ICS UID is ruled frozen.** `isCacheableRestGet` excludes
+  `messages`, `player_private`, `player_contacts`, `player_parents` and
+  `poll_votes` by TABLE (D3: all five — offline use is a non-goal, and no
+  variant of children's chat, DOB or named votes belongs on a stolen
+  unlocked device); NetworkFirst still serves them online. Pinned in the
+  unit test AND against the built `sw.js`. Item 16 half-and-half: the
+  missing `navigateFallbackDenylist` build assertion is added (measured in
+  the worker: `denylist:[/^\/calendar\.ics$/]`), and the UID domain stays
+  FROZEN on the retired alias after a peer-review catch — changing it would
+  duplicate the season in 13 subscribed calendars (13 live tokens,
+  measured); RFC 5545 treats it as opaque. D4 default: notes stay.
+  `pwa-cache-rules.js`, `tests/pwa-cache-rules.test.js`,
+  `tests/pwa-build.test.js`, `supabase/functions/calendar/index.ts`
+  (comment only). (SHA follows in the next changelog-touching PR.)
+- `c2554eb` — **Grok item 7 SHIPPED — the UI reads the child-PII allowlists that already
   gate the data.** New client mirrors of the 28 Aug RLS boundaries:
   `canWriteChild`, `canSeeChildPhotos`, `canEditChildPhotos`,
   `canWritePlayer` (the "player edit" policy: write allowlist for admins,
@@ -26,7 +41,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/lib/portals.js`, `src/screens/PlayerForm.jsx`,
   `src/screens/Roster.jsx`, `tests/super-admin.test.js`,
   `tests/admin-portals.test.jsx`, `tests/sidebar-submenu.test.jsx` + fixture
-  files. (SHA follows in the next changelog-touching PR.)
+  files.
 - `fe07419` — **Grok item 4 SHIPPED — staff edit-gates require an ACTIVE membership.**
   `canEditTeam`'s squad-staff arm and Roster's `canEditAnything` gain the
   `isActiveMembership` check the SQL `can_edit_team` has always had, so a

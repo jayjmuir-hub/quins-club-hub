@@ -14,6 +14,10 @@ PR 1 ships now (Jay already holds `welfare`). `main` is production
   welfare audit; D5 default taken — unread badges left as-is).
 - **PR 5 — SHIPPED 30 Aug 2026** (item 4: staff edit-gates active-only; D6
   default taken — pending squads stay visible, now documented).
+- **PR 7 — SHIPPED 30 Aug 2026** (items 6 & 16: five child-PII tables out of
+  the PWA cache per D3; the ICS UID RULED FROZEN — 13 live subscriber tokens,
+  changing it duplicates the season — plus the missing denylist build test;
+  D4 default taken).
 - **PR 6 — SHIPPED 30 Aug 2026** (item 7 core: child-PII allowlist mirrors
   wired into PlayerForm/Roster, Welfare portal explicit-only for supers,
   doctrine comments rewritten; read-surface polish left on refuse-by-empty).
