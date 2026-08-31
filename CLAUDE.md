@@ -339,10 +339,29 @@ worktree ships with **no `.env` and no `node_modules` of its own**. Without
 `Missing required Supabase env var(s)` while the great majority still pass,
 which reads as a broken suite and is not one — `cp` it from the parent clone;
 it is gitignored and holds only the public URL and the publishable key.
-⚠️ **And `tests/pwa-build.test.js` CANNOT pass in a worktree at all**: it
-spawns `node_modules/vite/bin/vite.js` by a cwd-relative path that resolves to
-nothing there. It passes in CI, which is a fresh clone. **Do not chase either
-one as a regression, and do not report a suite as red because of them.**
+⚠️ **And `tests/pwa-build.test.js` FAILED in this worktree — measured 1 Sep
+2026, and the mechanism is worth getting right because the obvious guess is
+wrong.** It resolves vite as
+`path.join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js')` where
+`projectRoot` comes from **the test file's own location** (`import.meta.url`),
+and it passes `cwd: projectRoot` explicitly so that cwd cannot matter. So the
+lookup lands in **that worktree's own `node_modules`, and does not walk up**
+the way an ordinary `import` does — which is exactly why the rest of the suite
+runs fine there off the parent clone's packages while this one file cannot.
+⚠️ **DO NOT READ "`node_modules` EXISTS" AS "THE PACKAGES ARE THERE."** In this
+worktree it existed and held **two entries, `.vite` and `.vite-temp`** — Vite's
+dep-optimiser CACHE, created by running a build here, not an install. The
+parent clone had 380. A peer checked three worktrees, found the directory
+present in all three, and reasonably but wrongly concluded the binary would
+resolve. **The discriminating probe is the FILE:**
+`ls <worktree>/node_modules/vite/bin/vite.js`.
+⚠️ **NOT asserted: that it always fails in a worktree.** A worktree where
+somebody ran `npm install --include=dev` has its own vite and was never
+measured. Reproduce before writing that down. It passes in CI, which is a
+fresh clone with a real install.
+**Do not chase the `.env` collection failures as a regression** — but do not
+wave a `pwa-build` failure away as "just the worktree" either, without
+checking that file.
 
 ⚠️ **The `NODE_ENV` row is why rule 8 exists, and it was wrong twice in
 opposite directions before it was ever run.** It said "cafnet only" in three
