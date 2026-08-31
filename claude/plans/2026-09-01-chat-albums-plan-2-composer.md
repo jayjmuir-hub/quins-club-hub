@@ -1,8 +1,12 @@
 # Chat photo albums — implementation plan 2 of 4: the composer
 
-**Status: BUILT, NOT YET MERGED — 1 Sep 2026.** Tasks 1 to 6 are done and
-green; task 7 (the release) is Jay's call and has not happened. Update this
-line when it merges.
+**Status: SHIPPED — `ebda2f3` (#605), 1 Sep 2026.** Tasks 1 to 7 done. The
+deploy moved (`index-j5FVPsQr` → `index-CYFFgl-T`) and the live bundle carries
+`Drop photos to attach`, a string that existed nowhere in `src/` before this
+merge. ⚠️ **Task 7 step 2 — a real three-photo album sent on the live site and
+seen by a SECOND account — has NOT been done.** It needs two real sign-ins,
+which Claude does not do. The storage read policy is the thing that would fail
+silently, so it is still worth someone's five minutes.
 
 ## ⚠️ Deviations from this plan, and why
 

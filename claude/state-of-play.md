@@ -32,10 +32,11 @@ are already LIVE on production; the PR ships the frontend only — merging it
 is a deploy, gated on the Session Validator's no-overlap check plus Jay's
 explicit yes. `claude/plans/2026-08-31-documents-repo-implementation.md`.
 
-📷 **CHAT PHOTO ALBUMS: the database is LIVE, the composer is BUILT AND
-UNMERGED, the album GRID is not written.** Paste, drag-and-drop onto the whole
-conversation, multi-select and an all-or-nothing send of up to ten photos are
-done and green on a branch — merging is a deploy and needs Jay's explicit yes.
+📷 **CHAT PHOTO ALBUMS: the composer is LIVE, the album GRID is not written.**
+Paste, drag-and-drop onto the whole conversation, multi-select and an
+all-or-nothing send of up to ten photos all shipped. ⚠️ **Nobody has yet sent a
+real album on the live site and checked a SECOND account sees every photo** —
+the storage read policy is what would fail silently there.
 ⚠️ **A ten-photo message SENDS but renders as one photo until plan 3 draws the
 grid**, so the two want shipping close together. Plan 4 (dropping the
 `attachment_path` contract) must wait on cached service workers.
