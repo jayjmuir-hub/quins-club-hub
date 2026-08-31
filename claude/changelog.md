@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Chrome-quarters: both bars go premium dark with ghosted harlequin
+- **The crown sits properly: ProfileIcon component, and the dotted name
+  underline retired.** Jay's polish notes off the first live crown (a real
+  head coach wore 👑 within the hour of the deploy): the emoji left the
+  name string for `src/components/ProfileIcon.jsx` — centred
+  (`align-middle`, `leading-none`, a 1px optical lift) and 15px against
+  the 12-13px names — and the dotted tappable-hint came off ChatBubble's
+  author button and `PersonName` ("do we need the giant row of dots?"):
+  the styled name is the door, desktop keeps a hover underline. (SHA
+  follows in the next changelog-touching PR.)
+- `1379a24` — **Chrome-quarters: both bars go premium dark with ghosted harlequin
   quarters.** Jay picked the direction from rendered options (B+C hybrid,
   hint intensity): near-black gradient chrome, red quarter sweeping from
   the left (≤0.30), green from the right (≤0.26), white inner hairline,
@@ -18,7 +27,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the clear-glass ink rules (24/28 Aug) with their premise. Spec:
   `claude/plans/2026-08-31-chrome-quarters-redesign.md`.
   `src/index.css`, `src/components/Nav.jsx`, `src/components/AppShell.jsx`.
-  (SHA follows in the next changelog-touching PR.)
 - `6d8d344` — **Profile icons SHIPPED — the crown for U11.** The 31-emoji library
   (`src/lib/profileIcons.js`, clipboard for coach), `profile_icons` with
   exactly-one-target check and super-admin-only writes under RLS,
@@ -63,8 +71,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   6px (`min-[360px]:px-1.5` on the masthead wrapper), measured pixel-aligned
   with the dock at 375px; below 360 and on desktop nothing changes. A parity
   test pins both halves. `src/components/AppShell.jsx`,
-  `tests/app-shell.test.jsx`. (SHA follows in the next changelog-touching
-  PR.)
+  `tests/app-shell.test.jsx`.
 - `eecf41e` — **Documents repo implementation PLANNED, not built** —
   `claude/plans/2026-08-31-documents-repo-implementation.md`. The merged spec
   (`1b7c59a`) turned into nine executable tasks: migration with RLS + RPCs
