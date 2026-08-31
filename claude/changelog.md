@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **31 Aug security re-review (Grok brief + peer probes) — hunt clean, three
+- **Realtime raw-websocket question MEASURED — walrus filters, no action
+  needed.** Follow-up to the security re-review: rather than hand Jay a fiddly
+  two-client websocket test, computed the exact per-row visibility check
+  walrus applies, directly against live prod (rolled back). A keyless (anon)
+  raw subscriber has no table grant on `messages` (refused before RLS); an
+  authenticated non-member (parent) gets **0 rows** for a `welfare` and a
+  `headcoaches` message; a welfare holder gets **1** (positive control). So a
+  raw Realtime socket delivers nothing to a non-member for role-channel /
+  welfare / DM messages — the only residual is Supabase correctly invoking
+  RLS on `postgres_changes`, a standard platform guarantee sitting on top of
+  the anon grant-refusal. `claude/open-items.md` (item revised from "needs a
+  live measurement" to measured/closed). (SHA follows in the next
+  changelog-touching PR.)
+- `e5adaa1` — **31 Aug security re-review (Grok brief + peer probes) — hunt clean, three
   items recorded.** Re-verified the 29 Aug sweep against live `main` and the
   live DB, then hunted NEW holes on the surfaces that post-date the sweep
   (role channels, message-edit, nested reply-privately, club-wide events,
@@ -29,8 +42,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   construct (no token handling) — handed to Jay; (2) `message_reads` INSERT
   is exists-only (inert — unguessable UUID, no leak back); (3) an author can
   pin their own post directly, bypassing `set_message_pinned` (cosmetic
-  boolean, pre-existing). `claude/open-items.md`. (SHA follows in the next
-  changelog-touching PR.)
+  boolean, pre-existing). `claude/open-items.md`.
 - `82952d2` — **Grok item 3 RECONCILED — the repo now records the pitch-occupancy fix
   production has run since 30 Aug.** The migration
   `20260830_pitch_occupancy_exclude_tournament_games` (adds `and
