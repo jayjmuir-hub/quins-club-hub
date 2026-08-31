@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Profile icons SHIPPED — the crown for U11.** The 31-emoji library
+- `6d8d344` — **Profile icons SHIPPED — the crown for U11.** The 31-emoji library
   (`src/lib/profileIcons.js`, clipboard for coach), `profile_icons` with
   exactly-one-target check and super-admin-only writes under RLS,
   `club_icon_map` + `member_icons` read paths — both migrations applied,
@@ -21,7 +21,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `/admin/icons` (super-only, AdminOfficers' shape) grants to a squad's
   staff or a person with Revoke and Make primary. All four `db/schema/`
   captures updated; every assertion red-first. Awaiting Jay's first real
-  grant as the live proof. (SHA follows in the next changelog-touching PR.)
+  grant as the live proof.
+- **Feature-guide template + method SHIPPED** — the head coaches'
+  "Build a training session" walkthrough is now a reusable system, so the
+  next feature guide is copy-and-screenshot, not a rebuild. A frozen
+  one-page design (black hero band, shield crest, Anton headlines, Barlow
+  body, cream ground — matched to the staff-signup print piece) with a
+  labelled component gallery lives in
+  `claude/guides/feature-guide-template.html`; the authoring method,
+  including the invented-data screenshot workflow, is
+  `claude/guides/authoring-guides.md`; the screenshot harness renders the
+  real components populated by `harness/stubs/trainingPlans.js` (invented
+  drills, no real people), wired in `harness/vite.config.js`. Guides
+  themselves ship as Artifacts, not committed HTML. (SHA follows in the next
+  changelog-touching PR.)
 - `c98c2c8` — **Profile icons SPECCED, not built** —
   `claude/plans/2026-08-31-profile-icons.md`. Jay's idea: crown the U11
   staff (best age group users of Club Hub), grantable by super admins to a
@@ -30,8 +43,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   everything grantable and nothing automatic (🔑 included), grants stack
   with one primary shown, chat + person card first. Carries the whistle
   tombstone: Unicode has no whistle emoji, three SVG candidates were drawn
-  and rejected, 📋 clipboard is the coach icon. (SHA follows in the next
-  changelog-touching PR.)
+  and rejected, 📋 clipboard is the coach icon.
 - `14f6cf2` — **The masthead widens to match the dock.** #573 widened the bottom bar to
   a 6px inset from 360px up (caption corner room); the top island kept its
   12px and the two edges of the chrome stopped lining up. Same gate, same
