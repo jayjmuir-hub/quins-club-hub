@@ -1367,3 +1367,68 @@ rollback;
 -- function with:
 --
 --     select pg_get_functiondef('private.can_read_document(uuid)'::regprocedure);
+--
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ THIRD, FOURTH AND FIFTH INJECTIONS — SECTION 14, THE PUSH AUDIENCE.
+--  Added 31 Aug 2026 at final review, with the section itself.
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- Section 14 asserts on what a function RETURNS rather than on what a policy
+-- refuses, so "it went green" is even weaker evidence than usual here: an
+-- audience function that returned NOTHING would satisfy every 0-rows probe in
+-- it. Each claim was therefore broken on purpose, on a scratch copy of this
+-- file with the fragment spliced in immediately after `begin;` and run through
+-- `npm run db:check`. All three went red, and — the part that matters — each
+-- flipped ONLY the steps that name its claim.
+--
+-- INJECTION 3 — THE TIER. document_push_subscriptions replaced with a body
+-- whose `where (not d.staff_only or m.role in (...))` line is GONE:
+--
+--     FAIL: 14b PARENT1 is NOT in the STAFF-ONLY doc's push audience
+--           -> 1 rows — ❌ FAIL
+--
+--     14a MEDIC1 in the staff-only audience      — ✅ pass, unchanged
+--     14c PARENT1 in the members audience        — ✅ pass, unchanged
+--     14d/14e/14f/14g/14h/14i                    — ✅ pass, unchanged
+--
+-- ⚠️ THAT 14a AND 14c DID NOT MOVE IS THE POINT OF THE INJECTION, not a
+-- footnote. A weakening that took 14b down WITH them would have meant the
+-- three probes were measuring one thing between them.
+--
+-- INJECTION 4 — THE GRANT. `grant execute on function
+-- public.document_push_subscriptions(uuid) to authenticated;` (transactional,
+-- so the rollback takes it):
+--
+--     FAIL: 14h COACH1 (a browser JWT) calls document_push_subscriptions
+--           -> ALLOWED, 4 rows — ❌ FAIL
+--         | 10c document_push_subscriptions is service_role-only
+--           -> 1 grant(s) — ❌ FAIL
+--
+-- ⚠️ BOTH HALVES OF THE PAIR FIRING IS THE CORRECT RESULT. 10c counts ACL rows
+-- and 14h makes the call; they are the same claim seen through a static and a
+-- behavioural probe, and a leak that moved one without the other would mean
+-- they had drifted apart. Note "4 rows" rather than a bare refusal — the
+-- injected grant really did hand a squad coach four people's push endpoints
+-- and keys, which is what the pair exists to make impossible to miss.
+--
+-- INJECTION 5 — THE UPLOADER EXCLUSION AND THE OPT-OUT, removed together
+-- (the `where p.profile_id <> d.created_by and not exists (... opt_outs ...)`
+-- tail deleted, everything else intact):
+--
+--     FAIL: 14d the UPLOADER is not pushed their own document
+--           -> 1 rows — ❌ FAIL
+--         | 14f MEDIC1 opts out of 'document' and leaves the audience
+--           -> 1 rows — ❌ FAIL
+--
+--     14e and 14g, the two controls, — ✅ pass, unchanged
+--
+-- ⚠️ AND THE ROLLBACKS WERE VERIFIED AFTERWARDS, not assumed. On production:
+-- pg_get_functiondef('public.document_push_subscriptions(uuid)'::regprocedure)
+-- still contains `staff_only`, `created_by` AND `opt_outs`, checked alongside
+-- a negative control token that must NOT be found and was not (rule 6 — a
+-- search that cannot come back empty proves nothing);
+-- has_function_privilege(...,'execute') is false for both `authenticated` and
+-- `anon` with `service_role` true as the positive control; and zero probe
+-- rows survived in push_subscriptions, documents or profiles. The scratch
+-- copy and the three fragments were deleted and `git status` confirmed clean
+-- before this was written.
