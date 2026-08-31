@@ -341,6 +341,11 @@ CREATE TRIGGER player_parents_sync_name
 CREATE TRIGGER messages_provenance BEFORE INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION private.set_message_provenance();
 CREATE TRIGGER messages_touch BEFORE UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION private.touch_message();
 CREATE TRIGGER messages_push AFTER INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION private.notify_message_push();
+-- 20260901_message_attachment_list: keeps attachment_path and attachment_paths[1]
+-- in step in BOTH directions. Load-bearing while the app is a PWA - phones on a
+-- cached service-worker bundle still write the old column. Removed only by the
+-- contract migration that drops attachment_path.
+CREATE TRIGGER sync_attachment_paths BEFORE INSERT OR UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION private.sync_attachment_paths();
 
 
 -- ---------------------------------------------------------------------

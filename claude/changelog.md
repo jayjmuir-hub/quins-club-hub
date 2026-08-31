@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The document that opened twice, and drag-a-file-in.** Jay's first real
+- **The schema captures caught up with production — including a child-photo
+  access rule that had gone stale.** #594 changed the database and did not
+  update `db/schema/`, so for a short while `policies.sql` documented the
+  PRE-change `chat media read` rule: anyone reading it would have concluded
+  the check is against a single path and reasoned about child-photo safety
+  from a rule that was not there. Production was correct throughout —
+  independently verified — this was the RECORD being wrong, which is this
+  repo's most expensive recurring failure. Now captured from live:
+  `policies.sql` (the list rule), `tables.sql` (`attachment_paths`, the
+  `<= 10` cap, the widened body check), `triggers.sql` and `functions.sql`
+  (`sync_attachment_paths`, INVOKER with an empty pinned search_path).
+  ⚠️ **The finding worth more than the fix is a hole in `docs:check`:** it
+  enforces that a migration GRANTING on a table reaches `grants.sql`, but
+  nothing enforces that one ALTERING a table reaches `tables.sql` or one
+  REPLACING a policy reaches `policies.sql` — which is why this passed every
+  gate and was caught only by a peer reading a diff at the right moment.
+  (SHA follows in the next changelog-touching PR.)
+- `7d6d37a` — **The document that opened twice, and drag-a-file-in.** Jay's first real
   document opened in a new tab AND the current one: `window.open` with
   `'noopener'` returns null BY SPEC even on success, so the iOS blocked-popup
   fallback also navigated the current tab — and the jsdom stub returned a

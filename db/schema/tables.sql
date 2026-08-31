@@ -2043,7 +2043,8 @@ CREATE TABLE public.messages (
   conversation_id uuid,
   quoted_id       uuid,
   forwarded       boolean   NOT NULL DEFAULT false,
-  attachment_path text
+  attachment_path text,
+  attachment_paths text[] DEFAULT '{}'::text[] NOT NULL
 );
 ALTER TABLE public.messages ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
 -- Re-captured 30 Aug 2026 (20260830_role_channels): five role-channel values,
@@ -2052,7 +2053,11 @@ ALTER TABLE public.messages ADD CONSTRAINT messages_channel_check CHECK (channel
 ALTER TABLE public.messages ADD CONSTRAINT messages_role_channel_shape CHECK (channel NOT IN ('headcoaches', 'managers', 'medics', 'welfare', 'clubstaff') OR (team_id IS NULL AND conversation_id IS NULL AND event_id IS NULL));
 -- Re-captured 25 Aug 2026: rewritten by chat round 2 — a photo with no text
 -- is a legal message, so the >= 1 arm now yields to attachment_path.
-ALTER TABLE public.messages ADD CONSTRAINT messages_body_check CHECK (((length(btrim(body)) <= 2000) AND ((length(btrim(body)) >= 1) OR (attachment_path IS NOT NULL))));
+ALTER TABLE public.messages ADD CONSTRAINT messages_body_check CHECK (((length(btrim(body)) <= 2000) AND ((length(btrim(body)) >= 1) OR (cardinality(attachment_paths) > 0))));
+-- 20260901_message_attachment_list: the cap is the DATABASE's rule, not the
+-- client's suggestion - it stops an accidental drop of a folder posting a
+-- hundred photographs of children.
+ALTER TABLE public.messages ADD CONSTRAINT messages_attachment_cap CHECK ((cardinality(attachment_paths) <= 10));
 ALTER TABLE public.messages ADD CONSTRAINT messages_staff_needs_team CHECK (channel <> 'staff' OR team_id IS NOT NULL);
 ALTER TABLE public.messages ADD CONSTRAINT messages_club_id_fkey   FOREIGN KEY (club_id)   REFERENCES clubs(id)    ON DELETE CASCADE;
 ALTER TABLE public.messages ADD CONSTRAINT messages_team_id_fkey   FOREIGN KEY (team_id)   REFERENCES teams(id)    ON DELETE CASCADE;
