@@ -23,6 +23,20 @@
 -- other five (squad/staff/club/group/role) have NO last-attachment coverage,
 -- and only the migration's compile against the live schema vouches for them.
 
+-- ⚠️ EVERY INSERT BELOW SETS created_at EXPLICITLY, AND MUST. This harness's
+-- whole shape is "a later message supersedes the previous one" — but
+-- messages.created_at defaults to now(), which is TRANSACTION-CONSTANT, so
+-- all three messages used to share one timestamp. my_chats picks the latest
+-- with `order by x.created_at desc limit 1` and NO tie-break, so "latest" was
+-- an arbitrary choice among three tied rows, and this file was green by luck.
+-- It stayed green for as long as the physical scan order happened to return
+-- the last-inserted row, and went red on 1 Sep 2026 when
+-- 20260901_message_attachment_list's backfill perturbed that order — a
+-- semantically harmless migration exposing a test that never tested what its
+-- header claimed. Measured, not inferred: now() gave 1 distinct value across
+-- three reads in one transaction; clock_timestamp() gave 3.
+-- Staggered timestamps make the premise true instead of lucky.
+
 begin;
 
 create temporary table _log(seq serial, line text) on commit drop;
@@ -59,8 +73,8 @@ begin
   conv := public.open_conversation(b);
 
   -- 1. latest message is a photo (no caption): body '', attachment set
-  insert into messages (conversation_id, channel, body, attachment_path)
-    values (conv, 'dm', '', a::text || '/holiday.jpg');
+  insert into messages (conversation_id, channel, body, attachment_path, created_at)
+    values (conv, 'dm', '', a::text || '/holiday.jpg', now() - interval '3 minutes');
   select * into r from public.my_chats() where kind = 'dm' and conversation_id = conv;
   if r.last_attachment_path <> a::text || '/holiday.jpg' then
     raise exception 'ASSERT 1 FAILED: photo last_attachment_path = %', r.last_attachment_path;
@@ -71,8 +85,8 @@ begin
   insert into _log(line) values ('1 photo: empty body, attachment_path surfaced');
 
   -- 2. a later voice note supersedes it: audio extension, still no words
-  insert into messages (conversation_id, channel, body, attachment_path)
-    values (conv, 'dm', '', a::text || '/note.m4a');
+  insert into messages (conversation_id, channel, body, attachment_path, created_at)
+    values (conv, 'dm', '', a::text || '/note.m4a', now() - interval '2 minutes');
   select * into r from public.my_chats() where kind = 'dm' and conversation_id = conv;
   if r.last_attachment_path <> a::text || '/note.m4a' then
     raise exception 'ASSERT 2 FAILED: voice last_attachment_path = %', r.last_attachment_path;
@@ -83,8 +97,8 @@ begin
   insert into _log(line) values ('2 voice note: empty body, audio attachment_path surfaced');
 
   -- 3. CONTROL: a later text message has words and NO attachment
-  insert into messages (conversation_id, channel, body)
-    values (conv, 'dm', 'see you Saturday');
+  insert into messages (conversation_id, channel, body, created_at)
+    values (conv, 'dm', 'see you Saturday', now() - interval '1 minute');
   select * into r from public.my_chats() where kind = 'dm' and conversation_id = conv;
   if r.last_body <> 'see you Saturday' then
     raise exception 'ASSERT 3 FAILED: text last_body = %', r.last_body;

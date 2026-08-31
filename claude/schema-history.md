@@ -788,3 +788,83 @@ other three) now 404 — PostgREST can no longer find them anywhere in its expos
 cache — where before this task they were live, callable endpoints (the advisor's original
 "anon/authenticated can execute via RPC" warning). `accept_invite` remains the one function
 genuinely reachable via RPC, exactly as intended.
+
+## 20260901_message_attachment_list — a message carries a LIST of attachments
+
+**The expand half of expand-then-contract, and the halves must not be merged.**
+`attachment_path` stays and a trigger keeps it and `attachment_paths[1]` in
+step in **both** directions. That is not belt-and-braces. This app is a PWA:
+after a deploy, phones keep running a cached service-worker bundle that writes
+the old column, and they must keep working. The contract migration that drops
+`attachment_path` is deliberately weeks away, gated on plan 2 having been live
+long enough for stale bundles to be gone.
+
+### ⚠️ The safety property of `chat media read` is invisible in its own text
+
+The policy's `EXISTS` carries **no conversation-membership condition**. Read
+literally it says *"if any live message references this object, any
+authenticated user may read it."* It is safe only because the subquery runs as
+the **caller** and `public.messages` has its own RLS, so the caller sees only
+the message rows they are entitled to. **The membership check is inherited,
+never stated.**
+
+⚠️ **Therefore keep the `EXISTS` inline and invoker.** Extracting it into
+`private.message_has_attachment(name)` and marking it `SECURITY DEFINER` — as
+most `private.*` helpers here are — stops `messages`' RLS applying, and the
+policy then means what it literally says: every member reads every chat photo
+in every squad, children included. It would look tidier and it would pass a
+naive fixture, because the test user is usually a legitimate member.
+`db/tests/chat-album-media.sql` assertion 3 (a club member **outside** the
+conversation is refused) is the tripwire for exactly that. It looks redundant.
+It is not.
+
+Measured before the change: `messages` `relrowsecurity` = true;
+`private.chat_media_owner` `prosecdef` = false.
+
+### What else the migration does, and why
+
+- **Cap of 10 as a database constraint**, not only a client check. A client cap
+  is a suggestion. It stops an accidental drop of a folder posting a hundred
+  photographs of children.
+- **Backfill runs before the constraint and the policy.** ⚠️ A row with
+  `attachment_path` set and an empty list is unreadable by **everyone,
+  including its own sender**, because `name = any('{}')` is false. The
+  migration aborts rather than leave one.
+- **`messages_body_check` counts the list**, so a photo may still travel with
+  no words. ⚠️ A consequence worth knowing: a *stranded photo-only* row is now
+  impossible to create at all, because a blank body demands a non-empty list.
+  The reachable stranded case has words **and** an empty list.
+- **The trigger is INVOKER with an empty pinned `search_path`.** It touches no
+  table, only `NEW`, so `SECURITY DEFINER` would be privilege for nothing.
+
+### ⚠️ Two things this migration exposed rather than caused
+
+- **The blast radius was six harnesses, not three.** The first sweep was
+  scoped to the files inside PR #587 and therefore missed
+  `db/tests/chat-round-2.sql`, which **inlines its own replay** of the very
+  policy being changed and would have tested that copy and never noticed. A
+  sweep scoped to one PR is not a sweep.
+- **`db/tests/my-chats-attachment.sql` was green by luck.** Its three messages
+  took the default `created_at = now()`, which is transaction-constant, so
+  they shared one timestamp — and `my_chats` picks the latest with
+  `order by created_at desc limit 1` and **no tie-break**. "A later message
+  supersedes it" was never true; it passed only while physical scan order
+  cooperated, and the backfill perturbed it. Measured: `now()` gave 1 distinct
+  value across three reads in one transaction, `clock_timestamp()` gave 3.
+  ⚠️ **The missing tie-break exists in production code too, but it has never
+  been reached, and THIS FEATURE DOES NOT BRING IT CLOSER.** Measured against
+  live data on 1 Sep 2026: conversations with two or more messages sharing a
+  `created_at` = **0**; channel groups likewise **0**; any two messages
+  anywhere sharing an exact `created_at` = **0**; control, total messages =
+  160. Every `my_chats` arm does pick its preview with an untie-broken
+  `order by created_at desc limit 1` (6 occurrences), so the smell is real.
+  ⚠️ **An earlier version of this note claimed a multi-photo send was "exactly
+  the kind of batch" that could reach it. That was wrong, and wrong because of
+  this migration's own design: an album is ONE message row carrying
+  `attachment_paths[]`, not N rows, so ten photos produce one timestamp.** The
+  rejected one-message-per-photo design is the one that would have created
+  same-timestamp clusters. Recorded as known-latent, not worth a deploy.
+  **What WOULD reach it:** anything inserting two messages into one
+  conversation inside a single transaction — a trigger posting a system
+  message alongside a user one, a bulk import, or a future "forward to N
+  chats". Add a tie-break before writing one of those.
