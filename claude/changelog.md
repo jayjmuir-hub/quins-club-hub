@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Implementation plan 1 of 4: the data foundation for chat photo albums.**
+- **Messages carry a LIST of attachments — the album migration is LIVE.**
+  Plan 1 of 4, the expand half of expand-then-contract: `attachment_paths`
+  added and backfilled, a `<= 10` check constraint, a sync trigger keeping
+  `attachment_path` and element 1 in step BOTH ways so phones on a cached PWA
+  bundle keep working, and `chat media read` now reads the list. The old
+  column is untouched; the contract migration is weeks away. ⚠️ **The safety
+  property of that storage policy is invisible in its own text** — its EXISTS
+  carries no membership condition and is safe ONLY because it runs as the
+  caller and `messages` has RLS, so wrapping it in a SECURITY DEFINER helper
+  (as most `private.*` helpers are) would open every chat photo in the club.
+  Said in full at the top of both the migration and the harness, and caught
+  by an arm that looks redundant and is not. `db/tests/chat-album-media.sql`
+  was written first, watched failing, and proved against an injected fault on
+  production. ⚠️ Two corrections to my own work: the blast radius was SIX
+  harnesses not three (a sweep scoped to one PR is not a sweep), and
+  `my-chats-attachment.sql` turned out **green by luck** — `now()` is
+  transaction-constant, so its three messages shared a timestamp and
+  `my_chats` picks the latest with no tie-break; the backfill merely
+  perturbed scan order. Staggered explicitly. No deploy — the app half ships
+  with plan 2. `db/migrations/20260901_message_attachment_list.sql`.
+  (SHA follows in the next changelog-touching PR.)
+- `f7dc697` — **Implementation plan 1 of 4: the data foundation for chat photo albums.**
   The spec is four independently shippable pieces, not one; a single plan
   would be a document nobody could review half of. Plan 1 is deliberately
   INVISIBLE — the attachment list, its sync trigger, the storage boundary,
@@ -21,7 +42,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   either passes early. ⚠️ Carries the shared-working-tree hazard as a
   standing constraint: another live session moved the checkout mid-rebase on
   31 Aug. `claude/plans/2026-08-31-chat-photo-albums-implementation.md`.
-  (SHA follows in the next changelog-touching PR.)
 - `9fa2a69` — **Documents repo SHIPPED — club distro to age groups, squad self-serve.** Nine
   tasks, per-task review: pure helpers (`src/lib/documents.js` — categories,
   validation, upload scope), the data layer (`src/data/documents.js` —
