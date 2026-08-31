@@ -110,12 +110,19 @@ jobs:
           existing=$(gh issue list --repo "${{ github.repository }}" \
             --state open --search "in:title \"$title\"" \
             --json number --jq '.[0].number // empty')
+          # ⚠️ printf, not a multi-line quoted string: a line at column 0 inside
+          # this block scalar ENDS the block, and the first version of this step
+          # did exactly that — GitHub could not parse the file, the workflow's
+          # name fell back to its path, and dispatch returned 422. Found within
+          # the hour by dispatching; kept as a comment because the mistake is
+          # invisible in a diff and inviting.
           if [ -z "$existing" ]; then
+            body=$(printf '%s\n\n%s' \
+              "The nightly db harness run failed: $run_url" \
+              "A red run is a statement about PRODUCTION, not about any branch — the database drifted, or a harness went stale against a deliberate change. Triage per claude/runbooks/db-harnesses.md; the 31 Aug 2026 triage in claude/open-items.md is the worked example. This issue is bumped on every further red run and should be closed when the nightly is green again.")
             gh issue create --repo "${{ github.repository }}" \
               --title "$title" \
-              --body "The nightly db harness run failed: $run_url
-
-A red run is a statement about PRODUCTION, not about any branch — the database drifted, or a harness went stale against a deliberate change. Triage per claude/runbooks/db-harnesses.md; the 31 Aug 2026 triage in claude/open-items.md is the worked example. This issue is bumped on every further red run and should be closed when the nightly is green again."
+              --body "$body"
           else
             gh issue comment "$existing" --repo "${{ github.repository }}" \
               --body "Still red: $run_url"
