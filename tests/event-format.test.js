@@ -24,6 +24,9 @@ import {
   sortByStart,
   venueLine,
   eventPitchLabel,
+  eventTimeLabel,
+  eventTimeRangeLabel,
+  isAllDay,
 } from '../src/lib/eventFormat.js'
 
 // Direct tests for src/lib/eventFormat.js — pure, import-free helpers, so
@@ -712,5 +715,79 @@ describe('titleRepeatsType', () => {
     expect(titleRepeatsType({ type: 'training', title: '' })).toBe(false)
     expect(titleRepeatsType({ type: 'training', title: null })).toBe(false)
     expect(titleRepeatsType(undefined)).toBe(false)
+  })
+})
+
+describe('all-day events (Club Diary phase 2)', () => {
+  // claude/plans/2026-09-01-club-diary-phase-2-implementation.md task 4.
+  // The third time state: not "here is the time", not "the time is not decided
+  // yet", but "there is no clock time".
+
+  it('isAllDay is strict about undefined and null', () => {
+    // Rows written before the migration, and read paths that do not select the
+    // column, must read as ordinary events. Same convention as isTimeTbd.
+    expect(isAllDay({ all_day: true })).toBe(true)
+    expect(isAllDay({ all_day: false })).toBe(false)
+    expect(isAllDay({})).toBe(false)
+    expect(isAllDay({ all_day: null })).toBe(false)
+    expect(isAllDay(null)).toBe(false)
+    // ⚠️ THE DISCRIMINATING FIXTURE, added after a fault injection PASSED. A
+    // truthy-test (Boolean(all_day)) agrees with === true on null, undefined
+    // and false — every fixture above — so a fault swapping one for the other
+    // went green. Only a truthy NON-boolean separates them. A string reaches
+    // this code from a fixture or a cache, never from Postgres, but the
+    // convention exists precisely so unexpected shapes read as "ordinary
+    // event" rather than as all-day.
+    expect(isAllDay({ all_day: 'false' })).toBe(false)
+    expect(isAllDay({ all_day: 1 })).toBe(false)
+  })
+
+  it('eventTimeLabel says "All day" for an all-day event', () => {
+    expect(eventTimeLabel({ all_day: true, starts_at: '2026-09-16T20:00:00Z' })).toBe('All day')
+  })
+
+  it('⚠️ all-day wins over any stored clock time — the placeholder must not leak', () => {
+    // starts_at holds club-midnight, which is 20:00Z. Rendering it would say
+    // "00:00" — the invented value this whole state exists to avoid.
+    const label = eventTimeLabel({ all_day: true, starts_at: '2026-09-16T20:00:00Z' })
+    expect(label).not.toMatch(/\d/)
+  })
+
+  it('still says Time TBD for a TBD event — the control', () => {
+    expect(eventTimeLabel({ time_tbd: true, starts_at: '2026-09-16T20:00:00Z' })).toBe('Time TBD')
+  })
+
+  it('leaves a timed event byte-identical — the regression guard', () => {
+    // 16:00Z is 20:00 in Abu Dhabi.
+    const before = eventTimeLabel({ starts_at: '2026-07-30T16:00:00Z' })
+    const after = eventTimeLabel({ starts_at: '2026-07-30T16:00:00Z', all_day: false, time_tbd: false })
+    expect(after).toBe(before)
+    expect(after).toMatch(/8:00/)
+  })
+
+  it('eventTimeRangeLabel also says "All day", never a midnight range', () => {
+    const label = eventTimeRangeLabel({
+      all_day: true,
+      starts_at: '2026-09-16T20:00:00Z',
+      ends_at: '2026-09-17T20:00:00Z',
+    })
+    expect(label).toBe('All day')
+  })
+})
+
+describe('the impossible both-flags row (defence in depth)', () => {
+  // The DB constraint events_not_all_day_and_time_tbd makes this row
+  // unstorable, so this is NOT testing a reachable state — it pins which
+  // branch wins if one ever arrives through a fixture, a cache, or a relaxed
+  // constraint. All-day first: "there is no time" beats "the time is not
+  // decided", because printing "Time TBD" for an event that HAS no time is the
+  // false sentence this whole feature exists to avoid.
+  //
+  // ⚠️ ADDED AFTER A FAULT INJECTION PASSED: swapping the branch order changed
+  // nothing for any legal row, so no legal-row test can pin the order. This one
+  // can, and it is the only kind that can.
+  it('all-day wins over TBD when both are (illegally) set', () => {
+    expect(eventTimeLabel({ all_day: true, time_tbd: true, starts_at: '2026-09-16T20:00:00Z' })).toBe('All day')
+    expect(eventTimeRangeLabel({ all_day: true, time_tbd: true, starts_at: '2026-09-16T20:00:00Z' })).toBe('All day')
   })
 })
