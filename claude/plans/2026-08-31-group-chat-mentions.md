@@ -1,8 +1,22 @@
 # Group chat @ mentions
 
-**Status: SPEC ONLY — nothing here is built.** Requested by Jay, 31 Aug 2026,
-after finding that @ tagging exists in every channel-shaped chat but not in
-groups.
+**Status: SHIPPED, 31 Aug 2026** — Jay's ruling on the fork: **no
+punch-through**. Two deviations from the spec as written, both recorded here:
+
+1. **No new RPC.** `useDmThread` already loads the group's members
+   (`listGroupMembers`), so the picker eats that list minus the reader —
+   `conversation_mentionables` was never needed.
+2. **"Push — no change" was WRONG, and the harness proved it before the
+   feature could.** `message_push_subscriptions`' mentions arm hard-coded
+   `squad_chat` with no channel guard (written 24 Aug, when mentions existed
+   only in channels), so the moment group mentions survived the trigger, a
+   mentioned member's `direct_messages` opt-out was sailed past — accidental
+   punch-through, the exact thing the ruling forbids.
+   `db/migrations/20260831_group_mentions_no_punch_through.sql` adds the
+   `channel <> 'dm'` guard; `db/tests/group-mentions.sql` check 4 pins it.
+
+Requested by Jay, 31 Aug 2026, after finding that @ tagging exists in every
+channel-shaped chat but not in groups.
 
 ## The question that prompted it, answered first
 
