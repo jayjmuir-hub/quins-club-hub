@@ -2375,7 +2375,8 @@ CREATE TABLE public.nicknames (
 ALTER TABLE public.nicknames ENABLE ROW LEVEL SECURITY;
 
 -- notification_opt_outs  (19 Aug 2026 — a row means OFF; described in grants.sql and
--- policies.sql, never captured here. Category list has grown to SEVEN values.)
+-- policies.sql, never captured here. Category list has grown to EIGHT values —
+-- 'document' joined 31 Aug 2026.)
 CREATE TABLE public.notification_opt_outs (
   profile_id  uuid        NOT NULL,
   category    text        NOT NULL,
