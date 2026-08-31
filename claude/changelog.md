@@ -10,6 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
+- **Dependencies: the safe-updates group, six updates.** Sentry, supabase-js,
+  libphonenumber-js and @testing-library/react patch/minor bumps. Full suite
+  green.
+  ⚠️ **Carries the changelog citation for `229607e` because a Dependabot PR
+  CANNOT PAY THE ONE-BEHIND DUTY ITSELF** — it only ever touches `package.json`
+  and the lockfile, so its `docs:check` fails on whatever squash SHA happens to
+  be main's tip, forever, however many times it is rebased. The citation has to
+  be pushed ONTO the Dependabot branch. This is the third time it has bitten;
+  see the note in `claude/open-items.md`.
+
+- `229607e` — **Changelog: cite `de05dd1`, the one-behind duty.** Every PR
+  branched on that main was failing CI with "commit missing from changelog",
+  including two Dependabot PRs touching nothing but dependencies.
+
 - `de05dd1` — **Docs: the albums plan marked shipped, and two stale claims in
   `state-of-play.md` corrected.** The documents repo was still described as "PR
   OPEN, NOT YET MERGED, gated on the Session Validator's no-overlap check" — it
