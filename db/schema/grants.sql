@@ -1035,40 +1035,27 @@ REVOKE ALL ON public.profile_icons FROM PUBLIC, anon;
 --     GRANT SELECT, DELETE ON public.documents TO authenticated;
 --     GRANT SELECT         ON public.document_squads TO authenticated;
 --
--- ⚠️ WHAT IS ACTUALLY LIVE IS WIDER THAN THAT, AND THE MIGRATION'S OWN
---    COMMENT SAYS OTHERWISE. It reads "INSERT and UPDATE have no policy and
---    no grant on purpose". The POLICY half is true. The GRANT half is not:
---    measured on both tables, `authenticated` holds
---        DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, UPDATE
---    (seven — no TRUNCATE, per the 19 Aug revoke) and `anon` holds nothing
---    (per the 14 Aug revoke). That is section 1 of this file doing exactly
---    what it says: a new table in `public` is BORN with those privileges
---    from `supabase_admin` default ACLs, and an extra GRANT of a subset
---    adds nothing and removes nothing.
+-- ⚠️ THE TABLES WERE BORN WIDER THAN THE MIGRATION'S COMMENT CLAIMED, AND
+--    THE GAP IS NOW CLOSED. 20260831_documents.sql said "INSERT and UPDATE
+--    have no policy and no grant on purpose"; the policy half was always
+--    true, the grant half was not — Supabase birth defaults handed
+--    `authenticated` the write verbs anyway (not exploitable: RLS with no
+--    INSERT/UPDATE policy denied them regardless). Jay ruled to trim it,
+--    and db/migrations/20260831_documents_grant_trim.sql revoked INSERT and
+--    UPDATE from authenticated on both tables, with rolled-back proofs that
+--    reads, policy-path deletes and the SECURITY DEFINER RPCs (owner:
+--    postgres) all survive.
 --
--- ⚠️ IS IT EXPLOITABLE? NO — and the distinction matters, because it is the
---    same shape as league_teams and the match-sheet tables above. RLS is
---    enabled on both tables and there is NO INSERT policy and NO UPDATE
---    policy, so those verbs are denied to every non-owner role regardless
---    of the grant. The grant is a ceiling sitting uselessly above RLS, not
---    a working permission. Writes reach the tables only through
---    public.create_document / public.update_document, which are SECURITY
---    DEFINER and run as `postgres`.
---
--- ⚠️ WHAT IS THEREFORE OPEN, AND DELIBERATELY LEFT FOR A DECISION: the
---    recent narrow tables — drill_likes, chat_prefs, message_deliveries,
---    club_officers — all trim their birth defaults with an explicit
---    `REVOKE ALL … FROM PUBLIC, anon` plus the verbs they want. These two
---    tables do not, so they do not match that convention and the
---    migration's comment overstates what was done. Closing it is one line
---    per table and changes no behaviour; it was NOT applied here because it
---    is beyond what the migration was reviewed to do. Recorded rather than
---    quietly fixed, and rather than quietly left.
+-- ⚠️ MEASURED AFTER THE TRIM (31 Aug 2026), not transcribed: authenticated
+--    holds exactly DELETE, REFERENCES, SELECT, TRIGGER on both tables;
+--    anon holds nothing. REFERENCES and TRIGGER are birth defaults left
+--    deliberately — inert without DDL access, same shape as the
+--    league_teams-class tables, and revoking them was beyond the ruling.
+--    document_squads' DELETE is also inert (no delete policy; rows go via
+--    the FK cascade, which runs as the table owner).
 -- ---------------------------------------------------------------------
---   documents         authenticated, postgres, service_role   ALL 8 minus TRUNCATE
---                                                             (authenticated); anon NONE
---   document_squads   authenticated, postgres, service_role   ALL 8 minus TRUNCATE
---                                                             (authenticated); anon NONE
+--   documents         authenticated: DELETE, REFERENCES, SELECT, TRIGGER; anon NONE
+--   document_squads   authenticated: DELETE, REFERENCES, SELECT, TRIGGER; anon NONE
 GRANT SELECT, DELETE ON public.documents TO authenticated;
 GRANT SELECT ON public.document_squads TO authenticated;
 
