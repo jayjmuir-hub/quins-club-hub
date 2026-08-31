@@ -25,22 +25,22 @@ history was a rotted measurement; the rulings never rotted. Measure it.
 **Live at https://adhquins-clubhub.com with real families on it.** The club went
 live 13 Aug 2026. Assume a real parent is looking at whatever you touch.
 
-📄 **THE DOCUMENTS REPO IS BUILT, PR OPEN, NOT YET MERGED.** Club distro to
-age groups plus squad self-serve uploads, two visibility tiers, multi-squad
-targeting, push on new documents. The four DB migrations and push-send v13
-are already LIVE on production; the PR ships the frontend only — merging it
-is a deploy, gated on the Session Validator's no-overlap check plus Jay's
-explicit yes. `claude/plans/2026-08-31-documents-repo-implementation.md`.
+📄 **THE DOCUMENTS REPO IS LIVE.** Club distro to age groups plus squad
+self-serve uploads, two visibility tiers, multi-squad targeting, push on new
+documents. Merged as #588 with the document cells following in #599.
+`claude/plans/2026-08-31-documents-repo-implementation.md`.
 
-📷 **CHAT PHOTO ALBUMS: the composer is LIVE, the album GRID is not written.**
-Paste, drag-and-drop onto the whole conversation, multi-select and an
-all-or-nothing send of up to ten photos all shipped. ⚠️ **Nobody has yet sent a
-real album on the live site and checked a SECOND account sees every photo** —
-the storage read policy is what would fail silently there.
-⚠️ **A ten-photo message SENDS but renders as one photo until plan 3 draws the
-grid**, so the two want shipping close together. Plan 4 (dropping the
-`attachment_path` contract) must wait on cached service workers.
-`claude/plans/2026-09-01-chat-albums-plan-2-composer.md`.
+📷 **CHAT PHOTO ALBUMS ARE LIVE — composer AND grid.** Paste, drag-and-drop
+onto the whole conversation, multi-select and an all-or-nothing send of up to
+ten photos (#605); the tiled grid and lightbox that draw them (#613), verified
+on the deployed bundle.
+⚠️ **STILL NOT DONE: nobody has sent a real album on the live site and checked
+a SECOND account sees every photo.** The storage read policy is what would fail
+silently there, and no test can stand in for it — it needs two real accounts.
+⚠️ **The chat LIST still previews an album as one photo**, because `my_chats()`
+returns `last_attachment_path` and no count. That is plan 4's, along with
+dropping the `attachment_path` contract, which must wait on cached service
+workers. `claude/plans/2026-08-31-chat-photo-albums.md`.
 
 💬 **The whole 26 Aug chat-and-identity stack is LIVE** — shared chat
 thread (the dock IS the main chat), person card, presence dots, identity

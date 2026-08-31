@@ -1,8 +1,22 @@
 # Chat photo albums — paste, drag-and-drop, and up to ten photos a message
 
-**Status: NOT SHIPPED — spec only, 31 Aug 2026.** Nothing in this file has
-been built. Update this line the moment it has, and record any deviation from
-the spec here rather than leaving the code as the only account of it.
+**Status: SHIPPED except plan 4 — 1 Sep 2026.** Plans 1 (`918fa59`), 1b
+(`812a185`), 2 (`ebda2f3`, #605) and 3 (#613) are live. **Plan 4 — dropping
+`attachment_path` and rewriting `my_chats()` — is NOT built**, and it is
+deliberately blocked: a phone on a cached service-worker bundle still writes
+that column and cannot be forced to update, so dropping it makes that photo
+unreadable by everyone, silently and per-device.
+
+⚠️ **Deviations from the spec, recorded here rather than left to the code:**
+- The album grid caps at FOUR tiles with a `+N` badge; the spec did not fix a
+  number.
+- The lightbox CLAMPS at both ends rather than wrapping — looping gives a
+  reader no signal they have seen the whole album.
+- **The chat LIST still previews an album as "📷 Photo"**, because
+  `my_chats()` returns `last_attachment_path` and no count. Fixing it needs the
+  function rewritten, so it belongs to plan 4. Recorded, not faked.
+- `attachmentPreviewLabel()` took an OPTIONAL `count` rather than a new
+  signature: four screens and eleven test files call it with a path alone.
 
 ## What was asked for, and how it grew
 
