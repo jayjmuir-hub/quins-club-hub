@@ -223,6 +223,24 @@ describe('Documents — opening a document', () => {
   })
 })
 
+describe('Documents — phone meta line', () => {
+  // 31 Aug 2026 follow-up: the date was dropped from the phone row's meta
+  // line in the cells restyle (the approved mock only named category ·
+  // audience · size), then put back on Jay's say-so — same formatTableDate
+  // formatting the row always used. jsdom leaves window.matchMedia
+  // undefined, so this renders the phone layout by default.
+  it('shows category, audience, size and date together on the row', async () => {
+    render(<Documents />)
+
+    const row = (await screen.findByText('Registration form')).closest(
+      '[data-testid="document-row"]',
+    )
+    expect(
+      within(row).getByText('Registration · Whole club · 200 kB · Thu, Aug 20'),
+    ).toBeInTheDocument()
+  })
+})
+
 describe('Documents — staff-only badge', () => {
   it('marks a staff-only row and leaves an ordinary row unmarked', async () => {
     render(<Documents />)

@@ -7,6 +7,7 @@ import { Empty } from '../components/Empty.jsx'
 import DocumentUploadSheet from '../components/DocumentUploadSheet.jsx'
 import { deleteDocument, listDocuments, signDocumentUrl } from '../data/documents.js'
 import { formatBytes } from '../data/storage.js'
+import { formatTableDate } from '../lib/eventFormat.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -57,19 +58,31 @@ function audienceLabel(document, teamsById) {
 // the neutral pairing rather than a blank swatch — the same "never
 // announce itself" rule StaffAvatar's monogram fallback follows.
 //
-// Blue/green/amber are Tailwind's stock ramps (theme.extend keeps them
-// available), not custom hexes — tests/theme.test.js's raw-hex rule only
-// polices arbitrary-value literals, but a named token is still preferred
-// wherever the palette already has one: PDF and "Staff only" both use the
-// themed danger/brand-red pairing rather than a fourth literal.
+// ⚠️ EVERY SWATCH ROUTES THROUGH A PAIRING THIS APP ALREADY DOCUMENTS WITH A
+// CONTRAST RATIO — 31 Aug 2026 review fix. Stock Tailwind blue/green/amber
+// (bg-blue-100/text-blue-700 etc.) used to sit here: colours used nowhere
+// else in src/, with no ratio recorded anywhere for this app's actual
+// surfaces. Every pairing below is instead one Chip.jsx already draws (see
+// its VARIANTS + header comment) and scripts/contrast-check.mjs already
+// measures at 4.5:1 (light mode; dark-mode equivalents are measured too):
+//   PDF  → danger:  bg-danger-bg / text-danger-ink — "light: deep-red text
+//          on error tint" (also PDF's Chip.jsx analogue: the `loss` variant).
+//   XLS  → accent (green): bg-accent-bg / text-accent-ink — "training / win
+//          chip".
+//   PPT  → warn: bg-warn-bg / text-warn-ink — "social chip / ScopeNote".
+//   DOC  → neutral: bg-surface-mute / text-ink-muted — "Chip/Badge neutral
+//          text". This app has NO blue token — inventing one was the bug.
+//          A neutral DOC swatch, told apart from the true-unknown fallback
+//          only by its "DOC" abbreviation, is the honest choice here.
+//   IMG and the true-unknown fallback share that same neutral pairing.
 const FILE_TYPE_STYLE = {
   pdf: { abbr: 'PDF', bg: 'bg-danger-bg', text: 'text-danger-ink' },
-  doc: { abbr: 'DOC', bg: 'bg-blue-100', text: 'text-blue-700' },
-  docx: { abbr: 'DOC', bg: 'bg-blue-100', text: 'text-blue-700' },
-  xls: { abbr: 'XLS', bg: 'bg-green-100', text: 'text-green-700' },
-  xlsx: { abbr: 'XLS', bg: 'bg-green-100', text: 'text-green-700' },
-  ppt: { abbr: 'PPT', bg: 'bg-amber-100', text: 'text-amber-700' },
-  pptx: { abbr: 'PPT', bg: 'bg-amber-100', text: 'text-amber-700' },
+  doc: { abbr: 'DOC', bg: 'bg-surface-mute', text: 'text-ink-muted' },
+  docx: { abbr: 'DOC', bg: 'bg-surface-mute', text: 'text-ink-muted' },
+  xls: { abbr: 'XLS', bg: 'bg-accent-bg', text: 'text-accent-ink' },
+  xlsx: { abbr: 'XLS', bg: 'bg-accent-bg', text: 'text-accent-ink' },
+  ppt: { abbr: 'PPT', bg: 'bg-warn-bg', text: 'text-warn-ink' },
+  pptx: { abbr: 'PPT', bg: 'bg-warn-bg', text: 'text-warn-ink' },
   jpg: { abbr: 'IMG', bg: 'bg-surface-mute', text: 'text-ink-muted' },
   png: { abbr: 'IMG', bg: 'bg-surface-mute', text: 'text-ink-muted' },
   webp: { abbr: 'IMG', bg: 'bg-surface-mute', text: 'text-ink-muted' },
@@ -338,9 +351,17 @@ export default function Documents() {
                 </button>
                 <div className="flex flex-wrap gap-1.5">
                   <Chip>{categoryLabel(document)}</Chip>
-                  {document.staff_only && (
-                    <Chip className="bg-danger-bg text-danger-ink">Staff only</Chip>
-                  )}
+                  {/* ⚠️ type="loss", NOT a className override — 31 Aug 2026 review
+                      fix. A className override sat here relying on cascade
+                      order (whichever rule the compiled CSS happened to emit
+                      last), which Tailwind gives no guarantee of. Chip.jsx's
+                      OWN explicit mechanism for "bg-danger-bg/text-danger-ink"
+                      is its `loss` variant — reused here purely for that
+                      pairing, the same way Chip's neutral variant already
+                      doubles as the unrelated age-group-label chip (see
+                      Chip.jsx's header comment). No result/loss semantics
+                      implied. */}
+                  {document.staff_only && <Chip type="loss">Staff only</Chip>}
                 </div>
                 <span className="block text-[12px] text-ink-faint">
                   {audienceLabel(document, teamsById)} · {formatBytes(document.file_size)}
@@ -380,6 +401,8 @@ export default function Documents() {
                       {categoryLabel(document)} · {audienceLabel(document, teamsById)}
                       {' · '}
                       {formatBytes(document.file_size)}
+                      {' · '}
+                      {formatTableDate(new Date(document.created_at))}
                       {document.staff_only && (
                         <>
                           {' · '}
