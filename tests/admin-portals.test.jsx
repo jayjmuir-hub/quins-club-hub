@@ -424,6 +424,9 @@ describe('AdminDashboard — inside a portal', () => {
       // Club officers joined the super-only pair on 26 Aug 2026 —
       // claude/plans/2026-08-26-club-officers.md.
       'Club officers',
+      // Profile icons joined 31 Aug 2026 —
+      // claude/plans/2026-08-31-profile-icons.md.
+      'Profile icons',
     ])
   })
 

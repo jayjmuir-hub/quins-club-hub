@@ -20,6 +20,18 @@ export async function listMemberIcons(profileId) {
   return data ?? []
 }
 
+/** Every grant with its target names, for the admin screen. Newest first. */
+export async function listIconGrants() {
+  const { data, error } = await supabase
+    .from('profile_icons')
+    // ⚠️ Two FKs point at profiles (profile_id and granted_by) — the embed
+    // must name its COLUMN or PostgREST refuses the ambiguity (PGRST201).
+    .select('id, icon, reason, is_primary, profile_id, team_id, created_at, profiles!profile_id(full_name), teams(name)')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
 /**
  * Grant an icon to a squad's staff (teamId) OR a person (profileId) —
  * exactly one; the table's check refuses both. A blank reason stays absent

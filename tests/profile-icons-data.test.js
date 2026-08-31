@@ -12,6 +12,7 @@ import { supabase } from '../src/lib/supabase.js'
 import {
   listClubIconMap,
   listMemberIcons,
+  listIconGrants,
   grantIcon,
   revokeIcon,
   setPrimaryIcon,
@@ -54,6 +55,20 @@ describe('the icon read paths', () => {
     supabase.rpc.mockResolvedValue({ data: [], error: null })
     await listMemberIcons('p-9')
     expect(supabase.rpc).toHaveBeenCalledWith('member_icons', { _profile: 'p-9' })
+  })
+})
+
+describe('the admin grant list', () => {
+  it('reads every grant with the target names embedded, newest first', async () => {
+    const sel = builder({ data: [], error: null })
+    supabase.from.mockReturnValue(sel.b)
+    sel.b.order = vi.fn(() => sel.b)
+    await listIconGrants()
+    expect(supabase.from).toHaveBeenCalledWith('profile_icons')
+    // The COLUMN-disambiguated embed — two FKs point at profiles, and a bare
+    // profiles(full_name) is a PGRST201 in production.
+    expect(sel.calls.select[0][0]).toMatch(/profiles!profile_id\(full_name\)/)
+    expect(sel.calls.select[0][0]).toMatch(/teams\(name\)/)
   })
 })
 

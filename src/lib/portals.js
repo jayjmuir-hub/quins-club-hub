@@ -80,6 +80,8 @@ export const PORTALS = [
       // The committee list — titles without rights, appointed by super
       // admins only (claude/plans/2026-08-26-club-officers.md).
       { to: '/admin/officers', label: 'Club officers', superOnly: true },
+      // Recognition emoji (claude/plans/2026-08-31-profile-icons.md).
+      { to: '/admin/icons', label: 'Profile icons', superOnly: true },
     ],
   },
   {
