@@ -391,6 +391,63 @@ function escapeHtmlFree(value: unknown): string {
   return String(value ?? '')
 }
 
+/**
+ * Voice notes ride the SAME bucket and the SAME extension-agnostic storage
+ * policies as photos — an attachment is audio or image purely by its key's
+ * extension. ⚠️ MIRRORS AUDIO_EXTENSIONS in src/data/chatMedia.js; see
+ * messageBody() below for why the copy is unavoidable.
+ */
+const AUDIO_EXTENSIONS = new Set(['webm', 'm4a', 'mp4', 'aac', 'mp3', 'ogg'])
+
+function isAudioKey(key: unknown): boolean {
+  const ext = String(key ?? '').split('.').pop()?.toLowerCase()
+  return ext ? AUDIO_EXTENSIONS.has(ext) : false
+}
+
+/**
+ * The notification body for a chat message: the member's caption when there is
+ * one, otherwise a stand-in naming what is attached.
+ *
+ * ⚠️ WITHOUT THIS A PHOTO-ONLY MESSAGE PUSHES A BLANK BODY. It shipped that
+ * way, and albums (#605) made it the normal case rather than the rare one —
+ * the whole point of dropping ten photos into a squad chat is that you often
+ * type nothing. Every parent in the squad got a sender's name over empty space.
+ *
+ * ⚠️ NEVER THE FILENAME, though `attachments` carries one. `name` exists so a
+ * DOCUMENT keeps its original filename, and a document named after the child it
+ * concerns would put that child's name on every parent's lock screen. The
+ * payload is required to carry no child's name BY CONSTRUCTION (see the comment
+ * above the select). A COUNT keeps that property; a filename destroys it.
+ *
+ * ⚠️ MUST MATCH attachmentPreviewLabel() in src/data/chatMedia.js. That module
+ * is browser JavaScript bundled by Vite; this is a standalone Deno function
+ * deployed separately, and there is no shared build between them — the same
+ * standing arrangement locationFor() has with venueLine() in the calendar
+ * function. A parent reading "10 photos" in the app and "Photo" on their lock
+ * screen is the drift this comment exists to prevent. Change both or neither.
+ *
+ * ⚠️ FALLS BACK TO attachment_path. A phone on a cached service-worker bundle
+ * still writes only that column and cannot be forced to update; without this
+ * arm its photo would push an empty body exactly as before.
+ */
+function messageBody(message: {
+  body?: unknown
+  attachments?: unknown
+  attachment_path?: unknown
+}): string {
+  const caption = escapeHtmlFree(message.body).slice(0, 200)
+  if (caption.trim()) return caption
+
+  const list = Array.isArray(message.attachments) ? message.attachments : []
+  if (list.length > 1) return `📷 ${list.length} photos`
+
+  const only = list.length === 1
+    ? (list[0] as { file?: unknown })?.file
+    : message.attachment_path
+  if (!only) return caption
+  return isAudioKey(only) ? '🎤 Voice message' : '📷 Photo'
+}
+
 /** `QCH-0041`. Must match feedbackRef() in src/data/feedback.js. */
 function ref(n: unknown): string {
   return `QCH-${String(n ?? '').padStart(4, '0')}`
@@ -772,7 +829,7 @@ Deno.serve(async (request) => {
       // ours. A club-wide post has no squad and says so.
       const rows = await db(
         `messages?id=eq.${encodeURIComponent(messageId)}` +
-          '&select=body,team_id,parent_id,channel,conversation_id,author_role,mentions,deleted_at,teams(name),author:profiles!messages_author_id_fkey(full_name)',
+          '&select=body,team_id,parent_id,channel,conversation_id,author_role,mentions,deleted_at,attachments,attachment_path,teams(name),author:profiles!messages_author_id_fkey(full_name)',
       )
       const message = rows?.[0]
       if (!message || message.deleted_at) return new Response('not found', { status: 404 })
@@ -786,7 +843,7 @@ Deno.serve(async (request) => {
         const sender = escapeHtmlFree(message.author?.full_name ?? 'Somebody')
         job = {
           title: sender,
-          body: escapeHtmlFree(message.body).slice(0, 200),
+          body: messageBody(message),
           url: `${APP_URL}/chat/dm/${encodeURIComponent(message.conversation_id)}`,
           tag: `dm-${message.conversation_id}`,
           subscriptions: await messageTargets(messageId),
@@ -807,7 +864,7 @@ Deno.serve(async (request) => {
           : message.channel === 'staff'
             ? `${escapeHtmlFree(squadName)} staff`
             : `${escapeHtmlFree(squadName)} chat`,
-        body: escapeHtmlFree(message.body).slice(0, 200),
+        body: messageBody(message),
         url: message.team_id
           ? `${APP_URL}/chat/${encodeURIComponent(message.team_id)}${message.channel === 'staff' ? '?channel=staff' : ''}`
           : `${APP_URL}/chat/club`,
