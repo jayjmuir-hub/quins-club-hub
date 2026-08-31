@@ -8,6 +8,7 @@ import PollComposer from './PollComposer.jsx'
 import PollVotes from './PollVotes.jsx'
 import Spinner from './Spinner.jsx'
 import VoiceComposer from './VoiceComposer.jsx'
+import MentionPicker, { appendMention } from './MentionPicker.jsx'
 import MessageEditor from './MessageEditor.jsx'
 import { attachmentPreviewLabel } from '../data/chatMedia.js'
 import { canStillEdit } from '../lib/messageEdit.js'
@@ -373,6 +374,16 @@ export default function DmThread({ thread, compact = false }) {
                 </div>
               )}
               <form onSubmit={thread.send} className="relative flex items-end gap-2" data-testid="dm-composer">
+                {/* Group @ mentions — the channels' button-not-typeahead
+                    picker, fed from the loaded members. mentionables is []
+                    in a 1:1, so the picker renders nothing there. */}
+                <MentionPicker
+                  people={thread.mentionables}
+                  onPick={(p) => {
+                    thread.setDraft((d) => appendMention(d, p))
+                    thread.setDraftMentions((ms) => (ms.some((x) => x.profile_id === p.profile_id) ? ms : [...ms, p]))
+                  }}
+                />
                 <input ref={thread.fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
                 <button
                   type="button"

@@ -84,6 +84,10 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   // Round 2 (claude/plans/2026-08-24-chat-round-2.md): reply-with-quote,
   // multi-select forwarding, and a photo waiting in the composer.
   const [replyTo, setReplyTo] = useState(null)
+  // Group @ mentions (claude/plans/2026-08-31-group-chat-mentions.md): the
+  // people picked via the @ button. Ids ride only while their @Full Name
+  // survives in the draft — pruned at send, like MessageRow.submitReply.
+  const [draftMentions, setDraftMentions] = useState([])
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
   const [selecting, setSelecting] = useState(false)
@@ -302,8 +306,11 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       // Photo first, message second — the WhatsApp order, so a reader never
       // meets a message whose image has not arrived yet.
       const attachmentPath = photo ? await uploadChatPhoto(selfId, photo) : null
-      await sendDirectMessage(conversationId, draft, { quotedId: replyTo?.id ?? null, attachmentPath })
+      // A deleted @name un-mentions — only ids whose name survives are sent.
+      const mentions = draftMentions.filter((p) => draft.includes(`@${p.full_name}`)).map((p) => p.profile_id)
+      await sendDirectMessage(conversationId, draft, { quotedId: replyTo?.id ?? null, attachmentPath, mentions })
       setDraft('')
+      setDraftMentions([])
       setReplyTo(null)
       clearPhoto()
       await load()
@@ -520,6 +527,11 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     newFromRef,
     draft,
     setDraft,
+    draftMentions,
+    setDraftMentions,
+    // Who the @ button offers: the group's members minus me. Empty for a 1:1
+    // (the only other person is already reading) — MentionPicker hides itself.
+    mentionables: isGroup ? (members ?? []).filter((p) => p.profile_id !== selfId) : [],
     sending,
     replyTo,
     setReplyTo,

@@ -168,7 +168,7 @@ describe('reply-with-quote', () => {
 
     await user.type(screen.getByLabelText('Message'), 'On it')
     await user.click(screen.getByRole('button', { name: 'Send' }))
-    expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'On it', { quotedId: 'd1', attachmentPath: null })
+    expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'On it', { quotedId: 'd1', attachmentPath: null, mentions: [] })
     await waitFor(() => expect(screen.queryByTestId('quote-preview')).not.toBeInTheDocument())
   })
 
@@ -254,7 +254,7 @@ describe('photo attachments', () => {
 
     await user.click(send)
     await waitFor(() => expect(media.uploadChatPhoto).toHaveBeenCalledWith(ME, file))
-    expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', '', { quotedId: null, attachmentPath: `${ME}/uploaded.jpg` })
+    expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', '', { quotedId: null, attachmentPath: `${ME}/uploaded.jpg`, mentions: [] })
     await waitFor(() => expect(screen.queryByTestId('photo-preview')).not.toBeInTheDocument())
   })
 

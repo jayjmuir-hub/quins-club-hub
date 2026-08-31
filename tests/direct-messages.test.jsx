@@ -143,6 +143,17 @@ beforeEach(() => {
   onlineMock.mockReturnValue(new Map())
 })
 
+// Group @ mentions shipped 31 Aug 2026 for GROUPS ONLY — in a 1:1 the only
+// other person is already reading; the trigger zeroes DM mentions and the
+// composer must not offer what the database strips.
+describe('a 1:1 DM has no mention button', () => {
+  it('the composer renders without Mention someone', async () => {
+    renderAt('/chat/dm/c1')
+    await screen.findByTestId('dm-composer')
+    expect(screen.queryByRole('button', { name: 'Mention someone' })).toBeNull()
+  })
+})
+
 // ── Ticks and online status (26 Aug 2026) ──────────────────────────────────
 describe('ticks and online status', () => {
   it('my message shows delivered ticks once their device has it, viewed once they read it', async () => {
@@ -274,7 +285,7 @@ describe('DirectMessages — a thread', () => {
     await user.type(screen.getByLabelText('Message'), 'See you Saturday')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     // Round 2 rides along: no quote, no photo unless the user set one up.
-    expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'See you Saturday', { quotedId: null, attachmentPath: null })
+    expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'See you Saturday', { quotedId: null, attachmentPath: null, mentions: [] })
   })
 
   it('block hides the composer and says so; unblock brings it back', async () => {

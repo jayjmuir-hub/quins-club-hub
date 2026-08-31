@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The wide tab bar grows for corner room; captions stay dead-centred.**
+- **Group-chat @ mentions SHIPPED — and the harness caught a push leak before
+  the club could.** The channels' @ button in the group composer (dock
+  included), fed from the loaded member list — no new RPC; `sendDirectMessage`
+  carries pruned mention ids; the provenance trigger keeps a group's mentions
+  filtered to conversation members (author stripped, 1:1 DMs still zeroed) —
+  `db/migrations/20260831_group_chat_mentions.sql`, applied. Then the
+  harness's first clean run went red against production: the mentions push
+  arm hard-coded `squad_chat` with no channel guard, so a surviving group
+  mention punched through the `direct_messages` opt-out — the exact thing
+  Jay's no-punch-through ruling forbids, live by accident.
+  `db/migrations/20260831_group_mentions_no_punch_through.sql` adds the
+  `channel <> 'dm'` guard; `db/tests/group-mentions.sql` pins both halves
+  with a member-injection self-test. Both functions re-captured from live in
+  `db/schema/functions.sql`. (SHA follows in the next changelog-touching PR.)
+- `d54cfbe` — **The wide tab bar grows for corner room; captions stay dead-centred.**
   "SCHEDULE" sat 2.5px from the dock's glass edge, ON the 22px corner curve
   (measured). Jay's fix, after an inward end-caption nudge was tried and
   rejected as off-centre: the five-tab bar widens (inset 12px → 6px) and

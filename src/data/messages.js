@@ -635,7 +635,7 @@ export async function listDirectMessages(conversationId, { limit = 200 } = {}) {
  * key already uploaded (photo-first, WhatsApp order), and lets the body be
  * empty; `forwarded` marks a passed-along message.
  */
-export async function sendDirectMessage(conversationId, body, { quotedId = null, attachmentPath = null, forwarded = false } = {}) {
+export async function sendDirectMessage(conversationId, body, { quotedId = null, attachmentPath = null, forwarded = false, mentions = [] } = {}) {
   const text = body?.trim() ?? ''
   if (!text && !attachmentPath) throw new Error('Write something first.')
   const { data, error } = await supabase
@@ -646,6 +646,10 @@ export async function sendDirectMessage(conversationId, body, { quotedId = null,
       ...(quotedId ? { quoted_id: quotedId } : {}),
       ...(attachmentPath ? { attachment_path: attachmentPath } : {}),
       ...(forwarded ? { forwarded: true } : {}),
+      // Groups only — the trigger keeps members, zeroes 1:1 DMs
+      // (db/migrations/20260831_group_chat_mentions.sql). Absent when empty,
+      // like the round-2 options above.
+      ...(mentions.length ? { mentions } : {}),
     })
     .select(SELECT)
     .single()
