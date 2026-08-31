@@ -45,9 +45,22 @@
 -- than was written down, and only `service_role` can clear it. The probes
 -- record the measurement; the migration headers still carry the claim.
 --
+--  4. THE PUSH AUDIENCE, added 31 Aug 2026 at final review. Section 14 is the
+--     one part of this feature RLS cannot speak for: public.
+--     document_push_subscriptions is reached by the edge function as
+--     `service_role`, which is RLS-exempt, so its audience rules are ordinary
+--     SQL in a function body and no policy above constrains what it returns.
+--     A tier bug there would put a coaching plan's title on every parent's
+--     lock screen while probes 01-05 stayed green, because the ROW would
+--     still be correctly hidden. Read that section's own header before
+--     changing it — its probes run as `postgres` on purpose, against the rule
+--     immediately below.
+--
 -- ⚠️ AS `postgres` RLS IS BYPASSED ENTIRELY. A run that forgets
 -- `set local role authenticated` passes while proving nothing. Every probe
--- below is preceded by `reset role;` and a fresh `set local role` + claims.
+-- below is preceded by `reset role;` and a fresh `set local role` + claims —
+-- EXCEPT section 14's output probes, where service-role reach is the thing
+-- under test and the grant half is pinned separately by 14h and 10c.
 --
 -- ⚠️ `storage.allow_delete_query` IS SET BELOW ON PURPOSE, AND WITHOUT IT
 -- PROBE 13 WOULD TEST THE WRONG GATE. storage.objects carries a statement
@@ -549,6 +562,244 @@ begin
      and name = (select v from _fix where k='t1') || '/d0c00000-0000-4000-8000-00000000e002.pdf';
   insert into _r values ('08g MEDIC1 SELECTs the orphan',
     case when _n = 0 then '0 rows — ✅ pass' else _n || ' rows — ❌ FAIL' end);
+end $$;
+
+-- ══ 14 THE PUSH AUDIENCE — the one path RLS cannot cover ══════════════════
+--
+-- ⚠️ EVERY PROBE ABOVE MEASURES WHAT A POLICY REFUSES. This section measures
+-- what a FUNCTION RETURNS, and that is a different kind of claim requiring a
+-- different kind of probe. public.document_push_subscriptions is SECURITY
+-- DEFINER and is reached by the push-send edge function as `service_role`,
+-- which is RLS-exempt — so no policy in this file governs its OUTPUT. Its
+-- audience rules (the staff tier, the targeting, the uploader exclusion, the
+-- 'document' opt-out) are ordinary SQL in the function body, and until now
+-- nothing here exercised them. A tier bug in that body would send a coaching
+-- plan's lock-screen title to every parent in the squad while probes 01-05
+-- stayed green, because the ROW would still be correctly hidden.
+--
+-- ⚠️ THESE PROBES RUN AS `postgres`, DELIBERATELY, AND THAT IS THE OPPOSITE OF
+-- THE RULE AT THE HEAD OF THIS FILE. Everywhere else, a missing `set local
+-- role authenticated` is the bug that makes a harness pass while proving
+-- nothing. Here, service-role reach IS the thing under test: the function is
+-- EXECUTE-closed to anon and authenticated (probe 10c), so a browser cannot
+-- call it at all and calling it as a persona would measure the grant, not the
+-- audience. Probe 14h is the grant half, and it is the one that stays as
+-- `authenticated`.
+--
+-- ⚠️ NOTE THE SEARCH_PATH INCONSISTENCY, RECORDED SO IT READS AS SEEN RATHER
+-- THAN MISSED. document_push_subscriptions pins `set search_path to 'public'`
+-- where PR #587's siblings pin `''` and schema-qualify everything. Defensible
+-- here: every table it reads (documents, document_squads, memberships,
+-- push_subscriptions, notification_opt_outs) lives in public, and on Supabase
+-- `authenticated` holds no CREATE on public, so there is no object-shadowing
+-- route in. It is an inconsistency, not a hole — do not "fix" it in a sweep
+-- without re-running this section.
+--
+-- ⚠️ THE SUBSCRIPTION ROWS ARE INVENTED AND DISPOSABLE (rule 9). The endpoints
+-- are a real-shaped FCM host with a `zz-probe-` path that no device holds, and
+-- the keys are nonsense; they exist for a join to find, and the rollback takes
+-- them. Nothing here can reach a real handset.
+
+reset role;
+
+do $$
+begin
+  insert into push_subscriptions (profile_id, endpoint, p256dh, auth) values
+   ('d0c00000-0000-4000-8000-0000000000a2',
+    'https://fcm.googleapis.com/fcm/send/zz-probe-coach1',  'zzprobep256dhcoach1',  'zzprobeauthcoach1'),
+   ('d0c00000-0000-4000-8000-0000000000a5',
+    'https://fcm.googleapis.com/fcm/send/zz-probe-medic1',  'zzprobep256dhmedic1',  'zzprobeauthmedic1'),
+   ('d0c00000-0000-4000-8000-0000000000a6',
+    'https://fcm.googleapis.com/fcm/send/zz-probe-parent1', 'zzprobep256dhparent1', 'zzprobeauthparent1');
+  insert into _r values ('14 fixture: disposable push subscriptions', '3 rows — ✅ pass');
+exception when others then
+  insert into _r values ('14 fixture: disposable push subscriptions',
+    'THREW ' || sqlstate || ' ' || sqlerrm || ' — ❌ FAIL');
+end $$;
+
+-- ── 14a/14b THE TIER, on the STAFF-ONLY document ──────────────────────────
+-- MEDIC1 is in the staff READ set, PARENT1 is not, and both are active members
+-- of the SAME targeted squad — so the role filter is the only thing that can
+-- separate them. 14a is also the control for every "0 rows" below: it proves
+-- the function returns anybody at all.
+do $$
+declare _n int;
+begin
+  select count(*) into _n
+    from public.document_push_subscriptions((select v from _fix where k='doc_s_t1')) a
+    join push_subscriptions s on s.id = a.id
+   where s.profile_id = 'd0c00000-0000-4000-8000-0000000000a5';
+  insert into _r values ('14a MEDIC1 is in the STAFF-ONLY doc''s push audience',
+    case when _n = 1 then '1 row — ✅ pass' else _n || ' rows — ❌ FAIL' end);
+end $$;
+
+do $$
+declare _n int;
+begin
+  select count(*) into _n
+    from public.document_push_subscriptions((select v from _fix where k='doc_s_t1')) a
+    join push_subscriptions s on s.id = a.id
+   where s.profile_id = 'd0c00000-0000-4000-8000-0000000000a6';
+  insert into _r values ('14b PARENT1 is NOT in the STAFF-ONLY doc''s push audience',
+    case when _n = 0 then '0 rows — ✅ pass' else _n || ' rows — ❌ FAIL' end);
+end $$;
+
+-- ── 14c THE TIER'S OTHER HALF, on the MEMBERS document ────────────────────
+-- The same PARENT1 who is refused above must be pushed here, or 14b is
+-- satisfied by an audience function that returns no parents at all.
+do $$
+declare _n int;
+begin
+  select count(*) into _n
+    from public.document_push_subscriptions((select v from _fix where k='doc_m_t1')) a
+    join push_subscriptions s on s.id = a.id
+   where s.profile_id = 'd0c00000-0000-4000-8000-0000000000a6';
+  insert into _r values ('14c PARENT1 IS in the MEMBERS doc''s push audience',
+    case when _n = 1 then '1 row — ✅ pass' else _n || ' rows — ❌ FAIL' end);
+end $$;
+
+-- ── 14d/14e THE UPLOADER EXCLUSION ────────────────────────────────────────
+--
+-- ⚠️ doc_coach1 IS USED HERE AND doc_s_t1 IS NOT, AND THE CHOICE IS THE WHOLE
+-- PROBE. doc_s_t1 was created by the ADMIN, whose membership row carries
+-- team_id null — so the admin is not in the audience CTE for a squad-targeted
+-- document in the first place, and asserting their absence would pass without
+-- the `p.profile_id <> d.created_by` line existing at all. doc_coach1 was
+-- created by COACH1, an ACTIVE COACH OF THE TARGETED SQUAD, who therefore
+-- qualifies on every other count. Only the uploader exclusion can drop them.
+--
+-- 14e is its control: somebody else in the same squad must still be returned
+-- for that document, or 14d is satisfied by an empty result.
+do $$
+declare _n int;
+begin
+  select count(*) into _n
+    from public.document_push_subscriptions((select v from _fix where k='doc_coach1')) a
+    join push_subscriptions s on s.id = a.id
+   where s.profile_id = 'd0c00000-0000-4000-8000-0000000000a2';
+  insert into _r values ('14d the UPLOADER is not pushed their own document',
+    case when _n = 0 then '0 rows — ✅ pass' else _n || ' rows — ❌ FAIL' end);
+end $$;
+
+do $$
+declare _n int;
+begin
+  select count(*) into _n
+    from public.document_push_subscriptions((select v from _fix where k='doc_coach1')) a
+    join push_subscriptions s on s.id = a.id
+   where s.profile_id = 'd0c00000-0000-4000-8000-0000000000a6';
+  insert into _r values ('14e CONTROL PARENT1 IS pushed the same coach-uploaded doc',
+    case when _n = 1 then '1 row — ✅ pass' else _n || ' rows — ❌ FAIL' end);
+end $$;
+
+-- ── 14f/14g THE 'document' OPT-OUT, both directions ───────────────────────
+--
+-- ⚠️ ASSERTED AS A PAIR, INSERT THEN DELETE, AGAINST THE SAME PERSONA AND THE
+-- SAME DOCUMENT AS 14a. One direction alone cannot tell "the opt-out works"
+-- from "this persona dropped out for some other reason": 14a said MEDIC1 was
+-- in this audience a moment ago, 14f says they are not while a row exists, and
+-- 14g says they are back once it is gone. The only variable is the row.
+--
+-- ⚠️ IF 14f THROWS on notification_opt_outs_category_check, that is a REAL
+-- FINDING, not a harness bug: it means 'document' never reached the live
+-- constraint and the Task 8 opt-out toggle writes a value the database
+-- refuses. Read the error rather than adjusting the probe.
+do $$
+declare _n int;
+begin
+  insert into notification_opt_outs (profile_id, category)
+  values ('d0c00000-0000-4000-8000-0000000000a5', 'document');
+
+  select count(*) into _n
+    from public.document_push_subscriptions((select v from _fix where k='doc_s_t1')) a
+    join push_subscriptions s on s.id = a.id
+   where s.profile_id = 'd0c00000-0000-4000-8000-0000000000a5';
+  insert into _r values ('14f MEDIC1 opts out of ''document'' and leaves the audience',
+    case when _n = 0 then '0 rows — ✅ pass' else _n || ' rows — ❌ FAIL' end);
+exception when others then
+  insert into _r values ('14f MEDIC1 opts out of ''document'' and leaves the audience',
+    'THREW ' || sqlstate || ' ' || sqlerrm || ' — ❌ FAIL');
+end $$;
+
+do $$
+declare _n int;
+begin
+  delete from notification_opt_outs
+   where profile_id = 'd0c00000-0000-4000-8000-0000000000a5' and category = 'document';
+
+  select count(*) into _n
+    from public.document_push_subscriptions((select v from _fix where k='doc_s_t1')) a
+    join push_subscriptions s on s.id = a.id
+   where s.profile_id = 'd0c00000-0000-4000-8000-0000000000a5';
+  insert into _r values ('14g MEDIC1 removes the opt-out and returns to the audience',
+    case when _n = 1 then '1 row — ✅ pass' else _n || ' rows — ❌ FAIL' end);
+end $$;
+
+-- ── 14h THE GRANT GATE — the actual first line of defence ─────────────────
+--
+-- ⚠️ THE BEHAVIOURAL TWIN OF PROBE 10c, AND NOT A DUPLICATE OF IT. 10c counts
+-- ACL rows and would go red if somebody granted EXECUTE; this one tries the
+-- call and is red if the grant ever actually works. The pair matters because
+-- every probe above runs as `postgres`, and an output-only section would keep
+-- passing unchanged if the function were opened up to `authenticated`
+-- tomorrow — the audience would be just as correct, and reachable from a
+-- browser, and this file would say nothing about it. The function returns push
+-- ENDPOINTS AND KEYS; reachability is the claim worth pinning behaviourally.
+--
+-- 14a is its control: the same call, as the service-reached role, succeeds —
+-- so this refusal is the grant and not a broken function.
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"d0c00000-0000-4000-8000-0000000000a2","role":"authenticated"}';
+
+do $$
+declare _n int;
+begin
+  select count(*) into _n
+    from public.document_push_subscriptions((select v from _fix where k='doc_m_t1'));
+  insert into _r values ('14h COACH1 (a browser JWT) calls document_push_subscriptions',
+    'ALLOWED, ' || _n || ' rows — ❌ FAIL');
+exception when others then
+  insert into _r values ('14h COACH1 (a browser JWT) calls document_push_subscriptions',
+    case when sqlstate = '42501' and sqlerrm like '%permission denied%'
+         then 'REFUSED 42501 by the GRANT — ✅ pass'
+         else 'REFUSED ' || sqlstate || ' (wrong gate: ' || sqlerrm || ') — ❌ FAIL' end);
+end $$;
+
+-- ── 14i THE club_wide DB HALF, which no UI can reach ──────────────────────
+--
+-- ⚠️ THE UI NEVER OFFERS THIS, WHICH IS EXACTLY WHY IT IS PROBED HERE.
+-- DocumentUploadSheet renders the whole-club switch only for admins, so the
+-- create_document club-wide branch is unexercised by every UI test on the
+-- branch — the "club_wide short-circuit unexercised" note carried forward from
+-- Task 8's review. A screen that does not draw a control is not a boundary;
+-- this is the boundary.
+--
+-- ⚠️ THE ASSERTION IS ON errcode 42501 AND ON 'admin' IN THE MESSAGE, because
+-- create_document has FOUR ways to refuse and only one of them is this claim.
+-- The club_wide branch is taken first and returns before the staffing loop and
+-- the prefix guard are reached at all, so a refusal from either of those would
+-- mean the branch was NOT taken — a different bug wearing the same 42501.
+-- Remove the club_wide admin check and this probe goes red either way: the
+-- call then either succeeds, or is refused by a LATER gate whose code and
+-- wording are not these. A bare `when others` would have passed on all three.
+reset role;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"d0c00000-0000-4000-8000-0000000000a2","role":"authenticated"}';
+
+do $$
+declare _ignore uuid;
+begin
+  _ignore := public.create_document(
+    'ZZ Probe coach goes club-wide', 'other', false, true, null::uuid[],
+    'club/d0c00000-0000-4000-8000-00000000e00c.pdf',
+    'clubwide-trespass.pdf', 1024, 'application/pdf');
+  insert into _r values ('14i COACH1 publishes a CLUB-WIDE document', 'ALLOWED — ❌ FAIL');
+exception when others then
+  insert into _r values ('14i COACH1 publishes a CLUB-WIDE document',
+    case when sqlstate = '42501' and sqlerrm like '%admin%'
+         then 'REFUSED 42501 (admin-only) — ✅ pass'
+         else 'REFUSED ' || sqlstate || ' (wrong gate: ' || sqlerrm || ') — ❌ FAIL' end);
 end $$;
 
 -- ══ 11 update_document keeps the key-prefix invariant ═════════════════════
