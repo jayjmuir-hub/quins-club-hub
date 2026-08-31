@@ -32,6 +32,11 @@
 --   RETURNS TABLE and a LEFT JOIN to league_teams. See the block at its
 --   definition for what the DROP did to its grants.
 --
+-- ⚠️ RE-CAPTURED 2026-08-31 — public.update_document only
+--   (20260831_documents_policy_split): the key-prefix invariant guard. Body
+--   diffed against pg_get_functiondef and identical; proacl re-read from
+--   pg_proc and unchanged by the CREATE OR REPLACE.
+--
 -- This is a CAPTURE, not a migration. Do not run this file. See README.md.
 --
 -- ── ⚠️ RE-CAPTURED 2026-08-11 AFTER THIS FILE WENT TWO DAYS BEHIND ───
@@ -7182,11 +7187,30 @@ GRANT EXECUTE ON FUNCTION public.create_document(text,text,boolean,boolean,uuid[
 -- ---------------------------------------------------------------------
 -- public.update_document(uuid, text, text, boolean, boolean, uuid[])
 -- proacl: postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres
+-- ⚠️ RE-CAPTURED 31 Aug 2026 from pg_get_functiondef after
+--   20260831_documents_policy_split — the prefix-invariant guard below.
+--   proacl re-read from pg_proc after the CREATE OR REPLACE and is
+--   unchanged (byte-identical to create_document's), which is the 20260821
+--   ruling holding for a function that already existed — the case
+--   20260831_documents_push_acl had to correct for one that did not.
 --
 -- ⚠️ METADATA ONLY. storage_key, file_name, file_size, content_type and
 -- created_by are NOT in the column list and cannot be reached from the
 -- app at all — there is no UPDATE policy on documents. That is the
 -- set_my_photo reasoning: RLS grants rows, not columns.
+--
+-- ⚠️ THE PREFIX GUARD IS WHY FILES DO NOT STRAND. create_document refuses a
+-- squad-prefixed key whose squad is not targeted; without the matching check
+-- here, a document could be RETARGETED away from the squad its file sits
+-- under — leaving that squad's staff with object-level authority over a
+-- document they no longer manage, and the new owners able to delete a row
+-- whose file they cannot reach. With the guard, the squad under whose prefix
+-- the file lives is always among the targets, so row authority and file
+-- authority never come apart.
+-- ⚠️ RESIDUAL: the club-wide flip does not check this. It is admin-only, so
+-- it is a trusted actor's choice rather than an escalation; moving the object
+-- is not something an RPC can do inside its own transaction. See the
+-- 20260831_documents_policy_split header.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.update_document(_id uuid, _title text, _category text, _staff_only boolean, _club_wide boolean, _team_ids uuid[])
  RETURNS void
@@ -7196,6 +7220,7 @@ CREATE OR REPLACE FUNCTION public.update_document(_id uuid, _title text, _catego
 AS $function$
 declare
   _team uuid;
+  _prefix_team uuid;
 begin
   if not private.can_manage_document(_id) then
     raise exception 'Not your document to change.' using errcode = '42501';
@@ -7217,6 +7242,14 @@ begin
           using errcode = '42501';
       end if;
     end loop;
+
+    select private.document_key_team(storage_key) into _prefix_team
+      from documents where id = _id;
+    if _prefix_team is not null and not (_prefix_team = any(_team_ids)) then
+      raise exception
+        'The targeted squads must keep the squad the file is stored under.'
+        using errcode = '22023';
+    end if;
   end if;
 
   update documents

@@ -133,6 +133,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   with the dock at 375px; below 360 and on desktop nothing changes. A parity
   test pins both halves. `src/components/AppShell.jsx`,
   `tests/app-shell.test.jsx`.
+- **Documents repo database SHIPPED, then CORRECTED the same day by review.**
+  `db/migrations/20260831_documents.sql` — two tables, a private bucket, the
+  key-prefix write convention, RLS and the create/update RPCs — plus
+  `db/migrations/20260831_documents_push_acl.sql`, closing an anon EXECUTE the new push
+  function was born with. Review then found the storage write policy was
+  `FOR ALL`, so its USING arm was **also a SELECT arm**: any squad's staff
+  could sign any object under their prefix, orphans included, which made the
+  migration's own "an orphan is signable by nobody" comment false the moment
+  it applied. `db/migrations/20260831_documents_policy_split.sql` replaces it with one
+  policy per command, so SELECT on the bucket is governed by `document read`
+  alone; adds the key-prefix invariant to `update_document`, which could
+  otherwise retarget a document away from the squad its file is stored under
+  and leave that squad's staff holding the file; and moves the bucket's
+  policies to `TO authenticated`. Applied to production and verified from
+  `pg_policy` / `pg_get_functiondef`, not from the migration text. (SHA
+  follows in the next changelog-touching PR.)
 - `eecf41e` — **Documents repo implementation PLANNED, not built** —
   `claude/plans/2026-08-31-documents-repo-implementation.md`. The merged spec
   (`1b7c59a`) turned into nine executable tasks: migration with RLS + RPCs
