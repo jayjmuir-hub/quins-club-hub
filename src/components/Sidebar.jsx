@@ -34,6 +34,16 @@ function NoticesIcon(props) {
   )
 }
 
+function DocumentsIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M14 3v5a1 1 0 0 0 1 1h5" />
+      <path d="M6 3h8l6 6v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+      <path d="M9 14h6M9 17h6" />
+    </svg>
+  )
+}
+
 function AdminIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -184,6 +194,7 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
     ...NAV_ITEMS,
     ...(showSquadHub ? [{ to: '/squad', label: 'Squad Hub', icon: SquadIcon }] : []),
     { to: '/notices', label: 'Notices', icon: NoticesIcon },
+    { to: '/documents', label: 'Documents', icon: DocumentsIcon },
     ...(showAdmin ? [{ to: '/admin', label: 'Admin', icon: AdminIcon }] : []),
   ]
 

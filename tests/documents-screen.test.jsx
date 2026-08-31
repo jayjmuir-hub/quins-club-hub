@@ -1,0 +1,170 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+// The documents-repo screen — /documents (task-6-brief.md). RLS decides who
+// may READ/WRITE a document; this file exercises only what the screen OFFERS,
+// mirroring the header comments in tests/pitches-screen.test.jsx and
+// tests/notices.test.js's sibling: everything permission-shaped here is a UI
+// convenience, and the real boundary lives in db/migrations/20260831_documents.sql.
+
+const listDocumentsMock = vi.fn()
+const signDocumentUrlMock = vi.fn()
+const deleteDocumentMock = vi.fn()
+const useMembershipsMock = vi.fn()
+
+vi.mock('../src/data/documents.js', () => ({
+  listDocuments: (...a) => listDocumentsMock(...a),
+  signDocumentUrl: (...a) => signDocumentUrlMock(...a),
+  deleteDocument: (...a) => deleteDocumentMock(...a),
+}))
+
+vi.mock('../src/lib/memberships.jsx', () => ({
+  useMemberships: () => useMembershipsMock(),
+}))
+
+vi.mock('../src/lib/auth.jsx', () => ({
+  useAuth: () => ({ user: { id: 'user-1' } }),
+}))
+
+// Import after vi.mock so this binds to the mocked modules.
+const Documents = (await import('../src/screens/Documents.jsx')).default
+
+const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 1 }
+const TEAM_U12 = { id: 'team-u12', name: 'U12', sort_order: 2 }
+const TEAMS = [TEAM_U10, TEAM_U12]
+
+const PARENT = [{ id: 'm1', role: 'parent', status: 'active', team_id: 'team-u10' }]
+const COACH = [{ id: 'm2', role: 'coach', status: 'active', team_id: 'team-u10' }]
+
+function membershipsReturn(rows, teams = TEAMS) {
+  return { memberships: rows, teams }
+}
+
+function doc(overrides = {}) {
+  return {
+    id: 'd1',
+    title: 'Registration form',
+    category: 'registration',
+    staff_only: false,
+    club_wide: true,
+    storage_key: 'club/d1.pdf',
+    file_name: 'form.pdf',
+    file_size: 204800,
+    content_type: 'application/pdf',
+    created_by: 'user-2',
+    created_at: '2026-08-20T10:00:00Z',
+    document_squads: [],
+    ...overrides,
+  }
+}
+
+const REG_DOC = doc()
+const COACHING_DOC = doc({
+  id: 'd2',
+  title: 'U10 training plan',
+  category: 'coaching',
+  staff_only: true,
+  club_wide: false,
+  storage_key: 'team-u10/d2.pdf',
+  file_name: 'plan.pdf',
+  file_size: 512000,
+  created_by: 'user-3',
+  created_at: '2026-08-21T10:00:00Z',
+  document_squads: [{ team_id: 'team-u10' }],
+})
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  listDocumentsMock.mockResolvedValue([COACHING_DOC, REG_DOC])
+  signDocumentUrlMock.mockResolvedValue('https://signed.example/d1?token=abc')
+  deleteDocumentMock.mockResolvedValue(undefined)
+  useMembershipsMock.mockReturnValue(membershipsReturn(PARENT))
+})
+
+describe('Documents — loading the list', () => {
+  it('renders rows from listDocuments', async () => {
+    render(<Documents />)
+
+    expect(await screen.findByText('Registration form')).toBeInTheDocument()
+    expect(screen.getByText('U10 training plan')).toBeInTheDocument()
+  })
+
+  it('shows the empty-state copy when there are no documents', async () => {
+    listDocumentsMock.mockResolvedValue([])
+    render(<Documents />)
+
+    expect(
+      await screen.findByText('No documents yet — the club and your coaches can share files here.'),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('Documents — category chips', () => {
+  it('narrows the list to the clicked category', async () => {
+    const user = userEvent.setup()
+    render(<Documents />)
+
+    await screen.findByText('Registration form')
+    expect(screen.getByText('U10 training plan')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Coaching' }))
+
+    expect(screen.getByText('U10 training plan')).toBeInTheDocument()
+    expect(screen.queryByText('Registration form')).not.toBeInTheDocument()
+  })
+})
+
+describe('Documents — "Add document"', () => {
+  it('is absent for a parent-only membership', async () => {
+    useMembershipsMock.mockReturnValue(membershipsReturn(PARENT))
+    render(<Documents />)
+
+    await screen.findByText('Registration form')
+    expect(screen.queryByRole('button', { name: /add document/i })).not.toBeInTheDocument()
+  })
+
+  it('is present for a coach', async () => {
+    useMembershipsMock.mockReturnValue(membershipsReturn(COACH))
+    render(<Documents />)
+
+    await screen.findByText('Registration form')
+    expect(screen.getByRole('button', { name: /add document/i })).toBeInTheDocument()
+  })
+})
+
+describe('Documents — opening a document', () => {
+  it('signs the storage key and opens the signed url in a new tab', async () => {
+    const user = userEvent.setup()
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {})
+    render(<Documents />)
+
+    const row = (await screen.findByText('Registration form')).closest(
+      '[data-testid="document-row"]',
+    )
+    await user.click(row)
+
+    await waitFor(() => expect(signDocumentUrlMock).toHaveBeenCalledWith('club/d1.pdf'))
+    await waitFor(() =>
+      expect(openSpy).toHaveBeenCalledWith('https://signed.example/d1?token=abc', '_blank', 'noopener'),
+    )
+
+    openSpy.mockRestore()
+  })
+})
+
+describe('Documents — staff-only badge', () => {
+  it('marks a staff-only row and leaves an ordinary row unmarked', async () => {
+    render(<Documents />)
+
+    const staffRow = (await screen.findByText('U10 training plan')).closest(
+      '[data-testid="document-row"]',
+    )
+    const publicRow = (await screen.findByText('Registration form')).closest(
+      '[data-testid="document-row"]',
+    )
+
+    expect(within(staffRow).getByText('Staff only')).toBeInTheDocument()
+    expect(within(publicRow).queryByText('Staff only')).not.toBeInTheDocument()
+  })
+})

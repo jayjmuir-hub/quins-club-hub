@@ -457,6 +457,25 @@ export default function More() {
         <PostNoticeAction className="mt-3" variant="secondary" />
       </Card>
 
+      {/* Task 6 of claude/plans/2026-08-31-documents-repo.md — same shape as
+          the Notices card above, deliberately: a link to the full list plus
+          a short line of copy. Every member sees this, for the same reason
+          the Notices card is unconditional — More is the one screen every
+          role reaches on a phone. */}
+      <SectionTitle>Documents</SectionTitle>
+      <Card className="p-[14px]">
+        <Link
+          to="/documents"
+          className="flex items-center justify-between gap-3 text-[14px] font-bold text-brand-ink"
+        >
+          <span>Club and squad documents</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+          Registration forms, fixtures and policies the club and your coaches have shared.
+        </p>
+      </Card>
+
       {/* ⚠️ EVERY MEMBER SEES THIS, and that is the ruling rather than an
           oversight (Jay, 12 Aug 2026): a parent with a good photo of Saturday's
           match is exactly who the social media manager needs to hear from. It
