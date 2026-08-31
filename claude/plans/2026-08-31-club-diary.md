@@ -1,7 +1,12 @@
 # Club Diary — dated items nobody replies to
 
-**STATUS: NOT SHIPPED.** Spec only, agreed with Jay 31 Aug 2026. No code, no
-migration, nothing applied. Replace this line the moment it ships.
+**STATUS: PHASE 1 SHIPPED 31 Aug 2026. PHASE 2 NOT SHIPPED.**
+Phase 1 — `info_only`, the Club Diary chooser kind, the read paths and the
+Schedule filter — is live: migration `events_info_only` applied to production,
+implementation `claude/plans/2026-08-31-club-diary-implementation.md`.
+Everything marked `[PHASE 2]` below (`all_day`, multi-day spans, the calendar
+feed branch, the `all_day`/`time_tbd` check constraint) is **still a spec** and
+nothing of it has been built.
 
 ## The problem, from a real artefact
 
