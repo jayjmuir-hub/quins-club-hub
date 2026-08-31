@@ -1,6 +1,6 @@
 // Sends a real browser/OS push notification — not an email.
 //
-// SIX triggers, ONE function:
+// SEVEN triggers, ONE function:
 //   { feedback_id }     an admin replied to somebody's report
 //                       (AFTER UPDATE on public.feedback, when status or
 //                        admin_note changes)
@@ -20,6 +20,9 @@
 //   { message_id }      squad staff posted in the squad chat
 //                       (AFTER INSERT on public.messages, staff top-level
 //                        posts only — the trigger decides, 23 Aug 2026)
+//   { document_id }     somebody published a document to a squad
+//                       (public.create_document with _notify => true —
+//                        an RPC, not a trigger, 31 Aug 2026)
 //
 // ⚠️ NO TRIGGER'S TEXT ARRIVES IN THE BODY ANY MORE (Grok item 11, 30 Aug
 // 2026 — 20260830_push_hardening.sql). `squad_push` used to arrive fully
@@ -517,6 +520,33 @@ async function noticeTargets(announcementId: string): Promise<Subscription[]> {
   return await response.json()
 }
 
+/**
+ * The subscriptions a new DOCUMENT should go to.
+ *
+ * ⚠️ THE SAME DIVISION OF LABOUR AS noticeTargets, AND FOR THE SAME REASON.
+ * Club-wide vs targeted squads, the staff_only narrowing to coach/manager/medic,
+ * the uploader's own exclusion, the `document` opt-out and the de-duplication of
+ * somebody who staffs two targeted squads ALL live in
+ * public.document_push_subscriptions (db/migrations/20260831_documents.sql).
+ * Who may be told a document exists is a disclosure rule; it belongs beside the
+ * RLS policy it narrows, not in a file that deploys separately.
+ */
+async function documentTargets(documentId: string): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/document_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _document: documentId }),
+  })
+  if (!response.ok) {
+    throw new Error(`document_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
 interface Subscription {
   id: string
   endpoint: string
@@ -572,6 +602,7 @@ Deno.serve(async (request) => {
   let announcementId = ''
   let messageId = ''
   let approvalMembershipId = ''
+  let documentId = ''
   let squad: Record<string, string> | null = null
   let nudge: Record<string, string> | null = null
   try {
@@ -580,6 +611,7 @@ Deno.serve(async (request) => {
     announcementId = String(payload?.announcement_id ?? '')
     messageId = String(payload?.message_id ?? '')
     approvalMembershipId = String(payload?.approval_membership_id ?? '')
+    documentId = String(payload?.document_id ?? '')
     squad = payload?.squad_push ?? null
     nudge = payload?.availability_nudge ?? null
   } catch {
@@ -589,7 +621,8 @@ Deno.serve(async (request) => {
   // asking for, and guessing which it meant is how the wrong people get
   // notified.
   if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0)
-      + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) + (messageId ? 1 : 0) !== 1) {
+      + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) + (messageId ? 1 : 0)
+      + (documentId ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
@@ -784,6 +817,57 @@ Deno.serve(async (request) => {
         tag: `chat-${message.channel === 'staff' ? 'staff-' : ''}${message.team_id ?? 'club'}`,
         subscriptions: await messageTargets(messageId),
       }
+      }
+    } else if (documentId) {
+      // ⚠️ DERIVED FROM THE DATABASE, NOT THE BODY (Grok item 11). The request
+      // carries an id and nothing else; every word below is read back with the
+      // service role. create_document only ever posts { document_id }.
+      const rows = await db(
+        `documents?id=eq.${encodeURIComponent(documentId)}` +
+          '&select=title,staff_only,club_wide',
+      )
+      const doc = rows?.[0]
+      if (!doc) return new Response('not found', { status: 404 })
+
+      // ⚠️ ONE SQUAD NAME, NOT A LIST, AND NEVER A CHILD'S NAME BY
+      // CONSTRUCTION. A document can target several squads; naming them all
+      // would push a lock-screen string of unbounded length, and the tap goes
+      // to the same screen either way. A club-wide document has no squad and
+      // says nothing — the title just reads "New document".
+      //
+      // ⚠️ A SECOND READ RATHER THAN documents?select=document_squads(teams(name)).
+      // The nested two-level embed may well work, but every embed already in
+      // this file is ONE level deep, so the two-level form would be a shape
+      // nothing here has ever proven — and a PostgREST 400 in this position
+      // costs the whole notification, not just the squad name.
+      let squadName: string | null = null
+      if (!doc.club_wide) {
+        const squadRows = await db(
+          `document_squads?document_id=eq.${encodeURIComponent(documentId)}` +
+            '&select=teams(name)&limit=1',
+        )
+        squadName = squadRows?.[0]?.teams?.name ?? null
+      }
+
+      job = {
+        // "New document for U12 staff" / "New document for U12" /
+        // "New document staff" (club-wide, staff-only) / "New document".
+        // ⚠️ THE WORD "staff" IS THE ONLY HINT THE AUDIENCE IS NARROW, and it
+        // is worth keeping: a coach who sees it knows not to forward the file
+        // to a parents' group chat.
+        title: 'New document'
+          + (squadName ? ` for ${escapeHtmlFree(squadName)}` : '')
+          + (doc.staff_only ? ' staff' : ''),
+        // The document's TITLE, not its file name — the title is what a person
+        // chose to call it; the file name is whatever their phone produced.
+        body: escapeHtmlFree(doc.title).slice(0, 200),
+        url: `${APP_URL}/documents`,
+        // Per DOCUMENT: two documents in a minute are two notifications, the
+        // same way two notices are. Only a repeat about the SAME thing should
+        // collapse, and there is no path that pushes one document twice.
+        tag: `document-${documentId}`,
+        // ⚠️ ONE CALL, AND THE DATABASE DECIDES — see documentTargets.
+        subscriptions: await documentTargets(documentId),
       }
     } else {
       const rows = await db(
