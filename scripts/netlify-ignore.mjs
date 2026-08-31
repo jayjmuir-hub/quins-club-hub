@@ -78,6 +78,7 @@ const DEPLOY_IRRELEVANT = [
   /^db\//, // schema captures and migrations; applied to Supabase, never bundled
   /^[^/]+\.md$/, // CLAUDE.md, RESTORE.md, README.md, AGENTS.md — root markdown only
   /^\.cursor\//, // Cursor rules, MCP, Cloud Agent environment — cannot reach dist/
+  /^\.claude\//, // Claude Code skills, hooks, settings — steers sessions, never the build
 ]
 
 /** True when this path cannot possibly change the built site. */

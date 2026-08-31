@@ -15,8 +15,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   no key) from `build --deep` (LLM concept map — spends tokens, goes stale as
   fast as the code, skip unless asked), and records the exact command for the
   deep build through the local `hermes proxy` with a dummy key, since there is
-  no `GRAFT_API_KEY` to set. Doc-only; the edit had been live-but-uncommitted
-  on cafnet. (SHA follows in the next changelog-touching PR.)
+  no `GRAFT_API_KEY` to set. The edit had been live-but-uncommitted on cafnet.
+  And since this was the repo's first committed `.claude/` file, `.claude/` is
+  now on `scripts/netlify-ignore.mjs`'s DEPLOY_IRRELEVANT list beside
+  `.cursor/` — it steers Claude sessions and can never reach `dist/`, so a
+  skill edit no longer spends a build. Proven red-then-green in
+  `tests/netlify-ignore.test.js`. (SHA follows in the next changelog-touching
+  PR.)
 
 ## 30 Aug 2026
 

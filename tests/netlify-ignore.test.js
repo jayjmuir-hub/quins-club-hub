@@ -46,6 +46,8 @@ describe('which paths can reach the built site', () => {
     'RESTORE.md',
     'README.md',
     'AGENTS.md',
+    '.claude/skills/graft/SKILL.md',
+    '.claude/settings.json',
     '.cursor/environment.json',
     '.cursor/install.sh',
     '.cursor/rules/graft.mdc',
@@ -82,6 +84,7 @@ describe('which paths can reach the built site', () => {
     // `dbmigrate/` is not `db/`, and `claude-notes/` is not `claude/`.
     expect(isDeployIrrelevant('dbmigrate/x.sql')).toBe(false)
     expect(isDeployIrrelevant('claude-notes/x.md')).toBe(false)
+    expect(isDeployIrrelevant('claude-skills/x.md')).toBe(false)
   })
 })
 
