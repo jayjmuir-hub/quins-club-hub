@@ -10,12 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Session record for the day: the graft-skill commit, the `.claude/` gate,
+- **Group-chat @ mentions SPECCED, not built** —
+  `claude/plans/2026-08-31-group-chat-mentions.md`. Mentions exist in every
+  channel-shaped chat but the message trigger hard-zeroes them for DMs and
+  groups; the spec adds a members-only mentionables RPC, a group trigger arm,
+  and the picker in the group composer, with one fork left for Jay (whether a
+  mention should punch through the `direct_messages` push opt-out —
+  recommendation: no). Also records the answer to "typing @ does nothing":
+  tagging is deliberately a BUTTON, not a typeahead. (SHA follows in the next
+  changelog-touching PR.)
+- `5744aad` — **Session record for the day: the graft-skill commit, the `.claude/` gate,
   and two false reds explained.** `claude/handoffs/2026-08-31-graft-skill-and-date-bomb.md`
   — the date-bomb mechanism (a test that fails only once the Monday-start week
   view reaches its fixture) and the stale-`dist/` wolf-cry in bundle-reading
-  tests, both worth knowing before trusting a local red. (SHA follows in the
-  next changelog-touching PR.)
+  tests, both worth knowing before trusting a local red.
 - `50bed3a` — **The graft skill now says how to run `build --deep` on Jay's PCs.**
   `.claude/skills/graft/SKILL.md` splits plain `build` (structural graph, free,
   no key) from `build --deep` (LLM concept map — spends tokens, goes stale as
