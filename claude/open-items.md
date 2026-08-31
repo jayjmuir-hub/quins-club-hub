@@ -61,6 +61,26 @@ rules missed by one migration each:
    anon grant — the trap the harness's own message describes. Guarded inside
    the function (raises on null uid), so defence in depth only.
 
+✅ **CATEGORY B IS CLOSED — `20260831_harness_drift_fixes.sql` HAS BEEN APPLIED,
+AND `npm run db:check` IS NOW FULLY GREEN. Measured 31 Aug 2026** during the
+documents-repo final review, when a full run came back **81 harnesses, 0
+failures** — three more than the expected-red list predicted. Verified against
+production rather than inferred from the green run, each with a control:
+
+- `officers read member` and BOTH `pitch_share_approvals` policies now read
+  `( SELECT auth.uid() AS uid)` — the initplan-safe form — read out of
+  `pg_get_expr(polqual/polwithcheck)`, not pattern-matched.
+- `private.push_endpoint_allowed` has `proconfig = search_path=""`.
+- `anon` EXECUTE on `public.complete_signup_intent` is **false**, with
+  `authenticated` EXECUTE **true** as the control proving the probe can see a
+  privilege that IS held.
+- The migration is recorded in `supabase_migrations.schema_migrations`.
+
+⚠️ **SO ANY DOCUMENT STILL SAYING THESE THREE ARE RED IS STALE**, including the
+`b6b43fc` changelog entry's "stay red until Jay applies the migration" and any
+session ledger pinning them as expected-red. Struck through here rather than
+deleted, per this file's own rule.
+
 **The finding underneath all of it:** eight of the fourteen staleness cases are
 migrations that shipped WITHOUT updating the harnesses they invalidated —
 `claude/runbooks/db-harnesses.md`'s "add the harness in the same commit as the
@@ -450,6 +470,38 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   personal/non-commercial only, and StatusCake deactivates accounts idle 90 days.
 
 ## Cheap (under an hour each)
+
+- **Two storage buckets still carry `FOR ALL` write policies and nobody has
+  audited what that grants them to READ — 31 Aug 2026, documents-repo final
+  review.** `for all`'s `using` arm is also the bucket's SELECT arm, so a write
+  rule is silently a read rule (the ruling is in `RESTORE.md`). That is exactly
+  how the documents bucket shipped with a false orphan claim, fixed by
+  `db/migrations/20260831_documents_policy_split.sql`. The **player-photo
+  write** and the **training-diagram write** were never checked. Both may be
+  perfectly fine — a bucket whose read rule is already as wide as its write rule
+  loses nothing by the conflation — but "probably fine" is precisely what the
+  documents migration header said. The check is a query, not a migration: count
+  permissive SELECT policies mentioning each bucket, the way probe 10b in
+  `db/tests/rls-documents.sql` does, and read the ones you find.
+
+- **An orphan in the `documents` bucket can be cleared by `service_role` and by
+  nobody else — no sweeper exists yet.** Measured 31 Aug 2026, probes 13d/13e in
+  `db/tests/rls-documents.sql`, and it contradicts what
+  `20260831_documents_policy_split.sql`'s header claims ("the prefix squad's
+  staff or any admin can still remove it" — they cannot). The mechanism is not a
+  mistake in any predicate: a `delete` whose `where` reads the table's own
+  columns applies the SELECT policies too, and since the split, "document read"
+  is the bucket's only SELECT path — so an object with no row is invisible to
+  everyone and therefore deletable by nobody holding a user JWT. **Not an
+  escalation and not urgent**: an orphan is unreadable, so the cost is storage
+  bytes, and `uploadDocument` already removes the file when the RPC refuses. It
+  accumulates only when that cleanup itself fails. The fix is a sweeper in the
+  `backup-player-photos` style — list bucket objects, drop any whose key no
+  `documents.storage_key` names — which is real work rather than an hour, so it
+  is the *decision* that belongs here: either build it, or write down that the
+  club accepts unbounded orphans. ⚠️ **Do NOT reach for
+  `storage.allow_delete_query`** to clear these by hand; `RESTORE.md` records why
+  that setting destroys the evidence of a delete rather than performing one.
 
 - ✅ ~~**The ticks' two small gaps (26 Aug 2026, shipped with #430).** The
   floating dock renders no ticks (its bubbles pass no `receipt`), and the
