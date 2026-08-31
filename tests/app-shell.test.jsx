@@ -836,6 +836,21 @@ describe('AppShell — the masthead hides on scroll like the dock', () => {
     expect(wrapper.className).toMatch(/desktop:translate-y-0/)
     expect(wrapper.className).toMatch(/desktop:opacity-100/)
   })
+
+  // Width parity with the bottom dock (31 Aug 2026, Jay: "widen the top bar
+  // to match"). The dock widened to a 6px inset from 360px up for caption
+  // corner room (nav.test.jsx pins its half); the masthead follows with the
+  // same gate and the same 6px (px-1.5), so the two islands read as one
+  // chrome. jsdom computes no pixels — these pin the classes, both the
+  // gated 6px and the ungated 12px floor below 360.
+  it('matches the dock: px-3 floor, 6px padding from 360px up, desktop untouched', () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    renderShell()
+    const wrapper = screen.getByTestId('masthead-wrapper')
+    expect(wrapper.className).toContain('px-3')
+    expect(wrapper.className).toContain('min-[360px]:px-1.5')
+    expect(wrapper.className).toContain('desktop:px-4')
+  })
 })
 
 describe('chrome-free conversations (Jay, 25 Aug 2026)', () => {

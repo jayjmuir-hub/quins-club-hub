@@ -10,14 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Documents repo implementation PLANNED, not built** —
+- **The masthead widens to match the dock.** #573 widened the bottom bar to
+  a 6px inset from 360px up (caption corner room); the top island kept its
+  12px and the two edges of the chrome stopped lining up. Same gate, same
+  6px (`min-[360px]:px-1.5` on the masthead wrapper), measured pixel-aligned
+  with the dock at 375px; below 360 and on desktop nothing changes. A parity
+  test pins both halves. `src/components/AppShell.jsx`,
+  `tests/app-shell.test.jsx`. (SHA follows in the next changelog-touching
+  PR.)
+- `eecf41e` — **Documents repo implementation PLANNED, not built** —
   `claude/plans/2026-08-31-documents-repo-implementation.md`. The merged spec
   (`1b7c59a`) turned into nine executable tasks: migration with RLS + RPCs
   (junction table over the notice fan-out precedent, with the argument
   recorded), a rolled-back RLS harness with fault injection, pure helpers,
   file-first data layer, upload sheet, the `/documents` member door, the
-  Squad Hub staff door, the push branch, and the live-verify sweep. (SHA
-  follows in the next changelog-touching PR.)
+  Squad Hub staff door, the push branch, and the live-verify sweep.
 - `517b6ab` — **Group-chat @ mentions SHIPPED — and the harness caught a push leak before
   the club could.** The channels' @ button in the group composer (dock
   included), fed from the loaded member list — no new RPC; `sendDirectMessage`
