@@ -1,7 +1,60 @@
 # Chat photo albums — implementation plan 2 of 4: the composer
 
-**Status: NOT SHIPPED — plan only, 1 Sep 2026.** Update this line when it
-ships and record deviations here.
+**Status: BUILT, NOT YET MERGED — 1 Sep 2026.** Tasks 1 to 6 are done and
+green; task 7 (the release) is Jay's call and has not happened. Update this
+line when it merges.
+
+## ⚠️ Deviations from this plan, and why
+
+**1. The task ORDER was changed: 4 and 5 were done together, before 2 and 3.**
+As written, task 2's own tests assert on `tray-thumb` — which task 5 draws —
+against a `tray` on the thread object that task 4 puts there. In the plan's
+order those tests could not pass at all, and the intermediate state would have
+been a tray holding three photos above a send that posts one, which is a
+silent-data-loss shape nobody should be able to reach even mid-branch. Same end
+state; each task's tests are unchanged and still written first.
+
+**2. `attachments` joined the SELECT list and `forwardMessagesTo` now carries
+the whole album.** Not in the plan. `attachment_path` is the FIRST key only, so
+forwarding by it silently drops every photo after the first — a data-loss path
+that plan 2 CREATES by making albums sendable. It is closed in the same commit
+that opens it rather than left for plan 3.
+
+**3. `PICKER_ACCEPT` was added to `imageResize.js`.** Task 1 merged two copies
+of the accepted-types list; the hand-typed `accept` string was its THIRD, in
+five components. Derived now, so it cannot drift. Both chat composers use it;
+⚠️ **`IdeaForm.jsx`, `MyPhotoField.jsx` and `PhotoField.jsx` still spell it
+out** and were left alone as out of scope.
+
+**4. Task 6's "album fixture" also mirrors the DERIVED columns.** A stub row
+now carries `attachments`, `attachment_paths` and `attachment_path` exactly as
+the trigger produces them — a fixture showing a shape the real thing never
+produces is worse than no fixture.
+
+**5. Sequential upload, not bounded-parallel.** The plan allowed either. A
+truthful counter over out-of-order concurrent uploads is a second piece of
+correctness for a gain nobody has measured; the note is in `uploadAlbum.js`.
+
+## ⚠️ Traps this work hit that the plan did not predict
+
+- **A WORKTREE SHIPS WITH NO `.env` AND NO `node_modules`** — the same trap
+  `CLAUDE.md` documents for the second jay-pc clone, and it applies to every
+  `.claude/worktrees/` checkout. Without `.env`, a block of tests fails to
+  COLLECT with a Supabase env-var error, which reads as a broken suite and is
+  not one. Copy it from the parent clone; it is gitignored and holds only the
+  public URL and publishable key. ⚠️ **`tests/pwa-build.test.js` CANNOT pass in
+  a worktree at all** — it spawns `node_modules/vite/bin/vite.js` by a
+  cwd-relative path. It passes in CI, which is a fresh clone.
+- **`origin/main` moved mid-branch and another session had ALREADY paid
+  `334f11e`'s changelog SHA.** Exactly the collision the handoff warns about.
+  Fetch and read what `main` already cites before citing anything.
+- **The Browser pane could not screenshot the harness DM thread** — timeouts and
+  a blank grey frame while the page was demonstrably rendered (geometry
+  measured, `elementFromPoint` returning the composer textarea). ⚠️ **Do not
+  read that blank frame as a layout regression**, which is the obvious wrong
+  conclusion when you have just wrapped the pane in a new div. Verified instead
+  by driving real `DragEvent`/`ClipboardEvent` with a real `DataTransfer`, which
+  is stronger evidence than a picture: jsdom has neither.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use
 > `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
@@ -81,7 +134,7 @@ becomes one hook.
 them. Move `isAcceptableImage` next to the types in `imageResize.js`, keep one
 list, and re-export from `PhotoPositioner.jsx` so its consumers are untouched.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 import { describe, it, expect } from 'vitest'
@@ -115,7 +168,7 @@ describe('useAttachmentTray', () => {
 })
 ```
 
-- [ ] **Step 2: Run them and confirm they FAIL**
+- [x] **Step 2: Run them and confirm they FAIL**
 
 ```bash
 npm run test:related -- src/lib/useAttachmentTray.js
@@ -124,7 +177,7 @@ npm run test:related -- src/lib/useAttachmentTray.js
 Expected: module not found. ⚠️ If the cap test passes before you write the
 cap, the fixture is not discriminating — fix it before continuing.
 
-- [ ] **Step 3: Move the gate to live beside the types**
+- [x] **Step 3: Move the gate to live beside the types**
 
 In `src/lib/imageResize.js`, after `UPLOAD_TYPES`:
 
@@ -147,7 +200,7 @@ so existing importers keep working:
 export { isAcceptableImage, ACCEPTED_IMAGE_TYPES } from '../lib/imageResize.js'
 ```
 
-- [ ] **Step 4: Write the hook**
+- [x] **Step 4: Write the hook**
 
 ```js
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -221,7 +274,7 @@ export function useAttachmentTray() {
 }
 ```
 
-- [ ] **Step 5: Confirm the tests pass, then commit**
+- [x] **Step 5: Confirm the tests pass, then commit**
 
 ```bash
 npm run test:related -- src/lib/useAttachmentTray.js
@@ -239,7 +292,7 @@ handler must do nothing at all unless the clipboard actually carries image
 files, and must not call `preventDefault()` otherwise — breaking ordinary
 paste into the message box would be a far worse bug than the one being fixed.
 
-- [ ] **Step 1: The failing tests — both directions**
+- [x] **Step 1: The failing tests — both directions**
 
 ```js
 it('attaches an image from the clipboard', async () => {
@@ -261,9 +314,9 @@ it('⚠️ leaves a TEXT paste completely alone', () => {
 })
 ```
 
-- [ ] **Step 2: Run, confirm both fail**
+- [x] **Step 2: Run, confirm both fail**
 
-- [ ] **Step 3: Add the handler to the textarea**
+- [x] **Step 3: Add the handler to the textarea**
 
 ```jsx
 onPaste={(e) => {
@@ -278,7 +331,7 @@ onPaste={(e) => {
 screenshots are ten identical names — **the tray shows thumbnails, not
 names.**
 
-- [ ] **Step 4: Confirm pass. Commit.**
+- [x] **Step 4: Confirm pass. Commit.**
 
 ## Task 3: Drop on the whole conversation
 
@@ -306,7 +359,7 @@ scrolls the page.** Check by hand on a real phone; no unit test catches it.
 That session confirmed **no** document-level drag/drop/paste listeners exist
 elsewhere, so there is nothing to fight over.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```js
 it('shows the overlay only when FILES are dragged', () => { /* types: ['Files'] vs ['text/plain'] */ })
@@ -320,7 +373,7 @@ it('⚠️ prevents the browser default so the draft is not lost', () => {
 it('does not flicker: dragleave over a child keeps the overlay up', () => { /* counter */ })
 ```
 
-- [ ] **Step 2: Run, confirm they fail. Step 3: implement. Step 4: confirm. Commit.**
+- [x] **Step 2: Run, confirm they fail. Step 3: implement. Step 4: confirm. Commit.**
 
 Follow the house pattern — a function taking `File` objects directly, so the
 picker, paste and drop all reach the same gate. Established twice already:
@@ -334,7 +387,7 @@ which is why traps 2 and 3 are new here.
 `src/data/messages.js`, `src/data/chatMedia.js`.
 **Test:** `tests/chat-album-send.test.js` (create).
 
-- [ ] **Step 1: The failing tests**
+- [x] **Step 1: The failing tests**
 
 ```js
 it('uploads every photo and sends ONE message carrying all of them', async () => {
@@ -357,9 +410,9 @@ it('⚠️ on a failed upload sends NOTHING, deletes what it uploaded, and keeps
 })
 ```
 
-- [ ] **Step 2: Run, confirm all three fail.**
+- [x] **Step 2: Run, confirm all three fail.**
 
-- [ ] **Step 3: Implement the send**
+- [x] **Step 3: Implement the send**
 
 ```js
 const uploaded = []
@@ -387,7 +440,7 @@ fixed line → Supabase Tokyo, 15-second hangs). Sequential is honest but slow;
 if you parallelise, bound it (3 at a time) and keep the counter truthful. The
 button must say **"Sending 3 of 10…"**, never spin blankly.
 
-- [ ] **Step 4: Update the four exact-shape assertions**
+- [x] **Step 4: Update the four exact-shape assertions**
 
 ⚠️ **Adding an option to `sendDirectMessage` breaks tests that pin the whole
 options object.** Measured 31 Aug; **re-grep before trusting this table**:
@@ -405,7 +458,7 @@ grep -rn "quotedId" tests/ | grep -E "toHaveBeenCalledWith|toEqual"
 ⚠️ **Do not loosen them to `expect.objectContaining`.** The exactness is what
 would catch a stray option reaching the database.
 
-- [ ] **Step 5: `npm test`, then commit.**
+- [x] **Step 5: `npm test`, then commit.**
 
 ## Task 5: The tray UI
 
@@ -422,7 +475,7 @@ scrolling strip, each with its own ×, plus a count. `data-testid="tray-thumb"`.
 - ⚠️ **Do not strip `data-testid="profile-icon"`** from author labels while
   editing this JSX (Message Tagging, 31 Aug).
 
-- [ ] Failing test → run → implement → confirm → commit.
+- [x] Failing test → run → implement → confirm → commit.
 
 ## Task 6: Harness stubs and documentation
 
@@ -433,7 +486,7 @@ status line.
 render to PNGs that reach parent-facing guides — that is how a member's name
 and a child's address were published in August.
 
-- [ ] Add an album fixture. Commit. `npm run docs:check` **after** committing.
+- [x] Add an album fixture. Commit. `npm run docs:check` **after** committing.
 
 ## Task 7: Release
 

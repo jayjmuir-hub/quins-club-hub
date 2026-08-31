@@ -332,6 +332,18 @@ Both were on `main` and clean on 11 Aug 2026.
 step 2 must be run in **whichever one you are actually in** — `hostname` no
 longer identifies the working tree on this PC.
 
+⚠️ **A GIT WORKTREE UNDER `.claude/worktrees/` IS A THIRD, AND IT HAS THE
+SECOND CLONE'S `.env` TRAP EXACTLY — measured 1 Sep 2026 on cafnet.** A fresh
+worktree ships with **no `.env` and no `node_modules` of its own**. Without
+`.env`, a block of test files fails to COLLECT with
+`Missing required Supabase env var(s)` while the great majority still pass,
+which reads as a broken suite and is not one — `cp` it from the parent clone;
+it is gitignored and holds only the public URL and the publishable key.
+⚠️ **And `tests/pwa-build.test.js` CANNOT pass in a worktree at all**: it
+spawns `node_modules/vite/bin/vite.js` by a cwd-relative path that resolves to
+nothing there. It passes in CI, which is a fresh clone. **Do not chase either
+one as a regression, and do not report a suite as red because of them.**
+
 ⚠️ **The `NODE_ENV` row is why rule 8 exists, and it was wrong twice in
 opposite directions before it was ever run.** It said "cafnet only" in three
 files until 7 Aug; that was corrected to "BOTH PCs", asserted about cafnet from
