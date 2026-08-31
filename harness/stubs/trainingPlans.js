@@ -81,3 +81,22 @@ export async function setSessionVisibility() { return {} }
 export async function submitDrillToClub() { return {} }
 export async function submitTemplateToClub() { return {} }
 export async function upsertDrill(d) { return { id: 'd-new', ...d } }
+
+// ---- the rest of the real module's surface (the club/RPD review flow and the
+// pure publish helpers). The guide never exercises these, but harness/main.jsx
+// imports every screen into one bundle, so a real named export the stub lacks
+// is an unresolved import that blanks every scenario — and tests/harness-stubs
+// .test.js pins full export parity for exactly that reason. Mirror them all. ----
+export async function listSubmittedDrills() { return [] }
+export async function approveDrillToClub() { return {} }
+export async function dismissDrillSubmission() { return {} }
+export async function setDrillActive() { return {} }
+export async function listSubmittedTemplates() { return [] }
+export async function approveTemplateToClub() { return {} }
+export async function dismissTemplateSubmission() { return {} }
+export async function saveTemplate() { return { id: 't-new' } }
+export async function setTemplateActive() { return {} }
+export async function upsertFocus(f) { return { id: 'f-new', ...f } }
+export async function deleteFocus() { return {} }
+export function previewPublish() { return { blocks: BLOCKS, minutes: totalMinutes(BLOCKS) } }
+export function publish() { return { ...SESSION } }

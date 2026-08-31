@@ -107,6 +107,11 @@ const ALIASES = [
   // Pins/archive and the per-chat wallpaper (26 Aug 2026) — ChatList and
   // both thread hooks reach Supabase through it.
   ['harness/stubs/chatPrefs.js', 'src/data/chatPrefs.js'],
+  // Training plans (31 Aug 2026) — the SquadTraining list, SessionPlan
+  // read/editor and TrainingShelf, populated for the coach walkthrough guide.
+  // The stub mirrors the full module (RPD review flow + publish helpers), not
+  // just the reads the guide screenshots, because main.jsx bundles every screen.
+  ['harness/stubs/trainingPlans.js', 'src/data/trainingPlans.js'],
 ]
 
 function read(relative) {
