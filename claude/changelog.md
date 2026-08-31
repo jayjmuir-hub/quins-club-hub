@@ -10,15 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **`docs:check` now refuses unresolved git conflict markers.** On 31 Aug the
+- **Shipped: the approvals queue names a possible duplicate.** A pending card
+  now says "Possible duplicate: <name> is already in this squad", and adds
+  ", with the same date of birth" when it does. ⚠️ It annotates and never
+  blocks — the Approve button is untouched, and a test asserts that rather
+  than trusting it. Two things the design got wrong, both corrected in the
+  spec rather than quietly dropped: the roster is NOT already in memory (it
+  loads lazily, so the queue reads the pending squads' rosters instead), and
+  the first twins fixture was five edits apart, which meant it passed with the
+  matcher deliberately broken. Both found by measuring, not reasoning.
+- **Design: flag a possible duplicate at APPROVAL, not at registration.**
+  A second duplicate roster row reached a contact squad — a child registering
+  himself weeks after a parent had registered him. The 14 Aug guard could not
+  have caught it: it compares first and last name tokens EXACTLY, and the two
+  spellings were different transliterations of the same name, one letter apart.
+  The design puts a fuzzy check where the person reading it can already see the
+  roster, so the match may be loose and may name what it matched. ⚠️ Date of
+  birth is corroboration only, never a trigger — the roster holds a pair of
+  twins who would otherwise be flagged forever.
+  `claude/specs/2026-08-31-duplicate-at-approval-design.md`.
+- `b44adcb` — **`docs:check` now refuses unresolved git conflict markers.** On 31 Aug the
   changelog was hand-resolved fourteen times in one day — the one-behind rule
   serialises every PR through it — and the checker would have passed a file
   still carrying `<<<<<<<` / `>>>>>>>` straight onto main (found by the
   validator session, confirmed against the script with a control). Scans every
   tracked file the script already reads; proven by planting all three marker
   forms (each fails) and a longer heading underline (passes). Also catches up
-  two uncited docs merges below. (SHA follows in the next changelog-touching
-  PR.)
+  two uncited docs merges below.
 - `6bec4d1` — **Handoff: chat photo albums.** A session record for whoever picks this up —
   what is live, the safeguarding rule that must not be broken, and the traps
   this work actually hit. ⚠️ **It records four corrections to its own author’s
@@ -221,6 +239,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   evidently not enough. Seven tray tests written to fail first, including a
   cap that holds across SEPARATE adds and a file still accepted when its
   preview cannot be made. `src/lib/useAttachmentTray.js`.
+- `3ab701e` — Home returns to the far left, on every bar.
 - `488bdf6` — **Plan 2 of 4: the composer — paste, drag-and-drop and the ten-photo tray.**
   The first plan in this series that DEPLOYS; plan 1 and the metadata reshape
   were database-only and cost nothing. Seven tasks: one shared tray hook

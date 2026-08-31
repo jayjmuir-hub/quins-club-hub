@@ -37,6 +37,7 @@ import {
 import { listPlayerPrivate, listPlayers } from '../data/players.js'
 import { listParentsForPlayers } from '../data/parents.js'
 import { missingForPlayer } from '../lib/completeness.js'
+import { findPossibleDuplicates } from '../lib/duplicateMatch.js'
 import { listVouches, setVouch, tallyVouches } from '../data/vouches.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
@@ -292,6 +293,7 @@ function PendingApprovals({
   onApprove,
   playsUpByPlayer = new Set(),
   gapsByPlayer = new Map(),
+  duplicatesByPlayer = new Map(),
   vouchesByMembership = new Map(),
   onVouch = () => {},
   onOpenCard = null,
@@ -330,6 +332,8 @@ function PendingApprovals({
           const registered = formatJoined(member.created_at)
           const playsUp = member.player_id ? playsUpByPlayer.has(member.player_id) : false
           const gaps = (member.player_id ? gapsByPlayer.get(member.player_id) : null) ?? []
+          const duplicates =
+            (member.player_id ? duplicatesByPlayer.get(member.player_id) : null) ?? []
           const vouch = vouchesByMembership.get(member.id) ?? { known: 0, unknown: 0, mine: null }
 
           return (
@@ -398,6 +402,40 @@ function PendingApprovals({
                     className={`mt-1 block text-[12.5px] ${MUTED_ON_PAPER}`}
                   >
                     Still missing: {gaps.map((gap) => gap.label).join(', ')}
+                  </span>
+                )}
+
+                {/* ⚠️ POSSIBLY THE SAME CHILD, SAID WHERE SOMEBODY CAN CHECK
+                    IT. The database guard refuses an EXACT name match at
+                    registration; it cannot see a different transliteration of
+                    one name, which is how a second roster row reached U16 on
+                    31 Aug 2026. The rule is src/lib/duplicateMatch.js.
+
+                    ⚠️ IT NAMES THE ROW IT MATCHED, AND ONLY HERE. At
+                    registration that would be an enumeration oracle — see the
+                    disclosure note in 20260814_registration_duplicate_guards.sql
+                    — but this reader can already open the roster and read every
+                    name on it, so naming it discloses nothing new.
+
+                    ⚠️ IT DOES NOT BLOCK APPROVAL, exactly like the gaps line
+                    above. Most flags will be RIGHT, and the approver is then
+                    approving a real person whose record needs merging
+                    afterwards; leaving a family waiting on a fuzzy string
+                    match would be the worse failure of the two. */}
+                {duplicates.length > 0 && (
+                  <span
+                    data-testid="possible-duplicate"
+                    className="mt-1 block text-[12.5px] font-semibold text-ink"
+                  >
+                    Possible duplicate:{' '}
+                    {duplicates
+                      .map(
+                        (row) =>
+                          `${row.full_name} is already in this squad${
+                            row.sameDob ? ', with the same date of birth' : ''
+                          }`,
+                      )
+                      .join('; ')}
                   </span>
                 )}
 
@@ -1067,6 +1105,10 @@ export default function Accounts() {
   // shared rule in src/lib/completeness.js. The SECOND of that rule's three
   // surfaces (item 6); the family's own card is the first.
   const [gapsByPlayer, setGapsByPlayer] = useState(() => new Map())
+  // player id -> roster rows that may be the SAME CHILD, from the shared rule
+  // in src/lib/duplicateMatch.js. `sameDob` corroborates the wording only; see
+  // that module's header for why a birthday must never raise the flag itself.
+  const [duplicatesByPlayer, setDuplicatesByPlayer] = useState(() => new Map())
   // membership id -> { known, unknown, mine }. Item 8: who recognises the person
   // in the queue. See src/data/vouches.js.
   const [vouchesByMembership, setVouchesByMembership] = useState(() => new Map())
@@ -1075,6 +1117,7 @@ export default function Accounts() {
     if (pendingPlayerIds.length === 0) {
       setPlaysUpByPlayer(new Set())
       setGapsByPlayer(new Map())
+      setDuplicatesByPlayer(new Map())
       return undefined
     }
 
@@ -1084,7 +1127,7 @@ export default function Accounts() {
     // children's birthdays and contact rows into an admin's browser to answer a
     // question about a handful of cards.
     Promise.all([listPlayerPrivate(pendingPlayerIds), listParentsForPlayers(pendingPlayerIds)])
-      .then(([privateRows, parentRows]) => {
+      .then(async ([privateRows, parentRows]) => {
         if (!active) return
         setPlaysUpByPlayer(
           new Set(privateRows.filter((row) => row.plays_up_confirmed_at).map((row) => row.player_id)),
@@ -1128,6 +1171,71 @@ export default function Accounts() {
               ]),
           ),
         )
+
+        // ⚠️ THE PENDING SQUADS' ROSTERS, NOT THE CLUB'S — AND NOT THE `players`
+        // STATE ABOVE. That one is loaded LAZILY, only when an access builder
+        // opens, precisely so ~315 rows are not fetched on every visit to this
+        // screen. Reading it here would have meant loading the whole club to
+        // answer a question about a handful of cards, and reusing it without
+        // loading it was worse: measured 31 Aug 2026, the state was still `[]`
+        // when this ran, so the warning silently never appeared.
+        //
+        // A duplicate is only ever looked for WITHIN one squad, so one squad is
+        // all this needs. That is a handful of rows per pending card, and it is
+        // the same "no wider than the decision" rule the reads above follow.
+        const pendingTeamIds = [
+          ...new Set(pendingMembers.map((member) => member.team_id).filter(Boolean)),
+        ]
+        const squadRoster = pendingTeamIds.length ? await listPlayers({ teamIds: pendingTeamIds }) : []
+        if (!active) return
+
+        // ⚠️ NAMES FIRST, BIRTHDAYS SECOND, AND THAT ORDER IS THE PRIVACY
+        // ARGUMENT: only the rows a name has ALREADY matched get their birthday
+        // read, and those are the rows the card is about to name anyway.
+        const matches = new Map()
+        for (const member of pendingMembers) {
+          if (!member.player_id || !member.team_id) continue
+          const found = findPossibleDuplicates({
+            // From the embed rather than the roster read: the pending child's
+            // own row is in `squadRoster` too, but a card must still work if a
+            // slow read has not returned it yet.
+            player: {
+              id: member.player_id,
+              team_id: member.team_id,
+              full_name: member.players?.full_name ?? null,
+            },
+            roster: squadRoster,
+          })
+          if (found.length > 0) matches.set(member.player_id, found)
+        }
+
+        const candidateIds = [...new Set([...matches.values()].flat().map((row) => row.id))]
+        const candidateDob = candidateIds.length
+          ? new Map(
+              (await listPlayerPrivate(candidateIds)).map((row) => [
+                row.player_id,
+                row.date_of_birth ?? null,
+              ]),
+            )
+          : new Map()
+        if (!active) return
+
+        setDuplicatesByPlayer(
+          new Map(
+            [...matches].map(([playerId, found]) => [
+              playerId,
+              found.map((row) => ({
+                full_name: row.full_name,
+                // ⚠️ `Boolean(...)` FIRST — two children with no birthday on
+                // file both read `null`, and without this every such pair
+                // would be reported as sharing one.
+                sameDob:
+                  Boolean(dobByPlayer.get(playerId)) &&
+                  dobByPlayer.get(playerId) === candidateDob.get(row.id),
+              })),
+            ]),
+          ),
+        )
       })
       // ⚠️ SWALLOWED, AND THE CHIPS SIMPLY DO NOT APPEAR. These are extra facts
       // on a card that is already complete without them; turning a failed read
@@ -1137,11 +1245,18 @@ export default function Accounts() {
         if (!active) return
         setPlaysUpByPlayer(new Set())
         setGapsByPlayer(new Map())
+        setDuplicatesByPlayer(new Map())
       })
 
     return () => {
       active = false
     }
+    // ⚠️ THE ROSTER IS READ INSIDE, NOT DEPENDED ON — and that is deliberate
+    // after a measured mistake on 31 Aug 2026. The first attempt matched
+    // against the `players` STATE, which is loaded lazily by the access
+    // builder: it was still `[]` when this ran, so the duplicate warning never
+    // appeared, and adding it to this key would have coupled the queue to a
+    // read it does not otherwise need.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the ids,
     // like the memo above; `pendingMembers` is rebuilt every render.
   }, [pendingPlayerIds])
@@ -1757,6 +1872,7 @@ export default function Accounts() {
             onApprove={approve}
             playsUpByPlayer={playsUpByPlayer}
             gapsByPlayer={gapsByPlayer}
+            duplicatesByPlayer={duplicatesByPlayer}
             vouchesByMembership={vouchesByMembership}
             onVouch={handleVouch}
             onOpenCard={setCardFor}
@@ -1842,6 +1958,7 @@ export default function Accounts() {
           onApprove={approve}
           playsUpByPlayer={playsUpByPlayer}
           gapsByPlayer={gapsByPlayer}
+          duplicatesByPlayer={duplicatesByPlayer}
           vouchesByMembership={vouchesByMembership}
           onVouch={handleVouch}
           onOpenCard={setCardFor}
