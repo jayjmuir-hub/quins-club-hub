@@ -242,6 +242,56 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
 - Parent tap on a tournament game → `/match-sheet/:id` (`Schedule.jsx:915`) they
   usually cannot use — UX rough edge, not a leak.
 
+### Realtime — NEEDS A LIVE MEASUREMENT (31 Aug 2026, Grok re-review + peer probe)
+
+- **Does Supabase Realtime's walrus actually filter role-channel / welfare /
+  DM message rows out of a RAW-websocket non-member's `postgres_changes`
+  stream?** `public.messages` and `public.conversations` are both in the
+  `supabase_realtime` publication (confirmed live), RLS is enabled, and the
+  `message read` / `conversation read` SELECT policies are CORRECT (role
+  channels → `in_role_channel`, DMs → `in_conversation`/`admin_may_review`).
+  **Our own client is RLS-safe regardless**: `subscribeToTable`
+  (`src/data/subscribeToTable.js`) forwards a NO-ARG "something changed,
+  re-read" callback and refetches through PostgREST — it never reads the
+  realtime payload. So the ONLY threat is an attacker on a raw Realtime
+  websocket reading walrus's delivered row. Walrus runs the same SELECT
+  policy per-subscriber in the subscriber's role/claims (SECURITY DEFINER
+  helpers read `auth.uid()` identically to a REST select), so it is
+  **structurally equivalent to the REST path that already filters** —
+  confidence HIGH that it filters. But documented ≠ measured, and the
+  measurement needs a real non-member user JWT on a raw websocket, which
+  Claude cannot construct (no account/token handling). **Action:** Jay (or a
+  peer) runs a ~5-min two-client raw-websocket test — one non-member socket
+  subscribed to `postgres_changes` on `public.messages`, then post a
+  welfare/role-channel message as someone else and read the raw channel
+  payload as the non-member. Same question covers `feedback` (admin-only,
+  could name incidents). **If it leaks**, the fix is a broadcast-only reload
+  signal (a trigger emits a broadcast on insert; the client subscribes to
+  broadcast instead of `postgres_changes`) — a real migration + client
+  change. ⚠️ **Dropping `messages` from the publication is NOT a zero-UX fix**
+  — the live-chat reload signal IS the `postgres_changes` event, so dropping
+  it kills live refresh. Broadcast-only is the belt-and-braces path, gated on
+  the measurement or Jay's preference for children's messages.
+
+### Cosmetic non-findings (recorded, deliberately NOT fixed in a security pass)
+
+- **`message_reads` INSERT is exists-only, not see-able.** `"message mark
+  read"` WITH CHECK is `profile_id = auth.uid() AND EXISTS(a message with
+  that id)` — it does not check the reader can SEE the message. Practically
+  inert: `message_id` is an unguessable UUID, so an attacker cannot target an
+  unreadable message, and the insert leaks nothing back to them (worst case a
+  spoofed "X read your message" to the author, which still needs the UUID).
+  Tightening would mean the INSERT policy replicating the whole `message
+  read` CASE for no real gain.
+- **An author can pin their own post directly, bypassing `set_message_pinned`.**
+  `pinned` is in the `messages` column-UPDATE grant and the `"message edit"`
+  USING admits `author_id = auth.uid()`, so `UPDATE messages SET pinned=true
+  WHERE id=<own row>` succeeds even though the RPC restricts pinning to staff
+  and refuses role channels (`'unknown channel'`). Boolean flag only — no data
+  exposed or destroyed. Pre-existing from the 24 Aug pin work, not introduced
+  by any 30 Aug surface. Backlog fix if wanted: freeze `pinned` for non-staff
+  in `touch_message`, or drop `pinned` from the column grant.
+
 ## Needs Jay (account creations — Claude does not do these)
 
 - **Should a player with their OWN account still count as "no parent on
