@@ -10,7 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Messages carry a LIST of attachments — the album migration is LIVE.**
+- **Spec + phase 1 plan: Club Diary — dated items nobody replies to.** Four of
+  the seven lines on the club's own "3 week look ahead" poster are dated,
+  calendar-worthy items with nothing to RSVP to (shop opening, ball collection,
+  kit collection), and the app can only file them as Socials carrying an
+  availability list nobody will fill in, or as Notices, which have no date and
+  so cannot reach a subscribed calendar at all. Adds a fifth chooser kind backed
+  by an `info_only` column, NOT a fourth `events.type` — following the
+  two-day-old Tournament precedent, because `type` is read by a dozen three-way
+  branches that would fall through silently. **Split into two phases on Jay's
+  call:** phase 1 is Club Diary alone, which changes no SQL function and no edge
+  function; phase 2 is a real `all_day` state — held distinct from `time_tbd`,
+  because the feed's own comment says an unexplained all-day entry makes a
+  different and wrong claim — plus multi-day spans on the existing `ends_at`.
+  Phase 2 is specified now so its reasoning is not re-argued from scratch. The
+  plan is ten TDD tasks, each naming the fault to inject to prove its test
+  discriminates, with controls where a bare negative would be ambiguous. ⚠️ One
+  assertion is deliberately NOT automated: "a diary event still exports to the
+  calendar" cannot be a unit test, because the feed is a Deno function with
+  `Deno.serve()` at module scope that the suite cannot execute — so it is a live
+  post-deploy check rather than a source-text assertion that would pass for the
+  wrong reason. Records the arguments AGAINST each choice, including the read
+  receipts a Club Diary gives up by not being a notice.
+  `claude/plans/2026-08-31-club-diary.md`,
+  `claude/plans/2026-08-31-club-diary-implementation.md`.
+  (SHA follows in the next changelog-touching PR.)
+- `918fa59` — **Messages carry a LIST of attachments — the album migration is LIVE.**
   Plan 1 of 4, the expand half of expand-then-contract: `attachment_paths`
   added and backfilled, a `<= 10` check constraint, a sync trigger keeping
   `attachment_path` and element 1 in step BOTH ways so phones on a cached PWA
@@ -30,7 +55,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `my_chats` picks the latest with no tie-break; the backfill merely
   perturbed scan order. Staggered explicitly. No deploy — the app half ships
   with plan 2. `db/migrations/20260901_message_attachment_list.sql`.
-  (SHA follows in the next changelog-touching PR.)
 - `f7dc697` — **Implementation plan 1 of 4: the data foundation for chat photo albums.**
   The spec is four independently shippable pieces, not one; a single plan
   would be a document nobody could review half of. Plan 1 is deliberately
