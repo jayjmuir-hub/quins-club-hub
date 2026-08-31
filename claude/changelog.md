@@ -20,7 +20,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   now on `scripts/netlify-ignore.mjs`'s DEPLOY_IRRELEVANT list beside
   `.cursor/` — it steers Claude sessions and can never reach `dist/`, so a
   skill edit no longer spends a build. Proven red-then-green in
-  `tests/netlify-ignore.test.js`. (SHA follows in the next changelog-touching
+  `tests/netlify-ignore.test.js`. Also defused a date bomb this PR trod on:
+  two `tests/allocation.test.jsx` direct-assignment tests used a singular
+  `findByRole` for the U16B event button, which went ambiguous the Monday
+  (31 Aug) the default week view first contained the 5 Sep fixture — the
+  event then renders in both the waiting list and the grid. Now
+  `findAllByRole(...)[0]`, matching `throughDetail` beside them, which is why
+  only two of the three broke. (SHA follows in the next changelog-touching
   PR.)
 
 ## 30 Aug 2026
