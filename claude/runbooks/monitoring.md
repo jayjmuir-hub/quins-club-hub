@@ -118,7 +118,12 @@ green while the check it vouches for is off would be worse than none. Until
 the secret below exists the step says "no heartbeat sent" and passes: inert,
 not red, same pattern as the harnesses themselves.
 
-**Jay's steps — in this order, because the order itself is the firing proof:**
+**The steps — in this order, because the order itself is the firing proof.
+✅ STEP 1 DONE 31 Aug 2026** (created through Jay's own browser session on his
+"drive everything" instruction; the URL was left uncopied on purpose — the
+runbook's Claude-never-handles-it rule stands, and step 2's wait makes the
+secret tomorrow's job anyway). **Steps 2-4 are live: the drill is running
+now**, so expect the "heartbeat missing" alert within ~30 hours of creation.
 
 1. **In Better Stack:** Heartbeats → **Create heartbeat**. Name
    `db-check nightly`, period **1 day**, grace **6 hours** (the run starts

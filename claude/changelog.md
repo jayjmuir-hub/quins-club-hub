@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Spec: chat photo albums — paste, drag-and-drop, up to ten a message.**
+- **The nightly is GREEN, the alerting is armed, and the #589 issue step is
+  fixed.** Three closings in one PR: (1) `harness_drift_fixes` APPLIED to
+  production on Jay's "drive everything" — all harnesses pass, the first fully
+  green run since 22 Aug; a duplicate history row from two sessions applying
+  concurrently was removed the same hour (duplicate rows are the
+  branching-breaker). (2) The #589 issue step had put body text at column 0
+  inside a `run: |` block scalar, which ENDS the block — GitHub could not
+  parse the workflow and dispatch 422'd; body is now printf-built, proven by
+  the same dispatch command failing against main and succeeding against the
+  fix (run 33376108406, green end-to-end). (3) The Better Stack heartbeat
+  `db-check nightly` (1 day / 6 h grace) was created via Jay's browser; the
+  no-secret drill is running — the "missing" alert must fire before the
+  `DB_CHECK_HEARTBEAT_URL` secret goes in. `claude/open-items.md` Category B
+  struck through with evidence. (SHA follows in the next changelog-touching
+  PR.)
+- `fac8488` — **Spec: chat photo albums — paste, drag-and-drop, up to ten a message.**
   Jay could not paste a picture into a chat. ⚠️ **Paste never existed** —
   `onPaste`/`clipboardData` appear in zero commits, all branches, all history
   (control: `git log -S"pickPhoto"` finds its three). Drag-and-drop DOES
@@ -24,8 +39,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   harnesses go red under this change, not two (`my-chats-attachment.sql` was
   missed), and `my_chats()` has **six** arms, not five —
   `20260830_role_channels.sql` added the sixth the day before, and the
-  harness comment saying five was fixed by #589 while this PR was open. `claude/plans/2026-08-31-chat-photo-albums.md`. (SHA follows in the
-  next changelog-touching PR.)
+  harness comment saying five was fixed by #589 while this PR was open.
+  `claude/plans/2026-08-31-chat-photo-albums.md`.
 - `711f6cf` — **A red db-check nightly now opens a GitHub issue.** Nine red nights
   (22-30 Aug) went unseen because the failure emails demonstrably reached
   nobody; the issue ("The db-check nightly is red", one issue bumped per
@@ -34,9 +49,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   grants harness's anon-arm coupling to concurrent sessions' migrations
   documented, and my-chats-attachment's "five branches" comment fixed to
   six (role channels made it wrong the day after it was written; only the
-  DM arm has last-attachment coverage). The Better Stack heartbeat is
-  still waiting on Jay's four steps in `claude/runbooks/monitoring.md`.
- 
+  DM arm has last-attachment coverage). The Better Stack heartbeat was
+  still waiting on Jay's four steps in `claude/runbooks/monitoring.md`
+  when this shipped; see the entry above.
 - `b6b43fc` — **The 16 red db harnesses triaged — 14 repointed, 3 real drifts get
   `db/migrations/20260831_harness_drift_fixes.sql` (NOT yet applied).** The
   nightly had been red since 22 Aug, unnoticed. Every failure measured against
