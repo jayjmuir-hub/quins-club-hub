@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   DOCUMENT_CATEGORIES, MAX_DOCUMENT_BYTES, validateDocumentFile,
-  canUploadDocuments, uploadableTeamIds, filterDocuments,
+  canUploadDocuments, uploadableTeamIds, filterDocuments, mayDeleteDocument,
 } from '../src/lib/documents.js'
 
 const active = (role, teamId) => ({ role, team_id: teamId, status: 'active' })
@@ -59,5 +59,48 @@ describe('documents lib', () => {
       .map((d) => d.id)).toEqual(['a', 'b'])
     expect(filterDocuments(docs, { teamId: 't2' })
       .map((d) => d.id)).toEqual(['a'])
+  })
+})
+
+// mayDeleteDocument mirrors private.can_manage_document
+// (db/schema/functions.sql, via private.is_active_staff_of) — the uploader,
+// an admin, or an active COACH/MANAGER of a targeted squad. ⚠️ NOT
+// isSquadStaffRole's wider set: the DB's manage gate deliberately excludes
+// medic ("a medic reads a staff document; a coach or manager curates one"),
+// so this reuses UPLOAD_ROLES rather than a second role-set literal, keeping
+// "who may add" and "who may remove" from drifting apart.
+describe('mayDeleteDocument', () => {
+  const squadDoc = {
+    id: 'd1', created_by: 'uploader-1', club_wide: false,
+    document_squads: [{ team_id: 't1' }],
+  }
+
+  // ⚠️ THE DEFECT THIS PINS. A medic of the targeted squad passes
+  // isSquadStaffRole but must NOT see a Remove control RLS then refuses.
+  it('refuses a medic of the targeted squad — the DB manage gate excludes medic', () => {
+    expect(mayDeleteDocument(squadDoc, 'someone-else', [active('medic', 't1')])).toBe(false)
+  })
+
+  it('allows a coach of the targeted squad', () => {
+    expect(mayDeleteDocument(squadDoc, 'someone-else', [active('coach', 't1')])).toBe(true)
+  })
+
+  it('allows a manager of the targeted squad', () => {
+    expect(mayDeleteDocument(squadDoc, 'someone-else', [active('manager', 't1')])).toBe(true)
+  })
+
+  it('allows the uploader even with no staff role at all', () => {
+    expect(mayDeleteDocument(squadDoc, 'uploader-1', [active('parent', 't1')])).toBe(true)
+  })
+
+  it('allows an admin regardless of squad', () => {
+    expect(mayDeleteDocument(squadDoc, 'someone-else', [active('admin', null)])).toBe(true)
+  })
+
+  // Club-wide documents are not squad-manageable — only the uploader or an
+  // admin may remove one, never a targeting squad's own staff.
+  it('refuses a squad coach on a club-wide document, when not the uploader or an admin', () => {
+    const clubWideDoc = { id: 'd2', created_by: 'uploader-1', club_wide: true, document_squads: [] }
+    expect(mayDeleteDocument(clubWideDoc, 'someone-else', [active('coach', 't1')])).toBe(false)
   })
 })

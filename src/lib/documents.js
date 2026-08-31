@@ -56,6 +56,33 @@ export function uploadableTeamIds(memberships) {
     .map((m) => m.team_id)
 }
 
+/**
+ * May this person delete THIS document? The client-side mirror of
+ * `private.can_manage_document` (db/schema/functions.sql, via
+ * `private.is_active_staff_of`) — the uploader, an admin, or an active
+ * coach/manager of a squad the document targets.
+ *
+ * ⚠️ UPLOAD_ROLES, NOT A SQUAD-STAFF SET — deliberately narrower than
+ * `isSquadStaffRole` in scope.js (which also admits 'medic'). The database's
+ * manage gate is coach+manager only: "a medic reads a staff document; a
+ * coach or manager curates one." A medic of the targeted squad must NOT see
+ * a Remove control that RLS will refuse — mirroring the wider
+ * SQUAD_STAFF_ROLES set here would draw exactly that dead button. Reusing
+ * UPLOAD_ROLES (rather than a second role-set literal) keeps "who may add" and
+ * "who may remove" from drifting apart, since the DB defines them as the same
+ * set.
+ */
+export function mayDeleteDocument(doc, userId, memberships) {
+  if (!doc) return false
+  if (doc.created_by && doc.created_by === userId) return true
+  if (isAdmin(memberships)) return true
+  if (doc.club_wide) return false
+  const targetedIds = new Set((doc.document_squads ?? []).map((s) => s.team_id))
+  return (memberships ?? []).some(
+    (m) => isActiveMembership(m) && UPLOAD_ROLES.has(m.role) && targetedIds.has(m.team_id),
+  )
+}
+
 export function filterDocuments(docs, { category, teamId } = {}) {
   return (docs ?? []).filter((doc) => {
     if (category && doc.category !== category) return false

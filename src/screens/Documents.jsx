@@ -15,8 +15,9 @@ import {
   canUploadDocuments,
   DOCUMENT_CATEGORIES,
   filterDocuments,
+  mayDeleteDocument,
 } from '../lib/documents.js'
-import { isActiveMembership, isAdmin, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
+import { visibleTeams } from '../lib/scope.js'
 
 // The documents repo — /documents. Task 6 of
 // claude/plans/2026-08-31-documents-repo.md.
@@ -38,22 +39,6 @@ function audienceLabel(document, teamsById) {
     .map((s) => teamsById.get(s.team_id)?.name)
     .filter(Boolean)
   return names.length > 0 ? names.join(', ') : 'Your squad'
-}
-
-/**
- * The client-side mirror of who may delete a document — the uploader, an
- * admin, or staff of a squad the document targets. RLS on `documents delete`
- * is the real boundary; this only decides whether to draw the control.
- */
-function mayDeleteDocument(memberships, userId, document) {
-  if (!document) return false
-  if (document.created_by && document.created_by === userId) return true
-  if (isAdmin(memberships)) return true
-  if (document.club_wide) return false
-  const targetedIds = new Set((document.document_squads ?? []).map((s) => s.team_id))
-  return (memberships ?? []).some(
-    (m) => isActiveMembership(m) && isSquadStaffRole(m.role) && targetedIds.has(m.team_id),
-  )
 }
 
 export default function Documents() {
@@ -206,7 +191,7 @@ export default function Documents() {
 
       <div className="flex flex-col gap-2.5">
         {shown.map((document) => {
-          const canDelete = mayDeleteDocument(memberships, user?.id, document)
+          const canDelete = mayDeleteDocument(document, user?.id, memberships)
           return (
             <Card
               key={document.id}
