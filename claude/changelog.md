@@ -10,7 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **CLUB DIARY PHASE 2 SHIPPED — All day, and multi-day spans.** The third time
+- **A PHOTO-ONLY CHAT MESSAGE PUSHED A BLANK NOTIFICATION, LIVE.**
+  `push-send` composed the body as the caption alone and its `select` fetched
+  no attachment column at all, so a message with photos and no words pushed the
+  sender's name over empty space to every parent in the squad. It had been true
+  for single photos since chat photos shipped; albums (`ebda2f3`, #605) made it
+  the NORMAL case, because the whole point of dropping ten photos into a squad
+  chat is that you often type nothing. Voice-note-only messages had the same
+  bug from the same cause and are fixed by the same change.
+  ⚠️ **TWO composition sites, not one** — the DM branch and the channel branch
+  each carried the expression, and the 1 Sep handoff records only one. Patching
+  the recorded line would have left half the bug live.
+  ⚠️ **The body is a COUNT, never the filename.** `attachments` carries `name`
+  so a DOCUMENT keeps its original filename; a document named after the child it
+  concerns would put that child's name on every parent's lock screen. The
+  payload is required to carry no child's name by construction, and a count
+  keeps that property where a filename destroys it. The test asserts the
+  filename is unreachable, with a control that the field it DOES read is present.
+  ⚠️ **`messageBody()` must stay in step with `attachmentPreviewLabel()` in
+  `src/data/chatMedia.js` by hand** — a Vite bundle and a Deno function share no
+  build, the same standing arrangement `locationFor()` has with `venueLine()`.
+  `supabase/functions/push-send/index.ts`, `tests/push-body-attachments.test.js`.
+
+- `7c0cf58` — **CLUB DIARY PHASE 2 SHIPPED — All day, and multi-day spans.** The third time
   state: Timed · Time TBD · All day, one segmented control replacing the 14 Aug
   TBD checkbox, because three states drawn as two checkboxes is how a row claims
   both. `events.all_day` is mutually exclusive with `time_tbd` by CHECK
