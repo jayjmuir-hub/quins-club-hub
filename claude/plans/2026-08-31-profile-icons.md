@@ -1,6 +1,11 @@
 # Profile icons — the crown for U11
 
-**Status: SPEC ONLY — nothing here is built.** Jay's idea, 31 Aug 2026:
+**Status: SHIPPED, 31 Aug 2026 — built to this spec the same day.** Both
+migrations applied, harness green with a drop-the-policy self-test, every
+render point live. One deviation: no `conversation_mentionables`-style
+per-surface RPC anywhere — the two read paths below shipped exactly as
+specced. The live proof outstanding: Jay's first real grant, seen on a
+second account. Jay's idea, 31 Aug 2026:
 "give U11 staff a crown icon because they are the best age group users of
 Club Hub so far … super admins would be able to designate age group staff or
 individual users with cool icons." Brainstormed the same day; every ruling
