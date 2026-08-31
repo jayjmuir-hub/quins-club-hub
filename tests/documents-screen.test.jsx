@@ -158,16 +158,23 @@ describe('Documents — opening a document', () => {
   it('signs the storage key and opens the signed url in a new tab', async () => {
     const user = userEvent.setup()
     // A truthy return = the popup was allowed, which is the desktop path.
-    const openSpy = vi.spyOn(window, 'open').mockReturnValue({})
+    const fakeTab = {}
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeTab)
     render(<Documents />)
 
     await screen.findByText('Registration form')
     await user.click(openButtonFor('Registration form'))
 
     await waitFor(() => expect(signDocumentUrlMock).toHaveBeenCalledWith('club/d1.pdf'))
+    // ⚠️ EXACTLY TWO ARGUMENTS — 'noopener' MUST NOT COME BACK. With it,
+    // window.open returns null BY SPEC even on success, the blocked-popup
+    // fallback fires anyway, and the document opens in the new tab AND the
+    // current one (Jay hit this live, 31 Aug 2026). Tabnabbing protection is
+    // the opener-nulling assertion below instead.
     await waitFor(() =>
-      expect(openSpy).toHaveBeenCalledWith('https://signed.example/d1?token=abc', '_blank', 'noopener'),
+      expect(openSpy).toHaveBeenCalledWith('https://signed.example/d1?token=abc', '_blank'),
     )
+    expect(fakeTab.opener).toBeNull()
 
     openSpy.mockRestore()
   })
