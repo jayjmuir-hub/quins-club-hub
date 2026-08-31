@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **Dependencies: the safe-updates group, six updates.** Sentry, supabase-js,
+- `a7b3c6d` — **Dependencies: the safe-updates group, six updates.** Sentry, supabase-js,
   libphonenumber-js and @testing-library/react patch/minor bumps. Full suite
   green.
   ⚠️ **Carries the changelog citation for `229607e` because a Dependabot PR
@@ -19,6 +19,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   be main's tip, forever, however many times it is rebased. The citation has to
   be pushed ONTO the Dependabot branch. This is the third time it has bitten;
   see the note in `claude/open-items.md`.
+
+- **eslint 10 IS BLOCKED UPSTREAM, and #568 stays open rather than merged.**
+  `npm ci` fails `ERESOLVE`: `eslint-plugin-react`'s LATEST release (7.37.5)
+  still caps at `eslint ^9.7`, so nothing published accepts eslint 10. Merging
+  it would break `npm ci` for CI and for both clones. It will resolve itself
+  when that plugin ships support.
+  ⚠️ **AND THE WAY THIS WAS NEARLY GOT WRONG IS THE REUSABLE PART.** It was
+  first reported verified-green on eslint 10 after running lint, build and the
+  full suite. All three passed — **against eslint 9.39.5**, because the
+  `npm install --include=dev --silent` that was supposed to bring in eslint 10
+  had itself failed with the same ERESOLVE, and `--silent` swallowed the error.
+  An empty output was read as success. **An install whose EXIT CODE you did not
+  read is not an install**, and the settling probe was
+  `require('eslint/package.json').version`, not the passing suite.
 
 - `229607e` — **Changelog: cite `de05dd1`, the one-behind duty.** Every PR
   branched on that main was failing CI with "commit missing from changelog",
