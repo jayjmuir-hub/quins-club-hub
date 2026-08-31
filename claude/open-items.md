@@ -37,11 +37,17 @@ Two categories:
 | ~~`grants` (two of its three complaints)~~ | Allowlist rot, its own header's predicted failure: the ten Phase 1b per-column `profiles` SELECTs (28 Aug, all captured in `db/schema/grants.sql`) and `list_signup_squads`' deliberate anon grant (25 Aug). Both allowlists extended |
 | ~~`search-path` (its second arm)~~ | `20260830_pin_private_helper_search_path` pinned `squad_expects_gender` but left it on the harness's exemption list — hidden behind the other failure. List now empty; `db/schema/functions.sql` branch-3 note updated |
 
-**Category B — 3 real production drifts. The harnesses are RIGHT and stay red
-until `db/migrations/20260831_harness_drift_fixes.sql` is applied — Jay's
-call, it is written and proven (rolled-back run: all three go green) but NOT
-applied.** None is exploitable; all are the repo's own hygiene rules missed by
-one migration each:
+**Category B — 3 real production drifts. ~~The harnesses are RIGHT and stay red
+until `db/migrations/20260831_harness_drift_fixes.sql` is applied~~ APPLIED to
+production 31 Aug 2026 on Jay's explicit "drive everything" — evidence: full
+`npm run db:check` immediately after prints "All harnesses passed", the first
+fully green run since 22 Aug, and the dispatched Actions run 33376108406 is
+green end-to-end. ⚠️ TWO sessions applied it within three minutes of each
+other (Jay told both to drive); the SQL is idempotent so production is fine,
+but the duplicate `schema_migrations` row — the exact disease that broke
+database branching here — was deleted the same hour, keeping version
+20260831085858 only.** None was exploitable; all were the repo's own hygiene
+rules missed by one migration each:
 
 1. **`rls-initplan`** — bare `auth.uid()` in `"officers read member"`
    (`20260826_club_officers`) and BOTH `pitch_share_approvals` policies
@@ -60,9 +66,12 @@ migrations that shipped WITHOUT updating the harnesses they invalidated —
 `claude/runbooks/db-harnesses.md`'s "add the harness in the same commit as the
 migration" has a missing half: **change the harness in the same commit as the
 migration that breaks it**. The nightly caught every one of these within a day;
-what failed was that nobody read the nightly. Worth deciding: should a red
-nightly page somebody (Better Stack email on workflow failure), or is a weekly
-glance at Actions enough?
+what failed was that nobody read the nightly. ~~Worth deciding: should a red
+nightly page somebody?~~ DECIDED AND DONE, 31 Aug 2026: a red run now opens or
+bumps a GitHub issue (no secret, cannot sit unarmed — #589 plus the YAML fix),
+and the Better Stack heartbeat `db-check nightly` exists with its no-secret
+drill running; the `DB_CHECK_HEARTBEAT_URL` secret goes in after the "missing"
+alert proves firing — `claude/runbooks/monitoring.md` step 3.
 
 **Source:** Grok's 29 Aug 2026 read-only sweep, every item independently
 **verified by Claude** against the code on `main` and — for the two criticals —
