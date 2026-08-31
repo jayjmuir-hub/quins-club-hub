@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The masthead widens to match the dock.** #573 widened the bottom bar to
+- **Profile icons SPECCED, not built** —
+  `claude/plans/2026-08-31-profile-icons.md`. Jay's idea: crown the U11
+  staff (best age group users of Club Hub), grantable by super admins to a
+  squad's staff or an individual. Rulings captured: emoji beside the name,
+  curated 31-icon library with default meanings and per-grant reason lines,
+  everything grantable and nothing automatic (🔑 included), grants stack
+  with one primary shown, chat + person card first. Carries the whistle
+  tombstone: Unicode has no whistle emoji, three SVG candidates were drawn
+  and rejected, 📋 clipboard is the coach icon. (SHA follows in the next
+  changelog-touching PR.)
+- `14f6cf2` — **The masthead widens to match the dock.** #573 widened the bottom bar to
   a 6px inset from 360px up (caption corner room); the top island kept its
   12px and the two edges of the chrome stopped lining up. Same gate, same
   6px (`min-[360px]:px-1.5` on the masthead wrapper), measured pixel-aligned
