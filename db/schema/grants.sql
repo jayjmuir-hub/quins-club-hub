@@ -1046,16 +1046,19 @@ REVOKE ALL ON public.profile_icons FROM PUBLIC, anon;
 --    reads, policy-path deletes and the SECURITY DEFINER RPCs (owner:
 --    postgres) all survive.
 --
--- ⚠️ MEASURED AFTER THE TRIM (31 Aug 2026), not transcribed: authenticated
---    holds exactly DELETE, REFERENCES, SELECT, TRIGGER on both tables;
---    anon holds nothing. REFERENCES and TRIGGER are birth defaults left
---    deliberately — inert without DDL access, same shape as the
---    league_teams-class tables, and revoking them was beyond the ruling.
---    document_squads' DELETE is also inert (no delete policy; rows go via
---    the FK cascade, which runs as the table owner).
+-- ⚠️ MEASURED AFTER THE TRIM (31 Aug 2026) FROM pg_class.relacl — NOT from
+--    information_schema.role_table_grants, WHICH CANNOT SEE PG17's MAINTAIN
+--    AND MADE THE FIRST VERSION OF THIS PARAGRAPH DROP IT SILENTLY (a
+--    re-review caught the "exactly" overclaim). relacl says
+--    authenticated=rdxtm: SELECT, DELETE, REFERENCES, TRIGGER, MAINTAIN on
+--    both tables; anon holds nothing. REFERENCES, TRIGGER and MAINTAIN are
+--    birth defaults left deliberately — inert without DDL/ownership paths,
+--    same shape as the league_teams-class tables, and revoking them was
+--    beyond the ruling. document_squads' DELETE is also inert (no delete
+--    policy; rows go via the FK cascade, which runs as the table owner).
 -- ---------------------------------------------------------------------
---   documents         authenticated: DELETE, REFERENCES, SELECT, TRIGGER; anon NONE
---   document_squads   authenticated: DELETE, REFERENCES, SELECT, TRIGGER; anon NONE
+--   documents         authenticated: DELETE, MAINTAIN, REFERENCES, SELECT, TRIGGER; anon NONE
+--   document_squads   authenticated: DELETE, MAINTAIN, REFERENCES, SELECT, TRIGGER; anon NONE
 GRANT SELECT, DELETE ON public.documents TO authenticated;
 GRANT SELECT ON public.document_squads TO authenticated;
 

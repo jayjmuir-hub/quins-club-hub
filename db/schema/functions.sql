@@ -7199,14 +7199,20 @@ GRANT EXECUTE ON FUNCTION public.create_document(text,text,boolean,boolean,uuid[
 -- app at all — there is no UPDATE policy on documents. That is the
 -- set_my_photo reasoning: RLS grants rows, not columns.
 --
--- ⚠️ THE PREFIX GUARD IS WHY FILES DO NOT STRAND. create_document refuses a
--- squad-prefixed key whose squad is not targeted; without the matching check
--- here, a document could be RETARGETED away from the squad its file sits
--- under — leaving that squad's staff with object-level authority over a
--- document they no longer manage, and the new owners able to delete a row
--- whose file they cannot reach. With the guard, the squad under whose prefix
--- the file lives is always among the targets, so row authority and file
--- authority never come apart.
+-- ⚠️ THE PREFIX GUARD NARROWS STRANDING; IT DOES NOT ELIMINATE IT, AND A
+-- RE-REVIEW (31 Aug 2026) CAUGHT THIS COMMENT CLAIMING MORE THAN IT PROVED.
+-- What the guard guarantees: a squad-prefixed file's squad is always among
+-- the document's targets, so THAT squad's staff (and admins) always hold
+-- file authority. What it does not guarantee: that every row-deleter holds
+-- it. Two residual arms, both accepted with eyes open: (1) on a MULTI-SQUAD
+-- document, any targeted squad's staff may delete the row (Jay ruled to
+-- keep the spec's manage rule) while only the prefix squad's staff or an
+-- admin may remove the file; (2) created_by keeps row authority after their
+-- memberships lapse. Either arm can orphan a file — invisible (no row, and
+-- the bucket's only SELECT path is "document read") and removable by the
+-- prefix squad's staff or any admin. It also names an admin restriction:
+-- the guard has no admin bypass, so retargeting a squad-filed document to a
+-- DIFFERENT squad requires delete-and-re-upload even for admins.
 -- ⚠️ RESIDUAL: the club-wide flip does not check this. It is admin-only, so
 -- it is a trusted actor's choice rather than an escalation; moving the object
 -- is not something an RPC can do inside its own transaction. See the

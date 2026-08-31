@@ -63,17 +63,23 @@
 -- a re-upload path, which is work nobody has asked for. Written down so the
 -- next reader knows it was seen and not missed.
 --
--- ══ 3. THE STRANDING FINDING IS CLOSED BY (2), NOT BY NEW CODE ═════════════
+-- ══ 3. THE STRANDING FINDING IS NARROWED BY (2), NOT CLOSED ════════════════
 --
--- The review also raised row-delete and file-delete authority diverging and
--- stranding files: delete the row and the object survives with nobody able to
--- remove it. That was a CONSEQUENCE of (2), and (2)'s guard closes it. With
--- the invariant restored, a squad-prefixed file's squad is ALWAYS among the
--- document's targets, so the staff who can delete the row are exactly the
--- staff the prefix policy grants file authority to — plus admins, who hold
--- both everywhere. There is no state reachable now in which a document's row
--- may be deleted by somebody who cannot then delete its file. No extra policy
--- was added for this; an invariant is a cheaper guarantee than a sweeper.
+-- ⚠️ THIS SECTION ORIGINALLY CLAIMED FULL CLOSURE AND A RE-REVIEW (31 Aug
+-- 2026, same day) REFUTED IT — left corrected rather than deleted, because
+-- the wrong argument is instructive. (2)'s guard guarantees the PREFIX
+-- squad's staff always hold file authority. It does not make row-deleters
+-- and file-deleters the same set: on a multi-squad document, any targeted
+-- squad's staff may delete the row (can_manage_document — Jay ruled to keep
+-- the spec's rule) without holding the prefix; and created_by keeps row
+-- authority after their memberships lapse. Either arm can orphan a file.
+-- Accepted: an orphan is invisible (no row; "document read" is the bucket's
+-- only SELECT path), costs only storage, and the prefix squad's staff or
+-- any admin can still remove it. A sweeper in the photo-orphans style is
+-- the fix if storage ever cares. Also named here because no header sentence
+-- did: the guard has no admin bypass, so even an admin cannot retarget a
+-- squad-filed document to a different squad — delete and re-upload is the
+-- route, consistent with create_document.
 --
 -- ══ 4. `TO authenticated`, THE BUCKET CONVENTION ═══════════════════════════
 --

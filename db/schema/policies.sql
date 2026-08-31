@@ -1917,8 +1917,16 @@ CREATE POLICY "icons revoke" ON public.profile_icons
 -- INVARIANT. A squad-prefixed file's squad is always among the document's
 -- targets — create_document refuses otherwise at upload, and since the
 -- policy-split migration update_document refuses to retarget away from it.
--- That is what keeps row authority and file authority together: whoever may
--- delete the row may delete its object. Weaken that guard and files strand.
+-- ⚠️ BUT ROW AUTHORITY AND FILE AUTHORITY ARE STILL NOT THE SAME SET, AND
+-- SAYING OTHERWISE WAS A REVIEW FINDING (31 Aug 2026). Two residual arms,
+-- both accepted with eyes open: (1) on a MULTI-SQUAD document, any targeted
+-- squad's staff may delete the ROW (can_manage_document — Jay ruled to keep
+-- the spec's rule) while only the PREFIX squad's staff or an admin may
+-- remove the FILE; (2) created_by keeps row authority even after their
+-- memberships lapse. Either arm can orphan a file. An orphan is invisible
+-- (no row, and "document read" is the bucket's only SELECT path) and costs
+-- only storage; the prefix squad's staff or any admin can still remove it.
+-- Weaken the update_document guard and this gets worse, not better.
 --
 -- ⚠️ TO authenticated, not the default TO public, matching "player photo",
 -- "chat media" and "social idea image". Both original policies landed on

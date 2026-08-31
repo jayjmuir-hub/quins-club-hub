@@ -16,11 +16,14 @@
 --   * anon holds nothing on either table (measured; no anon revoke needed).
 --
 -- ⚠️ DELIBERATELY NARROW: only the two verbs the migration's own comment
--- claimed were absent. REFERENCES and TRIGGER remain from birth defaults,
--- as they do on the league_teams-class tables — inert without DDL access,
--- and revoking them here would be a privilege change beyond what was
--- reviewed and ruled on. Measured after applying: authenticated holds
--- exactly DELETE, REFERENCES, SELECT, TRIGGER on both tables.
+-- claimed were absent. REFERENCES, TRIGGER and MAINTAIN remain from birth
+-- defaults, as they do on the league_teams-class tables — inert without
+-- DDL/ownership paths, and revoking them here would be a privilege change
+-- beyond what was reviewed and ruled on. Measured after applying, from
+-- pg_class.relacl (⚠️ not information_schema.role_table_grants, which
+-- cannot see PG17's MAINTAIN and briefly fooled this very header):
+-- authenticated = rdxtm — SELECT, DELETE, REFERENCES, TRIGGER, MAINTAIN —
+-- on both tables.
 
 revoke insert, update on public.documents from authenticated;
 revoke insert, update on public.document_squads from authenticated;
