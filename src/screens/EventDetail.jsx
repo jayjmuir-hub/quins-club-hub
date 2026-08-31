@@ -686,7 +686,16 @@ export default function EventDetail({
             <span className="text-base font-extrabold text-ink">{resultScore(event)}</span>
           </div>
         </div>
-      ) : FEATURES.availability && !clubWide ? (
+      ) : /* ⚠️ NOTHING TO REPLY TO, SO NOTHING IS RENDERED AND NOTHING IS
+             FETCHED. A Club Diary entry (info_only) suppresses the whole
+             availability section — the summary is not mounted, so no query
+             runs, and the button is not rendered at all rather than disabled.
+             That follows the same rule the onOpenAvailability comment below
+             records: a screen that cannot service the button shows no button.
+             Placed beside the existing clubWide guard because it is the same
+             kind of condition — "this event does not take RSVPs".
+             claude/plans/2026-08-31-club-diary.md. */
+      FEATURES.availability && !clubWide && event.info_only !== true ? (
         <div>
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Availability</h4>
           <AvailabilitySummary eventId={event.id} />
