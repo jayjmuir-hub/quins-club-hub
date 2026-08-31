@@ -20,6 +20,67 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### `events_info_only` — Club Diary, and why it is a column and not a type
+
+**STATUS: APPLIED to production 31 Aug 2026.** Harness `db/tests/club-diary.sql`
+green against live. File: `db/migrations/20260831_events_info_only.sql`.
+
+**What it adds:** `public.events.info_only boolean not null default false`.
+
+**Why it exists.** Four of the seven lines on the club's own "3 week look ahead"
+poster are dated, calendar-worthy items with nothing to RSVP to — a shop
+opening, a ball collection, a kit collection. Before this they could only be
+filed as a Social, which produces a fixture carrying an availability list nobody
+will ever fill in, or as a Notice, which has **no date column at all** and so
+cannot reach a subscribed calendar.
+
+**⚠️ THE DECISION THIS FILE EXISTS TO RECORD: it is NOT a fourth `events.type`,
+and the next session to look at it will want to make it one.** `type` is read by
+the calendar feed, `EVENT_TYPE_ICONS`, the chip and detail marks,
+`nextEventLabel`, and the filters on Schedule, Dashboard and SocialWhatsOn.
+Every one of those branches on three known values, so a fourth would fall
+through each of them **silently** — no error, just a missing icon, a missing
+filter row and a mislabelled calendar entry. The precedent followed is
+`competition_type`: a tournament is a first-class thing in the chooser and is
+`type = 'match'` with `competition_type = 'tournament'`. A Club Diary entry is
+`type = 'social'` with this flag.
+
+**The cost of that choice, stated so nobody rediscovers it the hard way.** Two
+different things now share `type = 'social'`, so anything reading `type` alone
+conflates a Welcome Back Party with a kit collection. `eventChipKind()` in
+`src/lib/eventFormat.js` is the single place that distinction lives, and
+`nextEventLabel` needed its `info_only` branch placed FIRST or the social branch
+claims it. The alternative failed invisibly, which is why it lost.
+
+**⚠️ Why `not null default false` rather than nullable.** Two reasons, and the
+second is somebody else's code. First, a nullable flag would make
+`info_only = true` and `info_only is not true` disagree about a null row while
+every app read path tests `=== true`. Second, chat's fixture-thread insert path
+carries `event_id` and inserts without naming this column — a NOT NULL column
+with no default would have broken it, and it would have broken in chat rather
+than here. Step 2 of the harness asserts that insert still works, so the safety
+is measured rather than assumed.
+
+**⚠️ Nothing is backfilled, deliberately.** Every existing row is correctly
+`false`. Flipping an old social would HIDE replies people had already given —
+the one outcome this feature's own rules forbid everywhere else.
+
+**⚠️ No constraint forbids availability rows on an info-only event, and that is
+a decision rather than an omission.** The suppression is a UI decision. Rows
+that already exist when somebody reclassifies a social must survive: the form
+**refuses** that toggle instead, because orphaning hides data that still exists
+and deleting destroys a coach's answer. Refusing is the only outcome that cannot
+lose information. Step 4 of the harness asserts the ABSENCE of such a
+constraint, so a future session adding one is sent here to read this.
+
+**Not in this migration.** `all_day` and multi-day spans are phase 2 —
+`claude/plans/2026-08-31-club-diary.md`. They are held distinct from `time_tbd`
+on purpose: `time_tbd` means "the day is known, the time is not yet decided",
+and an all-day item has no time at all. Collapsing them would put "Kick-off time
+to be confirmed" into subscribed calendars for an event that has no kick-off.
+
+---
+
 ### `20260827_drill_diagram_url` — schematic pitch drawings on opened cards
 
 **STATUS: in the pull request that adds this file; not yet applied.**
