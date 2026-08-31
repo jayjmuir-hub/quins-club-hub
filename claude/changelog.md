@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The graft skill now says how to run `build --deep` on Jay's PCs.**
+- **Session record for the day: the graft-skill commit, the `.claude/` gate,
+  and two false reds explained.** `claude/handoffs/2026-08-31-graft-skill-and-date-bomb.md`
+  — the date-bomb mechanism (a test that fails only once the Monday-start week
+  view reaches its fixture) and the stale-`dist/` wolf-cry in bundle-reading
+  tests, both worth knowing before trusting a local red. (SHA follows in the
+  next changelog-touching PR.)
+- `50bed3a` — **The graft skill now says how to run `build --deep` on Jay's PCs.**
   `.claude/skills/graft/SKILL.md` splits plain `build` (structural graph, free,
   no key) from `build --deep` (LLM concept map — spends tokens, goes stale as
   fast as the code, skip unless asked), and records the exact command for the
@@ -26,8 +32,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   (31 Aug) the default week view first contained the 5 Sep fixture — the
   event then renders in both the waiting list and the grid. Now
   `findAllByRole(...)[0]`, matching `throughDetail` beside them, which is why
-  only two of the three broke. (SHA follows in the next changelog-touching
-  PR.)
+  only two of the three broke.
 
 ## 30 Aug 2026
 
