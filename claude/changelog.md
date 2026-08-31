@@ -22,7 +22,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   staff or a person with Revoke and Make primary. All four `db/schema/`
   captures updated; every assertion red-first. Awaiting Jay's first real
   grant as the live proof.
-- **Feature-guide template + method SHIPPED** — the head coaches'
+- **Feature guides get a Drive PDF step.** `authoring-guides.md` now covers
+  rendering a guide to PDF for Google Drive (Drive shows `.html` as source, so
+  HTML reads as code), with the print-only override that lays each screenshot
+  beside its steps and halved the training-session guide to three pages, and the
+  `G:\My Drive` sync-mount route that avoids inlining a ~1MB file.
+  (SHA follows in the next changelog-touching PR.)
+- `89dd1a7` — **Feature-guide template + method SHIPPED** — the head coaches'
   "Build a training session" walkthrough is now a reusable system, so the
   next feature guide is copy-and-screenshot, not a rebuild. A frozen
   one-page design (black hero band, shield crest, Anton headlines, Barlow
@@ -33,8 +39,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `claude/guides/authoring-guides.md`; the screenshot harness renders the
   real components populated by `harness/stubs/trainingPlans.js` (invented
   drills, no real people), wired in `harness/vite.config.js`. Guides
-  themselves ship as Artifacts, not committed HTML. (SHA follows in the next
-  changelog-touching PR.)
+  themselves ship as Artifacts, not committed HTML.
 - `c98c2c8` — **Profile icons SPECCED, not built** —
   `claude/plans/2026-08-31-profile-icons.md`. Jay's idea: crown the U11
   staff (best age group users of Club Hub), grantable by super admins to a

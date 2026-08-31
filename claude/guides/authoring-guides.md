@@ -78,6 +78,25 @@ URI, never a URL.
    and check the black hero band and crest are there before handing it over. A
    guide whose crest silently failed to load looks broken to a parent.
 
+5. **For Google Drive, hand over a PDF, not the HTML.** Drive shows an `.html`
+   file as raw source — it does not render web pages — so a guide dropped in as
+   HTML reads as code. Render the artifact file to PDF with Playwright's
+   `page.pdf({ printBackground: true, format: 'A4', margin: 0 })` after
+   `emulateMedia({ media: 'screen' })` (so the black hero and colours print),
+   and drop the PDF into `Quins/Quins Shareable/Club Hub Guides` — the local
+   Google Drive for Desktop mount (`G:\My Drive\…`) syncs it up, which sidesteps
+   inlining a ~1MB file through a tool call. Two things keep the page count down
+   for a print handout:
+   - a small **print-only override stylesheet** injected before rendering that
+     tightens the vertical rhythm and lays each `figure.shot` in a right-hand
+     column beside its steps (CSS grid: heading and lead full-width, steps in
+     column 1, the screenshot in column 2) instead of a full-width block below —
+     this alone roughly halved the training-session guide (6 → 3 pages);
+   - **shrinking the screenshots** — WEBP at the display size is crisp and small.
+
+   The override lives only in the PDF copy; the published artifact keeps its
+   full-resolution, single-column screen layout.
+
 ## What lives where
 
 | Thing | Where | Committed? |
@@ -86,4 +105,5 @@ URI, never a URL.
 | This method | `claude/guides/authoring-guides.md` | yes |
 | A feature's screenshot stub | `harness/stubs/<module>.js` + alias in [`harness/vite.config.js`](../../harness/vite.config.js) | yes — reused by future guides |
 | A finished guide | an Artifact (claude.ai) | no — regenerated from the template |
-| Shoot / crop scripts for one guide | your scratchpad | no — throwaway |
+| A guide for Google Drive | a PDF in `Quins/Quins Shareable/Club Hub Guides` | no — rendered from the artifact HTML |
+| Shoot / crop / to-PDF scripts for one guide | your scratchpad | no — throwaway |
