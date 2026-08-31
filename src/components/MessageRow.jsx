@@ -230,6 +230,7 @@ export default function MessageRow({
         createdAt={message.created_at}
         body={message.body}
         photoPath={message.attachment_path}
+        attachments={message.attachments}
         edited={Boolean(message.edited_at)}
         lead={
           message.event ? (

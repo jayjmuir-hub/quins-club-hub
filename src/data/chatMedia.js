@@ -45,7 +45,18 @@ export function isAudioAttachment(path) {
  * The one-line stand-in shown for a message with an attachment and no words —
  * in pins, quotes and reply previews. WhatsApp's "🎤 Voice message" / "📷 Photo".
  */
-export function attachmentPreviewLabel(path) {
+export function attachmentPreviewLabel(path, count = 0) {
+  // ⚠️ `count` IS OPTIONAL ON PURPOSE. Eleven test files and four screens call
+  // this with a path alone; a required second argument would have been a
+  // sweeping edit for no gain, and a caller that does not know the count still
+  // gets exactly what it got before.
+  //
+  // ⚠️ MIRRORED BY messageBody() IN supabase/functions/push-send/index.ts. A
+  // Vite bundle and a Deno function share no build — the standing arrangement
+  // locationFor() has with venueLine() in the calendar function. A parent
+  // reading "10 photos" here and "Photo" on their lock screen is the drift
+  // both comments exist to prevent. Change both or neither.
+  if (count > 1) return `📷 ${count} photos`
   return isAudioAttachment(path) ? '🎤 Voice message' : '📷 Photo'
 }
 

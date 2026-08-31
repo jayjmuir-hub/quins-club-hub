@@ -1,5 +1,6 @@
 import ChatAudio from './ChatAudio.jsx'
 import ChatPhoto from './ChatPhoto.jsx'
+import ChatAlbum from './ChatAlbum.jsx'
 import { isAudioAttachment } from '../data/chatMedia.js'
 import MessageMenu from './MessageMenu.jsx'
 import PollBubble from './PollBubble.jsx'
@@ -102,6 +103,12 @@ export default function ChatBubble({
   createdAt,
   body = null,
   photoPath = null,
+  // The full attachment list, when the message has one. ⚠️ `photoPath` is the
+  // trigger-derived FIRST photo and stays the fallback: a phone on a cached
+  // service-worker bundle still writes only that column and cannot be forced to
+  // update, so its photo must keep rendering. That is also why plan 4 cannot
+  // drop the column yet.
+  attachments = [],
   photoCompact = false,
   edited = false,
   extra = null,
@@ -120,6 +127,7 @@ export default function ChatBubble({
   onVote = null,
   onViewVotes = null,
 }) {
+  const album = Array.isArray(attachments) ? attachments : []
   const canReact = Boolean(onReact) && !deleted
   const tallies = reactions ?? []
   const stamp = (
@@ -193,17 +201,21 @@ export default function ChatBubble({
           </p>
         ) : (
           <>
-            {photoPath &&
+            {album.length > 1 ? (
+              <ChatAlbum attachments={album} compact={photoCompact} />
+            ) : (
+              photoPath &&
               (isAudioAttachment(photoPath) ? (
                 <ChatAudio path={photoPath} messageId={messageId} mine={mine} />
               ) : (
                 <ChatPhoto path={photoPath} compact={photoCompact} />
-              ))}
+              ))
+            )}
             {body?.trim() ? (
               (() => {
                 // A photo caption stays body-sized — the emoji annotates the
                 // picture rather than being the message.
-                const bigEmoji = photoPath ? 0 : emojiOnlyCount(body)
+                const bigEmoji = photoPath || album.length ? 0 : emojiOnlyCount(body)
                 return (
                   <p
                     className={`whitespace-pre-wrap break-words ${

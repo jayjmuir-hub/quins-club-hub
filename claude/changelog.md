@@ -10,7 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **A PHOTO-ONLY CHAT MESSAGE PUSHED A BLANK NOTIFICATION, LIVE.**
+- **TEN PHOTOS NOW RENDER AS AN ALBUM, NOT AS ONE.** The composer could send
+  an album from `ebda2f3` (#605); every photo arrived and exactly ONE drew,
+  because the bubble read the trigger-derived `attachment_path` — the FIRST
+  photo — instead of the `attachments` array that carries them all. New
+  `ChatAlbum`: a tiled grid capped at four with a `+N` badge, and a lightbox
+  that opens on the tile you tapped, steps with arrows or the keyboard, and
+  CLAMPS at both ends rather than wrapping (looping gives a reader no signal
+  they have seen it all).
+  ⚠️ **`attachment_path` REMAINS the fallback and must not be dropped.** A
+  phone on a cached service-worker bundle still writes only that column and
+  cannot be forced to update; its photo has to keep rendering. That is plan 4's
+  constraint, not a leftover.
+  ⚠️ **One dead tile does not blank the album** — each signed URL catches its
+  own rejection, and an unsigned tile reserves its box so the thread does not
+  jump four times as ten URLs land.
+  ⚠️ **`attachmentPreviewLabel(path, count)` gained an OPTIONAL second
+  argument** rather than a new signature: four screens and eleven test files
+  call it with a path alone. It mirrors `messageBody()` in `push-send` by hand —
+  no shared build between a Vite bundle and a Deno function.
+  ⚠️ **The chat LIST still previews an album as "📷 Photo"**, because
+  `my_chats()` returns `last_attachment_path` and no count. That is a plan-4
+  item, recorded rather than faked.
+  ⚠️ **No `useCallback`** — the React Compiler is on, and a manual memo whose
+  inferred deps differ from the written ones makes it skip optimising the whole
+  component. `src/components/ChatAlbum.jsx`, `tests/chat-album-grid.test.jsx`.
+
+- `74d5f06` — **A PHOTO-ONLY CHAT MESSAGE PUSHED A BLANK NOTIFICATION, LIVE.**
   `push-send` composed the body as the caption alone and its `select` fetched
   no attachment column at all, so a message with photos and no words pushed the
   sender's name over empty space to every parent in the squad. It had been true
