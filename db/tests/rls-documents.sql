@@ -425,7 +425,13 @@ begin
           'd0c00000-0000-4000-8000-0000000000a2');
   insert into _r values ('08a COACH1 writes under club/', 'ALLOWED — ❌ FAIL');
 exception when others then
-  insert into _r values ('08a COACH1 writes under club/', 'REFUSED — ✅ pass');
+  -- ⚠️ A BARE `when others` PASSED ON ANY EXCEPTION AND SO WOULD HAVE PASSED
+  -- ON A TYPO IN THE BUCKET NAME OR A CHANGED COLUMN LIST. The refusal has to
+  -- be the RLS one, in the words Postgres uses for it.
+  insert into _r values ('08a COACH1 writes under club/',
+    case when sqlstate = '42501' and sqlerrm like '%row-level security%'
+         then 'REFUSED by RLS — ✅ pass'
+         else 'REFUSED ' || sqlstate || ' (wrong gate: ' || sqlerrm || ') — ❌ FAIL' end);
 end $$;
 
 do $$
@@ -450,7 +456,10 @@ begin
           'd0c00000-0000-4000-8000-0000000000a2');
   insert into _r values ('08c COACH1 writes under ANOTHER squad prefix', 'ALLOWED — ❌ FAIL');
 exception when others then
-  insert into _r values ('08c COACH1 writes under ANOTHER squad prefix', 'REFUSED — ✅ pass');
+  insert into _r values ('08c COACH1 writes under ANOTHER squad prefix',
+    case when sqlstate = '42501' and sqlerrm like '%row-level security%'
+         then 'REFUSED by RLS — ✅ pass'
+         else 'REFUSED ' || sqlstate || ' (wrong gate: ' || sqlerrm || ') — ❌ FAIL' end);
 end $$;
 
 -- ══ 08d THE ORPHAN PROPERTY — nobody can SELECT a file with no row ════════
@@ -470,8 +479,14 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"d0c00000-0000-4000-8000-0000000000a2","role":"authenticated"}';
 
 -- The objects for the T1 documents, so there is something legitimately
--- readable: f1 = doc_m_t1 (08e's control), f4 = doc_both (probe 13),
--- f6 = doc_coach1 (13f's control).
+-- readable: f1 = doc_m_t1 (08e's control, and 13f's), f4 = doc_both (probe 13).
+--
+-- ⚠️ BOTH CONTROLS USE f1, WHOSE DOCUMENT THE ADMIN CREATED. An object
+-- belonging to a document COACH1 created would be readable through
+-- can_read_document's `created_by = auth.uid()` arm, so the control would
+-- prove COACH1 can reach their own upload rather than that a T1 coach can
+-- reach a T1 document — the same created_by shortcut the fixture section
+-- above goes out of its way to avoid.
 do $$
 declare _t1 uuid := (select v from _fix where k='t1');
 begin
@@ -480,9 +495,6 @@ begin
           'd0c00000-0000-4000-8000-0000000000a2');
   insert into storage.objects (bucket_id, name, owner)
   values ('documents', _t1 || '/d0c00000-0000-4000-8000-0000000000f4.pdf',
-          'd0c00000-0000-4000-8000-0000000000a2');
-  insert into storage.objects (bucket_id, name, owner)
-  values ('documents', _t1 || '/d0c00000-0000-4000-8000-0000000000f6.pdf',
           'd0c00000-0000-4000-8000-0000000000a2');
 exception when others then
   insert into _r values ('08 fixture: objects for the T1 documents',
@@ -598,9 +610,25 @@ end $$;
 -- of the two refuses, because they are not the same failure and a future
 -- policy mistake would be caught only by the grant.
 --
--- ⚠️ EXPECTED 42501 insufficient_privilege — the GRANT, refused before any
--- policy is consulted. `42501 new row violates row-level security policy`
--- would mean the grant came back and RLS is now the only door.
+-- ⚠️ THE SQLSTATE ALONE CANNOT TELL THE TWO APART, AND ASSERTING ON IT WAS A
+-- BUG IN THIS FILE UNTIL 31 Aug 2026 (found in review, fixed the same day).
+-- BOTH refusals raise 42501:
+--
+--     the GRANT  ->  42501  permission denied for table documents
+--     RLS        ->  42501  new row violates row-level security policy for
+--                           table "documents"
+--
+-- so `exception when insufficient_privilege` passed for either, and reverting
+-- 20260831_documents_grant_trim.sql — the exact regression these probes exist
+-- to catch — would have left 12 and 12b GREEN. The outcome is therefore
+-- asserted on the MESSAGE, the same way probe 11 is: `permission denied` must
+-- be present and `row-level security` must be absent. Proved by simulating the
+-- revert (see the appendix at the foot of this file).
+--
+-- ⚠️ 12c IS THE ODD ONE OUT ON PURPOSE. An UPDATE that RLS refuses does not
+-- raise at all — with no UPDATE policy the USING arm matches no rows and the
+-- statement quietly reports 0. So if the grant came back, 12c reaches the
+-- no-exception arm rather than a wrong-message arm, and that arm is a FAIL.
 reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"d0c00000-0000-4000-8000-0000000000a2","role":"authenticated"}';
@@ -615,39 +643,49 @@ begin
           false, false, _t1 || '/d0c00000-0000-4000-8000-00000000e009.pdf',
           'direct.pdf', 1024, 'application/pdf',
           'd0c00000-0000-4000-8000-0000000000a2');
-  insert into _r values ('12 COACH1 INSERTs into documents directly', 'ALLOWED — ❌ FAIL');
-exception when insufficient_privilege then
   insert into _r values ('12 COACH1 INSERTs into documents directly',
-    'REFUSED 42501 by the GRANT (' || sqlerrm || ') — ✅ pass');
-when others then
+    'ALLOWED — ❌ FAIL');
+exception when others then
   insert into _r values ('12 COACH1 INSERTs into documents directly',
-    'REFUSED ' || sqlstate || ' ' || sqlerrm || ' — ❌ FAIL');
+    case when sqlstate = '42501'
+          and sqlerrm like '%permission denied%'
+          and sqlerrm not like '%row-level security%'
+         then 'REFUSED 42501 by the GRANT (' || sqlerrm || ') — ✅ pass'
+         when sqlerrm like '%row-level security%'
+         then 'REFUSED by RLS, not the GRANT — the INSERT grant is back (' || sqlerrm || ') — ❌ FAIL'
+         else 'REFUSED ' || sqlstate || ' (wrong gate: ' || sqlerrm || ') — ❌ FAIL' end);
 end $$;
 
 do $$
 begin
   insert into public.document_squads (document_id, team_id)
   values ((select v from _fix where k='doc_m_t1'), (select v from _fix where k='t2'));
-  insert into _r values ('12b COACH1 INSERTs into document_squads directly', 'ALLOWED — ❌ FAIL');
-exception when insufficient_privilege then
   insert into _r values ('12b COACH1 INSERTs into document_squads directly',
-    'REFUSED 42501 by the GRANT — ✅ pass');
-when others then
+    'ALLOWED — ❌ FAIL');
+exception when others then
   insert into _r values ('12b COACH1 INSERTs into document_squads directly',
-    'REFUSED ' || sqlstate || ' ' || sqlerrm || ' — ❌ FAIL');
+    case when sqlstate = '42501'
+          and sqlerrm like '%permission denied%'
+          and sqlerrm not like '%row-level security%'
+         then 'REFUSED 42501 by the GRANT — ✅ pass'
+         when sqlerrm like '%row-level security%'
+         then 'REFUSED by RLS, not the GRANT — the INSERT grant is back (' || sqlerrm || ') — ❌ FAIL'
+         else 'REFUSED ' || sqlstate || ' (wrong gate: ' || sqlerrm || ') — ❌ FAIL' end);
 end $$;
 
 do $$
 begin
   update public.documents set title = 'ZZ Probe direct update'
    where id = (select v from _fix where k='doc_m_t1');
-  insert into _r values ('12c COACH1 UPDATEs documents directly', 'ALLOWED — ❌ FAIL');
-exception when insufficient_privilege then
   insert into _r values ('12c COACH1 UPDATEs documents directly',
-    'REFUSED 42501 by the GRANT — ✅ pass');
-when others then
+    'NO ERROR — the UPDATE grant is back and RLS silently matched 0 rows — ❌ FAIL');
+exception when others then
   insert into _r values ('12c COACH1 UPDATEs documents directly',
-    'REFUSED ' || sqlstate || ' ' || sqlerrm || ' — ❌ FAIL');
+    case when sqlstate = '42501'
+          and sqlerrm like '%permission denied%'
+          and sqlerrm not like '%row-level security%'
+         then 'REFUSED 42501 by the GRANT — ✅ pass'
+         else 'REFUSED ' || sqlstate || ' (wrong gate: ' || sqlerrm || ') — ❌ FAIL' end);
 end $$;
 
 -- ══ 13 THE ACCEPTED STRANDING RESIDUAL, MEASURED ═════════════════════════
@@ -779,6 +817,12 @@ end $$;
 -- 13d; the ONLY difference is that a readable documents row still names this
 -- object. Without it, 13d and 13e are satisfied by a bucket in which nobody
 -- can delete anything, and the finding above would be mis-stated.
+--
+-- ⚠️ IT DELETES f1 — doc_m_t1's file, and doc_m_t1 was created by the ADMIN.
+-- COACH1's read of it therefore comes from the T1 staff arm, not from
+-- `created_by = auth.uid()`. Pointing this control at a document COACH1
+-- created would have made it pass through the creator shortcut and proved
+-- something weaker than it claims.
 reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"d0c00000-0000-4000-8000-0000000000a2","role":"authenticated"}';
@@ -788,7 +832,7 @@ declare _n int;
 begin
   delete from storage.objects
    where bucket_id = 'documents'
-     and name = (select v from _fix where k='t1') || '/d0c00000-0000-4000-8000-0000000000f6.pdf';
+     and name = (select v from _fix where k='t1') || '/d0c00000-0000-4000-8000-0000000000f1.pdf';
   get diagnostics _n = row_count;
   insert into _r values ('13f CONTROL COACH1 removes a file that STILL HAS a readable row',
     case when _n = 1 then '1 row — ✅ pass' else _n || ' rows — ❌ FAIL' end);
@@ -862,6 +906,13 @@ end $$;
 -- exactly ONE permissive SELECT policy on storage.objects mentions this
 -- bucket. Two would mean `for all` (or an equivalent) is back and 08d's
 -- claim is only as true as this run.
+--
+-- ⚠️ `polpermissive` IS IN THE FILTER DELIBERATELY. The count is about how
+-- many policies can GRANT a read, and permissive policies OR together — that
+-- is the shape that let `for all` leak a second SELECT path. A RESTRICTIVE
+-- policy ANDs, so it can only ever narrow the bucket; counting one would turn
+-- this control red for a TIGHTENING, which is the wrong way for a canary to
+-- fail. The comment above said "permissive" before the query did.
 do $$
 declare _n int;
 begin
@@ -869,6 +920,7 @@ begin
     from pg_policy p join pg_class c on c.oid = p.polrelid
    where c.relname = 'objects'
      and p.polcmd in ('r','*')
+     and p.polpermissive
      and pg_get_expr(p.polqual, p.polrelid) like '%''documents''%';
   if _n = 1 then
     insert into _r values ('10b exactly one SELECT policy governs the documents bucket',
@@ -881,6 +933,13 @@ end $$;
 
 -- 10c The push-audience function must stay unreachable from a browser
 -- (20260831_documents_push_acl.sql — it returns push endpoints and keys).
+--
+-- ⚠️ 10d IS NOT A DUPLICATE OF 10c, AND WITHOUT IT 10c IS VACUOUS. "count the
+-- rows that hold a grant" returns 0 when the function has been DROPPED, so a
+-- deleted function reads as a secured one. The existence assertion is the
+-- control that makes the absence assertion mean something — the same reason
+-- every "this is refused" probe in this file is paired with a "this is
+-- allowed" one.
 do $$
 declare _n int;
 begin
@@ -891,6 +950,17 @@ begin
   insert into _r values ('10c document_push_subscriptions is service_role-only',
     case when _n = 0 then 'no anon/authenticated EXECUTE — ✅ pass'
          else _n || ' grant(s) — ❌ FAIL' end);
+end $$;
+
+do $$
+declare _n int;
+begin
+  select count(*) into _n from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'document_push_subscriptions';
+  insert into _r values ('10d CONTROL document_push_subscriptions still EXISTS',
+    case when _n = 1 then '1 function — ✅ pass'
+         else _n || ' functions — ❌ FAIL' end);
 end $$;
 
 reset role;
@@ -973,6 +1043,12 @@ rollback;
 --     05 MEDIC1 reads T1 staff-only doc   — ✅ pass, unchanged
 --     every other step                    — ✅ pass, unchanged
 --
+-- ⚠️ RE-RUN UNCHANGED after the review fixes of 31 Aug 2026, because probe
+-- 13f now deletes an object whose readability runs through this very function
+-- (a DELETE ... WHERE applies the SELECT policies — the finding at the head of
+-- this file). It stayed green, as expected: doc_m_t1 is members-tier and
+-- COACH1 staffs T1, so the removed arm was never what admitted them.
+--
 -- ⚠️ 02b FLIPPING TOO IS THE CORRECT RESULT, NOT NOISE, and it is worth
 -- knowing before somebody reads this as an over-broad injection: "document
 -- squads read" is defined as can_read_document(document_id), so the junction
@@ -996,6 +1072,44 @@ rollback;
 -- membership insert threw on `memberships_family_role_needs_player` and the
 -- persona has no membership at all. Fix the harness before believing the
 -- policy.
+--
+-- ══════════════════════════════════════════════════════════════════════════
+--  ⚠️ SECOND INJECTION — THE GRANT, WHICH THE FIRST VERSION OF PROBE 12
+--  COULD NOT SEE. Added 31 Aug 2026 after review.
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- Probes 12/12b originally caught the refusal with `exception when
+-- insufficient_privilege`. Both the GRANT and RLS raise 42501, so that arm
+-- passed for either — and the regression the probes exist to catch (somebody
+-- reverting 20260831_documents_grant_trim.sql) would have left them GREEN.
+-- A check that cannot distinguish its two outcomes is not checking the one it
+-- names.
+--
+-- INJECTION. Inside a transaction you will roll back, put the grants back and
+-- re-run the bodies of 12, 12b and 12c:
+--
+--     begin;
+--     grant insert, update on public.documents to authenticated;
+--     grant insert, update on public.document_squads to authenticated;
+--     -- ... probe 12, 12b, 12c bodies here, as COACH1 ...
+--     rollback;
+--
+-- ⚠️ MEASURED, and all three went red:
+--
+--   12   REFUSED by RLS, not the GRANT — the INSERT grant is back
+--        (new row violates row-level security policy for table "documents")
+--   12b  REFUSED by RLS, not the GRANT — the INSERT grant is back
+--   12c  NO ERROR — the UPDATE grant is back and RLS silently matched 0 rows
+--
+-- ⚠️ NOTE 12c's DIFFERENT SHAPE, because it is the thing most likely to
+-- confuse the next reader: an UPDATE that RLS refuses raises NOTHING. With no
+-- UPDATE policy the USING arm matches no rows and the statement reports 0. So
+-- 12c fails through its no-exception arm, not through a wrong-message arm.
+--
+-- The grants were confirmed absent on production afterwards
+-- (has_table_privilege('authenticated', …, 'insert'/'update') = false on both
+-- tables, with 'select' = true as the control proving the probe can see a
+-- privilege that IS held).
 --
 -- ⚠️ IF PROBE 01 OR 05 ALSO FLIPS, something other than the staff_only arm is
 -- doing the work and the finding is mis-diagnosed. Stop and re-read the live
