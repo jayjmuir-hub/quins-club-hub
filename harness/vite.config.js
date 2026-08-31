@@ -67,6 +67,11 @@ export default defineConfig({
       // The DM thread's photos (25 Aug 2026) — signed LATE on purpose, so the
       // dm-thread scenario reproduces the page growing after the open-scroll.
       { find: /^\.\.\/data\/chatMedia\.js$/, replacement: path.resolve(__dirname, 'stubs/chatMedia.js') },
+      // Training plans — the SquadTraining list, SessionPlan read/editor, and
+      // TrainingShelf all import '../data/trainingPlans.js' (screens/ and
+      // components/ sit one level below src/). Populated invented data for the
+      // coach walkthrough guide's screenshots.
+      { find: /^\.\.\/data\/trainingPlans\.js$/, replacement: path.resolve(__dirname, 'stubs/trainingPlans.js') },
       // ⚠️ './auth.jsx' as well as '../lib/auth.jsx', and the difference is
       // not cosmetic. These aliases match SPECIFIER TEXT, so they only catch
       // importers sitting one directory below src/. src/lib/useMyProfile.js
