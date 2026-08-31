@@ -42,7 +42,28 @@ export default function SquadDocumentsCard({ teamId, teamName }) {
   async function handleOpen(document) {
     try {
       const url = await signDocumentUrl(document.storage_key)
-      window.open(url, '_blank', 'noopener')
+      // ⚠️ THE AWAIT ABOVE HAS ALREADY ENDED THE USER-GESTURE CONTEXT, AND ON
+      // iOS THAT IS THE DIFFERENCE BETWEEN THIS FEATURE WORKING AND DOING
+      // NOTHING AT ALL. Safari — and an installed PWA especially — only honours
+      // window.open while a tap is still being handled. Signing the URL is a
+      // network round trip, so by the time we call open the gesture is spent:
+      // the popup is blocked, window.open returns null, and NOTHING throws. The
+      // catch below never runs and the coach taps a row that silently does
+      // nothing.
+      //
+      // Same-tab navigation is never popup-blocked, so a null return falls back
+      // to it. That is an acceptable landing for a signed URL whose only job is
+      // to open one file: the browser hands the PDF to its viewer or to the OS,
+      // and this app is still behind it in history.
+      //
+      // ⚠️ STILL UNPROVEN ON A REAL IPHONE — the fallback is reasoned from the
+      // popup rule, not measured on a device. The check is listed in the
+      // live-verify (claude/plans/2026-08-31-documents-repo-implementation.md,
+      // Task 9 Step 5); do not tick it off this comment.
+      //
+      // ⚠️ src/screens/Documents.jsx CARRIES THE SAME THREE LINES. Change both.
+      const opened = window.open(url, '_blank', 'noopener')
+      if (!opened) window.location.assign(url)
     } catch (err) {
       setError(friendlyMessage(err, 'That document could not be opened.'))
     }

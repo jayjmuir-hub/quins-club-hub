@@ -80,7 +80,28 @@ export default function Documents() {
   async function handleOpen(document) {
     try {
       const url = await signDocumentUrl(document.storage_key)
-      window.open(url, '_blank', 'noopener')
+      // ⚠️ THE AWAIT ABOVE HAS ALREADY ENDED THE USER-GESTURE CONTEXT, AND ON
+      // iOS THAT IS THE DIFFERENCE BETWEEN THIS FEATURE WORKING AND DOING
+      // NOTHING AT ALL. Safari — and an installed PWA especially — only honours
+      // window.open while a tap is still being handled. Signing the URL is a
+      // network round trip, so by the time we call open the gesture is spent:
+      // the popup is blocked, window.open returns null, and NOTHING throws. The
+      // catch below never runs and the member taps a row that silently does
+      // nothing.
+      //
+      // Same-tab navigation is never popup-blocked, so a null return falls back
+      // to it. That is an acceptable landing for a signed URL whose only job is
+      // to open one file: the browser hands the PDF to its viewer or to the OS,
+      // and this app is still behind it in history.
+      //
+      // ⚠️ STILL UNPROVEN ON A REAL IPHONE — the fallback is reasoned from the
+      // popup rule, not measured on a device. The check is listed in the
+      // live-verify (claude/plans/2026-08-31-documents-repo-implementation.md,
+      // Task 9 Step 5); do not tick it off this comment.
+      //
+      // ⚠️ SquadDocumentsCard.jsx CARRIES THE SAME THREE LINES. Change both.
+      const opened = window.open(url, '_blank', 'noopener')
+      if (!opened) window.location.assign(url)
     } catch (err) {
       setError(friendlyMessage(err, 'That document could not be opened.'))
     }
@@ -193,42 +214,43 @@ export default function Documents() {
         {shown.map((document) => {
           const canDelete = mayDeleteDocument(document, user?.id, memberships)
           return (
-            <Card
-              key={document.id}
-              data-testid="document-row"
-              className="cursor-pointer p-[14px]"
-              role="button"
-              tabIndex={0}
-              onClick={() => handleOpen(document)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  handleOpen(document)
-                }
-              }}
-            >
+            // ⚠️ THE CARD IS A CONTAINER, NOT THE CONTROL — 31 Aug 2026, final
+            // review. It used to carry role="button" + tabIndex + onClick, which
+            // put the Remove <button> INSIDE an element claiming to be a button.
+            // Nested interactive content is invalid HTML, and screen readers
+            // flatten it: the row announced as one button whose name swept up
+            // "Remove", and the delete control was not reliably reachable on its
+            // own. The title is now a real <button> — the same row-button shape
+            // SquadDocumentsCard uses — so the two controls are siblings, keyboard
+            // focus order is free, and the hand-rolled Enter/Space handler that
+            // stood in for real button semantics is gone with it.
+            <Card key={document.id} data-testid="document-row" className="p-[14px]">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[15px] font-bold text-ink">{document.title}</p>
-                  <p className="mt-0.5 text-[12.5px] text-ink-muted">
+                <button
+                  type="button"
+                  data-testid="document-open"
+                  onClick={() => handleOpen(document)}
+                  className="min-w-0 flex-1 rounded-[9px] px-1 py-0.5 text-left hover:bg-surface-mute"
+                >
+                  <span className="block truncate text-[15px] font-bold text-ink">
+                    {document.title}
+                  </span>
+                  <span className="mt-0.5 block text-[12.5px] text-ink-muted">
                     {DOCUMENT_CATEGORIES.find((c) => c.key === document.category)?.label
                       ?? document.category}
                     {' · '}
                     {audienceLabel(document, teamsById)}
-                  </p>
-                  <p className="mt-1.5 text-[12px] text-ink-faint">
+                  </span>
+                  <span className="mt-1.5 block text-[12px] text-ink-faint">
                     {formatBytes(document.file_size)} · {formatTableDate(new Date(document.created_at))}
-                  </p>
-                </div>
+                  </span>
+                </button>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   {document.staff_only && <Chip>Staff only</Chip>}
                   {canDelete && (
                     <button
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        handleDelete(document)
-                      }}
+                      onClick={() => handleDelete(document)}
                       className="text-[12.5px] font-bold text-danger-ink"
                     >
                       Remove

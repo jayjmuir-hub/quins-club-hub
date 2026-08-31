@@ -91,7 +91,15 @@ export default function DocumentUploadSheet({
     try {
       await uploadDocument({
         file,
-        title: title.trim() || file.name,
+        // ⚠️ TRUNCATED TO 120 BECAUSE THE FALLBACK IS UNBOUNDED. The title
+        // input has a maxLength, but `file.name` is whatever the OS handed the
+        // picker and can be far longer — and `documents_title_check` in
+        // 20260831_documents.sql caps the column at
+        // `length(trim(title)) between 1 and 120`. Without this slice, someone
+        // who leaves the title blank and picks a file with a very long name
+        // gets a raw check-constraint violation from Postgres AFTER the file
+        // has already uploaded, which then orphans it. Cheaper to trim here.
+        title: (title.trim() || file.name).slice(0, 120),
         category,
         staffOnly,
         clubWide: wholeClub,

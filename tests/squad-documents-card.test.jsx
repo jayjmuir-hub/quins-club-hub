@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
@@ -117,9 +117,24 @@ describe('SquadDocumentsCard — the cap', () => {
 })
 
 describe('SquadDocumentsCard — opening a row', () => {
+  // ⚠️ `vi.spyOn(window.location, 'assign')` THROWS "Cannot redefine property"
+  // — jsdom's Location instance is sealed. The whole `location` global IS
+  // configurable though, so the way to observe a navigation is to replace it,
+  // which is what vi.stubGlobal does (the same idiom tests/more.test.jsx and
+  // tests/photo-positioner.test.jsx use for rAF). afterEach unstubs, so the
+  // real location is back for every other file.
+  function stubAssign() {
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign, href: window.location.href })
+    return assign
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
   it('signs the row\'s storage key and opens the signed url in a new tab', async () => {
     const user = userEvent.setup()
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {})
+    // A truthy return = the popup was allowed, which is the desktop path.
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue({})
     renderCard()
 
     const row = (await screen.findByText('U10 kit list')).closest('[data-testid="squad-document-row"]')
@@ -127,11 +142,51 @@ describe('SquadDocumentsCard — opening a row', () => {
 
     expect(signDocumentUrlMock).toHaveBeenCalledWith('team-u10/d1.pdf')
     await screen.findByText('U10 kit list') // still there, nothing crashed
-    expect(openSpy).toHaveBeenCalledWith(
-      'https://signed.example/squad-doc?token=abc',
-      '_blank',
-      'noopener',
+    await vi.waitFor(() =>
+      expect(openSpy).toHaveBeenCalledWith(
+        'https://signed.example/squad-doc?token=abc',
+        '_blank',
+        'noopener',
+      ),
     )
+
+    openSpy.mockRestore()
+  })
+
+  // ⚠️ THE iOS CASE. The await on signDocumentUrl ends the user-gesture
+  // context, so Safari and installed PWAs block the popup: window.open returns
+  // null and throws NOTHING, so the catch/friendlyMessage path cannot catch it.
+  // Without the same-tab fallback, tapping a document in the Squad Hub silently
+  // does nothing on an iPhone. Drop the `if (!opened)` line in the component and
+  // this test fails while the one above still passes.
+  it('falls back to same-tab navigation when the popup is blocked', async () => {
+    const user = userEvent.setup()
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const assignSpy = stubAssign()
+    renderCard()
+
+    const row = (await screen.findByText('U10 kit list')).closest('[data-testid="squad-document-row"]')
+    await user.click(row)
+
+    await vi.waitFor(() =>
+      expect(assignSpy).toHaveBeenCalledWith('https://signed.example/squad-doc?token=abc'),
+    )
+
+    openSpy.mockRestore()
+  })
+
+  // The control: an allowed popup must NOT also navigate the current tab.
+  it('does not navigate the current tab when the popup was allowed', async () => {
+    const user = userEvent.setup()
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue({})
+    const assignSpy = stubAssign()
+    renderCard()
+
+    const row = (await screen.findByText('U10 kit list')).closest('[data-testid="squad-document-row"]')
+    await user.click(row)
+
+    await vi.waitFor(() => expect(openSpy).toHaveBeenCalled())
+    expect(assignSpy).not.toHaveBeenCalled()
 
     openSpy.mockRestore()
   })
