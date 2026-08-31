@@ -1871,3 +1871,57 @@ CREATE POLICY "icons revoke" ON public.profile_icons
   USING ((private.is_super_admin() AND (EXISTS ( SELECT 1
    FROM memberships m
   WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = profile_icons.club_id) AND (m.status = 'active'::text))))));
+
+-- ---------------------------------------------------------------------
+-- documents (2), document_squads (1), and TWO on storage.objects
+-- (31 Aug 2026 — the documents repo, 20260831_documents.sql)
+-- CAPTURED FROM pg_policies after applying.
+--
+-- ⚠️ SELECT AND DELETE ONLY. There is no INSERT policy and no UPDATE policy
+-- on documents, and that is the design, not an omission: writes go through
+-- public.create_document / public.update_document. RLS grants access to
+-- ROWS, not COLUMNS, so an update policy would let a squad manager repoint
+-- storage_key at another document's file — no policy violated, and their
+-- readers would then sign URLs for a file they were never granted. The RPCs
+-- have hard-coded column lists and never touch storage_key after creation.
+--
+-- ⚠️ THE TWO STORAGE POLICIES SPLIT ON PURPOSE. READ resolves THROUGH a
+-- documents row ("is there a row with this storage_key that you may read"),
+-- so an ORPHAN key — file uploaded, row insert failed — is signable by
+-- NOBODY. That is what makes the app's file-first upload order safe.
+-- WRITE/DELETE resolve by PREFIX instead, because the delete path removes
+-- the row FIRST and file authority cannot depend on the row still existing.
+--   club/<uuid>.<ext>      admins only
+--   <team_id>/<uuid>.<ext> that squad's coach/manager (private.is_active_staff_of)
+-- private.document_key_team parses the first path segment and fails CLOSED
+-- (null) on any other shape — the private.staff_photo_owner ruling.
+-- WITH CHECK repeats USING per the 20260804_self_service_profile trap:
+-- USING alone lets anyone INSERT into another prefix.
+-- ---------------------------------------------------------------------
+CREATE POLICY "document read" ON public.documents
+  FOR SELECT
+  USING (private.can_read_document(id));
+
+CREATE POLICY "document delete" ON public.documents
+  FOR DELETE
+  USING (private.can_manage_document(id));
+
+CREATE POLICY "document squads read" ON public.document_squads
+  FOR SELECT
+  USING (private.can_read_document(document_id));
+
+CREATE POLICY "document read" ON storage.objects
+  AS PERMISSIVE FOR SELECT TO public
+  USING (((bucket_id = 'documents'::text) AND (EXISTS ( SELECT 1
+   FROM documents d
+  WHERE ((d.storage_key = objects.name) AND private.can_read_document(d.id))))));
+
+CREATE POLICY "document write" ON storage.objects
+  AS PERMISSIVE FOR ALL TO public
+  USING (((bucket_id = 'documents'::text) AND (((split_part(name, '/'::text, 1) = 'club'::text) AND private.is_admin_anywhere()) OR private.is_active_staff_of(private.document_key_team(name)) OR ((private.document_key_team(name) IS NOT NULL) AND private.is_admin_anywhere()))))
+  WITH CHECK (((bucket_id = 'documents'::text) AND (((split_part(name, '/'::text, 1) = 'club'::text) AND private.is_admin_anywhere()) OR private.is_active_staff_of(private.document_key_team(name)) OR ((private.document_key_team(name) IS NOT NULL) AND private.is_admin_anywhere()))));
+
+-- The `documents` bucket itself: PRIVATE (public=false), 25 MB limit
+-- (26214400), 10 allowed MIME types — pdf, the six Office types, and
+-- jpeg/png/webp. Reads are signed URLs only, like every bucket here except
+-- training-diagrams.

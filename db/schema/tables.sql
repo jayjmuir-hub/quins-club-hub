@@ -2508,3 +2508,65 @@ CREATE TABLE public.profile_icons (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT profile_icons_one_target CHECK ((profile_id IS NULL) <> (team_id IS NULL))
 );
+
+-- ---------------------------------------------------------------------
+-- public.documents + public.document_squads
+-- (31 Aug 2026 — the documents repo)
+-- Migration: db/migrations/20260831_documents.sql
+-- CAPTURED FROM LIVE after applying, not transcribed from the migration:
+-- information_schema.columns, pg_constraint, pg_indexes, pg_class.relrowsecurity.
+--
+-- A JUNCTION TABLE, against the notice_multi_squad fan-out precedent, and
+-- deliberately — the migration header carries the argument. The short form:
+-- a document has ONE file in storage, so fan-out rows would share one
+-- storage_key and "delete the document" would become "delete the last
+-- surviving sibling, then the file".
+--
+-- storage_key is UNIQUE and immutable after creation: update_document's
+-- column list does not include it, and there is no UPDATE policy at all.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.documents (
+  id           uuid        NOT NULL DEFAULT gen_random_uuid(),
+  club_id      uuid        NOT NULL,
+  title        text        NOT NULL,
+  category     text        NOT NULL,
+  staff_only   boolean     NOT NULL DEFAULT true,
+  club_wide    boolean     NOT NULL DEFAULT false,
+  storage_key  text        NOT NULL,
+  file_name    text        NOT NULL,
+  file_size    bigint      NOT NULL,
+  content_type text        NOT NULL,
+  created_by   uuid        NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT documents_pkey PRIMARY KEY (id),
+  CONSTRAINT documents_storage_key_key UNIQUE (storage_key),
+  CONSTRAINT documents_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id),
+  CONSTRAINT documents_created_by_fkey FOREIGN KEY (created_by) REFERENCES profiles(id),
+  CONSTRAINT documents_category_check CHECK ((category = ANY (ARRAY['registration'::text, 'fixtures'::text, 'policies'::text, 'coaching'::text, 'other'::text]))),
+  CONSTRAINT documents_file_size_check CHECK ((file_size > 0)),
+  CONSTRAINT documents_title_check CHECK (((length(TRIM(BOTH FROM title)) >= 1) AND (length(TRIM(BOTH FROM title)) <= 120)))
+);
+ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.documents IS
+  'The documents repo. staff_only=true limits reads to squad staff + admins; club_wide=true targets every squad, otherwise document_squads lists the targets. storage_key is immutable after creation (see update_document).';
+
+CREATE TABLE public.document_squads (
+  document_id uuid NOT NULL,
+  team_id     uuid NOT NULL,
+  CONSTRAINT document_squads_pkey PRIMARY KEY (document_id, team_id),
+  CONSTRAINT document_squads_document_id_fkey FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+  CONSTRAINT document_squads_team_id_fkey FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+);
+ALTER TABLE public.document_squads ENABLE ROW LEVEL SECURITY;
+
+-- The PK already covers (document_id, team_id); this is the reverse lookup,
+-- which is the one the squad-filtered document list actually runs.
+CREATE INDEX document_squads_team_idx ON public.document_squads USING btree (team_id);
+
+-- ⚠️ notification_opt_outs_category_check REPLACED 31 Aug 2026 by the same
+-- migration, adding 'document' as the eighth category. The list was read
+-- from production before restating it and is NOT the one the plan guessed —
+-- production carries 'availability', not 'availability_nudge'. Live now:
+--   CHECK (category = ANY (ARRAY['feedback_reply','notice','fixture',
+--          'approval','availability','squad_chat','direct_messages','document']))

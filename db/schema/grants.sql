@@ -1025,3 +1025,55 @@ REVOKE ALL ON public.club_officers FROM PUBLIC, anon;
 -- ---------------------------------------------------------------------
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.profile_icons TO authenticated;
 REVOKE ALL ON public.profile_icons FROM PUBLIC, anon;
+
+-- ---------------------------------------------------------------------
+-- documents, document_squads  (31 Aug 2026 — the documents repo)
+-- Migration: db/migrations/20260831_documents.sql
+-- MEASURED from pg_class.relacl after applying, not transcribed.
+--
+-- What the migration WRITES:
+--     GRANT SELECT, DELETE ON public.documents TO authenticated;
+--     GRANT SELECT         ON public.document_squads TO authenticated;
+--
+-- ⚠️ WHAT IS ACTUALLY LIVE IS WIDER THAN THAT, AND THE MIGRATION'S OWN
+--    COMMENT SAYS OTHERWISE. It reads "INSERT and UPDATE have no policy and
+--    no grant on purpose". The POLICY half is true. The GRANT half is not:
+--    measured on both tables, `authenticated` holds
+--        DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, UPDATE
+--    (seven — no TRUNCATE, per the 19 Aug revoke) and `anon` holds nothing
+--    (per the 14 Aug revoke). That is section 1 of this file doing exactly
+--    what it says: a new table in `public` is BORN with those privileges
+--    from `supabase_admin` default ACLs, and an extra GRANT of a subset
+--    adds nothing and removes nothing.
+--
+-- ⚠️ IS IT EXPLOITABLE? NO — and the distinction matters, because it is the
+--    same shape as league_teams and the match-sheet tables above. RLS is
+--    enabled on both tables and there is NO INSERT policy and NO UPDATE
+--    policy, so those verbs are denied to every non-owner role regardless
+--    of the grant. The grant is a ceiling sitting uselessly above RLS, not
+--    a working permission. Writes reach the tables only through
+--    public.create_document / public.update_document, which are SECURITY
+--    DEFINER and run as `postgres`.
+--
+-- ⚠️ WHAT IS THEREFORE OPEN, AND DELIBERATELY LEFT FOR A DECISION: the
+--    recent narrow tables — drill_likes, chat_prefs, message_deliveries,
+--    club_officers — all trim their birth defaults with an explicit
+--    `REVOKE ALL … FROM PUBLIC, anon` plus the verbs they want. These two
+--    tables do not, so they do not match that convention and the
+--    migration's comment overstates what was done. Closing it is one line
+--    per table and changes no behaviour; it was NOT applied here because it
+--    is beyond what the migration was reviewed to do. Recorded rather than
+--    quietly fixed, and rather than quietly left.
+-- ---------------------------------------------------------------------
+--   documents         authenticated, postgres, service_role   ALL 8 minus TRUNCATE
+--                                                             (authenticated); anon NONE
+--   document_squads   authenticated, postgres, service_role   ALL 8 minus TRUNCATE
+--                                                             (authenticated); anon NONE
+GRANT SELECT, DELETE ON public.documents TO authenticated;
+GRANT SELECT ON public.document_squads TO authenticated;
+
+-- ⚠️ FUNCTION EXECUTE grants for this feature are in functions.sql as
+-- proacl lines, per the rule at the top of this file — including the one
+-- that had to be corrected by a second migration the same day
+-- (public.document_push_subscriptions was born anon-executable; see
+-- db/migrations/20260831_documents_push_acl.sql).
