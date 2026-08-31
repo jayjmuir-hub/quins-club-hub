@@ -20,9 +20,11 @@ export default function PersonName({ profileId, selfId = null, onOpen, className
     <button
       type="button"
       onClick={() => onOpen(profileId)}
-      // The same affordance ChatBubble's author button established: dotted
-      // underline, solid on hover — a door, not a decoration.
-      className={`underline decoration-dotted underline-offset-2 hover:decoration-solid ${className}`.trim()}
+      // The same affordance ChatBubble's author button carries. Dotted
+      // underline retired 31 Aug 2026 (Jay: "do we need the giant row of
+      // dots?") — the styled name is the door; desktop gets a hover
+      // underline, phones never showed hover anyway.
+      className={`underline-offset-2 hover:underline ${className}`.trim()}
     >
       {children}
     </button>

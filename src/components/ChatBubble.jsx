@@ -161,11 +161,15 @@ export default function ChatBubble({
             {onAuthor ? (
               // The RolePill stays OUTSIDE the button: the tap target is the
               // person, and a pill inside it would announce as button text.
+              // Dotted underline retired 31 Aug 2026 (Jay: "do we need the
+              // giant row of dots?") — the colored bold name is the
+              // affordance; desktop gets a hover underline, phones never
+              // showed hover anyway. PersonName carries the same change.
               <button
                 type="button"
                 onClick={onAuthor}
                 data-testid="author-chat"
-                className="underline decoration-dotted underline-offset-2 hover:decoration-solid"
+                className="underline-offset-2 hover:underline"
               >
                 {authorLabel}
               </button>

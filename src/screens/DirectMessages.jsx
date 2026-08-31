@@ -17,6 +17,7 @@ import { blockDm, deleteConversation, leaveGroup, renameGroup, unblockDm } from 
 import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
 import useDmThread from '../lib/useDmThread.js'
 import useProfileIcons from '../lib/useProfileIcons.js'
+import ProfileIcon from '../components/ProfileIcon.jsx'
 
 // Direct messages — squad chat phase 3. claude/plans/2026-08-23-squad-chat.md.
 //
@@ -50,7 +51,7 @@ const STAFF = new Set(['admin', 'coach', 'manager', 'medic'])
 
 function Thread({ conversationId }) {
   const thread = useDmThread(conversationId)
-  const iconAfter = useProfileIcons()
+  const iconFor = useProfileIcons()
   const {
     conversation,
     missing,
@@ -157,7 +158,7 @@ function Thread({ conversationId }) {
           </PersonName>
           {/* The icon sits OUTSIDE PersonName so the button's accessible
               name stays the bare first name. */}
-          {p.profile_id !== selfId ? iconAfter(p.profile_id) : ''}
+          {p.profile_id !== selfId && <ProfileIcon emoji={iconFor(p.profile_id)} />}
         </Fragment>
       ))
     : null

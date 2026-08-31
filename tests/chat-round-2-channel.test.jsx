@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Round 2 in the CHANNEL stream: MessageRow (pure props, harness-rendered)
@@ -128,7 +128,9 @@ describe('MessageRow — DM bubble language (25 Aug 2026)', () => {
     listClubIconMapMock.mockResolvedValue(new Map([['coach-1', 'crown']]))
     render(<MessageRow message={{ ...BASE }} selfId="me-1" onReply={noop} onReport={noop} />)
     const row = screen.getByTestId('message-row')
-    await within(row).findByText(/Zz Coach Probe 👑/)
+    // A styled span (centered, slightly larger) — Jay's 31 Aug polish note.
+    await waitFor(() => expect(within(row).getByTestId('profile-icon')).toHaveTextContent('👑'))
+    expect(within(row).getByText('Zz Coach Probe')).toBeInTheDocument()
   })
 
   it('actions live in the chevron — Reply / Pin / Delete / Report are menuitems, not a row under the bubble', async () => {

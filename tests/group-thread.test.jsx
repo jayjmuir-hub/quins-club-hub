@@ -242,11 +242,19 @@ describe('profile icons in a group thread', () => {
     listClubIconMapMock.mockResolvedValue(new Map([['p-2', 'crown']]))
     renderAt('/chat/dm/g1')
     const bubble = await screen.findByTestId('dm-bubble')
-    await waitFor(() => expect(within(bubble).getByText(/Mira Vantel 👑/)).toBeInTheDocument())
+    // A STYLED span, not baseline text riding the name string — Jay, 31 Aug
+    // 2026, off the first live crown: "not centered properly … could it be
+    // slightly bigger".
+    await waitFor(() => expect(within(bubble).getByTestId('profile-icon')).toHaveTextContent('👑'))
+    expect(within(bubble).getByText('Mira Vantel')).toBeInTheDocument()
     const subtitle = screen.getByTestId('chat-subtitle')
-    await waitFor(() => expect(subtitle).toHaveTextContent('Mira 👑'))
+    await waitFor(() => expect(within(subtitle).getByTestId('profile-icon')).toHaveTextContent('👑'))
     // The name button keeps its bare accessible name — the icon sits outside.
-    expect(within(subtitle).getByRole('button', { name: 'Mira' })).toBeInTheDocument()
+    const mira = within(subtitle).getByRole('button', { name: 'Mira' })
+    expect(mira).toBeInTheDocument()
+    // And the dotted tappable-hint is retired (same Jay message): colored
+    // bold names are the affordance; desktop keeps a hover underline.
+    expect(mira.className).not.toMatch(/decoration-dotted/)
   })
 
   it('an unknown icon key decorates nothing', async () => {

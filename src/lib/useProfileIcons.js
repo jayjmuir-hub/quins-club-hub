@@ -7,8 +7,10 @@ import { iconEmoji } from './profileIcons.js'
 // sense: a failed fetch renders no icons, never an error — and an unknown
 // key (an icon retired from the library) renders nothing too.
 //
-// Returns iconAfter(profileId): ' 👑' — with the leading space, ready to
-// append to a name string — or '' for the undecorated.
+// Returns iconFor(profileId): the raw emoji, or null for the undecorated —
+// callers render it through components/ProfileIcon.jsx, which owns the
+// centring and size (Jay's 31 Aug polish: a string ride-along sat on the
+// baseline and inherited the tiny name font).
 export default function useProfileIcons() {
   const [map, setMap] = useState(() => new Map())
 
@@ -24,11 +26,5 @@ export default function useProfileIcons() {
     }
   }, [])
 
-  return useCallback(
-    (profileId) => {
-      const emoji = iconEmoji(map.get(profileId))
-      return emoji ? ` ${emoji}` : ''
-    },
-    [map],
-  )
+  return useCallback((profileId) => iconEmoji(map.get(profileId)), [map])
 }
