@@ -223,6 +223,24 @@ describe('Documents — opening a document', () => {
   })
 })
 
+describe('Documents — phone meta line', () => {
+  // 31 Aug 2026 follow-up: the date was dropped from the phone row's meta
+  // line in the cells restyle (the approved mock only named category ·
+  // audience · size), then put back on Jay's say-so — same formatTableDate
+  // formatting the row always used. jsdom leaves window.matchMedia
+  // undefined, so this renders the phone layout by default.
+  it('shows category, audience, size and date together on the row', async () => {
+    render(<Documents />)
+
+    const row = (await screen.findByText('Registration form')).closest(
+      '[data-testid="document-row"]',
+    )
+    expect(
+      within(row).getByText('Registration · Whole club · 200 kB · Thu, Aug 20'),
+    ).toBeInTheDocument()
+  })
+})
+
 describe('Documents — staff-only badge', () => {
   it('marks a staff-only row and leaves an ordinary row unmarked', async () => {
     render(<Documents />)
@@ -236,5 +254,71 @@ describe('Documents — staff-only badge', () => {
 
     expect(within(staffRow).getByText('Staff only')).toBeInTheDocument()
     expect(within(publicRow).queryByText('Staff only')).not.toBeInTheDocument()
+  })
+})
+
+// "Cells" restyle (31 Aug 2026): staff-card rows on phones, a tile grid on
+// desktop — the same isDesktop-branching idiom Roster.jsx/Schedule.jsx use.
+// jsdom leaves window.matchMedia undefined, so useMediaQuery(DESKTOP_QUERY)
+// defaults to false = phone; these tests stub it explicitly in both
+// directions, same idiom as tests/schedule.test.jsx's stubDesktopViewport.
+describe('Documents — responsive layout', () => {
+  const LONG_TITLE =
+    'A club registration and welfare policy pack for every squad, every season, and every coach to read in full'
+
+  function stubMatchMedia(matches) {
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }))
+  }
+
+  afterEach(() => {
+    delete window.matchMedia
+  })
+
+  it('renders staff-card rows on phone: no tile grid, and a long title is nowrap-truncated', async () => {
+    stubMatchMedia(false)
+    listDocumentsMock.mockResolvedValue([doc({ title: LONG_TITLE })])
+    render(<Documents />)
+
+    const title = await screen.findByText(LONG_TITLE)
+    expect(screen.queryByTestId('document-grid')).not.toBeInTheDocument()
+    expect(title.className).toMatch(/\btruncate\b/)
+    expect(title.className).not.toMatch(/line-clamp/)
+  })
+
+  it('renders a tile grid on desktop, with a long title wrapped via line-clamp rather than truncated', async () => {
+    stubMatchMedia(true)
+    listDocumentsMock.mockResolvedValue([doc({ title: LONG_TITLE })])
+    render(<Documents />)
+
+    expect(await screen.findByTestId('document-grid')).toBeInTheDocument()
+    const title = screen.getByText(LONG_TITLE)
+    expect(title.className).toMatch(/line-clamp-3/)
+    expect(title.className).not.toMatch(/\btruncate\b/)
+  })
+
+  it('desktop tiles still open the same title button and expose Remove as a sibling', async () => {
+    stubMatchMedia(true)
+    useMembershipsMock.mockReturnValue(membershipsReturn(COACH))
+    listDocumentsMock.mockResolvedValue([COACHING_DOC, REG_DOC])
+    render(<Documents />)
+
+    await screen.findByTestId('document-grid')
+    const openButton = screen
+      .getByText('U10 training plan')
+      .closest('[data-testid="document-open"]')
+    expect(openButton).not.toBeNull()
+    expect(openButton.tagName).toBe('BUTTON')
+
+    const row = openButton.closest('[data-testid="document-row"]')
+    expect(within(row).getByRole('button', { name: 'Remove' })).toBeInTheDocument()
   })
 })

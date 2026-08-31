@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Chat attachments carry METADATA — the door to documents-in-chat, left
+- **Documents become cells — staff-card rows on phones, a tile grid on
+  desktop.** Jay picked the split from a mock (both variants drawn with a
+  deliberately long title, the layout trap that has bitten before): phones
+  get the age-group-staff row shape — round type swatch, one-line truncated
+  title, `category · audience · size · date` meta; desktop gets 3-4 tiles a
+  row with a `line-clamp-3` wrapping title. Every swatch inherits a pairing
+  already recorded at 4.5:1 in `scripts/contrast-check.mjs` — the app has no
+  blue token, so DOC wears the neutral pair rather than inventing one. The
+  `useMediaQuery(DESKTOP_QUERY)` branch idiom is Roster's; the open handler
+  and delete gating are untouched. `src/screens/Documents.jsx`. (SHA follows
+  in the next changelog-touching PR.)
+- `812a185` — **Chat attachments carry METADATA — the door to documents-in-chat, left
   open for half an hour instead of a day.** Jay wants PDFs in chat and turned
   down share-a-link, so the list had to be able to hold what a photo never
   needs: ⚠️ **a document is useless without its ORIGINAL FILENAME, and that
@@ -29,7 +40,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   everyone, silently and per-device. Harness grew to 15 arms including write
   PRECEDENCE asserted rather than implied. Schema captured in the SAME commit.
   `db/migrations/20260901_attachment_metadata.sql`.
-  (SHA follows in the next changelog-touching PR.)
 - `d49a2ff` — **`chat-list.sql` assert 5 was green by luck — `now()` is
   transaction-constant.** The squad post and the DM shared one `created_at`,
   `my_chats`' recency ordering tied, and 'dm' won on a label tie-break
