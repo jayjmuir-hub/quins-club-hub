@@ -32,11 +32,42 @@ import { subscribeToTable, REALTIME_DEBOUNCE_MS } from './subscribeToTable.js'
 // not read comes back null, which renders as no quote at all.
 const SELECT = `
   id, club_id, team_id, channel, parent_id, event_id, author_id, author_role, author_title, body, pinned,
-  mentions, edited_at, deleted_at, created_at, quoted_id, forwarded, attachment_path,
+  mentions, edited_at, deleted_at, created_at, quoted_id, forwarded, attachment_path, attachments,
   author:profiles!messages_author_id_fkey(full_name),
   quoted:quoted_id(id, body, deleted_at, attachment_path, author_id, author:profiles!messages_author_id_fkey(full_name)),
   event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, ends_at, time_tbd, venue, pitch, team_id)
 `
+
+// ══ THE ONE PLACE A CLIENT DECIDES WHAT TO WRITE FOR AN ATTACHMENT ════════
+//
+// `messages` carries THREE attachment columns and only ONE of them is the
+// truth (db/migrations/20260901_attachment_metadata.sql):
+//
+//   attachments      jsonb   [{ file, type, size, name }, ...]   <- WRITE THIS
+//   attachment_paths text[]  derived by trigger  <- the STORAGE READ POLICY
+//   attachment_path  text    derived by trigger  <- cached service workers
+//
+// ⚠️ Writing a derived column BESIDE the truth is how the three come to
+// disagree, and a disagreement in `attachment_paths` is an invisible
+// permission bug, not a cosmetic one: that array is what the
+// `chat media read` policy on storage.objects matches against, so a message
+// could render a photo its own audience is refused — or grant one it should
+// never have carried.
+//
+// `attachmentPath` survives for the writers that have no album and never
+// will: voice notes, and forwarding a message sent by an old cached bundle.
+function attachmentColumns({ attachments = [], attachmentPath = null }) {
+  if (attachments.length) return { attachments }
+  return attachmentPath ? { attachment_path: attachmentPath } : {}
+}
+
+/**
+ * Whether a wordless message is legal — the client half of
+ * `messages_body_check`, which counts `attachments` and not the old column.
+ */
+function carriesAttachment(opts) {
+  return Object.keys(attachmentColumns(opts)).length > 0
+}
 
 /**
  * The stream for one squad (or the club when teamId is null): top-level posts
@@ -90,16 +121,16 @@ export async function listMessages(teamId, { limit = 50 } = {}) {
  * announce-only is off. Throws the RLS error otherwise; the screen hides the
  * composer first, from getChannelSettings() plus canEditTeam().
  */
-export async function postMessage(teamId, body, { eventId = null, mentions = [], attachmentPath = null, forwarded = false } = {}) {
+export async function postMessage(teamId, body, { eventId = null, mentions = [], attachmentPath = null, attachments = [], forwarded = false } = {}) {
   // Round 2: a photo may travel alone — empty body is legal exactly when an
   // attachment rides along, mirroring the messages_body_check.
   const text = body?.trim() ?? ''
-  if (!text && !attachmentPath) throw new Error('Write something first.')
+  if (!text && !carriesAttachment({ attachments, attachmentPath })) throw new Error('Write something first.')
   // ⚠️ A FIXTURE THREAD SENDS event_id AND NOT team_id — the trigger sets the
   // squad from the fixture and refuses a mismatch, so the client never gets
   // to say which squad a fixture belongs to. One open thread per fixture.
   const extras = {
-    ...(attachmentPath ? { attachment_path: attachmentPath } : {}),
+    ...attachmentColumns({ attachments, attachmentPath }),
     ...(forwarded ? { forwarded: true } : {}),
   }
   const row = eventId
@@ -519,16 +550,16 @@ export async function listRoleMessages(channelKey, { limit = 50 } = {}) {
 }
 
 /** Posts to a role channel. Members only — the policy decides. */
-export async function postRoleMessage(channelKey, body, { mentions = [], attachmentPath = null, forwarded = false } = {}) {
+export async function postRoleMessage(channelKey, body, { mentions = [], attachmentPath = null, attachments = [], forwarded = false } = {}) {
   const text = body?.trim() ?? ''
-  if (!text && !attachmentPath) throw new Error('Write something first.')
+  if (!text && !carriesAttachment({ attachments, attachmentPath })) throw new Error('Write something first.')
   const { data, error } = await supabase
     .from('messages')
     .insert({
       channel: channelKey,
       body: text,
       mentions,
-      ...(attachmentPath ? { attachment_path: attachmentPath } : {}),
+      ...attachmentColumns({ attachments, attachmentPath }),
       ...(forwarded ? { forwarded: true } : {}),
     })
     .select(SELECT)
@@ -550,9 +581,9 @@ export async function channelMembers(channel, teamId = null) {
 }
 
 /** Posts to the squad's staff channel. Staff only — the policy decides. */
-export async function postStaffMessage(teamId, body, { mentions = [], attachmentPath = null, forwarded = false } = {}) {
+export async function postStaffMessage(teamId, body, { mentions = [], attachmentPath = null, attachments = [], forwarded = false } = {}) {
   const text = body?.trim() ?? ''
-  if (!text && !attachmentPath) throw new Error('Write something first.')
+  if (!text && !carriesAttachment({ attachments, attachmentPath })) throw new Error('Write something first.')
   const { data, error } = await supabase
     .from('messages')
     .insert({
@@ -560,7 +591,7 @@ export async function postStaffMessage(teamId, body, { mentions = [], attachment
       channel: 'staff',
       body: text,
       mentions,
-      ...(attachmentPath ? { attachment_path: attachmentPath } : {}),
+      ...attachmentColumns({ attachments, attachmentPath }),
       ...(forwarded ? { forwarded: true } : {}),
     })
     .select(SELECT)
@@ -635,16 +666,16 @@ export async function listDirectMessages(conversationId, { limit = 200 } = {}) {
  * key already uploaded (photo-first, WhatsApp order), and lets the body be
  * empty; `forwarded` marks a passed-along message.
  */
-export async function sendDirectMessage(conversationId, body, { quotedId = null, attachmentPath = null, forwarded = false, mentions = [] } = {}) {
+export async function sendDirectMessage(conversationId, body, { quotedId = null, attachmentPath = null, attachments = [], forwarded = false, mentions = [] } = {}) {
   const text = body?.trim() ?? ''
-  if (!text && !attachmentPath) throw new Error('Write something first.')
+  if (!text && !carriesAttachment({ attachments, attachmentPath })) throw new Error('Write something first.')
   const { data, error } = await supabase
     .from('messages')
     .insert({
       conversation_id: conversationId,
       body: text,
       ...(quotedId ? { quoted_id: quotedId } : {}),
-      ...(attachmentPath ? { attachment_path: attachmentPath } : {}),
+      ...attachmentColumns({ attachments, attachmentPath }),
       ...(forwarded ? { forwarded: true } : {}),
       // Groups only — the trigger keeps members, zeroes 1:1 DMs
       // (db/migrations/20260831_group_chat_mentions.sql). Absent when empty,
@@ -669,7 +700,15 @@ export async function sendDirectMessage(conversationId, body, { quotedId = null,
 export async function forwardMessagesTo(dest, msgs) {
   const ordered = msgs.slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   for (const m of ordered) {
-    const opts = { attachmentPath: m.attachment_path ?? null, forwarded: true }
+    // ⚠️ THE WHOLE ALBUM, not attachment_path — that column is the FIRST
+    // key only, so forwarding by it would silently drop every photo after
+    // the first the moment an album could be sent at all. `attachments` is
+    // absent on a message loaded by an old cached bundle, hence the fallback.
+    const opts = {
+      attachments: m.attachments ?? [],
+      attachmentPath: m.attachment_path ?? null,
+      forwarded: true,
+    }
     if (dest.kind === 'dm' || dest.kind === 'group') {
       await sendDirectMessage(dest.conversation_id, m.body, opts)
     } else if (dest.kind === 'staff') {

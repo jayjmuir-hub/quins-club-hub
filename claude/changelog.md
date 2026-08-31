@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **A Club Diary entry is no longer pushed to the squad as a "New fixture".**
+- `06ec8b5` — **A Club Diary entry is no longer pushed to the squad as a "New fixture".**
   ⚠️ **A bug shipped in the Club Diary merge earlier the same day, caught before
   it ever fired.** Adding an event triggers a squad push whose headline was the
   hard-coded literal `'New fixture'` — so the first kit collection anybody
@@ -60,7 +60,70 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `db/migrations/20260901_fixture_push_diary_wording.sql`,
   `db/migrations/20260901_fixture_push_headline_pin_search_path.sql`,
   `db/tests/club-diary-push.sql`.
+- **PASTE AND DRAG-AND-DROP, AND SEVERAL PHOTOS IN ONE MESSAGE.** Plan 2 of the
+  chat-albums series, tasks 2 to 6 — the thing Jay asked for on 31 Aug and did
+  not have. ⚠️ **Paste had NEVER existed in this app** (`onPaste` and
+  `clipboardData` in zero commits, all branches; control: `git log -S"pickPhoto"`
+  finds its three), and drag-and-drop existed only on the bounded targets in
+  `PhotoPositioner` — so this is a feature, not a regression fixed.
+  ⚠️ **THE TASK ORDER WAS DEVIATED FROM, DELIBERATELY.** The plan puts paste
+  (task 2) before the tray UI (5) and the send (4), but task 2's own tests
+  assert on `tray-thumb` — which task 5 draws — against a `tray` that task 4
+  puts on the thread object. In the plan's order those tests could not pass, and
+  the intermediate state would have been a tray holding three photos above a
+  send that posted one. Same end state, safer road.
+  ⚠️ **Only `attachments` is ever written.** The database derives
+  `attachment_paths` — which the storage READ POLICY matches against — and
+  `attachment_path`, for cached service workers. A client writing a derived
+  column beside the truth is how the three come to disagree, and a disagreement
+  in `attachment_paths` is an invisible permission bug, not a cosmetic one.
+  ⚠️ **Forwarding now carries the WHOLE album**, closed in the same commit that
+  opened it: `attachment_path` is the first key only, so forwarding by it would
+  have silently dropped every photo after the first the moment an album could be
+  sent at all.
+  ⚠️ **Pasting TEXT is a hundred times commoner than pasting a photo**, so the
+  handler returns BEFORE `preventDefault`, not after — breaking typing into the
+  message box would be far worse than the bug being fixed — and it claims only
+  IMAGES, so a pasted PDF is left to the browser rather than swallowed in
+  silence by a handler that prevents the default and adds nothing.
+  ⚠️ **Drop takes the whole conversation pane, per Jay's ruling**, with three
+  traps each under test: `dragover` must `preventDefault` or the element is not
+  a drop target at all and the browser navigates away with the draft;
+  `dragleave` fires on every child boundary, so counted enter/leave pairs and
+  not a boolean; and only `Files`, because dragging a selected word across a
+  conversation is an everyday accident. The overlay sits at `z-30`, BELOW the
+  `z-40` chrome, on purpose — its job is to say "drop here", not to seize the
+  screen, and covering bars that auto-hide on scroll would make them flicker
+  underneath it mid-drag.
+  The upload is ALL OR NOTHING and the draft and tray survive a failure. A
+  partial album is worse than a failed one twice over: the member cannot tell
+  which photos are missing, and the ones that did reach storage are orphans no
+  live message points at, so the read policy refuses everyone and only a future
+  reaper would find them. Sequential, and the button COUNTS — ten uploads is the
+  same road as the 28 Aug slow-site incident, where a blank spinner is
+  indistinguishable from a hang.
+  `multiple` on the input is not cosmetic: paste and drop are desktop-only, so
+  it is the only route to an album from a phone. `PICKER_ACCEPT` is derived from
+  the one accepted-types list, whose hand-typed THIRD copy was still sitting in
+  five components.
+  **Eight faults injected, eight caught** — boolean instead of counter, overlay
+  for dragged text, no `preventDefault` on dragover, paste claiming everything,
+  sending only the first photo, orphans left behind, a derived column written
+  beside the truth, and the type gate removed. **Verified LIVE in a real browser
+  with a real `DataTransfer`**, which jsdom cannot provide: text paste
+  `defaultPrevented === false` with no phantom attachment, PDF paste left alone,
+  overlay surviving a child crossing, and the cap holding at ten with its
+  message. Nine assertions pinning the old single-photo options object were
+  UPDATED, not loosened to `objectContaining` — the exactness is what would
+  catch a stray option reaching the database.
+  ⚠️ **KNOWN GAP, DELIBERATE:** a ten-photo message SENDS but still renders one
+  photo per bubble until plan 3 draws the grid. Ship them close together.
+  `src/lib/uploadAlbum.js`, `src/components/AttachmentTray.jsx`,
+  `src/components/ChatDropZone.jsx`, `src/lib/chatComposer.js`,
+  `src/data/messages.js`, `src/lib/useDmThread.js`,
+  `src/lib/useChannelThread.js`.
   (SHA follows in the next changelog-touching PR.)
+
 - `87c1d3c` — **CLUB DIARY SHIPPED (phase 1) — dated items nobody replies to.** Four of the
   seven lines on the club's own "3 week look ahead" poster are dated,
   calendar-worthy items with nothing to RSVP to (shop opening, ball collection,
@@ -93,8 +156,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/lib/eventFormat.js`, `src/components/EventKindChooser.jsx`,
   `src/screens/EventForm.jsx`, `src/screens/Schedule.jsx`,
   `claude/plans/2026-08-31-club-diary-implementation.md`.
-  (SHA follows in the next changelog-touching PR.)
-- `334f11e` — **One attachment tray, replacing two copies of `pickPhoto`.** Task 1 of
+- `334f11e` — **One attachment tray, TO REPLACE two copies of `pickPhoto`.** Task 1 of
   plan 2, and ⚠️ **the first BUILDING merge of the chat-albums series** — plan
   1 and the metadata reshape were database-only and cost nothing. Nothing is
   wired to the hook yet, so members see no change; it lands first so the

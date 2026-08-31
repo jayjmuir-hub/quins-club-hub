@@ -1,6 +1,10 @@
+import { isAcceptableImage } from './imageResize.js'
+
 // Composer behaviour shared by the channel screen and the DM/group thread
 // (24 Aug 2026 feedback round: "message typing area should expand" and
-// "option to have enter button send a message, changeable").
+// "option to have enter button send a message, changeable"), plus the paste
+// door added by plan 2 of the chat-albums series
+// (claude/plans/2026-09-01-chat-albums-plan-2-composer.md).
 
 const ENTER_KEY = 'chat-enter-sends'
 
@@ -66,4 +70,28 @@ export function composerKeyDown(domEvent) {
   if (!enterSends()) return
   domEvent.preventDefault()
   domEvent.currentTarget.form?.requestSubmit?.()
+}
+
+/**
+ * The PASTE door: Ctrl+V a screenshot into a chat and it joins the tray.
+ *
+ * ⚠️ PASTING TEXT IS A HUNDRED TIMES COMMONER THAN PASTING A PHOTO, so this
+ * does nothing at all unless the clipboard actually carries image files.
+ * Calling preventDefault on an ordinary text paste would break typing into
+ * the message box — a far worse bug than the one this fixes — which is why
+ * the early return comes BEFORE preventDefault and not after it.
+ *
+ * ⚠️ AND IT ONLY CLAIMS IMAGES. Copying a file in Explorer puts it on the
+ * clipboard as a File too, so "the clipboard has files" is not enough: a
+ * pasted PDF must be left to the browser rather than silently swallowed by
+ * a handler that prevents the default and then adds nothing.
+ *
+ * Returns true when it took over, for tests and for callers that care.
+ */
+export function pasteImages(domEvent, add) {
+  const files = Array.from(domEvent.clipboardData?.files ?? []).filter(isAcceptableImage)
+  if (files.length === 0) return false
+  domEvent.preventDefault()
+  add(files)
+  return true
 }

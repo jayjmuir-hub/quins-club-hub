@@ -1,5 +1,7 @@
 import { Fragment, useState } from 'react'
 import Button from './Button.jsx'
+import AttachmentTray from './AttachmentTray.jsx'
+import ChatDropZone from './ChatDropZone.jsx'
 import Card from './Card.jsx'
 import ChatBubble from './ChatBubble.jsx'
 import EmojiPicker from './EmojiPicker.jsx'
@@ -13,10 +15,11 @@ import ProfileIcon from './ProfileIcon.jsx'
 import useProfileIcons from '../lib/useProfileIcons.js'
 import MessageEditor from './MessageEditor.jsx'
 import { attachmentPreviewLabel } from '../data/chatMedia.js'
+import { PICKER_ACCEPT } from '../lib/imageResize.js'
 import { canStillEdit } from '../lib/messageEdit.js'
 import { receiptState } from '../data/messages.js'
 import { backgroundStyle } from '../lib/chatBackgrounds.js'
-import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
+import { autoGrow, composerKeyDown, insertAtCursor, pasteImages } from '../lib/chatComposer.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { RowAvatar, scopeChatRows } from '../screens/ChatList.jsx'
@@ -59,7 +62,7 @@ export default function DmThread({ thread, compact = false }) {
   const [editingId, setEditingId] = useState(null)
 
   return (
-    <>
+    <ChatDropZone onFiles={thread.tray.add}>
       {/* ── The notice is REVIEWING-ONLY since 26 Aug 2026 — Jay: "remove
              the club admins can review notice", pointing at the dock, which
              never showed it. The member-facing "admins can review" line was
@@ -371,20 +374,7 @@ export default function DmThread({ thread, compact = false }) {
                   </button>
                 </div>
               )}
-              {thread.photoPreview && (
-                <div className="mb-1.5 flex items-center gap-2 rounded-[10px] bg-surface-mute px-2.5 py-1.5" data-testid="photo-preview">
-                  <img src={thread.photoPreview} alt="Photo to send" className="h-12 w-12 rounded-[8px] object-cover" />
-                  <p className="min-w-0 flex-1 truncate text-[12px] text-ink-muted">{thread.photo?.name ?? 'Photo'}</p>
-                  <button
-                    type="button"
-                    aria-label="Remove photo"
-                    onClick={thread.clearPhoto}
-                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
-                  </button>
-                </div>
-              )}
+              <AttachmentTray items={thread.tray.items} onRemove={thread.tray.remove} error={thread.tray.error} />
               <form onSubmit={thread.send} className="relative flex items-end gap-2" data-testid="dm-composer">
                 {/* Group @ mentions — the channels' button-not-typeahead
                     picker, fed from the loaded members. mentionables is []
@@ -396,7 +386,7 @@ export default function DmThread({ thread, compact = false }) {
                     thread.setDraftMentions((ms) => (ms.some((x) => x.profile_id === p.profile_id) ? ms : [...ms, p]))
                   }}
                 />
-                <input ref={thread.fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
+                <input ref={thread.fileRef} type="file" multiple accept={PICKER_ACCEPT} className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
                 <button
                   type="button"
                   aria-label="Attach a photo"
@@ -433,17 +423,23 @@ export default function DmThread({ thread, compact = false }) {
                   onChange={(e) => thread.setDraft(e.target.value)}
                   onInput={(e) => autoGrow(e.currentTarget)}
                   onKeyDown={composerKeyDown}
+                  // ⚠️ Ctrl+V a screenshot. Hands off entirely unless the
+                  // clipboard carries images — see pasteImages.
+                  onPaste={(e) => pasteImages(e, thread.tray.add)}
                   rows={1}
                   maxLength={2000}
                   placeholder={`Message ${(isGroup ? conversation?.title : otherName?.split(' ')[0]) ?? ''}`}
                   className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
                 />
                 <EmojiPicker onPick={(emoji) => thread.setDraft(insertAtCursor(thread.draftRef.current, emoji))} />
-                {!thread.draft.trim() && !thread.photo ? (
+                {!thread.draft.trim() && thread.tray.items.length === 0 ? (
                   <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} onError={thread.setError} />
                 ) : (
-                  <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && !thread.photo)}>
-                    Send
+                  <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && thread.tray.items.length === 0)}>
+                    {/* ⚠️ Counts rather than spinning: ten uploads over the
+                        UAE-to-Tokyo route (28 Aug incident) is a long wait,
+                        and a blank spinner there reads as a hang. */}
+                    {thread.progress ? <span data-testid="send-progress">{thread.progress}</span> : 'Send'}
                   </Button>
                 )}
               </form>
@@ -467,6 +463,6 @@ export default function DmThread({ thread, compact = false }) {
         }}
       />
       <PollVotes open={Boolean(votesFor)} onClose={() => setVotesFor(null)} poll={votesFor} />
-    </>
+    </ChatDropZone>
   )
 }

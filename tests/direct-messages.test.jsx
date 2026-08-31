@@ -285,7 +285,7 @@ describe('DirectMessages — a thread', () => {
     await user.type(screen.getByLabelText('Message'), 'See you Saturday')
     await user.click(screen.getByRole('button', { name: 'Send' }))
     // Round 2 rides along: no quote, no photo unless the user set one up.
-    expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'See you Saturday', { quotedId: null, attachmentPath: null, mentions: [] })
+    expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'See you Saturday', { quotedId: null, attachments: [], mentions: [] })
   })
 
   it('block hides the composer and says so; unblock brings it back', async () => {

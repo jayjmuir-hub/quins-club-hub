@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
@@ -206,7 +206,7 @@ describe('Chat — announce-only', () => {
     await user.type(await screen.findByLabelText('Message'), 'Anyone need a lift?')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'Anyone need a lift?', { eventId: null, mentions: [], attachmentPath: null })
+    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'Anyone need a lift?', { eventId: null, mentions: [], attachments: [] })
   })
 
   it('always opens the composer for a coach, and never shows them the lock', async () => {
@@ -344,7 +344,7 @@ describe('Chat — fixture threads', () => {
     await user.type(await screen.findByLabelText('Message'), 'Who needs a lift?')
     await user.click(screen.getByRole('button', { name: 'Start thread' }))
 
-    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'Who needs a lift?', { eventId: 'ev-1', mentions: [], attachmentPath: null })
+    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'Who needs a lift?', { eventId: 'ev-1', mentions: [], attachments: [] })
   })
 
   it('hides a fixture from the picker once it has a thread', async () => {
@@ -411,7 +411,7 @@ describe('Chat — @mentions', () => {
     await user.type(screen.getByLabelText('Message'), 'changed my mind')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'changed my mind', { eventId: null, mentions: [], attachmentPath: null })
+    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'changed my mind', { eventId: null, mentions: [], attachments: [] })
   })
 
   it('shows no mention button when nobody can be mentioned', async () => {
@@ -505,7 +505,7 @@ describe('Chat — staff channel', () => {
 
     await user.type(screen.getByLabelText('Message'), 'Go with the big pack')
     await user.click(screen.getByRole('button', { name: 'Send' }))
-    expect(postStaffMessageMock).toHaveBeenCalledWith('team-a', 'Go with the big pack', { mentions: [], attachmentPath: null })
+    expect(postStaffMessageMock).toHaveBeenCalledWith('team-a', 'Go with the big pack', { mentions: [], attachments: [] })
     expect(postMessageMock).not.toHaveBeenCalled()
   })
 
@@ -539,5 +539,35 @@ describe('Chat — reporting', () => {
     await user.click(screen.getByRole('button', { name: 'Message options' }))
     expect(screen.queryByRole('menuitem', { name: 'Report' })).toBeNull()
     expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
+  })
+})
+
+describe("Chat — the album composer is WIRED here too", () => {
+  // ⚠️ THE POINT OF THIS BLOCK IS THE SURFACE, NOT THE LOGIC. The tray, the
+  // paste gate and the drop gate are proved in tests/chat-album-send.test.jsx,
+  // tests/chat-paste.test.jsx and tests/chat-drop.test.jsx against the DM
+  // thread. What no pure test can see is a handler that was wired to ONE of
+  // the two composers — which is exactly the drift the shared hook exists to
+  // prevent, and exactly what a copy-paste implementation would have left.
+  beforeEach(() => {
+    getChannelSettingsMock.mockResolvedValue({ team_id: "team-a", announce_only: false })
+  })
+
+  it("multi-select, paste and drop all reach the channel tray", async () => {
+    renderAt("/chat/team-a")
+    await screen.findByTestId("message-row")
+    expect(screen.getByTestId("photo-input")).toHaveAttribute("multiple")
+
+    const box = screen.getByLabelText("Message")
+    const paste = new Event("paste", { bubbles: true, cancelable: true })
+    paste.clipboardData = { files: [new File(["x"], "image.png", { type: "image/png" })], getData: () => "" }
+    fireEvent(box, paste)
+    expect(await screen.findAllByTestId("tray-thumb")).toHaveLength(1)
+
+    const drop = new Event("drop", { bubbles: true, cancelable: true })
+    drop.dataTransfer = { files: [new File(["x"], "b.jpg", { type: "image/jpeg" })], types: ["Files"] }
+    fireEvent(screen.getByTestId("chat-drop-pane"), drop)
+    expect(drop.defaultPrevented).toBe(true)
+    await waitFor(() => expect(screen.getAllByTestId("tray-thumb")).toHaveLength(2))
   })
 })
