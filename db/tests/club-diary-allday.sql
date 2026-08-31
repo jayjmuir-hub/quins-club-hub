@@ -172,4 +172,51 @@ begin
   end if;
 end $$;
 
+-- ── STEP 7 — the calendar feed can SEE both flags ────────────────────────
+--
+-- ⚠️ THE FEED IS THE HARDEST PLACE IN THIS APP TO WITHDRAW A MISTAKE. A wrong
+-- entry that has synced to a parent's phone stays wrong until their calendar
+-- refetches, and some clients cache hard. So the column reaching the function
+-- is asserted here rather than discovered when an all-day event renders as a
+-- midnight appointment.
+--
+-- ⚠️ THE FUNCTION IS `public.calendar_events_for_token`, NOT `calendar_feed`.
+-- The migration FILES are named calendar_feed*.sql and the spec and plan both
+-- inherited that name from the filenames — so a probe written from the
+-- documentation raises "function does not exist" rather than returning a wrong
+-- answer, which is the lucky version of that mistake. A file name is not an
+-- object name; resolve the object.
+--
+-- ⚠️ ASSERTED ON THE RETURN SIGNATURE, not on the body. The function is
+-- replaced wholesale by migrations; a body check would break on any unrelated
+-- edit, while the signature is the actual contract the Deno edge function
+-- reads. Same reasoning as the pg_get_function_result assertion in
+-- db/migrations/20260814_calendar_feed_competition_type.sql.
+do $$
+declare sig text;
+begin
+  select pg_get_function_result(oid) into sig
+    from pg_proc
+   where oid = 'public.calendar_events_for_token(uuid)'::regprocedure;
+
+  if not found then
+    raise exception 'PROBE FAILED: could not resolve public.calendar_events_for_token(uuid) to read its signature';
+  end if;
+
+  -- CONTROL: the signature contains something we know is there. Without it, a
+  -- signature read as an empty string would satisfy both checks below by
+  -- containing nothing at all.
+  if sig not like '%time_tbd boolean%' then
+    raise exception
+      'CONTROL FAILED: calendar_events_for_token''s signature does not mention time_tbd — the probe is reading the wrong thing: %', sig;
+  end if;
+
+  if sig not like '%all_day boolean%' then
+    raise exception 'calendar_events_for_token does not return all_day — an all-day event would render as a midnight appointment: %', sig;
+  end if;
+  if sig not like '%info_only boolean%' then
+    raise exception 'calendar_events_for_token does not return info_only: %', sig;
+  end if;
+end $$;
+
 rollback;

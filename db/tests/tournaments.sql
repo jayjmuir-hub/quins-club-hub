@@ -46,32 +46,31 @@ end $$;
 create index if not exists events_tournament_id_idx
   on public.events using btree (tournament_id) where (tournament_id is not null);
 
-create or replace function public.calendar_events_for_token(_token uuid)
-returns table (
-  id uuid, type text, title text, opponent text, home boolean, venue text,
-  pitch text, competition text, starts_at timestamptz, ends_at timestamptz,
-  notes text, team_name text, league_team_name text, league_division text,
-  round smallint, time_tbd boolean, competition_type text
-)
-language sql stable security definer set search_path to 'public'
-as $function$
-  select e.id, e.type, e.title, e.opponent, e.home, e.venue, e.pitch, e.competition,
-         e.starts_at, e.ends_at, e.notes, t.name as team_name,
-         lt.rcm_name as league_team_name, lt.division as league_division, e.round,
-         e.time_tbd, e.competition_type
-  from public.events e
-  join public.teams t on t.id = e.team_id
-  left join public.league_teams lt on lt.id = e.league_team_id
-  where exists (
-    select 1 from public.calendar_tokens ct
-    join public.memberships m on m.profile_id = ct.profile_id
-    where ct.token = _token
-      and ((m.role = 'admin' and m.club_id = t.club_id) or m.team_id = e.team_id)
-  )
-  and e.starts_at > now() - interval '6 months'
-  and e.tournament_id is null
-  order by e.starts_at;
-$function$;
+-- ── The feed function is asserted, NOT recreated — REPOINTED 1 Sep 2026. ────
+--
+-- ⚠️ THIS BLOCK USED TO HOLD A FULL COPY OF calendar_events_for_token, as
+-- scaffolding so the harness could run BEFORE the tournament migration was
+-- applied. That migration shipped on 29 Aug; the copy then sat here as a stale
+-- duplicate of a live function body — and when 20260901 widened the live
+-- RETURNS TABLE (info_only, all_day), the copy's `create or replace` started
+-- failing with "cannot change return type of existing function". The harness
+-- went red not because the filter it tests broke, but because it was trying to
+-- narrow the live function back to a 17-column signature.
+--
+-- ⚠️ A HARNESS MUST NOT CARRY A COPY OF A FUNCTION BODY. A copy drifts the
+-- moment anyone replaces the original — the same failure as editing a function
+-- from its old migration file instead of from pg_get_functiondef. What this
+-- harness actually needs is (a) the filter to exist and (b) the filter to
+-- WORK; both are properties of the LIVE function, asserted below and by the
+-- behavioural steps that follow.
+do $$
+begin
+  if pg_get_functiondef('public.calendar_events_for_token(uuid)'::regprocedure)
+     not like '%tournament_id is null%' then
+    raise exception
+      'TOURNAMENTS: the live feed no longer filters tournament games — games would reach subscribed calendars';
+  end if;
+end $$;
 
 
 create function pg_temp.check_tournaments() returns void language plpgsql as $fn$

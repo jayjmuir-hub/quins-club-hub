@@ -299,6 +299,17 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 -- the RETURNS TABLE signature and the select list, so a subscribed calendar
 -- shows which pitch. Nothing else about the visibility rule changed.
 --
+-- ⚠️ CHANGED 2026-09-01 (calendar_token_fn_all_day): `info_only` and `all_day`
+-- added to the signature and select list, via DROP + CREATE — Postgres refuses
+-- a return-type change in place. ⚠️ THE DROP DROPS THE ACL, and a fresh
+-- function grants EXECUTE to PUBLIC by default, so the migration re-applies
+-- the exact measured grants (anon/authenticated/service_role, PUBLIC absent)
+-- and ASSERTS them; forgetting that would silently undo
+-- calendar_feed_revoke_public_execute with a body that looks right.
+-- Also repointed db/tests/tournaments.sql, which carried a stale 17-column
+-- COPY of this function as pre-migration scaffolding and went red on the
+-- signature change — a harness must not carry a copy of a function body.
+--
 -- ⚠️ CHANGED 2026-08-08 (20260808154115 calendar_feed_end_time_and_notes):
 -- `ends_at` and `notes` added to both the RETURNS TABLE signature and the
 -- select list, following 20260808151251 event_end_time_and_notes which added
@@ -309,7 +320,7 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 -- function did NOT. See the note on can_see_team below.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.calendar_events_for_token(_token uuid)
- RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text, league_team_name text, league_division text, round smallint, time_tbd boolean, competition_type text)
+ RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text, league_team_name text, league_division text, round smallint, time_tbd boolean, competition_type text, info_only boolean, all_day boolean)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
@@ -317,7 +328,7 @@ AS $function$
   select e.id, e.type, e.title, e.opponent, e.home, e.venue, e.pitch, e.competition,
          e.starts_at, e.ends_at, e.notes, t.name as team_name,
          lt.rcm_name as league_team_name, lt.division as league_division, e.round,
-         e.time_tbd, e.competition_type
+         e.time_tbd, e.competition_type, e.info_only, e.all_day
   from public.events e
   join public.teams t on t.id = e.team_id
   left join public.league_teams lt on lt.id = e.league_team_id
