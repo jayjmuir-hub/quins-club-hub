@@ -8,13 +8,27 @@ import EventKindChooser from '../src/components/EventKindChooser.jsx'
 // EventForm. See claude/plans/2026-08-29-tournaments-as-containers.md.
 
 describe('EventKindChooser', () => {
-  it('offers the four kinds under the prompt', () => {
+  it('offers the five kinds under the prompt', () => {
     render(<EventKindChooser onPick={() => {}} onClose={() => {}} />)
 
     expect(screen.getByText('What are you adding?')).toBeInTheDocument()
-    for (const label of ['Match', 'Tournament', 'Training', 'Social']) {
+    // ⚠️ 'Club Diary' ADDED 31 Aug 2026 and it is NOT an events.type — it maps
+    // to type='social' with info_only set, the same way 'Tournament' maps to a
+    // match with competition_type='tournament'. The chooser speaks the user's
+    // language; EventForm turns the pick back into columns.
+    // claude/plans/2026-08-31-club-diary.md.
+    for (const label of ['Match', 'Tournament', 'Training', 'Social', 'Club Diary']) {
       expect(screen.getByRole('button', { name: new RegExp(`^${label}`) })).toBeInTheDocument()
     }
+  })
+
+  it('calls onPick with diary for the Club Diary card', async () => {
+    const user = userEvent.setup()
+    const onPick = vi.fn()
+    render(<EventKindChooser onPick={onPick} onClose={() => {}} />)
+
+    await user.click(screen.getByRole('button', { name: /^Club Diary/ }))
+    expect(onPick).toHaveBeenCalledWith('diary')
   })
 
   it('calls onPick with the chosen kind', async () => {

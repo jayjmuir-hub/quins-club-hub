@@ -126,10 +126,48 @@ export function PeopleIcon(props) {
 // that a rugby ball would assert a fixture is a match on the strength of a
 // value nothing recognised. Absence is the honest answer here — the same rule
 // EventDetail's "Not a league match" default follows.
+/**
+ * Club Diary — a dated item with nothing to reply to.
+ *
+ * ⚠️ A CALENDAR, NOT A MEGAPHONE AND NOT A TROPHY. A megaphone says
+ * "announcement", which is the NOTICEBOARD — a different feature with read
+ * receipts, and confusing the two is the exact ambiguity the name "Club Diary"
+ * was chosen to avoid. A trophy is already the tournament mark in
+ * EventKindChooser. A calendar page says "a date you keep", which is the whole
+ * of what this kind means. See claude/plans/2026-08-31-club-diary.md.
+ *
+ * ⚠️ EXPORTED, because EventKindChooser draws it too. The tournament trophy is
+ * drawn locally there precisely because a tournament is NOT an event.type and
+ * so has no entry here; a diary entry DOES have one (via eventChipKind), so a
+ * second copy would be the drift that comment warns about.
+ */
+export function CalendarIcon(props) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <rect x="3" y="5" width="18" height="16" rx="2.5" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  )
+}
+
 export const EVENT_TYPE_ICONS = {
   match: RugbyBallIcon,
   training: ConeIcon,
   social: PeopleIcon,
+  // ⚠️ 'diary' IS NOT AN events.type. It comes from eventChipKind() in
+  // src/lib/eventFormat.js, which returns it for an info_only event. Adding it
+  // here is safe for exactly the reason the note above gives: this map is asked
+  // about CHIP KINDS, and 'diary' is not a result value, so the win/loss/draw
+  // chips and the neutral squad pill stay untouched.
+  diary: CalendarIcon,
 }
 
 /**

@@ -68,6 +68,11 @@ const TYPE_FILTERS = [
   { id: 'match', label: 'Matches', empty: 'No upcoming matches. Try Everything to see what else is on.' },
   { id: 'training', label: 'Training', empty: 'No upcoming training. Try Everything to see what else is on.' },
   { id: 'social', label: 'Socials', empty: 'No upcoming socials. Try Everything to see what else is on.' },
+  // ⚠️ 'diary' IS NOT AN events.type — it is type='social' with info_only set.
+  // It gets its own pill rather than living under Socials because a kit
+  // collection is not a social, and the filter below narrows Socials to match.
+  // claude/plans/2026-08-31-club-diary.md.
+  { id: 'diary', label: 'Diary', empty: 'Nothing in the club diary. Try Everything to see what else is on.' },
 ]
 
 const TYPE_FILTER_KEY = 'quins.schedule.typeFilter'
@@ -99,6 +104,20 @@ function readStoredTypeFilter() {
 export function filterByType(events, typeFilter) {
   if (!Array.isArray(events)) return []
   if (!typeFilter || !TYPE_IDS.includes(typeFilter) || typeFilter === ALL_TYPES_ID) return events
+  // ⚠️ TWO SPECIAL CASES, AND THE SECOND IS THE ONE THAT MATTERS. 'diary' is
+  // not an events.type — a Club Diary entry is type='social' with info_only
+  // set. Adding the Diary pill WITHOUT narrowing Socials would have left kit
+  // collections showing under Socials exactly as before, which is the thing
+  // this kind exists to stop, and it would have looked finished.
+  //
+  // ⚠️ STRICT === true / !== true, so a row written before the migration (or
+  // read through a path that does not select the column) stays an ordinary
+  // social rather than vanishing from both pills.
+  // claude/plans/2026-08-31-club-diary.md.
+  if (typeFilter === 'diary') return events.filter((event) => event?.info_only === true)
+  if (typeFilter === 'social') {
+    return events.filter((event) => event?.type === 'social' && event?.info_only !== true)
+  }
   return events.filter((event) => event?.type === typeFilter)
 }
 

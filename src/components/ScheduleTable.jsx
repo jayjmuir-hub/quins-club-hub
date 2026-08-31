@@ -11,6 +11,7 @@ import {
   resultOutcome,
   resultScore,
   venueLine,
+  eventChipKind,
 } from '../lib/eventFormat.js'
 import {
   groupEventsByMonth,
@@ -45,8 +46,8 @@ const CELL = 'border-t border-line px-3 py-2 text-[14px] text-ink align-middle'
 const COL_STICKY_TOP = 'var(--schedule-filter-h, 0px)'
 const MONTH_STICKY_TOP = 'calc(var(--schedule-filter-h, 0px) + var(--schedule-col-h, 2.75rem))'
 
-const TYPE_TONE = { match: 'match', training: 'training', social: 'social' }
-const TYPE_LABEL = { match: 'Match', training: 'Training', social: 'Social' }
+const TYPE_TONE = { match: 'match', training: 'training', social: 'social', diary: 'diary' }
+const TYPE_LABEL = { match: 'Match', training: 'Training', social: 'Social', diary: 'Diary' }
 
 const COLUMNS = [
   { key: 'starts_at', label: 'Date' },
@@ -108,7 +109,11 @@ function EventRow({ event, teamsById, onSelect }) {
       </td>
 
       <td className={CELL}>
-        <Chip type={TYPE_TONE[event.type]}>{TYPE_LABEL[event.type] ?? event.type}</Chip>
+        {/* ⚠️ eventChipKind, NOT event.type — a Club Diary entry is
+            type='social'. claude/plans/2026-08-31-club-diary.md. */}
+        <Chip type={TYPE_TONE[eventChipKind(event)]}>
+          {TYPE_LABEL[eventChipKind(event)] ?? event.type}
+        </Chip>
       </td>
 
       <td className={`${CELL} whitespace-nowrap text-ink-muted`}>

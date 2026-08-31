@@ -10,7 +10,40 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **One attachment tray, replacing two copies of `pickPhoto`.** Task 1 of
+- **CLUB DIARY SHIPPED (phase 1) — dated items nobody replies to.** Four of the
+  seven lines on the club's own "3 week look ahead" poster are dated,
+  calendar-worthy items with nothing to RSVP to (shop opening, ball collection,
+  kit collection). They could previously only be filed as Socials, producing a
+  fixture with an availability list nobody will fill in, or as Notices, which
+  have no date column and so cannot reach a subscribed calendar at all. A fifth
+  chooser card now writes `events.info_only`.
+  ⚠️ **NOT a fourth `events.type`, and the migration says why at length:** `type`
+  is read by a dozen three-way branches that would fall through a new value
+  SILENTLY. A Club Diary entry is `type='social'` with the flag — the same shape
+  a tournament already uses. The price is that two things share that type, and
+  it is paid in `eventChipKind()`, without which a kit collection draws the
+  People icon under the word "Social".
+  ⚠️ **Reclassifying a social with replies is REFUSED, and fails CLOSED** —
+  orphaning the rows hides data that still exists, deleting them destroys a
+  coach's answer, and if the count cannot be read the save is refused rather
+  than assumed safe.
+  ⚠️ **Schedule and SocialWhatsOn deliberately DISAGREE** about whether Socials
+  includes diary entries, and a test pins it so nobody makes them agree — a
+  parent does not want kit-collection logistics under Socials, the media team
+  does. That is also the first test `SocialWhatsOn` has ever had.
+  Ten TDD tasks, each proven against an injected fault, several with controls
+  where a bare negative would have been ambiguous — including the harness's own
+  step 0, which asks the same `information_schema` question about a column that
+  certainly exists so that "column missing" is a measurement rather than an
+  inference. The calendar feed is UNTOUCHED: appearing in a subscribed calendar
+  is the whole point of the kind. `all_day`, multi-day spans and the feed branch
+  are phase 2 and are specified but NOT built.
+  `db/migrations/20260831_events_info_only.sql`, `db/tests/club-diary.sql`,
+  `src/lib/eventFormat.js`, `src/components/EventKindChooser.jsx`,
+  `src/screens/EventForm.jsx`, `src/screens/Schedule.jsx`,
+  `claude/plans/2026-08-31-club-diary-implementation.md`.
+  (SHA follows in the next changelog-touching PR.)
+- `334f11e` — **One attachment tray, replacing two copies of `pickPhoto`.** Task 1 of
   plan 2, and ⚠️ **the first BUILDING merge of the chat-albums series** — plan
   1 and the metadata reshape were database-only and cost nothing. Nothing is
   wired to the hook yet, so members see no change; it lands first so the
@@ -27,7 +60,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   evidently not enough. Seven tray tests written to fail first, including a
   cap that holds across SEPARATE adds and a file still accepted when its
   preview cannot be made. `src/lib/useAttachmentTray.js`.
-  (SHA follows in the next changelog-touching PR.)
 - `488bdf6` — **Plan 2 of 4: the composer — paste, drag-and-drop and the ten-photo tray.**
   The first plan in this series that DEPLOYS; plan 1 and the metadata reshape
   were database-only and cost nothing. Seven tasks: one shared tray hook

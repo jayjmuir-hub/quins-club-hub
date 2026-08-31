@@ -7,7 +7,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, clubToday, eventChipKind, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 
@@ -31,6 +31,21 @@ import { fixtureLabel } from '../lib/fixtureLabel.js'
 // every admin can already read them; this is a "not your job" message. The
 // screen repeats the check because a route is linkable.
 
+// ⚠️ "Socials" HERE DELIBERATELY INCLUDES CLUB DIARY ENTRIES, AND Schedule's
+// "Socials" DELIBERATELY DOES NOT. That is not an oversight and it must not be
+// "fixed" into agreement — making the two screens match makes one of them
+// worse. A parent filtering the schedule to Socials does not want the club's
+// kit-collection logistics; the media team does, because posting about them is
+// the job. The club's own "3 week look ahead" poster — the artefact that
+// prompted the Club Diary kind — lists a kit collection, a ball collection and
+// a shop opening alongside the Welcome Back Party.
+//
+// There is no `diary` filter here for the same reason: this screen wants those
+// entries mixed in, not partitioned off.
+//
+// Pinned by tests/social-whats-on-diary.test.jsx, which fails if a future
+// session adds `info_only !== true` to the filter below.
+// claude/plans/2026-08-31-club-diary.md.
 const FILTERS = [
   { key: 'all', label: 'Everything' },
   { key: 'match', label: 'Matches' },
@@ -224,7 +239,13 @@ function EventSection({ title, events, squadsById, empty }) {
                       {event.result_us}–{event.result_them}
                     </span>
                   )}
-                  <Chip type={event.type}>{event.type}</Chip>
+                  {/* ⚠️ eventChipKind, NOT event.type — a Club Diary entry is
+                      type='social' and would otherwise read "social" here.
+                      This screen deliberately KEEPS diary entries in its
+                      Socials filter (see the note on FILTERS above); labelling
+                      them correctly is a different question from filtering
+                      them out. claude/plans/2026-08-31-club-diary.md. */}
+                  <Chip type={eventChipKind(event)}>{eventChipKind(event)}</Chip>
                 </div>
               </div>
             )

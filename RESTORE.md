@@ -294,6 +294,50 @@ link as of 8 Aug. The trap now fires on a work-vs-personal address at password s
 
 ## Rulings that cost real effort to discover — don't rediscover them
 
+### Club Diary — `events.info_only`, and why `'diary'` is not a type
+
+**A Club Diary entry is `type = 'social'` with `info_only = true`.** It is a
+dated item nobody replies to — a kit collection, a shop opening, a ball
+collection. Shipped 31 Aug 2026;
+`claude/plans/2026-08-31-club-diary.md`.
+
+⚠️ **`'diary'` IS A UI KIND AND NEVER REACHES THE DATABASE.** It exists in the
+"What are you adding?" chooser and as a chip kind; `EventForm` translates it
+into columns, exactly as `'tournament'` becomes `type = 'match'` with
+`competition_type = 'tournament'`. **Do not add a fourth `events.type`.** `type`
+is read by the calendar feed, `EVENT_TYPE_ICONS`, the chip and detail marks,
+`nextEventLabel` and three screen filters, every one of which branches on three
+known values — a fourth falls through all of them **silently**, giving a missing
+icon, a missing filter row and a mislabelled calendar entry rather than an error.
+
+⚠️ **THE PRICE OF THAT, AND WHERE IT IS PAID.** Two different things now share
+`type = 'social'`, so anything reading `type` alone conflates a Welcome Back
+Party with a kit collection. **`eventChipKind()` in `src/lib/eventFormat.js` is
+the single place that distinction lives** — every component drawing a type chip
+asks it rather than reading `event.type`. `nextEventLabel`'s `info_only` branch
+must stay **first**, before the type checks, or the social branch claims it.
+
+⚠️ **THE TWO SCREENS DELIBERATELY DISAGREE, AND MAKING THEM AGREE MAKES ONE
+WORSE.** `src/screens/Schedule.jsx` EXCLUDES diary entries from its Socials pill
+and gives them their own; `src/screens/SocialWhatsOn.jsx` KEEPS them under
+Socials. A parent filtering the schedule does not want the club's kit-collection
+logistics; the media team does, because posting about them is the job. Pinned by
+`tests/social-whats-on-diary.test.jsx`, which fails if somebody "fixes" it.
+
+⚠️ **RECLASSIFYING A SOCIAL WITH REPLIES IS REFUSED, NOT RESOLVED.** Leaving the
+availability rows ORPHANS them — this flag hides the UI they are seen through —
+and deleting them DESTROYS a coach's answer. Refusing is the only outcome that
+cannot lose information, and the check **fails closed**: if the reply count
+cannot be read, the save is refused rather than assumed safe.
+
+**Nothing in the calendar feed changed.** Appearing in a subscribed calendar is
+a Club Diary entry's whole purpose, so it exports like any other event.
+
+**Not shipped:** `all_day`, multi-day spans and the feed branch are phase 2 in
+the same plan. `all_day` is held distinct from `time_tbd` on purpose — `time_tbd`
+means "the day is known, the time is not decided", and an all-day item has no
+time at all.
+
 ### Scope and RLS
 
 **RLS is stricter than the plan assumed.** Every SELECT policy — `clubs`, `events`,

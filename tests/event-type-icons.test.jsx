@@ -32,10 +32,25 @@ import EventDetail from '../src/screens/EventDetail.jsx'
 const svgIn = (el) => el.querySelector('svg')
 
 describe('EventTypeIcon', () => {
-  it('has a mark for each of the three event types', () => {
+  it('has a mark for each of the three event types, plus the diary CHIP KIND', () => {
     // Keyed by the events.type column's own vocabulary, so it cannot disagree
     // with Chip's colour map about which types exist.
-    expect(Object.keys(EVENT_TYPE_ICONS).sort()).toEqual(['match', 'social', 'training'])
+    //
+    // ⚠️ 'diary' IS THE ONE KEY HERE THAT IS NOT AN events.type, ADDED 31 Aug
+    // 2026, AND THAT IS DELIBERATE RATHER THAN A LEAK. A Club Diary entry is
+    // stored as type='social' with info_only set; the map is asked about CHIP
+    // KINDS via eventChipKind() in src/lib/eventFormat.js, not about the column.
+    // This assertion was written when the two vocabularies were identical and
+    // it correctly caught the moment they stopped being. It stays exhaustive —
+    // a `toContain` here would let a future stray key in silently, which is the
+    // failure this test exists to prevent.
+    // See claude/plans/2026-08-31-club-diary.md.
+    expect(Object.keys(EVENT_TYPE_ICONS).sort()).toEqual([
+      'diary',
+      'match',
+      'social',
+      'training',
+    ])
   })
 
   it('⚠️ renders NOTHING for an unknown or missing type', () => {

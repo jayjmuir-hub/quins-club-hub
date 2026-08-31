@@ -799,6 +799,31 @@ CREATE TABLE public.events (
   -- ⚠️ NOT NULL DEFAULT false, so every fixture predating it keeps exactly the
   -- meaning it had. Measured immediately after applying: 62 events, 0 flagged.
   time_tbd     boolean NOT NULL DEFAULT false,
+  -- Added 2026-08-31 (events_info_only). Club Diary: a dated item with nothing
+  -- to RSVP to — kit collection, shop opening, ball collection. Column comment
+  -- as stored: "Club Diary: a dated item with nothing to RSVP to (kit
+  -- collection, shop opening). Suppresses the availability UI; the calendar
+  -- feed exports it like any other event. NOT a type — a Club Diary entry is
+  -- type=social with this set."
+  --
+  -- ⚠️ NOT A FOURTH events.type, AND THAT IS THE WHOLE DESIGN. `type` is read
+  -- by the calendar feed, EVENT_TYPE_ICONS, the chip and detail marks,
+  -- nextEventLabel and three screen filters, each branching on three known
+  -- values; a fourth would fall through every one SILENTLY. Same shape a
+  -- tournament already uses. src/lib/eventFormat.js eventChipKind() is what
+  -- keeps a kit collection from drawing as a Social.
+  --
+  -- ⚠️ NOT NULL DEFAULT false, and the default is load-bearing beyond
+  -- tidiness: chat's fixture-thread insert path carries event_id and inserts
+  -- without naming this column. Measured immediately after applying: 529
+  -- events, 0 flagged, and db/tests/club-diary.sql step 2 asserts an insert
+  -- that omits the column still lands false.
+  --
+  -- ⚠️ NOTHING CONSTRAINS AVAILABILITY AGAINST THIS FLAG, deliberately. The
+  -- suppression is a UI decision; rows written before a social was
+  -- reclassified must survive, and the form REFUSES that toggle rather than
+  -- orphaning or deleting them.
+  info_only    boolean NOT NULL DEFAULT false,
   -- Re-captured 25 Aug 2026 (tiers_and_player_grades, 14 Aug — uncaptured
   -- for 11 days): the tier of the COMPETITION this fixture was played in, or
   -- NULL for a friendly and anything untiered. NOT derived from

@@ -8,6 +8,10 @@ import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
 import { PITCH_PORTIONS, defaultPitchPortion } from '../lib/pitchPortion.js'
 import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '../data/events.js'
+// ⚠️ READ ONLY, AND ONLY TO REFUSE. The form never writes availability; it asks
+// whether any exists before letting an event become information-only, because
+// this flag hides the UI those rows are seen through.
+import { listAvailability } from '../data/availability.js'
 import { SCORE_KINDS, hasNoComponents } from '../lib/scoring.js'
 import { isMinisTeam, recordsScores } from '../lib/minis.js'
 
@@ -263,14 +267,25 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     // default of a Match. A tournament defaults its Self-service availability to
     // Auto like any match — nothing kind-specific rides on this beyond type and
     // competitionType.
+    // ⚠️ 'diary' IS THE SECOND KIND THAT IS NOT A TYPE. A Club Diary entry is
+    // type='social' with info_only set — the same translation 'tournament'
+    // gets. Neither string ever reaches the database.
+    // claude/plans/2026-08-31-club-diary.md.
     const isTournamentKind = initialKind === 'tournament'
+    const isDiaryKind = initialKind === 'diary'
     const type = isTournamentKind
       ? 'match'
-      : initialKind === 'training' || initialKind === 'social' || initialKind === 'match'
-        ? initialKind
-        : 'match'
+      : isDiaryKind
+        ? 'social'
+        : initialKind === 'training' || initialKind === 'social' || initialKind === 'match'
+          ? initialKind
+          : 'match'
     return {
       type,
+      // ⚠️ SET FROM THE KIND, NOT FROM A CONTROL. Choosing "Club Diary" in the
+      // chooser IS the decision; the checkbox further down exists only for
+      // reclassifying an event that already exists.
+      infoOnly: isDiaryKind,
       availabilityOverride: 'auto',
       title: '',
       opponent: '',
@@ -323,6 +338,10 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
   return {
     type: event.type ?? 'match',
     availabilityOverride: event.availability_override ?? 'auto',
+    // ⚠️ STRICT === true, matching the calendar feed's convention. A row
+    // written before the migration has this undefined and must open as an
+    // ordinary event, not as a Club Diary entry.
+    infoOnly: event.info_only === true,
     title: event.title ?? '',
     opponent: event.opponent ?? '',
     // ══ DUPLICATING ═══════════════════════════════════════════════════════
@@ -536,6 +555,11 @@ export default function EventForm({
   const setFromInput = (key) => (domEvent) => set(key)(domEvent.target.value)
 
   const isMatch = values.type === 'match'
+  // ⚠️ A CLUB DIARY IS A SOCIAL WITH NOTHING TO ANSWER. Everything this hides
+  // is a question the entry does not ask — and above all the availability
+  // control, which is the entire reason the kind exists.
+  // claude/plans/2026-08-31-club-diary.md.
+  const isDiary = values.infoOnly === true
   // Whether this fixture is a tournament entry rather than a fixture against one
   // named side. Decides that the opponent is optional, and how the field is
   // labelled — see the `opponent` guard in handleSubmit.
@@ -907,7 +931,13 @@ export default function EventForm({
     )
   }
 
-  function handleSubmit(domEvent) {
+  // ⚠️ ASYNC SINCE 31 Aug 2026, for the Club Diary reply guard below, which has
+  // to ASK the database whether anybody has replied before it can refuse. Every
+  // pre-existing early `return` in here is unchanged in meaning — an async
+  // function returning early still just resolves — and the write section
+  // further down already builds its own promises rather than awaiting them, so
+  // nothing about its ordering moves.
+  async function handleSubmit(domEvent) {
     domEvent.preventDefault()
     if (inFlight.current) return
 
@@ -1020,6 +1050,43 @@ export default function EventForm({
       return
     }
 
+    // ⚠️ REFUSE TO MAKE AN EVENT INFORMATION-ONLY ONCE PEOPLE HAVE REPLIED.
+    // Three outcomes were considered and two of them lose information: leaving
+    // the availability rows in place ORPHANS them, since the UI that shows them
+    // is exactly what this flag hides, and deleting them DESTROYS a coach's
+    // answer. Refusing is the only one that cannot. The message names the
+    // number so the admin can judge whether it matters.
+    //
+    // ⚠️ ONLY WHEN THE FLAG IS BEING TURNED ON, AND ONLY WHEN EDITING. A brand
+    // new entry has no replies by definition, and an event that is ALREADY
+    // information-only must stay editable — an admin fixing its time should not
+    // be blocked by rows that predate the flag.
+    // claude/plans/2026-08-31-club-diary.md.
+    if (editing && isDiary && event?.info_only !== true) {
+      let replies = []
+      try {
+        replies = await listAvailability(event.id)
+      } catch (err) {
+        // ⚠️ FAIL CLOSED. If we cannot find out whether anybody replied, the
+        // safe answer is not "probably nobody" — it is to refuse and say why.
+        setError(
+          new Error(
+            `We couldn't check whether anybody has replied to this, so it hasn't been changed. ${err.message ?? ''}`.trim(),
+          ),
+        )
+        return
+      }
+      if (replies.length > 0) {
+        const one = replies.length === 1
+        setError(
+          new Error(
+            `${replies.length} ${one ? 'person has' : 'people have'} already replied to this — delete ${one ? 'their reply' : 'their replies'} first, or leave it as a social.`,
+          ),
+        )
+        return
+      }
+    }
+
     // Everything except the squad-specific bits. Built once and stamped per
     // team below, so a fanned-out session cannot end up with a different
     // venue or kick-off time on one squad's copy than on another's.
@@ -1028,7 +1095,16 @@ export default function EventForm({
       // A fact about the EVENT (true of every squad in a fan-out and every week
       // of a series), so it lives in `common`. Default 'auto' keeps the calendar
       // lock; 'open'/'locked' override it. Enforced in RLS.
-      availability_override: values.availabilityOverride,
+      // ⚠️ FORCED BACK TO 'auto' FOR A CLUB DIARY. The control is hidden, so a
+      // value left over from a type switch would otherwise ride along on the
+      // row — an 'open' or 'locked' answer to a question the entry no longer
+      // asks. RLS reads this column, so a stale value is not merely untidy.
+      availability_override: isDiary ? 'auto' : values.availabilityOverride,
+      // ⚠️ IN `common`, LIKE availability_override ABOVE AND FOR THE SAME
+      // REASON: whether an entry is information-only is a fact about the EVENT,
+      // true of every squad in a fan-out and every week of a repeating series.
+      // A kit collection added for U16 and U18 is information-only for both.
+      info_only: isDiary,
       title: isMatch ? null : values.title.trim(),
       // ⚠️ NULL FOR A TOURNAMENT CONTAINER, not the empty string a hidden field
       // would otherwise write. A tournament is named, not opposed, and is not
@@ -1325,18 +1401,49 @@ export default function EventForm({
           />
         )}
 
-        <Segmented
-          legend="Self-service availability"
-          name="availability-override"
-          options={AVAILABILITY_OVERRIDES}
-          value={values.availabilityOverride}
-          onChange={set('availabilityOverride')}
-        />
-        <p className="mb-4 mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
-          Auto locks RSVPs 5 days before a match, 1 day before training (never for a
-          social). Choose <strong>Open</strong> to keep them open right up to the event,
-          or <strong>Locked</strong> to close them to parents now.
-        </p>
+        {/* ⚠️ HIDDEN ENTIRELY FOR A CLUB DIARY, not disabled. There is nothing
+            to be available for, so a greyed-out control would be asking a
+            question and then refusing the answer. The payload forces
+            availability_override back to 'auto' as well, so a value carried
+            over from a type switch cannot survive on the row.
+            claude/plans/2026-08-31-club-diary.md. */}
+        {!isDiary && (
+          <>
+            <Segmented
+              legend="Self-service availability"
+              name="availability-override"
+              options={AVAILABILITY_OVERRIDES}
+              value={values.availabilityOverride}
+              onChange={set('availabilityOverride')}
+            />
+            <p className="mb-4 mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+              Auto locks RSVPs 5 days before a match, 1 day before training (never for a
+              social). Choose <strong>Open</strong> to keep them open right up to the event,
+              or <strong>Locked</strong> to close them to parents now.
+            </p>
+          </>
+        )}
+
+        {/* ⚠️ THE RECLASSIFY CONTROL, AND IT IS DELIBERATELY EDIT-ONLY. On a
+            NEW event the chooser already asked; a second control would be the
+            same question twice. On an existing social an admin may genuinely
+            need to say "this was never a thing to reply to" — and the save path
+            REFUSES that when replies already exist, because orphaning them
+            hides data that still exists and deleting them destroys a coach's
+            answer. claude/plans/2026-08-31-club-diary.md. */}
+        {editing && values.type === 'social' && (
+          <label className="mb-4 flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+              checked={values.infoOnly}
+              onChange={(e) => setValues((v) => ({ ...v, infoOnly: e.target.checked }))}
+            />
+            <span className="text-[13px] leading-snug text-ink">
+              Information only — on the calendar, nothing to reply to
+            </span>
+          </label>
+        )}
 
         {/* ⚠️ NO OPPONENT (nor title) IN TOURNAMENT MODE. A tournament is named,
             not opposed — its own name IS the fixture, entered above. The games

@@ -202,7 +202,37 @@ export function titleRepeatsType(event) {
  * "Fixture" is not a loose synonym for "event" in rugby — it means a match
  * against another side, which is exactly the thing a parent is checking for.
  */
+/**
+ * The chip kind for an event — 'diary' for an information-only entry, and
+ * otherwise the event's own type.
+ *
+ * ⚠️ A CLUB DIARY ENTRY IS `type = 'social'`, so every component that draws a
+ * type chip must ask THIS rather than reading `event.type`. Left to `type`, a
+ * kit collection draws the People icon under the word "Social" — the app
+ * asserting something false, not a cosmetic slip. That conflation is the price
+ * of not adding a fourth `events.type`, and this function is where it is paid.
+ * See claude/plans/2026-08-31-club-diary.md.
+ *
+ * ⚠️ STRICT `=== true`, matching the calendar feed's convention for `time_tbd`.
+ * A row written before the migration, or read through a path that does not
+ * select the column, must read as an ordinary event.
+ *
+ * ⚠️ NULL FOR A MISSING EVENT, not a guessed kind. Absence is the honest
+ * answer — the same rule EVENT_TYPE_ICONS follows in drawing an unrecognised
+ * type as the neutral pill rather than asserting a rugby ball.
+ */
+export function eventChipKind(event) {
+  if (!event) return null
+  return event.info_only === true ? 'diary' : event.type
+}
+
 export function nextEventLabel(event) {
+  // ⚠️ FIRST, BEFORE THE TYPE CHECKS, AND THE ORDER IS THE ENTIRE FIX. A Club
+  // Diary entry is stored as type='social', so the social branch below would
+  // claim a kit collection and the Home card would head it "Next social".
+  // Moving this line down is a silent regression — tests/event-format.test.js
+  // fails if you do. claude/plans/2026-08-31-club-diary.md.
+  if (event?.info_only === true) return 'Next up'
   if (event?.type === 'match') return 'Next fixture'
   if (event?.type === 'training') return 'Next training'
   if (event?.type === 'social') return 'Next social'
