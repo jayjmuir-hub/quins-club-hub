@@ -494,12 +494,17 @@
   .glass-island,
   .glass-dock {
     position: relative;
-    background: linear-gradient(
-      160deg,
-      rgb(140 150 165 / 0.1),
-      rgb(90 100 115 / 0.05) 45%,
-      rgb(140 150 165 / 0.12)
-    );
+    /* ══ CHROME-QUARTERS (31 Aug 2026, Jay) ══ Premium dark chrome with
+       the quartered-shirt echo: club red sweeping from the LEFT, club
+       green from the RIGHT, both GHOSTED over near-black. The alphas are
+       a RULE, not taste — ≤0.30 so the red active pill and the unread
+       dots always dominate the quarters. Identical in both themes:
+       identity lives on the chrome (2.0 retheme ruling, restored).
+       Spec: claude/plans/2026-08-31-chrome-quarters-redesign.md */
+    background:
+      linear-gradient(115deg, rgb(225 27 34 / 0.3) 0 30%, transparent 43%),
+      linear-gradient(295deg, rgb(0 106 77 / 0.26) 0 22%, transparent 38%),
+      linear-gradient(160deg, rgb(21 21 23 / 0.94), rgb(12 12 14 / 0.97));
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
     /* ⚠️ THE LIQUID LENS — DECLARATION ORDER IS THE FALLBACK MECHANISM.
@@ -513,12 +518,12 @@
     -webkit-backdrop-filter: url(#liquid-lens);
     backdrop-filter: url(#liquid-lens);
     border: 1px solid rgb(255 255 255 / 0.16);
+    /* Depth + the white inner top hairline that keeps the island's edge
+       readable over dark-mode content. The clear-glass shadow stack (red
+       halo rings, white/0.5 inset) retired with the frost it decorated. */
     box-shadow:
-      0 0 0 1px rgb(200 16 46 / 0.28),
-      0 0 16px 3px rgb(200 16 46 / 0.35),
-      inset 0 1px 0 rgb(255 255 255 / 0.5),
-      inset 0 -8px 14px -10px rgb(40 50 70 / 0.35),
-      0 8px 24px rgb(0 0 0 / 0.12);
+      0 10px 34px rgb(0 0 0 / 0.45),
+      inset 0 1px 0 rgb(255 255 255 / 0.09);
   }
   /* ⚠️ THE DOCK GETS A LITTLE MORE FROST IN LIGHT MODE (28 Aug 2026, Jay: the
      bottom bar reads faint in light mode). The base stops above are a few
@@ -533,16 +538,10 @@
   /* ⚠️ GUARDED so it cannot beat the opaque `@supports not (backdrop-filter)`
      fallback below on specificity — where the glass does not filter, the dock
      must stay the solid card surface, not this translucent tint. */
-  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    :root:not(.dark) .glass-dock {
-      background: linear-gradient(
-        160deg,
-        rgb(140 150 165 / 0.18),
-        rgb(90 100 115 / 0.1) 45%,
-        rgb(140 150 165 / 0.22)
-      );
-    }
-  }
+  /* Tombstone: a :root:not(.dark) frost-strengthening block lived here
+     until the chrome-quarters pass — clear glass needed a thicker frost
+     in light mode; opaque chrome does not. The 28 Aug comment above it
+     describes the problem it solved; the chrome dissolves the problem. */
   /* The light-catch glint: strongest top-left, a faint cool return at the
      bottom-right — the sliding reflection that says "glass" even when the
      page behind is featureless. pointer-events-none, pure paint. */
@@ -553,22 +552,17 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    background: linear-gradient(
-      115deg,
-      rgb(255 255 255 / 0.35),
-      rgb(255 255 255 / 0.08) 30%,
-      transparent 50%,
-      rgb(120 130 150 / 0.06) 80%
-    );
+    /* Softened for the dark chrome — the clear-glass 35% white flare read
+       as haze over near-black. */
+    background: linear-gradient(115deg, rgb(255 255 255 / 0.1), transparent 34%);
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    /* No backdrop-filter → clear glass is invisible and its content floats
-       bare over the page. Fall back to an opaque CARD surface (not the old
-       dark chrome): the bars' content is theme ink now, and ink on the
-       card token is the pairing every card in the app already proves. */
+    /* No backdrop-filter → solid chrome. The clear-glass era fell back to
+       the CARD token because the bars' content was theme ink; the content
+       is white again, and white on a light card would be invisible. */
     .glass-island,
     .glass-dock {
-      background: rgb(var(--surface-card-rgb));
+      background: rgb(21 21 23);
     }
   }
 
