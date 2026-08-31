@@ -81,6 +81,34 @@ production rather than inferred from the green run, each with a control:
 session ledger pinning them as expected-red. Struck through here rather than
 deleted, per this file's own rule.
 
+### Two latent defect classes in `db/tests/`, surfaced 31 Aug 2026 — NOT fully swept
+
+**1. Green-by-luck under transaction-constant `now()`.** Everything one
+transaction inserts shares ONE `now()`, so a fixture asserting "the later row
+wins" over `created_at`/`last_at` ordering with no tie-break tests scan order,
+not time — and passes against the very bug it guards. Found via
+`my-chats-attachment.sql` (went red when the photo-albums backfill perturbed
+row order; fixed on that branch) and confirmed in `chat-list.sql` assert 5,
+which passed only because a label tie-break met an empty fixture name —
+~~fixed same day~~ fixed with an explicit stagger, proven BOTH directions
+(dm-newer passes, dm-older-via-`conversations.last_at` fails — and the first
+flip attempt via `messages.created_at` did NOT flip it, which is how
+`conversations.last_at` was found to be the real driver). ⚠️ **The sweep is
+NOT complete:** any "latest/supersedes/wins" assertion over a column that
+transaction-time populates is suspect, and the ordering often hides inside the
+FUNCTION under test, so grepping harness files for `order by` cannot find it.
+Remaining candidates screened shallowly: `adult-dms-private.sql`,
+`availability-nudge.sql`, `group-chats.sql` step 12.
+
+**2. Pre-assert migration replays mask production.** `chat-list.sql` and
+`group-chats.sql` replayed their migrations verbatim before asserting — so
+the asserts tested the replay, and a live regression stayed green (both
+tombstoned in the 31 Aug triage). **30 more files in `db/tests/` contain
+`create or replace function public./private.`** — many are the legitimate
+post-assert fault-injection pattern, but nobody has classified which. Each
+pre-assert replay found should be tombstoned the same way. The audit: for
+each file, does the replace happen BEFORE the assertions run against it?
+
 **The finding underneath all of it:** eight of the fourteen staleness cases are
 migrations that shipped WITHOUT updating the harnesses they invalidated —
 `claude/runbooks/db-harnesses.md`'s "add the harness in the same commit as the
