@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **TEN PHOTOS NOW RENDER AS AN ALBUM, NOT AS ONE.** The composer could send
+- `f844fd8` — **TEN PHOTOS NOW RENDER AS AN ALBUM, NOT AS ONE.** The composer could send
   an album from `ebda2f3` (#605); every photo arrived and exactly ONE drew,
   because the bubble read the trigger-derived `attachment_path` — the FIRST
   photo — instead of the `attachments` array that carries them all. New
