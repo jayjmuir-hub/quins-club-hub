@@ -3637,6 +3637,56 @@ $function$
 ;
 
 -- ---------------------------------------------------------------------
+-- private.fixture_push_headline(text, boolean)
+-- proacl: null
+-- Added 2026-09-01 (fixture_push_diary_wording).
+--
+-- ⚠️ THE WORDING OF A FIXTURE PUSH, SPLIT OUT SO IT CAN BE TESTED. A Club
+-- Diary entry (events.info_only) is NOT a fixture and must never be announced
+-- as one — before this, adding a kit collection told the whole squad "New
+-- fixture". The decision lives here rather than inside send_fixture_push
+-- because that function ends in net.http_post: asserting its behaviour from a
+-- harness would send a REAL push to REAL members, and a rollback does not
+-- un-send a notification. This one is IMMUTABLE and touches nothing.
+--
+-- ⚠️ coalesce ON _info_only IS LOAD-BEARING. A null would otherwise return
+-- null from the CASE, and a null headline reaches the push body as SQL null —
+-- a notification with no title rather than a wrong one.
+-- Asserted by db/tests/club-diary-push.sql.
+--
+-- ⚠️ PINNED search_path, ADDED THE SAME DAY BY A CORRECTIVE MIGRATION
+-- (20260901_fixture_push_headline_pin_search_path.sql). It shipped WITHOUT the
+-- pin and was briefly the ONLY unpinned function in `private` — 109 functions,
+-- 108 pinned — which turned db/tests/search-path.sql RED against production.
+-- Pinned rather than exempted: `''` is correct for a CASE over two scalars that
+-- resolves nothing, and it keeps that harness's exemption list EMPTY, which is
+-- the stronger state.
+-- ⚠️ A NEW FUNCTION IS A NEW OBLIGATION TO AN EXISTING HARNESS. Run the FULL
+-- `npm run db:check`, not just your own new file.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.fixture_push_headline(_kind text, _info_only boolean)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+  select case when coalesce(_info_only, false) then
+           case _kind
+             when 'added'     then 'New in the club diary'
+             when 'changed'   then 'Diary entry changed'
+             when 'cancelled' then 'Diary entry cancelled'
+           end
+         else
+           case _kind
+             when 'added'     then 'New fixture'
+             when 'changed'   then 'Fixture changed'
+             when 'cancelled' then 'Fixture cancelled'
+           end
+         end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
 -- private.notify_fixture_added()
 -- proacl: null
 -- ---------------------------------------------------------------------
@@ -3651,7 +3701,9 @@ begin
   if (select count(*) from inserted) <> 1 then return null; end if;
   select * into e from inserted;
   if e.series_id is not null then return null; end if;
-  perform private.send_fixture_push(e.club_id, e.team_id, auth.uid(), 'New fixture', e);
+  perform private.send_fixture_push(
+    e.club_id, e.team_id, auth.uid(),
+    private.fixture_push_headline('added', e.info_only), e);
   return null;
 end;
 $function$
@@ -3671,7 +3723,9 @@ declare e public.events;
 begin
   if (select count(*) from deleted) <> 1 then return null; end if;
   select * into e from deleted;
-  perform private.send_fixture_push(e.club_id, e.team_id, auth.uid(), 'Fixture cancelled', e);
+  perform private.send_fixture_push(
+    e.club_id, e.team_id, auth.uid(),
+    private.fixture_push_headline('cancelled', e.info_only), e);
   return null;
 end;
 $function$
@@ -3700,7 +3754,9 @@ begin
      or o.home     is distinct from n.home
      or o.team_id  is distinct from n.team_id
   then
-    perform private.send_fixture_push(n.club_id, n.team_id, auth.uid(), 'Fixture changed', n);
+    perform private.send_fixture_push(
+      n.club_id, n.team_id, auth.uid(),
+      private.fixture_push_headline('changed', n.info_only), n);
   end if;
   return null;
 end;

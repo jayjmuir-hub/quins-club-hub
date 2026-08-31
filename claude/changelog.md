@@ -10,7 +10,58 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **CLUB DIARY SHIPPED (phase 1) — dated items nobody replies to.** Four of the
+- **A Club Diary entry is no longer pushed to the squad as a "New fixture".**
+  ⚠️ **A bug shipped in the Club Diary merge earlier the same day, caught before
+  it ever fired.** Adding an event triggers a squad push whose headline was the
+  hard-coded literal `'New fixture'` — so the first kit collection anybody
+  created would have told every parent in that squad a fixture had been added:
+  *"New fixture — U16 / Kit collection · Thu 17 Sep, 17:00"*. The wording now
+  comes from `private.fixture_push_headline(_kind, _info_only)`, and ordinary
+  matches, training and socials keep BYTE-IDENTICAL wording — asserted
+  explicitly, because changing what parents already recognise in their tray is
+  the regression that would matter. The push is **not** suppressed for diary
+  entries: a kit collection is exactly what people want told about, and
+  silencing it would trade a misleading notification for a missing one.
+  ⚠️ **The helper is separate and `IMMUTABLE` for a testing reason, not a
+  tidiness one:** `send_fixture_push` ends in `net.http_post`, so asserting its
+  behaviour from a harness would send a REAL push to REAL members, and a
+  rollback does not un-send a notification. `coalesce` on `_info_only` keeps the
+  function total — a null headline would reach the push body as SQL null and
+  produce a notification with no title, which is worse than a wrong one.
+  ⚠️ **THE LESSON IS LARGER THAN THE BUG.** The spec and the implementation plan
+  both traced the READ paths exhaustively — chip, detail marks, Schedule filter,
+  `nextEventLabel`, calendar feed — each with a test and an injected fault, and
+  **neither asked what happens when the row is WRITTEN.** The audit was
+  thorough; the question was incomplete. It surfaced only because the plan's
+  last step said to create a test entry on production and the write path was
+  checked for side effects first. Within minutes of that being shared, a
+  concurrent session applied it to chat and found that a photo-only message
+  pushes an EMPTY body — already true today, and the normal case once albums
+  ship. In a repo with push, email and a public calendar feed, "where does this
+  value get displayed" and "what does creating this row do to somebody" are
+  different questions and both need asking of every new column.
+  Harness written first and watched failing, with a step 0 control and a step 4
+  that asserts the TRIGGERS actually call the helper — a correct helper that
+  nothing calls passes every other assertion in the file.
+  ⚠️ **AND THE SAME MISTAKE FAMILY, TWICE IN ONE DAY.** The new helper shipped
+  UNPINNED and was briefly the only function in `private` with a mutable
+  `search_path` — 109 functions, 108 pinned — which turned
+  `db/tests/search-path.sql` RED **against production**, not merely at risk on
+  the nightly. Caught by a concurrent session and verified here before acting
+  (the control matters: a probe returning exactly one row is as suspect as one
+  returning none). Pinned rather than exempted, because `''` is correct for a
+  CASE over two scalars and it keeps that harness's exemption list EMPTY — the
+  state #587 deliberately established the same morning.
+  **A new function is a new obligation to an EXISTING harness**, which is the
+  root cause #587 named for its sixteen reds, repeated within hours by the
+  session that read it. The whole defence is one command: run the full
+  `npm run db:check`, not `-- <your own file>`. Full suite now 84 harnesses
+  green, 0 failed.
+  `db/migrations/20260901_fixture_push_diary_wording.sql`,
+  `db/migrations/20260901_fixture_push_headline_pin_search_path.sql`,
+  `db/tests/club-diary-push.sql`.
+  (SHA follows in the next changelog-touching PR.)
+- `87c1d3c` — **CLUB DIARY SHIPPED (phase 1) — dated items nobody replies to.** Four of the
   seven lines on the club's own "3 week look ahead" poster are dated,
   calendar-worthy items with nothing to RSVP to (shop opening, ball collection,
   kit collection). They could previously only be filed as Socials, producing a

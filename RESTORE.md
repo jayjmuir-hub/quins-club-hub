@@ -333,6 +333,33 @@ cannot be read, the save is refused rather than assumed safe.
 **Nothing in the calendar feed changed.** Appearing in a subscribed calendar is
 a Club Diary entry's whole purpose, so it exports like any other event.
 
+⚠️ **CREATING AN EVENT SENDS A PUSH, AND THE FIRST VERSION OF THIS FEATURE GOT
+ITS WORDING WRONG.** `private.notify_fixture_added` fires a squad notification
+on every non-series insert. Its headline was the hard-coded literal
+`'New fixture'`, so a kit collection would have told every parent in the squad a
+fixture had been added. Fixed 1 Sep 2026 by
+`private.fixture_push_headline(_kind, _info_only)` — pure and `IMMUTABLE`, so it
+can be asserted without sending a real push, which is why the decision does not
+live inside `send_fixture_push` (that one ends in `net.http_post`, and a
+rollback does not un-send a notification). Ordinary fixtures keep byte-identical
+wording, asserted explicitly.
+
+⚠️ **THE LESSON IS BIGGER THAN THE BUG, AND IT IS THE REASON THIS PARAGRAPH IS
+HERE.** The spec and the implementation plan both traced the READ paths
+exhaustively — chip, detail marks, the Schedule filter, `nextEventLabel`, the
+calendar feed — each with a test and an injected fault. **Neither asked what
+happens when the row is WRITTEN.** The audit was thorough; the question was
+incomplete. "Where does this value get displayed" and "what does creating this
+row DO to somebody" are different questions, and a repo with push notifications,
+email and a public calendar feed needs both asked of every new column.
+It surfaced only because the plan's last step said to create a test entry on
+production and somebody asked what that would actually do first.
+
+⚠️ **RECLASSIFYING A SOCIAL SENDS NOTHING, AND THAT IS ALREADY CORRECT.**
+`notify_fixture_changed` fires only when `starts_at`, `time_tbd`, `venue`,
+`pitch`, `opponent`, `home` or `team_id` change. `info_only` is deliberately not
+in that list, so flipping the flag is silent.
+
 **Not shipped:** `all_day`, multi-day spans and the feed branch are phase 2 in
 the same plan. `all_day` is held distinct from `time_tbd` on purpose — `time_tbd`
 means "the day is known, the time is not decided", and an all-day item has no

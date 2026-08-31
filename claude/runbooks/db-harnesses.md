@@ -27,6 +27,31 @@ One file, or a group, by substring:
 npm run db:check -- grants
 ```
 
+⚠️ **THE FILTERED FORM ANSWERS A DIFFERENT QUESTION FROM THE BARE ONE, AND
+CONFUSING THEM HAS COST A RED PRODUCTION HARNESS TWICE IN ONE DAY.**
+`npm run db:check -- <your file>` tells you **your** harness is right. Only
+`npm run db:check` — no argument — tells you **what you broke**. Those are not
+the same question, and passing the first one feels exactly like passing the
+second.
+
+**Before applying any migration, run the bare form.** On 1 Sep 2026 a session
+added one small function, asserted its new behaviour exhaustively — six input
+combinations, a control, and a check that the callers actually used it — ran
+`npm run db:check -- club-diary`, saw green, and applied. The new function was
+the only one in `private` with a mutable `search_path`, so
+`db/tests/search-path.sql` went **red against production** the moment it landed.
+The bare form would have said so immediately and cost seconds.
+
+**This is the sibling of the rule at the top of this file.** A check nobody runs
+is not a check; a check you *filtered out of the run* is the same thing with
+better intentions. It is also the same root cause `#587` named that morning for
+its sixteen red harnesses — **migrations shipped without updating the harnesses
+they invalidate** — repeated the same day by a session that had read it. Being
+able to state the rule is not the same as applying it.
+
+⚠️ **A NEW FUNCTION, TABLE OR COLUMN IS A NEW OBLIGATION TO AN EXISTING
+HARNESS.** Ask what your change makes false, not only whether it works.
+
 The runner is `scripts/db-check.mjs`. It needs a connection string in
 `SUPABASE_DB_URL` (or `DATABASE_URL`), taken from the environment or read out of
 `.env`, which is gitignored.
