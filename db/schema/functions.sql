@@ -7209,8 +7209,11 @@ GRANT EXECUTE ON FUNCTION public.create_document(text,text,boolean,boolean,uuid[
 -- keep the spec's manage rule) while only the prefix squad's staff or an
 -- admin may remove the file; (2) created_by keeps row authority after their
 -- memberships lapse. Either arm can orphan a file — invisible (no row, and
--- the bucket's only SELECT path is "document read") and removable by the
--- prefix squad's staff or any admin. It also names an admin restriction:
+-- the bucket's only SELECT path is "document read") and, MEASURED in
+-- db/tests/rls-documents.sql 13d-13f, removable by NO user JWT — DELETE
+-- applies SELECT policies too, so only service_role clears an orphan (an
+-- earlier version of this sentence claimed prefix staff or admins could).
+-- It also names an admin restriction:
 -- the guard has no admin bypass, so retargeting a squad-filed document to a
 -- DIFFERENT squad requires delete-and-re-upload even for admins.
 -- ⚠️ RESIDUAL: the club-wide flip does not check this. It is admin-only, so

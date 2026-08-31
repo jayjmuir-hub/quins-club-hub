@@ -74,9 +74,12 @@
 -- the spec's rule) without holding the prefix; and created_by keeps row
 -- authority after their memberships lapse. Either arm can orphan a file.
 -- Accepted: an orphan is invisible (no row; "document read" is the bucket's
--- only SELECT path), costs only storage, and the prefix squad's staff or
--- any admin can still remove it. A sweeper in the photo-orphans style is
--- the fix if storage ever cares. Also named here because no header sentence
+-- only SELECT path) and costs only storage. ⚠️ MEASURED, second correction
+-- (db/tests/rls-documents.sql 13d-13f): NO user JWT can remove an orphan —
+-- not prefix staff, not admins — because DELETE ... WHERE applies SELECT
+-- policies too, so invisibility and unclearability are the same fact. Only
+-- service_role clears one; a sweeper in the photo-orphans style is the fix
+-- if storage ever cares. Also named here because no header sentence
 -- did: the guard has no admin bypass, so even an admin cannot retarget a
 -- squad-filed document to a different squad — delete and re-upload is the
 -- route, consistent with create_document.

@@ -1925,7 +1925,13 @@ CREATE POLICY "icons revoke" ON public.profile_icons
 -- remove the FILE; (2) created_by keeps row authority even after their
 -- memberships lapse. Either arm can orphan a file. An orphan is invisible
 -- (no row, and "document read" is the bucket's only SELECT path) and costs
--- only storage; the prefix squad's staff or any admin can still remove it.
+-- only storage. ⚠️ AND MEASURED (db/tests/rls-documents.sql 13d-13f): an
+-- orphan is removable by NOBODY on a user JWT — a DELETE ... WHERE applies
+-- SELECT policies too, so the same fact that makes orphans invisible makes
+-- them unclearable except by service_role. An earlier version of this
+-- paragraph claimed prefix staff or admins could remove them; the harness
+-- refuted it. A service-role sweeper in the photo-orphans style is the
+-- cleanup route if storage ever cares.
 -- Weaken the update_document guard and this gets worse, not better.
 --
 -- ⚠️ TO authenticated, not the default TO public, matching "player photo",
