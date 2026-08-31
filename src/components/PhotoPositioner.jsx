@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { ACCEPTED_IMAGE_TYPES, isAcceptableImage } from '../lib/imageResize.js'
 // ⚠️ IMPORTED AS WELL AS RE-EXPORTED FURTHER DOWN. A bare `export … from` does
 // NOT bring the names into this module's scope, and this file calls all three.
 import { DEFAULT_FOCUS, clampFocus, focusToObjectPosition } from '../lib/photoFocus.js'
@@ -56,11 +57,18 @@ export { DEFAULT_FOCUS, clampFocus, focusToObjectPosition } from '../lib/photoFo
 // HEIC/HEIF added 26 Aug 2026: iPhones shoot HEIC by default, Safari can
 // decode it, and preparePhotoUpload re-encodes it to JPEG on the way up —
 // or refuses it plainly on a device that cannot decode it.
-export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
-
-export function isAcceptableImage(file) {
-  return Boolean(file) && ACCEPTED_IMAGE_TYPES.includes(file.type)
-}
+// ⚠️ MOVED to src/lib/imageResize.js, beside the single list of accepted
+// types, because the list lived here AND there and the two had to agree with
+// nothing making them. Re-exported so every existing importer — including
+// tests/photo-positioner.test.jsx — keeps working unchanged.
+//
+// ⚠️ IMPORTED **AND** RE-EXPORTED, and it must be both. A bare
+// `export { X } from '...'` re-exports the name without binding it in THIS
+// module's scope, so the component below — which uses ACCEPTED_IMAGE_TYPES
+// for its `accept` attribute — died with "ACCEPTED_IMAGE_TYPES is not
+// defined". Caught by tests/photo-positioner.test.jsx, which is exactly the
+// regression that test exists for.
+export { ACCEPTED_IMAGE_TYPES, isAcceptableImage }
 
 function UploadIcon(props) {
   return (

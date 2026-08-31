@@ -126,6 +126,23 @@ export async function resizePhotoFit(file) {
 // cannot decode them the gate refuses rather than uploading a file half
 // the club's phones cannot display.
 const UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+
+/**
+ * The accepted-image list, and the gate that reads it, in ONE place.
+ *
+ * ⚠️ THIS LIST USED TO EXIST TWICE — here as UPLOAD_TYPES and again as
+ * ACCEPTED_IMAGE_TYPES in PhotoPositioner.jsx. Two lists that had to agree,
+ * with nothing making them. PhotoPositioner now re-exports these.
+ *
+ * ⚠️ THE GATE IS NOT DECORATION. `accept` on an <input> filters the PICKER
+ * only: a DROPPED or PASTED file bypasses it completely, so this function is
+ * the only thing between a PDF and an upload on those paths.
+ */
+export const ACCEPTED_IMAGE_TYPES = UPLOAD_TYPES
+
+export function isAcceptableImage(file) {
+  return Boolean(file) && ACCEPTED_IMAGE_TYPES.includes(file.type)
+}
 const HEIC_TYPES = ['image/heic', 'image/heif']
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 // every photo bucket's file_size_limit
 

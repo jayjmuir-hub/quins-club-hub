@@ -10,6 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
+- **One attachment tray, replacing two copies of `pickPhoto`.** Task 1 of
+  plan 2, and ⚠️ **the first BUILDING merge of the chat-albums series** — plan
+  1 and the metadata reshape were database-only and cost nothing. Nothing is
+  wired to the hook yet, so members see no change; it lands first so the
+  composer work has one place to attach to. `pickPhoto` was BYTE-IDENTICAL in
+  both thread hooks and was about to grow a third copy. The accepted-image
+  list also existed TWICE — `ACCEPTED_IMAGE_TYPES` and `UPLOAD_TYPES` — two
+  lists that had to agree with nothing making them; now one, in
+  `imageResize.js` beside the resizer that enforces it. ⚠️ **The move broke
+  `PhotoPositioner` and its own test caught it:** a bare `export { X } from`
+  re-exports without binding the name in that module’s scope, so the
+  component died on its `accept` attribute — and the file already carried a
+  comment warning of exactly that trap three lines above, for a different
+  re-export. The warning is duplicated at the new site now, since one was
+  evidently not enough. Seven tray tests written to fail first, including a
+  cap that holds across SEPARATE adds and a file still accepted when its
+  preview cannot be made. `src/lib/useAttachmentTray.js`.
+  (SHA follows in the next changelog-touching PR.)
 - `488bdf6` — **Plan 2 of 4: the composer — paste, drag-and-drop and the ten-photo tray.**
   The first plan in this series that DEPLOYS; plan 1 and the metadata reshape
   were database-only and cost nothing. Seven tasks: one shared tray hook
@@ -31,7 +49,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The bottom bar puts Home on the LEFT again, for everyone.** Home had ridden
+- `3ab701e` — **The bottom bar puts Home on the LEFT again, for everyone.** Home had ridden
   the CENTRE of the wide five-tab squad-staff dock since 29 Aug (#526) — the app
   opens on Home and the middle of a full-width bar is the thumb's rest, which was
   a real argument. But the four-tab parent/player island was pulled back out of
@@ -46,7 +64,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   judging this diff locally. The argument FOR centring, and the argument against
   this revert, are in
   `claude/decisions/2026-08-31-home-tab-left-in-all-views.md` rather than lost
-  with the code. (SHA follows in the next changelog-touching PR.)
+  with the code.
 - `fc44896` — **Documents become cells — staff-card rows on phones, a tile grid on
   desktop.** Jay picked the split from a mock (both variants drawn with a
   deliberately long title, the layout trap that has bitten before): phones
