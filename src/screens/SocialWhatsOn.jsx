@@ -7,7 +7,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
-import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
+import { CLUB_TIME_ZONE, clubToday, eventChipKind, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 
@@ -224,7 +224,13 @@ function EventSection({ title, events, squadsById, empty }) {
                       {event.result_us}–{event.result_them}
                     </span>
                   )}
-                  <Chip type={event.type}>{event.type}</Chip>
+                  {/* ⚠️ eventChipKind, NOT event.type — a Club Diary entry is
+                      type='social' and would otherwise read "social" here.
+                      This screen deliberately KEEPS diary entries in its
+                      Socials filter (see the note on FILTERS above); labelling
+                      them correctly is a different question from filtering
+                      them out. claude/plans/2026-08-31-club-diary.md. */}
+                  <Chip type={eventChipKind(event)}>{eventChipKind(event)}</Chip>
                 </div>
               </div>
             )

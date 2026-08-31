@@ -48,6 +48,17 @@ const VARIANTS = {
   //   - loss: --bad (#d1483b) on --bad-bg (#fbeae8) measures 3.84:1. Text
   //           swapped to --plum/brand-deep (#b3141a) for ~7.9:1.
   //   - draw: #5a6470 on #eef0f2 already measures ~5.3:1 — used verbatim.
+  // ⚠️ THE NEUTRAL PAIR, DELIBERATELY, AND THIS IS NOT LAZINESS — it is the
+  // only choice available without a measurement. Every other pairing above is
+  // spoken for (brand, accent, warn, danger), and inventing a sixth means
+  // picking two hex values and clearing AA at 11.5px bold, which is a
+  // design-system change and not a chip change. surface-mute/ink-muted is
+  // already measured at ~6.0:1 in the note above. Nothing here depends on
+  // colour alone: the chip carries the word "Diary" and its own calendar mark,
+  // so it is distinguishable from the draw chip that shares this pair by both
+  // of the other two channels. A dedicated colour is a follow-up WITH a
+  // measurement, not a guess made here.
+  diary: 'bg-surface-mute text-ink-muted',
   win: 'bg-accent-bg text-accent-ink',
   loss: 'bg-danger-bg text-danger-ink',
   draw: 'bg-surface-mute text-ink-muted',

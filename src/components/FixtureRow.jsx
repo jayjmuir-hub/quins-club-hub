@@ -10,6 +10,7 @@ import {
   resultOutcome,
   resultScore,
   titleRepeatsType,
+  eventChipKind,
 } from '../lib/eventFormat.js'
 
 // Fixture / event row (design-system.md §4.13) — "the single most-reused
@@ -22,7 +23,7 @@ import {
 // time, via dateBoxParts/formatTime (see CLUB_TIME_ZONE in eventFormat.js).
 // The row itself carries no zone label; only the detail sheet says so.
 
-const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social' }
+const TYPE_LABELS = { match: 'Match', training: 'Training', social: 'Social', diary: 'Diary' }
 
 function ClockIcon(props) {
   return (
@@ -134,7 +135,13 @@ export function FixtureRow({ event, teamName, onSelect, className = '', style })
 
       <span className="min-w-0 flex-1">
         <span className="mb-1 flex flex-wrap items-center gap-1.5">
-          <Chip type={event.type}>{TYPE_LABELS[event.type] ?? 'Event'}</Chip>
+          {/* ⚠️ eventChipKind, NOT event.type. A Club Diary entry is
+              type='social', so reading the type here would draw the People icon
+              under the word "Social" on a kit collection.
+              claude/plans/2026-08-31-club-diary.md. */}
+          <Chip type={eventChipKind(event)}>
+            {TYPE_LABELS[eventChipKind(event)] ?? 'Event'}
+          </Chip>
           {squadLabel && <Chip>{squadLabel}</Chip>}
         </span>
         {/* ⚠️ DROPPED WHEN IT ONLY ECHOES THE CHIP ABOVE IT — see
