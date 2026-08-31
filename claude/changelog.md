@@ -10,6 +10,35 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
+- **Handoff: chat photo albums.** A session record for whoever picks this up —
+  what is live, the safeguarding rule that must not be broken, and the traps
+  this work actually hit. ⚠️ **It records four corrections to its own author’s
+  claims**, because a handoff listing only successes leaves the next session to
+  rediscover the failures: Club Diary wrongly reported as orphaned (a renamed
+  session read as an ended one); the repo’s "duplicate rows break branching"
+  wording, which cannot be true given `PRIMARY KEY (version)`; a 15-credit
+  deploy that is now permanently unmeasurable because no baseline hash was
+  taken; and a changelog heading claiming a replacement that has not happened
+  (both `pickPhoto` copies measured still present on `main`).
+  ⚠️ **It also carries a LIVE bug**: a captionless photo message pushes a
+  notification with an EMPTY body, which #605 makes routine —
+  `push-send/index.ts` still mentions `attachments` zero times.
+  `claude/handoffs/2026-09-01-chat-photo-albums.md`.
+  (SHA follows in the next changelog-touching PR.)
+- `f16ca8d` — **Albums recorded as shipped, and a control that proved nothing.**
+  Paid `ebda2f3` and wrote up the live verification of #605. ⚠️ **The entry is
+  worth reading for the control it had to throw away:** refetching the OLD
+  bundle to show the album strings absent proved nothing, because that URL no
+  longer resolves and Netlify answered **200 with the SPA’s 4.8 KB fallback
+  HTML**, in which every string is absent. Replaced with one that
+  discriminates — `Drop photos to attach` absent from `src/` at `ebda2f3^` and
+  present at `ebda2f3` — and a second candidate marker was REJECTED because it
+  had shipped with #602 and would have been present either way.
+  ⚠️ **It also records that task 7 step 2 is NOT done:** nobody has sent a real
+  album on the live site and confirmed a SECOND account sees every photo. That
+  needs two real sign-ins, and the storage read policy is the thing that would
+  fail silently. (This entry written by the following PR — #606 left none for
+  itself, which `docs:check` caught.)
 - `06ec8b5` — **A Club Diary entry is no longer pushed to the squad as a "New fixture".**
   ⚠️ **A bug shipped in the Club Diary merge earlier the same day, caught before
   it ever fired.** Adding an event triggers a squad push whose headline was the
