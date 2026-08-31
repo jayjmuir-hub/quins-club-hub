@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **Handoff: chat photo albums.** A session record for whoever picks this up —
+- **`docs:check` now refuses unresolved git conflict markers.** On 31 Aug the
+  changelog was hand-resolved fourteen times in one day — the one-behind rule
+  serialises every PR through it — and the checker would have passed a file
+  still carrying `<<<<<<<` / `>>>>>>>` straight onto main (found by the
+  validator session, confirmed against the script with a control). Scans every
+  tracked file the script already reads; proven by planting all three marker
+  forms (each fails) and a longer heading underline (passes). Also catches up
+  two uncited docs merges below. (SHA follows in the next changelog-touching
+  PR.)
+- `6bec4d1` — **Handoff: chat photo albums.** A session record for whoever picks this up —
   what is live, the safeguarding rule that must not be broken, and the traps
   this work actually hit. ⚠️ **It records four corrections to its own author’s
   claims**, because a handoff listing only successes leaves the next session to
@@ -24,7 +33,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   notification with an EMPTY body, which #605 makes routine —
   `push-send/index.ts` still mentions `attachments` zero times.
   `claude/handoffs/2026-09-01-chat-photo-albums.md`.
-  (SHA follows in the next changelog-touching PR.)
 - `f16ca8d` — **Albums recorded as shipped, and a control that proved nothing.**
   Paid `ebda2f3` and wrote up the live verification of #605. ⚠️ **The entry is
   worth reading for the control it had to throw away:** refetching the OLD
