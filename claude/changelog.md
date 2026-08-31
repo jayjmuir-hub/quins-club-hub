@@ -8,9 +8,19 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 31 Aug 2026
+
+- **The graft skill now says how to run `build --deep` on Jay's PCs.**
+  `.claude/skills/graft/SKILL.md` splits plain `build` (structural graph, free,
+  no key) from `build --deep` (LLM concept map — spends tokens, goes stale as
+  fast as the code, skip unless asked), and records the exact command for the
+  deep build through the local `hermes proxy` with a dummy key, since there is
+  no `GRAFT_API_KEY` to set. Doc-only; the edit had been live-but-uncommitted
+  on cafnet. (SHA follows in the next changelog-touching PR.)
+
 ## 30 Aug 2026
 
-- **Grok item 17 SHIPPED — what an error may SAY to a parent, plus the item-6
+- `c021bff` — **Grok item 17 SHIPPED — what an error may SAY to a parent, plus the item-6
   cache residue.** `RequireAuth` maps the login URL fragment through
   `friendlyAuthError`: the fragment is attacker-writable (any link can end
   `#error_description=…`), so Login now receives a sentence this app wrote,
@@ -26,8 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   device that never switches user. `src/lib/friendlyError.js` (new),
   `src/lib/apiCache.js`, `src/components/RequireAuth.jsx`, the six screens,
   `tests/error-hygiene.test.jsx` (new), `tests/api-cache.test.js`,
-  `tests/require-auth.test.jsx`. (SHA follows in the next changelog-touching
-  PR.)
+  `tests/require-auth.test.jsx`.
 - `bb3490d` — **Grok item 14 SHIPPED — `db/schema/policies.sql` re-captured to match
   live.** The 28 Aug admin-rights redesign turned four surfaces into real
   allowlist boundaries and this capture had lagged them by two days — the

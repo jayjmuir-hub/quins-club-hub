@@ -83,7 +83,14 @@ projection, rebuilt at the end of the turn rather than on each query, so after a
 they can lag. The tools above never do — prefer them, and treat a card's spans as
 stale if you have edited that file this turn.
 
-`build` is for the LLM layer (`--deep` adds a concept map; skip unless asked);
+`build` refreshes the structural graph ($0, no key). `build --deep` adds the
+LLM concept map — it spends tokens and goes stale as fast as the code, so skip
+it unless asked. When asked, on Jay's own PCs run it through `hermes proxy`
+(his Nous sub) with a dummy key — there is no `GRAFT_API_KEY` to set:
+
+    graft --provider openai --base-url http://127.0.0.1:8645/v1 \
+          --api-key dummy --model google/gemini-3.7-flash build --deep
+
 `check` fails when `graft/` is stale, for CI.
 
 ## Scenarios: the shortest path through a coding task
