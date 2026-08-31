@@ -117,7 +117,10 @@ function linkClassName({ isActive }) {
     // content (Jay). Ink already meets icon contrast on its own — dropping the
     // fade is the free half of that. The frost that backs it in light mode is
     // strengthened in src/index.css (see `.glass-dock` cool-grey stops).
-    isActive ? 'px-3 text-white' : 'px-2 text-ink',
+    // White again since the chrome-quarters pass (31 Aug 2026): the dock
+    // is opaque dark chrome, so the clear-glass reasons for theme ink
+    // (24 Aug, above) and full-strength ink (28 Aug) both retire with it.
+    isActive ? 'px-3 text-white' : 'px-2 text-white/90',
   ].join(' ')
 }
 
