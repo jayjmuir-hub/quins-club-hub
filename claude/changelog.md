@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The schema captures caught up with production — including a child-photo
+- **`chat-list.sql` assert 5 was green by luck — `now()` is
+  transaction-constant.** The squad post and the DM shared one `created_at`,
+  `my_chats`' recency ordering tied, and 'dm' won on a label tie-break
+  against empty fixture names — "newest first" was never tested. Staggered
+  explicitly and proven both directions (the failed first flip exposed
+  `conversations.last_at`, not `messages.created_at`, as the DM rows'
+  driver). Both latent defect classes — now()-tie luck and the 30
+  still-unclassified function-replay files — recorded in
+  `claude/open-items.md` for the full audit. (SHA follows in the next
+  changelog-touching PR.)
+- `e2c0a10` — **The schema captures caught up with production — including a child-photo
   access rule that had gone stale.** #594 changed the database and did not
   update `db/schema/`, so for a short while `policies.sql` documented the
   PRE-change `chat media read` rule: anyone reading it would have concluded
@@ -26,7 +36,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   nothing enforces that one ALTERING a table reaches `tables.sql` or one
   REPLACING a policy reaches `policies.sql` — which is why this passed every
   gate and was caught only by a peer reading a diff at the right moment.
-  (SHA follows in the next changelog-touching PR.)
 - `7d6d37a` — **The document that opened twice, and drag-a-file-in.** Jay's first real
   document opened in a new tab AND the current one: `window.open` with
   `'noopener'` returns null BY SPEC even on success, so the iOS blocked-popup
@@ -36,8 +45,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   two-argument call so the flag cannot return. Plus the photo drop-zone idiom
   on the upload sheet — drag a document in, same validation as picking one.
   `src/screens/Documents.jsx`, `src/components/SquadDocumentsCard.jsx`,
-  `src/components/DocumentUploadSheet.jsx`. (SHA follows in the next
-  changelog-touching PR.)
+  `src/components/DocumentUploadSheet.jsx`.
 - `474f3ac` — **Spec + phase 1 plan: Club Diary — dated items nobody replies to.** Four of
   the seven lines on the club's own "3 week look ahead" poster are dated,
   calendar-worthy items with nothing to RSVP to (shop opening, ball collection,

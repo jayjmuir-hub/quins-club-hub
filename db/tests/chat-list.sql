@@ -147,11 +147,23 @@ begin
   insert into _log(line) values ('4 a DM: a row for each side, unread for the recipient only, invisible to anyone else');
 
   -- 5
+  -- ⚠️ STAGGER FIRST — now() is TRANSACTION-CONSTANT (31 Aug 2026, the
+  -- green-by-luck class found via my-chats-attachment). The squad post and
+  -- the DM above share ONE created_at, so my_chats' `last_at desc` TIES and
+  -- falls through to its label tie-break — where 'dm' won only because this
+  -- fixture's profiles have empty names. "Newest first" was never tested.
+  -- Backdate the squad message so the DM is GENUINELY newer; flipping the
+  -- stagger (DM older) makes this assert fail, which is the proof it now
+  -- discriminates.
+  alter table messages disable trigger messages_touch;
+  update messages set created_at = created_at - interval '2 minutes'
+   where team_id = squad_a and channel = 'squad';
+  alter table messages enable trigger messages_touch;
   perform pg_temp.as_user(parent::text);
   select kind into r from public.my_chats() limit 1;
   reset role;
   if r.kind <> 'dm' then raise exception 'ASSERT 5 FAILED: first row is %', r.kind; end if;
-  insert into _log(line) values ('5 newest first: the DM just sent is at the top');
+  insert into _log(line) values ('5 newest first: the DM (genuinely newer, staggered) is at the top');
 
   -- 6. the author removes an OLD message (older than 15 minutes)
   select id into post_id from messages where conversation_id = conv limit 1;
