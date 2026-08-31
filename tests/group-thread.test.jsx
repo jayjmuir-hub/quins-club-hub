@@ -223,6 +223,49 @@ describe('a group thread', () => {
   })
 })
 
+// Group @ mentions (claude/plans/2026-08-31-group-chat-mentions.md): the same
+// button-not-typeahead picker the channels use, fed from the already-loaded
+// member list. The discriminating pair: the id rides in `mentions` only while
+// its @Full Name survives in the draft — a deleted name un-mentions.
+describe('group @ mentions', () => {
+  it('the picker lists the members minus me, and a pick sends the id', async () => {
+    m.sendDirectMessage.mockResolvedValue({ id: 'sent-1' })
+    const user = userEvent.setup()
+    renderAt('/chat/dm/g1')
+    await screen.findByRole('heading', { name: 'Zz Test Group' })
+
+    await user.click(screen.getByRole('button', { name: 'Mention someone' }))
+    const list = screen.getByRole('listbox', { name: 'People in this channel' })
+    expect(within(list).getByRole('option', { name: /Mira Vantel/ })).toBeInTheDocument()
+    // Never myself — mentioning the author is noise the trigger strips anyway.
+    expect(within(list).queryByRole('option', { name: /Me Myself/ })).toBeNull()
+
+    await user.click(within(list).getByRole('option', { name: /Mira Vantel/ }))
+    expect(screen.getByLabelText('Message')).toHaveValue('@Mira Vantel ')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() =>
+      expect(m.sendDirectMessage).toHaveBeenCalledWith('g1', '@Mira Vantel ', expect.objectContaining({ mentions: ['p-2'] })),
+    )
+  })
+
+  it('deleting the @name from the draft un-mentions — the id is NOT sent', async () => {
+    m.sendDirectMessage.mockResolvedValue({ id: 'sent-2' })
+    const user = userEvent.setup()
+    renderAt('/chat/dm/g1')
+    await screen.findByRole('heading', { name: 'Zz Test Group' })
+
+    await user.click(screen.getByRole('button', { name: 'Mention someone' }))
+    await user.click(screen.getByRole('option', { name: /Tomas Orrin/ }))
+    const draft = screen.getByLabelText('Message')
+    await user.clear(draft)
+    await user.type(draft, 'changed my mind')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() =>
+      expect(m.sendDirectMessage).toHaveBeenCalledWith('g1', 'changed my mind', expect.objectContaining({ mentions: [] })),
+    )
+  })
+})
+
 // The person card (claude/plans/2026-08-26-person-card.md): each name in the
 // group header's member line is a door; "You" stays plain text.
 describe('group thread — member names open the person card', () => {

@@ -61,6 +61,25 @@ describe('sendDirectMessage — round 2 options', () => {
     expect(plain.calls.insert[0][0]).toEqual({ conversation_id: 'c1', body: 'no frills' })
   })
 
+  it('group mentions ride the insert when given, and stay ABSENT when empty', async () => {
+    // claude/plans/2026-08-31-group-chat-mentions.md — same absent-not-null
+    // rule as the round-2 options above: an empty mentions array must not
+    // decorate every plain message.
+    const withM = builder({ data: { id: 'db' }, error: null })
+    supabase.from.mockReturnValue(withM.b)
+    await sendDirectMessage('g1', '@Mira Vantel are you driving?', { mentions: ['p-2'] })
+    expect(withM.calls.insert[0][0]).toEqual({
+      conversation_id: 'g1',
+      body: '@Mira Vantel are you driving?',
+      mentions: ['p-2'],
+    })
+
+    const empty = builder({ data: { id: 'dc' }, error: null })
+    supabase.from.mockReturnValue(empty.b)
+    await sendDirectMessage('g1', 'plain', { mentions: [] })
+    expect(empty.calls.insert[0][0]).toEqual({ conversation_id: 'g1', body: 'plain' })
+  })
+
   it('the quoted embed goes through the FK COLUMN itself — both other spellings shipped broken', async () => {
     // ⚠️ MEASURED LIVE, 24 Aug 2026, twice in one evening. On a SELF-join
     // this project's PostgREST rejects a constraint-name hint
