@@ -360,10 +360,52 @@ production and somebody asked what that would actually do first.
 `pitch`, `opponent`, `home` or `team_id` change. `info_only` is deliberately not
 in that list, so flipping the flag is silent.
 
-**Not shipped:** `all_day`, multi-day spans and the feed branch are phase 2 in
-the same plan. `all_day` is held distinct from `time_tbd` on purpose — `time_tbd`
-means "the day is known, the time is not decided", and an all-day item has no
-time at all.
+### Club Diary phase 2 — `all_day`, and the traps it stepped around
+
+**Shipped 1 Sep 2026.** `events.all_day` is the THIRD time state: `time_tbd`
+means "the day is known, the time is not decided" (and earns the feed's
+"Kick-off time to be confirmed" line); `all_day` means "there is no clock time"
+(and must NOT). `events_not_all_day_and_time_tbd` keeps them mutually exclusive
+— the form's three-way control (Timed · Time TBD · All day) makes the illegal
+pair unreachable, but the constraint is the guarantee.
+
+⚠️ **AN ALL-DAY DATE IS CLUB-MIDNIGHT, NEVER UTC MIDNIGHT.** The form goes
+through `clubWallTimeToUtc(date, '00:00')`, giving 20:00Z the previous day. A
+writer that stores `new Date('2026-09-17')` (UTC midnight) makes the event
+render as **16 Sep** in Dubai — a day early, in the push AND the feed AND the
+schedule — and the bug is invisible under a UTC test runner, which is why
+`tests/event-form-allday.test.jsx` pins `TZ=America/New_York`.
+
+⚠️ **A MULTI-DAY SPAN STORES CLUB-MIDNIGHT ON ITS LAST DAY; the feed's DTEND
+adds the +1.** ICS's DATE-valued DTEND is EXCLUSIVE (RFC 5545 §3.6.1): 17–18
+Sep is `DTSTART:20260917 / DTEND:20260919`. A one-day all-day event stores
+`ends_at` NULL — the DB refuses a same-midnight end via the pre-existing
+`events_ends_after_starts`, so no new constraint repeats the rule.
+
+⚠️ **THE PUSH WHEN-LINE HAS EXACTLY ONE IMPLEMENTATION** —
+`private.fixture_push_when` (scalar form; the `public.events` form delegates).
+It existed as two inline copies in `send_fixture_push` AND
+`send_availability_nudges`, so fixing one left "Thu 17 Sep, 00:00" reachable
+from the other. The nudge is match-only (`e.type = 'match'`) and a harness step
+asserts that filter SURVIVES any future replacement.
+
+⚠️ **THE SQL FEED FUNCTION IS `calendar_events_for_token`, NOT `calendar_feed`.**
+The migration FILES are named `calendar_feed*.sql` and two documents inherited
+the wrong name from them. A file name is not an object name.
+
+⚠️ **REPLACING THAT FUNCTION MEANS DROP + CREATE (return-type change), AND THE
+DROP DROPS THE ACL.** A fresh function grants EXECUTE to PUBLIC by default, so
+the migration must re-apply the measured grants (anon/authenticated/
+service_role, PUBLIC absent) and assert them — anon is load-bearing, because
+calendar clients fetch the .ics unauthenticated and the token is the
+credential. Forgetting this silently undoes
+`calendar_feed_revoke_public_execute` with a diff that looks right.
+
+⚠️ **THE CALENDAR EDGE FUNCTION IS DEPLOYED BY HAND AND NOTHING IN CI SHIPS
+IT.** Merging a change to `supabase/functions/calendar/index.ts` deploys the
+app bundle and does NOT touch the deployed function — a guaranteed window, not
+a race. Deploy the function BEFORE merging UI that can produce data the old
+function renders wrongly.
 
 ### Scope and RLS
 

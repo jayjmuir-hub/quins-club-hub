@@ -1,12 +1,10 @@
 # Club Diary — dated items nobody replies to
 
-**STATUS: PHASE 1 SHIPPED 31 Aug 2026. PHASE 2 NOT SHIPPED.**
-Phase 1 — `info_only`, the Club Diary chooser kind, the read paths and the
-Schedule filter — is live: migration `events_info_only` applied to production,
-implementation `claude/plans/2026-08-31-club-diary-implementation.md`.
-Everything marked `[PHASE 2]` below (`all_day`, multi-day spans, the calendar
-feed branch, the `all_day`/`time_tbd` check constraint) is **still a spec** and
-nothing of it has been built.
+**STATUS: BOTH PHASES SHIPPED.** Phase 1 (Club Diary, `info_only`) 31 Aug 2026;
+phase 2 (`all_day`, the three-way time control, multi-day spans, the feed
+branch) built 1 Sep 2026 —
+`claude/plans/2026-09-01-club-diary-phase-2-implementation.md`. The `[PHASE 2]`
+markers below are history, not a to-do list.
 
 ## The problem, from a real artefact
 
@@ -49,7 +47,10 @@ is yet known to need.
 
 **The phases are genuinely independent, and that is the test of the split.**
 Phase 1 touches no SQL function and no edge function — it adds one column and
-changes app code. Phase 2 touches `calendar_feed`, the Deno function and the
+changes app code. Phase 2 touches `calendar_events_for_token` (⚠️ the SQL
+function's real name — this spec said `calendar_feed` until 1 Sep, a name
+taken from the migration FILENAMES; a file name is not an object name), the
+Deno function and the
 time control, and adds nothing to Club Diary that Club Diary needs.
 
 **Everything below marked `[PHASE 2]` is deferred.** It is specified here rather
@@ -251,7 +252,8 @@ fix applied to one and not the other means a parent reads one thing on screen an
 another in their calendar.
 
 **Migration** (a new file in `db/migrations/`): add the two columns and the check
-constraint, then replace `calendar_feed` so its `RETURNS TABLE` gains
+constraint, then replace `calendar_events_for_token` (not `calendar_feed` —
+see the phasing note above) so its `RETURNS TABLE` gains
 `info_only boolean, all_day boolean`. Following the precedent already in
 `db/migrations/20260814_calendar_feed_competition_type.sql`, the migration ends
 with a `pg_get_function_result` assertion, so a silently unreplaced function

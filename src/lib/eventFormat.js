@@ -347,6 +347,23 @@ export function isTimeTbd(event) {
   return event?.time_tbd === true
 }
 
+/** Shown wherever a clock time would be, for an event that has none. */
+export const ALL_DAY = 'All day'
+
+/**
+ * True when the event has NO clock time — it lasts the whole day, or several
+ * days via ends_at. The THIRD time state, distinct from isTimeTbd ("the day is
+ * known, the time is not decided yet"): collapsing them would tell a subscribed
+ * parent a kit collection's kick-off is to be confirmed.
+ *
+ * ⚠️ STRICT === true, the same convention as isTimeTbd and eventChipKind. A row
+ * written before the migration, or read through a path that does not select the
+ * column, must read as an ordinary timed event.
+ */
+export function isAllDay(event) {
+  return event?.all_day === true
+}
+
 /**
  * "7:30 PM", or "Time TBD" when the kick-off is not yet known.
  *
@@ -358,6 +375,10 @@ export function isTimeTbd(event) {
  * read receipt, a pitch request's window.
  */
 export function eventTimeLabel(event) {
+  // ⚠️ ALL-DAY FIRST. An all-day event's starts_at is club-midnight — a
+  // PLACEHOLDER. Falling through to formatTime would render "12:00 AM", the
+  // invented value this state exists to avoid.
+  if (isAllDay(event)) return ALL_DAY
   if (isTimeTbd(event)) return TIME_TBD
   return formatTime(eventDate(event))
 }
@@ -371,6 +392,10 @@ export function eventTimeLabel(event) {
  * fifteen-hour event in every parent's calendar.
  */
 export function eventTimeRangeLabel(event) {
+  // ⚠️ ALL-DAY FIRST, and never a range: a multi-day all-day event has an
+  // ends_at, and formatting midnight-to-midnight would render a 24-hour
+  // "12:00 AM – 12:00 AM" in the detail sheet.
+  if (isAllDay(event)) return ALL_DAY
   if (isTimeTbd(event)) return TIME_TBD
   return formatTimeRange(eventDate(event), eventEndDate(event))
 }

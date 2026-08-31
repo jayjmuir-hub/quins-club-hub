@@ -115,6 +115,20 @@ type Event = {
   // — which is what every fixture rendered as yesterday. Deploying this
   // function early therefore changes nothing.
   competition_type?: string | null
+  // Added 1 Sep 2026 (Club Diary phase 2 — claude/plans/2026-08-31-club-diary.md).
+  // ⚠️ THE THIRD TIME STATE, distinct from time_tbd and never merged with it:
+  // time_tbd = "the day is known, the time is not decided" and earns the
+  // "Kick-off time to be confirmed" line; all_day = "there is no clock time"
+  // and must NOT carry that line, or a kit collection tells every subscribed
+  // parent its kick-off is pending. Optional for the same deploy-order reason
+  // as every field above: this function may run against a database whose token
+  // function does not yet return the column.
+  all_day?: boolean | null
+  // Also added 1 Sep 2026. Not used in the ICS output today — a diary entry
+  // exports like any other event, which is its whole purpose — but carried so
+  // labelling diary entries in the feed is a one-line change, not a function
+  // replacement plus a hand deploy.
+  info_only?: boolean | null
 }
 
 /**
@@ -285,7 +299,16 @@ function toVEvent(event: Event, stamp: string): string[] {
   // ⚠️ STRICT === true, matching src/lib/eventFormat.js's isTimeTbd. An
   // `undefined` from a pre-migration feed function must read as "has a time",
   // which is what every fixture in the database was before the column existed.
-  const allDay = event.time_tbd === true
+  //
+  // ⚠️ TWO WAYS TO BE A VALUE=DATE ENTRY, ONE SENTENCE APART. time_tbd earns
+  // the "Kick-off time to be confirmed" DESCRIPTION line below; a genuinely
+  // all-day event (event.all_day) must NOT — printing it would claim the time
+  // is undecided when there is no time, the inverse of the mistake that line
+  // exists to prevent. `timeTbd` is therefore kept separate from `allDay`
+  // rather than folded in.
+  const timeTbd = event.time_tbd === true
+  const isAllDayEvent = event.all_day === true
+  const allDay = isAllDayEvent || timeTbd
 
   const description: string[] = []
   // ⚠️ FIRST, AHEAD OF THE COMPETITION. DESCRIPTION is the line a phone
@@ -301,7 +324,8 @@ function toVEvent(event: Event, stamp: string): string[] {
   // wrong claim — the day is known and the kick-off is not. DESCRIPTION
   // truncates from the right on a phone, so this has to be the first thing in
   // it or it is the first thing lost.
-  if (allDay) description.push('Kick-off time to be confirmed')
+  // ⚠️ timeTbd, NOT allDay — an all-day event has no time to confirm.
+  if (timeTbd) description.push('Kick-off time to be confirmed')
   const league = leagueLabel(event)
   if (league) description.push(league)
   // ⚠️ SKIPPED WHEN THE SUMMARY ALREADY IS THE TOURNAMENT NAME, or the entry
@@ -335,10 +359,24 @@ function toVEvent(event: Event, stamp: string): string[] {
     // ⚠️ `;VALUE=DATE` IS WHAT MAKES IT ALL-DAY, and both properties must carry
     // it — a DATE DTSTART with a DATE-TIME DTEND is invalid and clients disagree
     // wildly about how to recover from it.
+    // ⚠️ THE SPAN: a multi-day all-day event ends the day AFTER its last day,
+    // because ICS's DATE-valued DTEND is EXCLUSIVE (RFC 5545 §3.6.1). A kit
+    // collection on 17–18 Sep is DTSTART:20260917 / DTEND:20260919 — the +1 on
+    // ends_at's club date is not an off-by-one, it IS the format. Dropping it
+    // shows a one-day event; applying it to the last day directly shows three.
+    // Both look plausible, which is why the boundary is written longhand in
+    // tests/calendar-all-day.test.js.
+    // ⚠️ ends_at is only consulted for a genuinely all-day event. A time_tbd
+    // fixture cannot carry one (events_no_end_when_time_tbd), so its DTEND
+    // stays start-plus-one-day exactly as before.
     ...(allDay
       ? [
           `DTSTART;VALUE=DATE:${icsDate(start)}`,
-          `DTEND;VALUE=DATE:${icsDatePlusOneDay(icsDate(start))}`,
+          `DTEND;VALUE=DATE:${
+            isAllDayEvent && event.ends_at
+              ? icsDatePlusOneDay(icsDate(new Date(event.ends_at)))
+              : icsDatePlusOneDay(icsDate(start))
+          }`,
         ]
       : [`DTSTART:${icsStamp(start)}`, `DTEND:${icsStamp(end)}`]),
     `SUMMARY:${escapeText(summaryFor(event))}`,

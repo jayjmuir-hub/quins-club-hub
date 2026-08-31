@@ -170,6 +170,13 @@ const TYPES = [
   { value: 'social', label: 'Social' },
 ]
 
+// ⚠️ THE THREE TIME STATES, never collapsed — see events_not_all_day_and_time_tbd.
+const TIME_MODES = [
+  { value: 'timed', label: 'Timed' },
+  { value: 'tbd', label: 'Time TBD' },
+  { value: 'allday', label: 'All day' },
+]
+
 const AVAILABILITY_OVERRIDES = [
   { value: 'auto', label: 'Auto' },
   { value: 'open', label: 'Open' },
@@ -296,6 +303,12 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       // is about to type; TBD is a thing you say on purpose, and the required
       // Time field is what prompts you to say it.
       timeTbd: false,
+      // ⚠️ THE THIRD TIME STATE — see the TIME_MODES control. false, not
+      // derived: a new event is assumed timed, and All day is said on purpose.
+      allDay: false,
+      // The last day of a multi-day all-day event, 'yyyy-mm-dd', or '' for a
+      // single day. Only meaningful while allDay is true; cleared on leaving.
+      untilDate: '',
       teamId: fallbackTeamId,
       home: true,
       venue: DEFAULT_VENUE,
@@ -383,6 +396,14 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     // another week, time still to be confirmed" is the ordinary case; clearing
     // it would demand a kick-off nobody knows yet.
     timeTbd: event.time_tbd === true,
+    // ⚠️ STRICT === true — pre-migration rows open as ordinary timed events.
+    allDay: event.all_day === true,
+    // An existing span's last day, recovered as a club-zone date string so the
+    // picker shows the day the club means, not the reader's-zone day.
+    untilDate:
+      event.all_day === true && event.ends_at
+        ? clubDateTimeInputs(new Date(event.ends_at)).date
+        : '',
     // ⚠️ A club-wide event (team_id null) opens with the "Whole club" sentinel
     // selected, so editing one does not silently reassign it to a squad.
     teamId:
@@ -951,7 +972,14 @@ export default function EventForm({
     // is what every reader tests; nothing anywhere may infer TBD from a midnight
     // start, because a genuine 00:00 social is a legal fixture.
     const timeTbd = values.timeTbd === true
-    const starts_at = clubWallTimeToUtc(values.date, timeTbd ? '00:00' : values.time)
+    // ⚠️ THE SAME PLACEHOLDER, A DIFFERENT MEANING. An all-day start is ALSO
+    // club-midnight, via the same clubWallTimeToUtc — which is what defuses the
+    // off-by-one-day trap: new Date('2026-09-17') is UTC midnight, which is
+    // 16 Sep in Dubai, and every renderer would show the day BEFORE the one
+    // chosen. clubWallTimeToUtc('2026-09-17', '00:00') is 20:00Z on the 16th —
+    // genuine club-midnight — and the club-zone renderers all agree on the day.
+    const allDay = values.allDay === true
+    const starts_at = clubWallTimeToUtc(values.date, timeTbd || allDay ? '00:00' : values.time)
     // Both ends are built from the SAME date field and the same club-zone
     // conversion, so an event runs on one club calendar day.
     //
@@ -968,7 +996,18 @@ export default function EventForm({
     // (`events_no_end_when_time_tbd`). A real finish against a placeholder
     // midnight passes `events_ends_after_starts` happily and renders as a
     // fifteen-hour event in every subscribed calendar.
-    const ends_at = timeTbd ? null : clubWallTimeToUtc(values.date, values.endTime)
+    // ⚠️ ALL-DAY ENDS ARE DATES, NOT TIMES. A single day leaves ends_at NULL —
+    // the database refuses a same-midnight end (events_ends_after_starts), and
+    // a stale non-null here is how a one-day collection silently becomes a
+    // five-week span. A multi-day span stores club-midnight on its LAST day;
+    // the feed's exclusive DTEND adds the +1, not this writer.
+    const ends_at = allDay
+      ? values.untilDate
+        ? clubWallTimeToUtc(values.untilDate, '00:00')
+        : null
+      : timeTbd
+        ? null
+        : clubWallTimeToUtc(values.date, values.endTime)
     // Instant comparison, not a string one. Both are UTC ISO strings today so
     // a lexicographic compare would happen to work — and would stop working
     // the day either side gained an offset or a different precision.
@@ -981,10 +1020,14 @@ export default function EventForm({
     // else (squad, opponent, title) is unaffected.
     const nextInvalid = {
       date: !values.date,
-      time: timeTbd ? false : !values.time || !starts_at,
+      time: timeTbd || allDay ? false : !values.time || !starts_at,
       // REQUIRED (Jay's ruling, 8 Aug 2026) even though the column is
       // nullable — see the migration for why those two are not in conflict.
-      endTime: timeTbd ? false : !values.endTime || !ends_at || !endsAfterStart,
+      endTime: timeTbd || allDay ? false : !values.endTime || !ends_at || !endsAfterStart,
+      // ⚠️ OPTIONAL, BUT NOT ALLOWED TO BE WRONG. An empty until-date is a
+      // one-day event; a filled one must land strictly after the start, or the
+      // database's events_ends_after_starts surfaces as a raw 23514.
+      untilDate: allDay && Boolean(values.untilDate) ? !ends_at || !endsAfterStart : false,
       teamId: !teamId,
       // ⚠️ NOT REQUIRED FOR A TOURNAMENT (Jay, 14 Aug 2026). A club enters a
       // tournament months ahead and finds out who it is playing days before, so
@@ -1153,7 +1196,12 @@ export default function EventForm({
       // ⚠️ IN `common`, so a multi-squad fan-out and a whole repeating term all
       // carry it — "the time is not settled yet" is a fact about the SESSION,
       // true of every squad joining it and of every week of it.
-      time_tbd: timeTbd,
+      // ⚠️ MUTUALLY EXCLUSIVE BY CONSTRAINT (events_not_all_day_and_time_tbd),
+      // and the three-way control makes the illegal pair unreachable — but the
+      // payload states both explicitly so a state bug here surfaces as a loud
+      // 23514 rather than a silently wrong calendar entry.
+      time_tbd: allDay ? false : timeTbd,
+      all_day: allDay,
       // Overwritten per occurrence in the series branch below. Left here so
       // the ONE-OFF and the MULTI-SQUAD fan-out both carry it without a
       // second place to remember: rowFor() spreads `common`, so every fanned
@@ -1264,7 +1312,7 @@ export default function EventForm({
           // ⚠️ THE PLACEHOLDER IS RECOMPUTED PER DATE TOO. Midnight is a wall
           // time, and a wall time is only meaningful against a date — the same
           // trap the ends_at line below documents.
-          starts_at: clubWallTimeToUtc(date, timeTbd ? '00:00' : values.time),
+          starts_at: clubWallTimeToUtc(date, timeTbd || allDay ? '00:00' : values.time),
           // ⚠️ RECOMPUTED PER OCCURRENCE, exactly like starts_at, and NOT
           // carried over from `payload`. The whole series is "the same wall
           // clock on each date", so the end has to be converted against ITS
@@ -1274,7 +1322,11 @@ export default function EventForm({
           // CHECK would reject as a raw 23514 on a batch insert, taking the
           // whole term down with it. Same trap as the offset lookup in
           // clubWallTimeToUtc: a time is only meaningful against a date.
-          ends_at: timeTbd ? null : clubWallTimeToUtc(date, values.endTime),
+          // ⚠️ A REPEATING ALL-DAY SERIES IS ALWAYS ONE DAY PER OCCURRENCE.
+          // untilDate is deliberately ignored here: "every Tuesday, and each
+          // one spans to Thursday" is a stated non-goal, and carrying the span
+          // would make every occurrence overlap the next.
+          ends_at: timeTbd || allDay ? null : clubWallTimeToUtc(date, values.endTime),
           series_id: newSeriesId,
         }))
       : multiSquad
@@ -1517,51 +1569,83 @@ export default function EventForm({
             invalid={invalid.date}
           />
         </div>
-        {/* ⚠️ TIME TBD (Jay, 14 Aug 2026). A CHECKBOX rather than a "TBD" option
-            inside the time input, because a native <input type="time"> has no
-            way to carry one — and rather than a magic blank, because blank
-            already means "you haven't filled this in" and the form refuses it.
-            Ticking it says something; leaving a box empty says nothing. */}
-        <label className="mb-3.5 flex cursor-pointer items-start gap-2.5 rounded-[11px] border-[1.5px] border-line px-3 py-2.5">
-          <input
-            type="checkbox"
-            checked={values.timeTbd}
-            onChange={(domEvent) => {
-              const on = domEvent.target.checked
-              setDurationNote(null)
-              // ⚠️ TICKING CLEARS BOTH TIMES. They are about to become
-              // unsendable — ends_at is nulled on save and starts_at becomes a
-              // placeholder — so leaving them on screen would show two values
-              // that Save is going to throw away.
-              setValues((current) => ({
-                ...current,
-                timeTbd: on,
-                time: on ? '' : current.time,
-                endTime: on ? '' : current.endTime,
-              }))
-              // The two time errors no longer apply; clearing them stops a
-              // stale red border sitting on a field that is now disabled.
-              setInvalid((current) => ({ ...current, time: false, endTime: false }))
-            }}
-            className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-          />
-          <span className="text-[13px] leading-relaxed text-ink">
-            <span className="font-bold">Kick-off time to be confirmed</span>
-            {/* ⚠️ "day", NOT "date". This whole label is the checkbox's
-                accessible name, and the word "date" in it made
-                `getByLabelText(/date/i)` ambiguous with the Date field directly
-                above — which broke an unrelated Schedule test. The copy is no
-                worse for it, but the reason it is worded this way is not
-                obvious enough to leave unwritten. */}
-            <span className="block text-[12.5px] text-ink-muted">
-              The day is fixed but the time isn&apos;t settled. It shows as
-              &ldquo;Time TBD&rdquo; in the app, and goes into subscribed calendars as an
-              all-day entry rather than at a made-up time.
-            </span>
-          </span>
-        </label>
+        {/* ⚠️ THE THREE-WAY TIME CONTROL (Club Diary phase 2, 1 Sep 2026),
+            replacing the TBD checkbox of 14 Aug. Three states drawn as two
+            checkboxes is how a row ends up claiming both — the database's
+            events_not_all_day_and_time_tbd constraint is the guarantee, this
+            control is what makes the illegal pair unreachable.
 
-        {!values.timeTbd && (
+            Timed    = a clock time somebody is about to type.
+            Time TBD = the day is fixed, the time is not settled yet. Shows as
+                       "Time TBD"; subscribed calendars carry an all-day entry
+                       plus "Kick-off time to be confirmed".
+            All day  = there is NO clock time — a kit collection, a tournament
+                       day. Shows as "All day"; calendars carry a plain all-day
+                       entry with no explanatory line, because there is no time
+                       to confirm. May span days via the "until" date below.
+
+            ⚠️ SWITCHING MODE CLEARS WHAT THE NEW MODE CANNOT SEND — times when
+            leaving Timed, the until-date when leaving All day. A stale
+            untilDate surviving into Timed is how a quiz night acquires a
+            five-week ends_at. */}
+        <Segmented
+          legend="Time"
+          name="time-mode"
+          options={TIME_MODES}
+          value={values.allDay ? 'allday' : values.timeTbd ? 'tbd' : 'timed'}
+          onChange={(mode) => {
+            setDurationNote(null)
+            setValues((current) => ({
+              ...current,
+              timeTbd: mode === 'tbd',
+              allDay: mode === 'allday',
+              time: mode === 'timed' ? current.time : '',
+              endTime: mode === 'timed' ? current.endTime : '',
+              untilDate: mode === 'allday' ? current.untilDate : '',
+            }))
+            setInvalid((current) => ({
+              ...current,
+              time: false,
+              endTime: false,
+              untilDate: false,
+            }))
+          }}
+        />
+        {values.timeTbd && (
+          <p className="mb-3.5 mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+            The day is fixed but the time isn&apos;t settled. It shows as
+            &ldquo;Time TBD&rdquo; in the app, and goes into subscribed calendars as an
+            all-day entry rather than at a made-up time.
+          </p>
+        )}
+        {values.allDay && (
+          <div className="mb-3.5">
+            <p className="mb-2 mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+              No clock time — it lasts the whole day. Set an{' '}
+              <strong>until</strong> date if it runs across more than one.
+            </p>
+            {/* ⚠️ "until", NOT "end date" — "date" in this accessible name
+                would make getByLabelText(/date/i) ambiguous with the Date
+                field above, the same trap the old TBD checkbox's comment
+                recorded for its own wording. */}
+            <label className={LABEL} htmlFor="event-until">
+              Until (optional)
+            </label>
+            <DatePicker
+              id="event-until"
+              value={values.untilDate}
+              onChange={set('untilDate')}
+              invalid={invalid.untilDate}
+            />
+            {invalid.untilDate && (
+              <p className="mt-1 text-[12.5px] text-danger-ink">
+                The until day must be after the first day.
+              </p>
+            )}
+          </div>
+        )}
+
+        {!values.timeTbd && !values.allDay && (
           <>
             <div className={FIELD_ROW}>
               <div>
@@ -1676,7 +1760,7 @@ export default function EventForm({
             "Times are Abu Dhabi time" sitting under a form with no times in it.
             Spotted by actually ticking the box in the running app; jsdom
             renders it either way and no test noticed. */}
-        {!values.timeTbd && (
+        {!values.timeTbd && !values.allDay && (
           <p id="event-time-note" className="-mt-2 mb-3.5 text-[12.5px] text-ink-muted">
             Times are Abu Dhabi time.
           </p>

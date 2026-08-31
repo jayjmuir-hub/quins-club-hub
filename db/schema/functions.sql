@@ -299,6 +299,17 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 -- the RETURNS TABLE signature and the select list, so a subscribed calendar
 -- shows which pitch. Nothing else about the visibility rule changed.
 --
+-- ⚠️ CHANGED 2026-09-01 (calendar_token_fn_all_day): `info_only` and `all_day`
+-- added to the signature and select list, via DROP + CREATE — Postgres refuses
+-- a return-type change in place. ⚠️ THE DROP DROPS THE ACL, and a fresh
+-- function grants EXECUTE to PUBLIC by default, so the migration re-applies
+-- the exact measured grants (anon/authenticated/service_role, PUBLIC absent)
+-- and ASSERTS them; forgetting that would silently undo
+-- calendar_feed_revoke_public_execute with a body that looks right.
+-- Also repointed db/tests/tournaments.sql, which carried a stale 17-column
+-- COPY of this function as pre-migration scaffolding and went red on the
+-- signature change — a harness must not carry a copy of a function body.
+--
 -- ⚠️ CHANGED 2026-08-08 (20260808154115 calendar_feed_end_time_and_notes):
 -- `ends_at` and `notes` added to both the RETURNS TABLE signature and the
 -- select list, following 20260808151251 event_end_time_and_notes which added
@@ -309,7 +320,7 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 -- function did NOT. See the note on can_see_team below.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.calendar_events_for_token(_token uuid)
- RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text, league_team_name text, league_division text, round smallint, time_tbd boolean, competition_type text)
+ RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text, league_team_name text, league_division text, round smallint, time_tbd boolean, competition_type text, info_only boolean, all_day boolean)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
@@ -317,7 +328,7 @@ AS $function$
   select e.id, e.type, e.title, e.opponent, e.home, e.venue, e.pitch, e.competition,
          e.starts_at, e.ends_at, e.notes, t.name as team_name,
          lt.rcm_name as league_team_name, lt.division as league_division, e.round,
-         e.time_tbd, e.competition_type
+         e.time_tbd, e.competition_type, e.info_only, e.all_day
   from public.events e
   join public.teams t on t.id = e.team_id
   left join public.league_teams lt on lt.id = e.league_team_id
@@ -3637,6 +3648,61 @@ $function$
 ;
 
 -- ---------------------------------------------------------------------
+-- private.fixture_push_when(timestamptz, timestamptz, boolean, boolean)
+-- private.fixture_push_when(public.events)
+-- proacl: null
+-- Added 2026-09-01 (fixture_push_all_day_when, then availability_nudge_all_day_when).
+--
+-- ⚠️ THE "when" LINE OF A FIXTURE PUSH, AND THERE IS EXACTLY ONE
+-- IMPLEMENTATION. The scalar form below is it; the public.events form
+-- DELEGATES to it. That is not tidiness — TWO copies of this expression is
+-- what caused the bug: send_fixture_push and send_availability_nudges each
+-- built it inline, so fixing one left "Thu 17 Sep, 00:00" reachable from the
+-- other, with no test anywhere that would have said so.
+--
+-- ⚠️ AN ALL-DAY EVENT GETS A DATE AND NO CLOCK TIME. Its starts_at is
+-- club-midnight, a PLACEHOLDER — printing it as 00:00 is the invented value the
+-- time_tbd branch was written to avoid. A multi-day one names both days,
+-- because a two-day collection announced as one day is its own small lie and
+-- the second day is the one a parent would miss.
+--
+-- ⚠️ coalesce ON BOTH FLAGS. send_availability_nudges passes record columns
+-- straight in; a null flag would return NULL, and a null when-line
+-- concatenated into the body makes the WHOLE body null — a notification with no
+-- text, worse than one with a wrong time.
+--
+-- Both forms pinned in their introducing migrations. Asserted by
+-- db/tests/club-diary-push.sql steps 5-13, including that the two forms agree
+-- and that the nudge is STILL match-only after being replaced.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.fixture_push_when(_starts_at timestamp with time zone, _ends_at timestamp with time zone, _all_day boolean, _time_tbd boolean)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+  select to_char(_starts_at at time zone 'Asia/Dubai', 'Dy DD Mon')
+      || case
+           when coalesce(_all_day, false) and _ends_at is not null
+             then ' – ' || to_char(_ends_at at time zone 'Asia/Dubai', 'Dy DD Mon')
+           when coalesce(_all_day, false)  then ''
+           when coalesce(_time_tbd, false) then ', time TBC'
+           else ', ' || to_char(_starts_at at time zone 'Asia/Dubai', 'HH24:MI')
+         end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION private.fixture_push_when(_event events)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+  select private.fixture_push_when(_event.starts_at, _event.ends_at, _event.all_day, _event.time_tbd);
+$function$
+;
+
+-- ---------------------------------------------------------------------
 -- private.fixture_push_headline(text, boolean)
 -- proacl: null
 -- Added 2026-09-01 (fixture_push_diary_wording).
@@ -3934,9 +4000,7 @@ begin
     if n_people = 0 then continue; end if;
 
     squad   := ev.team_name;
-    whenish := to_char(ev.starts_at at time zone 'Asia/Dubai', 'Dy DD Mon')
-               || case when ev.time_tbd then ', time TBC'
-                       else ', ' || to_char(ev.starts_at at time zone 'Asia/Dubai', 'HH24:MI') end;
+    whenish := private.fixture_push_when(ev.starts_at, ev.ends_at, ev.all_day, ev.time_tbd);
     detail  := coalesce(
       case when ev.opponent is not null then 'v ' || ev.opponent end,
       nullif(ev.title, ''), 'Match');
@@ -3985,9 +4049,7 @@ begin
 
   select t.name into squad from teams t where t.id = _team;
 
-  whenish := to_char(_event.starts_at at time zone 'Asia/Dubai', 'Dy DD Mon')
-             || case when _event.time_tbd then ', time TBC'
-                     else ', ' || to_char(_event.starts_at at time zone 'Asia/Dubai', 'HH24:MI') end;
+  whenish := private.fixture_push_when(_event);
 
   detail := coalesce(
     case when _event.type = 'match' and _event.opponent is not null then 'v ' || _event.opponent end,

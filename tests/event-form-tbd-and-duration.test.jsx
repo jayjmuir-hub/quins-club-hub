@@ -239,7 +239,7 @@ describe('start time TBD', () => {
   it('hides the time fields and saves midnight CLUB time with the flag', async () => {
     const user = renderForm()
     await fillMatchBasics(user, { date: '2026-09-12' })
-    await user.click(screen.getByRole('checkbox', { name: /kick-off time to be confirmed/i }))
+    await user.click(screen.getByRole('radio', { name: 'Time TBD' })) // was the 14 Aug checkbox; three-way control since 1 Sep (Club Diary phase 2)
 
     expect(screen.queryByLabelText('Time')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('End time')).not.toBeInTheDocument()
@@ -262,7 +262,7 @@ describe('start time TBD', () => {
   it('saves without a time, which the form would otherwise require', async () => {
     const user = renderForm()
     await fillMatchBasics(user)
-    await user.click(screen.getByRole('checkbox', { name: /kick-off time to be confirmed/i }))
+    await user.click(screen.getByRole('radio', { name: 'Time TBD' }))
     await user.click(screen.getByRole('button', { name: /add event/i }))
     // No "fill in the highlighted fields" — the two time checks are suspended.
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
@@ -273,7 +273,7 @@ describe('start time TBD', () => {
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     // The create form defaults the date to today; clear it to test the guard.
     await user.click(screen.getByRole('button', { name: 'Clear date' }))
-    await user.click(screen.getByRole('checkbox', { name: /kick-off time to be confirmed/i }))
+    await user.click(screen.getByRole('radio', { name: 'Time TBD' }))
     await user.click(screen.getByRole('button', { name: /add event/i }))
 
     expect(upsertEventMock).not.toHaveBeenCalled()
@@ -295,7 +295,7 @@ describe('start time TBD', () => {
         time_tbd: true,
       },
     })
-    expect(screen.getByRole('checkbox', { name: /kick-off time to be confirmed/i })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Time TBD' })).toBeChecked()
     expect(screen.queryByLabelText('Time')).not.toBeInTheDocument()
   })
 })

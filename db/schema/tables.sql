@@ -824,6 +824,28 @@ CREATE TABLE public.events (
   -- reclassified must survive, and the form REFUSES that toggle rather than
   -- orphaning or deleting them.
   info_only    boolean NOT NULL DEFAULT false,
+  -- Added 2026-09-01 (events_all_day). Club Diary phase 2: there is NO CLOCK
+  -- TIME. Column comment as stored: "There is no clock time: the event lasts
+  -- the whole day, or several days via ends_at. NOT the same as time_tbd,
+  -- which means the time is not decided yet — the calendar feed says
+  -- 'Kick-off time to be confirmed' for that and must not for this."
+  --
+  -- ⚠️ THE THIRD TIME STATE, AND A FUTURE SESSION WILL WANT TO MERGE IT WITH
+  -- time_tbd. Do not. time_tbd = the day is known and the time is undecided;
+  -- all_day = there is no time at all. The feed prints an explanatory line for
+  -- the first and must not for the second, or a kit collection tells every
+  -- subscribed parent its kick-off is to be confirmed. Same ruling as
+  -- competition_tbd (14 Aug): "not decided" and "not applicable" differ.
+  -- Enforced by events_not_all_day_and_time_tbd below.
+  --
+  -- ⚠️ NOT NULL DEFAULT false and NOT backfilled. Inferring all-day from a
+  -- midnight starts_at is the heuristic 20260814 refused and would be wrong for
+  -- a fixture legitimately kicking off at 00:00.
+  --
+  -- ⚠️ A ONE-DAY all-day event leaves ends_at NULL; a same-midnight end is
+  -- already refused by events_ends_after_starts, so no second constraint says
+  -- it. db/tests/club-diary-allday.sql step 6 asserts that coverage.
+  all_day      boolean NOT NULL DEFAULT false,
   -- Re-captured 25 Aug 2026 (tiers_and_player_grades, 14 Aug — uncaptured
   -- for 11 days): the tier of the COMPETITION this fixture was played in, or
   -- NULL for a friendly and anything untiered. NOT derived from
@@ -883,6 +905,12 @@ CREATE TABLE public.events (
   -- events_ends_after_starts accepts happily (00:00 < 15:30) and every calendar
   -- renders as a 15½-hour event. Fault-injected against the live database after
   -- applying: the insert is refused with a check_violation.
+  -- Added 2026-09-01 (events_all_day). The two time flags are mutually
+  -- exclusive: a row may not claim both "there is no clock time" and "the time
+  -- is not decided yet". The form's three-way control makes it unreachable
+  -- through the UI, but the UI is not a boundary — without this the calendar
+  -- feed's all-day branch would have to guess which sentence to print.
+  CONSTRAINT events_not_all_day_and_time_tbd CHECK ((NOT (all_day AND time_tbd))),
   CONSTRAINT events_no_end_when_time_tbd CHECK (((time_tbd = false) OR (ends_at IS NULL))),
   -- Added 2026-08-08 (event_end_time_and_notes). Note the `ends_at IS NULL OR`
   -- arm: a NULL end time stays legal, so the CHECK only ever fires on an end
