@@ -10,7 +10,43 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **Shipped: the approvals queue names a possible duplicate.** A pending card
+- **CLUB DIARY PHASE 2 SHIPPED — All day, and multi-day spans.** The third time
+  state: Timed · Time TBD · All day, one segmented control replacing the 14 Aug
+  TBD checkbox, because three states drawn as two checkboxes is how a row claims
+  both. `events.all_day` is mutually exclusive with `time_tbd` by CHECK
+  constraint — `time_tbd` earns the feed's "Kick-off time to be confirmed" line
+  and `all_day` must not, or a kit collection tells every subscribed parent its
+  kick-off is pending. A span stores club-midnight on its LAST day and the
+  feed adds the exclusive-DTEND +1 (RFC 5545: 17–18 Sep is
+  DTSTART:20260917/DTEND:20260919).
+  ⚠️ **Two traps found by review before any code, both tested under
+  TZ=America/New_York where they cannot hide:** an all-day date must be
+  CLUB-midnight (UTC midnight renders a day early in Dubai, invisibly on a UTC
+  runner), and a stale until-date must not survive the mode round-trip.
+  ⚠️ **The push when-line now has exactly ONE implementation**
+  (`private.fixture_push_when`; the row form delegates) — it existed as two
+  inline copies, in `send_fixture_push` AND `send_availability_nudges`, so
+  fixing one left "Thu 17 Sep, 00:00" reachable from the other. The nudge is
+  match-only, measured, and a harness step asserts the filter survives
+  replacement.
+  ⚠️ **The SQL feed function is `calendar_events_for_token`, not
+  `calendar_feed`** — two documents inherited the wrong name from the migration
+  FILENAMES, and the probe raised "does not exist" (the lucky version). Its
+  signature change forced DROP+CREATE, **and the drop drops the ACL: a fresh
+  function grants EXECUTE to PUBLIC by default**, so the migration re-applies
+  the measured grants and asserts PUBLIC absent — forgetting that silently
+  undoes calendar_feed_revoke_public_execute. The stale 17-column COPY of the
+  function inside `db/tests/tournaments.sql` (pre-migration scaffolding) went
+  red on the change and was REPOINTED to assert the live filter, never deleted.
+  ⚠️ **One hour lost to violating rule 6:** faults were injected into the feed
+  BEFORE committing it, and the checkout-restore reverted the whole file. The
+  rule says commit first, in bold, because of exactly this.
+  Migrations `events_all_day`, `fixture_push_all_day_when`,
+  `availability_nudge_all_day_when`, `calendar_token_fn_all_day` — all applied
+  and harness-verified (85/85). Full suite 4,272 green.
+  `claude/plans/2026-09-01-club-diary-phase-2-implementation.md`.
+  (SHA follows in the next changelog-touching PR.)
+- `8f758a2` — **Shipped: the approvals queue names a possible duplicate.** A pending card
   now says "Possible duplicate: <name> is already in this squad", and adds
   ", with the same date of birth" when it does. ⚠️ It annotates and never
   blocks — the Approve button is untouched, and a test asserts that rather
