@@ -446,7 +446,13 @@ export default function AppShell({ children }) {
         data-testid="masthead-wrapper"
         data-hidden={mastheadHidden ? 'true' : undefined}
         className={[
-          'pointer-events-none sticky top-0 z-40 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:px-4',
+          // px-3 → px-1.5 from 360px up, matching the bottom dock's widened
+          // inset (Jay, 31 Aug 2026: "widen the top bar to match"). The dock
+          // grew for caption corner room (see Nav.jsx); the masthead follows
+          // so the two islands read as one chrome again. Same min-[360px]
+          // gate for the same reason, and desktop keeps px-4 — the sidebar
+          // shell, not the phone chrome, owns that breakpoint.
+          'pointer-events-none sticky top-0 z-40 px-3 min-[360px]:px-1.5 pb-2 pt-[calc(env(safe-area-inset-top)+8px)] desktop:px-4',
           // Chrome-free conversations: the island leaves the phone AND the
           // desktop. Until 26 Aug 2026 this restored it on desktop ("a
           // top-right island that never crosses a thread") — measured false
