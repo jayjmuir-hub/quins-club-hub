@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **Plan 2 of 4: the composer — paste, drag-and-drop and the ten-photo tray.**
+- `488bdf6` — **Plan 2 of 4: the composer — paste, drag-and-drop and the ten-photo tray.**
   The first plan in this series that DEPLOYS; plan 1 and the metadata reshape
   were database-only and cost nothing. Seven tasks: one shared tray hook
   replacing the byte-identical `pickPhoto` in both thread hooks before it grew
@@ -28,10 +28,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `objectContaining`. Reuses the house `take(file)` pattern proven twice today,
   recording that both prior uses are BOUNDED zones while this is the first
   whole-pane one. `claude/plans/2026-09-01-chat-albums-plan-2-composer.md`.
-  (SHA follows in the next changelog-touching PR.)
 
 ## 31 Aug 2026
 
+- **The bottom bar puts Home on the LEFT again, for everyone.** Home had ridden
+  the CENTRE of the wide five-tab squad-staff dock since 29 Aug (#526) — the app
+  opens on Home and the middle of a full-width bar is the thumb's rest, which was
+  a real argument. But the four-tab parent/player island was pulled back out of
+  it a day later (#531), and the leftover split put Home in two different places
+  depending on who was signed in: position stopped being learnable, and every
+  test, screenshot and doc had to carry both cases. Jay reverted the remaining
+  half — the dock now reorders nothing and `items` is the list order. Only Home's
+  slot moved: dock width, spacing, Squad-Hub-before-Chat and the desktop Sidebar
+  are untouched. Proven against an injected fault (restoring the reorder fails
+  both five-tab assertions, and the caption test independently). ⚠️
+  `tests/nav-sheen.test.js` reads BUILT css, so run `npm run build` before
+  judging this diff locally. The argument FOR centring, and the argument against
+  this revert, are in
+  `claude/decisions/2026-08-31-home-tab-left-in-all-views.md` rather than lost
+  with the code. (SHA follows in the next changelog-touching PR.)
 - `fc44896` — **Documents become cells — staff-card rows on phones, a tile grid on
   desktop.** Jay picked the split from a mock (both variants drawn with a
   deliberately long title, the layout trap that has bitten before): phones

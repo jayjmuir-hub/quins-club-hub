@@ -56,23 +56,30 @@ describe('Nav', () => {
 
   // ⚠️ Squad Hub sits BEFORE Chat (29 Aug 2026): Chat keeps the rightmost slot
   // so its short caption, not the long "SQUAD HUB" one, meets the dock's rounded
-  // corner. See Nav.jsx. ⚠️ AND HOME IS CENTRED (29 Aug 2026): on the five-tab
-  // bar that is dead centre, so the rendered order is Schedule, Roster, Home,
-  // Squad Hub, Chat — Squad-Hub-before-Chat still holds around it.
-  it('inserts Squad Hub before Chat when showSquadHub is set — five tabs, Home centred, no More', () => {
+  // corner. See Nav.jsx. That invariant is unchanged.
+  // ⚠️ HOME LEADS, ON THIS BAR TOO (Jay, 31 Aug 2026). Home was centred here
+  // — and ONLY here — from 29 Aug; the reorder is gone and the dock now renders
+  // NAV_ITEMS order with Squad Hub spliced in, in every view. This assertion is
+  // the five-tab half of that rule; the four-tab half is the test below, and
+  // the two must agree on Home's slot. See the tombstone in Nav.jsx.
+  it('inserts Squad Hub before Chat when showSquadHub is set — five tabs, Home leading, no More', () => {
     renderNav('/', { showSquadHub: true })
 
     const squadHub = screen.getByRole('link', { name: 'Squad Hub' })
     expect(squadHub).toHaveAttribute('href', '/squad')
     const labels = [...document.querySelectorAll('[data-testid="dock-label"]')].map((el) => el.textContent)
-    expect(labels).toEqual(['Schedule', 'Roster', 'Home', 'Squad Hub', 'Chat'])
+    expect(labels).toEqual(['Home', 'Schedule', 'Roster', 'Squad Hub', 'Chat'])
+    // Home FIRST, not at floor(5/2) === 2. A revived centring reorder puts it
+    // there and fails this line — which is exactly what the injected fault did.
+    expect(labels[0]).toBe('Home')
     expect(document.querySelectorAll('nav a')).toHaveLength(5)
   })
 
-  // ⚠️ HOME STAYS FAR LEFT ON THE FOUR-TAB BAR (Jay, 30 Aug 2026). Home rides
-  // the CENTRE only on the wide five-tab squad-staff bar (the Squad Hub test
-  // above); on the narrow parent/player island the centre is no longer the
-  // thumb's resting slot, so Home keeps its natural NAV_ITEMS lead. See Nav.jsx.
+  // ⚠️ HOME STAYS FAR LEFT ON THE FOUR-TAB BAR. True since 30 Aug 2026 (#531),
+  // when this bar was pulled back out of the centring experiment, and since
+  // 31 Aug it is no longer an EXCEPTION — the five-tab test above now asserts
+  // the same thing. Both are kept: they are the two bars a user can actually
+  // see, and Home's slot must not diverge between them again. See Nav.jsx.
   it('keeps Home on the far left of the four-tab bar', () => {
     renderNav()
 
@@ -128,7 +135,7 @@ describe('Nav', () => {
     renderNav('/', { showSquadHub: true })
 
     const wide = [...document.querySelectorAll('[data-testid="dock-caption"]')]
-    expect(wide.map((el) => el.textContent)).toEqual(['Schedule', 'Roster', 'Home', 'Squad Hub', 'Chat'])
+    expect(wide.map((el) => el.textContent)).toEqual(['Home', 'Schedule', 'Roster', 'Squad Hub', 'Chat'])
     for (const caption of wide) {
       expect(caption.className).toContain('-translate-x-1/2')
       expect(caption.className).not.toContain('calc(-50%')
