@@ -9,6 +9,7 @@ import PollVotes from './PollVotes.jsx'
 import Spinner from './Spinner.jsx'
 import VoiceComposer from './VoiceComposer.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
+import useProfileIcons from '../lib/useProfileIcons.js'
 import MessageEditor from './MessageEditor.jsx'
 import { attachmentPreviewLabel } from '../data/chatMedia.js'
 import { canStillEdit } from '../lib/messageEdit.js'
@@ -51,6 +52,7 @@ export default function DmThread({ thread, compact = false }) {
     blocked,
   } = thread
 
+  const iconAfter = useProfileIcons()
   const [pollOpen, setPollOpen] = useState(false)
   const [votesFor, setVotesFor] = useState(null)
   const [editingId, setEditingId] = useState(null)
@@ -143,7 +145,11 @@ export default function DmThread({ thread, compact = false }) {
         </div>
         {messages?.map((m, index) => {
           const mine = m.author_id === selfId
-          const authorName = mine ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')
+          // Profile icons: the primary emoji rides IN the label string — own
+          // messages stay a plain 'You' (you know who you are).
+          const authorName = mine
+            ? 'You'
+            : nameFor(m.author_id, m.author?.full_name ?? 'Member') + iconAfter(m.author_id)
           const tallies = reactions.get(m.id) ?? []
           // Round 4: the chevron menu carries every action; the thread
           // decides the list, ChatBubble only draws it.

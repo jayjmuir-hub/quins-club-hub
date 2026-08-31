@@ -5,6 +5,7 @@ import FixtureCard from './FixtureCard.jsx'
 import MentionPicker, { appendMention } from './MentionPicker.jsx'
 import MessageEditor from './MessageEditor.jsx'
 import { canStillEdit } from '../lib/messageEdit.js'
+import useProfileIcons from '../lib/useProfileIcons.js'
 import { labelForRole } from '../lib/scope.js'
 
 // One post in a channel, as a BUBBLE, with its replies. The bubble itself
@@ -32,6 +33,7 @@ function RolePill({ role, title }) {
 }
 
 function Reply({ reply, selfId, canModerate, onRemove, onEdit, onAuthor, onReplyPrivately }) {
+  const iconAfter = useProfileIcons()
   const staff = isStaffRole(reply.author_role)
   const mine = reply.author_id === selfId
   const [editing, setEditing] = useState(false)
@@ -72,7 +74,7 @@ function Reply({ reply, selfId, canModerate, onRemove, onEdit, onAuthor, onReply
         menuItems={menuItems}
         showAuthor={!mine}
         onAuthor={!mine && onAuthor ? () => onAuthor(reply.author_id) : null}
-        authorLabel={reply.author?.full_name ?? 'Someone'}
+        authorLabel={(reply.author?.full_name ?? 'Someone') + iconAfter(reply.author_id)}
         authorExtra={staff ? <RolePill role={reply.author_role} title={reply.author_title} /> : null}
         forwarded={Boolean(reply.forwarded)}
         deleted={Boolean(reply.deleted_at)}
@@ -125,6 +127,7 @@ export default function MessageRow({
   onReplyPrivately,
   onAuthor,
 }) {
+  const iconAfter = useProfileIcons()
   const [open, setOpen] = useState(forceOpen)
   const [editing, setEditing] = useState(false)
   const [reporting, setReporting] = useState(false)
@@ -211,7 +214,7 @@ export default function MessageRow({
         authorLabel={
           <>
             {unread && <span className="sr-only">New. </span>}
-            {message.author?.full_name ?? 'Someone'}
+            {(message.author?.full_name ?? 'Someone') + iconAfter(message.author_id)}
           </>
         }
         authorExtra={staff ? <RolePill role={message.author_role} title={message.author_title} /> : null}

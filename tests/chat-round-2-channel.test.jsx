@@ -19,6 +19,12 @@ const media = { signChatPhotoUrl: vi.fn() }
 // The DM identity badges fetch member_identity (26 Aug 2026); empty here
 // keeps this file about its own subject and network-free.
 vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] }))
+// Profile icons: off unless a test arms the map, so exact-name queries hold.
+const listClubIconMapMock = vi.fn(async () => new Map())
+vi.mock('../src/data/profileIcons.js', () => ({
+  listClubIconMap: (...a) => listClubIconMapMock(...a),
+  listMemberIcons: async () => [],
+}))
 vi.mock('../src/data/personCard.js', () => ({ getPersonCard: async () => null }))
 vi.mock('../src/data/chatMedia.js', () => ({
   signChatPhotoUrl: (...a) => media.signChatPhotoUrl(...a),
@@ -114,6 +120,15 @@ describe('MessageRow — DM bubble language (25 Aug 2026)', () => {
     expect(within(row).getByText('Zz Coach Probe')).toBeInTheDocument()
     expect(within(row).getByText('Head Coach')).toBeInTheDocument()
     expect(row.innerHTML).not.toMatch(/bg-monogram/)
+  })
+
+  it('a crowned author wears 👑 after their name in a channel', async () => {
+    // claude/plans/2026-08-31-profile-icons.md — the primary icon rides in
+    // the label. The waitFor is the map's fetch resolving.
+    listClubIconMapMock.mockResolvedValue(new Map([['coach-1', 'crown']]))
+    render(<MessageRow message={{ ...BASE }} selfId="me-1" onReply={noop} onReport={noop} />)
+    const row = screen.getByTestId('message-row')
+    await within(row).findByText(/Zz Coach Probe 👑/)
   })
 
   it('actions live in the chevron — Reply / Pin / Delete / Report are menuitems, not a row under the bubble', async () => {

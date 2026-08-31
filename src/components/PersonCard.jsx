@@ -12,6 +12,8 @@ import {
   WhatsAppIcon,
 } from './SquadStaffCard.jsx'
 import { getPersonCard } from '../data/personCard.js'
+import { listMemberIcons } from '../data/profileIcons.js'
+import { iconEmoji, iconMeaning } from '../lib/profileIcons.js'
 import { openConversation } from '../data/messages.js'
 import { labelForRole } from '../lib/scope.js'
 import { whatsappUrl } from '../lib/phone.js'
@@ -41,6 +43,24 @@ function PersonCardBody({ profileId, onClose }) {
   const [person, setPerson] = useState(null)
   const [error, setError] = useState(null)
   const [chatError, setChatError] = useState(null)
+  // Profile icons (claude/plans/2026-08-31-profile-icons.md): decoration —
+  // a failed fetch shows no strip, never an error. A key the library has
+  // retired is dropped here, not rendered broken.
+  const [icons, setIcons] = useState([])
+
+  useEffect(() => {
+    if (!profileId) return
+    let cancelled = false
+    setIcons([])
+    listMemberIcons(profileId)
+      .then((rows) => {
+        if (!cancelled) setIcons(rows.filter((r) => iconEmoji(r.icon)))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [profileId])
 
   useEffect(() => {
     if (!profileId) return
@@ -111,6 +131,16 @@ function PersonCardBody({ profileId, onClose }) {
               header (claude/plans/2026-08-26-club-officers.md: titles
               "should also appear everywhere titles appear"). */}
           <IdentityBadges profileId={person.profileId} className="px-1 pb-1" />
+          {icons.length > 0 && (
+            <ul className="space-y-0.5 px-1 pb-1" data-testid="person-card-icons">
+              {icons.map((row) => (
+                <li key={row.id} className="text-[12.5px] text-ink-muted">
+                  {row.emoji ?? iconEmoji(row.icon)} {row.reason ?? iconMeaning(row.icon)}
+                  {row.team_name ? ` · ${row.team_name}` : ''}
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="flex flex-nowrap gap-2 px-1 pb-1 pt-2" data-testid="person-card-actions">
             {person.phone && (
               <ContactButton href={`tel:${person.phone}`} label={`Call ${person.name}`} tone="solid">
