@@ -10,6 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
+- `de05dd1` — **Docs: the albums plan marked shipped, and two stale claims in
+  `state-of-play.md` corrected.** The documents repo was still described as "PR
+  OPEN, NOT YET MERGED, gated on the Session Validator's no-overlap check" — it
+  merged as #588 with #599 following; the album entry still said the grid was
+  not written. Deviations from the albums spec recorded IN the plan (grid caps
+  at four tiles, lightbox clamps rather than wraps, `attachmentPreviewLabel()`
+  took an optional count) rather than leaving the code as their only account.
+  ⚠️ **Kept deliberately: nobody has sent a real album on the live site and
+  confirmed a SECOND account sees every photo.** No test substitutes for two
+  real accounts.
+
 - `f844fd8` — **TEN PHOTOS NOW RENDER AS AN ALBUM, NOT AS ONE.** The composer could send
   an album from `ebda2f3` (#605); every photo arrived and exactly ONE drew,
   because the bubble read the trigger-derived `attachment_path` — the FIRST
