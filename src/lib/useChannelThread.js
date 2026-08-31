@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listAvailabilityForEvents } from '../data/availability.js'
-import { removeChatPhoto, uploadChatPhoto, uploadChatVoice } from '../data/chatMedia.js'
+import { removeChatPhoto, uploadChatVoice } from '../data/chatMedia.js'
 import { listEvents } from '../data/events.js'
+import { useAttachmentTray } from './useAttachmentTray.js'
+import { uploadAlbum } from './uploadAlbum.js'
 import {
   channelMembers,
   editMessage,
@@ -104,10 +106,13 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   const [postingPoll, setPostingPoll] = useState(false)
   const [mentionables, setMentionables] = useState([])
   const [upcoming, setUpcoming] = useState([])
-  // Round 2 (claude/plans/2026-08-24-chat-round-2.md): a photo waiting in
-  // the composer, and the emoji picker's cursor handle.
-  const [photo, setPhoto] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(null)
+  // ⚠️ The composer's photos live in useAttachmentTray, NOT in this hook —
+  // the same tray serves the picker, Ctrl+V and drag-and-drop, and the
+  // single `photo` state it replaces was byte-identical in BOTH thread
+  // hooks (plan 2, task 1).
+  const tray = useAttachmentTray()
+  // What the Send button says while an album climbs the wire. Null when idle.
+  const [progress, setProgress] = useState(null)
   const [background, setBackground] = useState(DEFAULT_BACKGROUND)
   // Where "New" starts and what was unread, captured ONCE per visit — the
   // mark-read-on-arrival effect updates `reads` moments later, so a live
@@ -282,45 +287,44 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     await reportMessage(id, reason)
   }
 
-  function clearPhoto() {
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhoto(null)
-    setPhotoPreview(null)
-  }
-
+  /**
+   * The picker door. ⚠️ `accept` on the input filters this door ONLY — the
+   * paste and drop doors bypass it entirely — so the real type gate is
+   * isAcceptableImage inside the tray, which all three share.
+   */
   function pickPhoto(domEvent) {
-    const file = domEvent.target.files?.[0]
+    const files = Array.from(domEvent.target.files ?? [])
+    // Reset FIRST: without this, picking the same file twice in a row fires
+    // no change event the second time.
     domEvent.target.value = ''
-    if (!file) return
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhoto(file)
-    try {
-      setPhotoPreview(URL.createObjectURL(file))
-    } catch {
-      setPhotoPreview(null)
-    }
+    tray.add(files)
   }
 
   async function send(domEvent) {
     domEvent.preventDefault()
-    if ((!draft.trim() && !photo) || sending) return
+    if ((!draft.trim() && tray.items.length === 0) || sending) return
     setSending(true)
     setSendError(null)
     try {
       const kept = draftMentions.filter((m) => draft.includes(`@${m.full_name}`)).map((m) => m.profile_id)
-      // Photo first, message second — WhatsApp order, same as the DM thread.
-      const attachmentPath = photo ? await uploadChatPhoto(selfId, photo) : null
-      if (roleKey) await postRoleMessage(roleKey, draft, { mentions: kept, attachmentPath })
-      else if (staffChannel) await postStaffMessage(teamId, draft, { mentions: kept, attachmentPath })
-      else await postMessage(teamId, draft, { eventId: attachEventId || null, mentions: kept, attachmentPath })
+      // Photos first, message second — WhatsApp order, same as the DM thread.
+      // ⚠️ uploadAlbum is all-or-nothing: a failure has already taken back
+      // anything it managed to upload, so the throw leaves nothing behind.
+      const attachments = await uploadAlbum(selfId, tray.items, setProgress)
+      if (roleKey) await postRoleMessage(roleKey, draft, { mentions: kept, attachments })
+      else if (staffChannel) await postStaffMessage(teamId, draft, { mentions: kept, attachments })
+      else await postMessage(teamId, draft, { eventId: attachEventId || null, mentions: kept, attachments })
       setDraft('')
       setDraftMentions([])
       setAttachEventId('')
-      clearPhoto()
+      tray.clear()
       await load()
     } catch (err) {
+      // ⚠️ The draft and the tray SURVIVE a failure — the retry costs one
+      // tap, which matters most on the slow connection that caused it.
       setSendError(err.message || 'Could not send that.')
     } finally {
+      setProgress(null)
       setSending(false)
     }
   }
@@ -496,9 +500,8 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     mentionables,
     background,
     pickBackground,
-    photo,
-    photoPreview,
-    clearPhoto,
+    tray,
+    progress,
     pickPhoto,
     draftRef,
     fileRef,

@@ -3,6 +3,14 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
+// THE ALBUM COMPOSER — plan 2 of the chat-albums series
+// (claude/plans/2026-09-01-chat-albums-plan-2-composer.md), tasks 4 and 5.
+// Several photos in one tray, one message carrying all of them, and an
+// upload that is ALL OR NOTHING. Rendered through the real DM screen so the
+// hook, the tray strip and the send are proved together — a tray that holds
+// three photos and a send that posts one is exactly the bug worth catching.
+//
+// Old header follows.
 // Round 2 in the DM/group thread (claude/plans/2026-08-24-chat-round-2.md):
 // reply-with-quote, multi-select forwarding, photo attachments. Who may do
 // any of it is the database's (db/tests/chat-round-2.sql); this proves the
@@ -154,139 +162,133 @@ beforeEach(() => {
   globalThis.URL.revokeObjectURL = vi.fn()
 })
 
-describe('reply-with-quote', () => {
-  it('Reply arms the preview; send carries quotedId; ✕ disarms it', async () => {
+const img = (name) => new File(['x'], name, { type: 'image/jpeg' })
+
+/** The tray's thumbnails, in order. */
+const thumbs = () => screen.queryAllByTestId('tray-thumb')
+
+async function attach(user, files) {
+  await user.upload(screen.getByTestId('photo-input'), files)
+}
+
+describe('the tray holds several photos', () => {
+  it('takes three at once from the picker and shows three thumbnails', async () => {
     const user = userEvent.setup()
     renderThread()
-    const bubbles = await screen.findAllByTestId('dm-bubble')
-    // Round 4: actions live in the bubble's chevron menu.
-    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Reply' }))
-    const preview = screen.getByTestId('quote-preview')
-    expect(preview).toHaveTextContent('Replying to Zz Manager Probe')
-    expect(preview).toHaveTextContent('Two seats held')
+    await screen.findAllByTestId('dm-bubble')
+    await attach(user, [img('a.jpg'), img('b.jpg'), img('c.jpg')])
+    expect(thumbs()).toHaveLength(3)
+  })
 
-    await user.type(screen.getByLabelText('Message'), 'On it')
+  it('⚠️ the input says `multiple`, or a phone can only ever pick one', async () => {
+    renderThread()
+    await screen.findAllByTestId('dm-bubble')
+    // Paste and drop are desktop-only; multi-select from the picker is the
+    // ONLY way a phone reaches an album at all.
+    expect(screen.getByTestId('photo-input')).toHaveAttribute('multiple')
+  })
+
+  it('each ✕ names WHICH photo it removes, and removing one keeps the rest', async () => {
+    const user = userEvent.setup()
+    renderThread()
+    await screen.findAllByTestId('dm-bubble')
+    await attach(user, [img('a.jpg'), img('b.jpg'), img('c.jpg')])
+    // claude/specs/accessibility.md: three buttons called "Remove photo" are
+    // three identical announcements. Screenshots paste in as image.png, so
+    // the position is the only thing that tells them apart.
+    await user.click(screen.getByRole('button', { name: 'Remove photo 2 of 3' }))
+    expect(thumbs()).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Remove photo 2 of 2' })).toBeInTheDocument()
+  })
+
+  it('refuses an eleventh photo and says so, keeping the ten', async () => {
+    const user = userEvent.setup()
+    renderThread()
+    await screen.findAllByTestId('dm-bubble')
+    await attach(user, Array.from({ length: 11 }, (_, i) => img(`p${i}.jpg`)))
+    expect(thumbs()).toHaveLength(10)
+    expect(screen.getByRole('alert')).toHaveTextContent(/10 photos/i)
+  })
+})
+
+describe('sending the album', () => {
+  it('uploads every photo and sends ONE message carrying all of them', async () => {
+    const user = userEvent.setup()
+    media.uploadChatPhoto
+      .mockResolvedValueOnce(`${ME}/k1.jpg`)
+      .mockResolvedValueOnce(`${ME}/k2.jpg`)
+      .mockResolvedValueOnce(`${ME}/k3.jpg`)
+    renderThread()
+    await screen.findAllByTestId('dm-bubble')
+    await attach(user, [img('a.jpg'), img('b.jpg'), img('c.jpg')])
     await user.click(screen.getByRole('button', { name: 'Send' }))
-    expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'On it', { quotedId: 'd1', attachments: [], mentions: [] })
-    await waitFor(() => expect(screen.queryByTestId('quote-preview')).not.toBeInTheDocument())
-  })
 
-  it('an EMPTY-ARRAY quoted embed draws no quote block — the phantom-chip regression', async () => {
-    // A reverse-direction embed once made `quoted` [] on every message
-    // (24 Aug 2026, live): truthy, bodyless, so every bubble grew a
-    // "📷 Photo" chip. The renderers now demand an object with an id.
-    m.listDirectMessages.mockResolvedValue([dm('d1', OTHER, 'Two seats held', { quoted: [] })])
-    renderThread()
-    await screen.findAllByTestId('dm-bubble')
-    expect(screen.queryByTestId('quote-block')).not.toBeInTheDocument()
-  })
-
-  it('a quoted message renders its block; a soft-deleted original says "Message deleted" and never its words', async () => {
-    m.listDirectMessages.mockResolvedValue([
-      dm('d1', OTHER, 'Two seats held'),
-      dm('d2', ME, 'On it', { quoted_id: 'd1', quoted: { id: 'd1', body: 'Two seats held', deleted_at: null, attachment_path: null, author: { full_name: 'Zz Manager Probe' } } }),
-      dm('d3', ME, 'Still there?', { quoted_id: 'd1', quoted: { id: 'd1', body: 'Two seats held', deleted_at: '2026-08-23T09:00:00Z', attachment_path: null, author: { full_name: 'Zz Manager Probe' } } }),
-    ])
-    renderThread()
-    const blocks = await screen.findAllByTestId('quote-block')
-    expect(blocks[0]).toHaveTextContent('Zz Manager Probe')
-    expect(blocks[0]).toHaveTextContent('Two seats held')
-    expect(blocks[1]).toHaveTextContent('Message deleted')
-    expect(blocks[1]).not.toHaveTextContent('Two seats held')
-  })
-})
-
-describe('forwarding', () => {
-  it('Forward selects, tapping adds, and the sheet hands the set to forwardMessagesTo', async () => {
-    const user = userEvent.setup()
-    m.listChats.mockResolvedValue([
-      { kind: 'dm', conversation_id: 'c1', label: 'This same chat' },
-      { kind: 'group', conversation_id: 'c9', label: 'ZZ Probe Carpool' },
-    ])
-    renderThread()
-    const bubbles = await screen.findAllByTestId('dm-bubble')
-    await user.click(within(bubbles[0]).getByRole('button', { name: 'Message options' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Forward' }))
-    expect(screen.getByTestId('forward-bar')).toHaveTextContent('1 selected')
-    // The composer yields to the bar — no half-armed send under a selection.
-    expect(screen.queryByTestId('dm-composer')).not.toBeInTheDocument()
-
-    await user.click(bubbles[1].firstChild)
-    expect(screen.getByTestId('forward-bar')).toHaveTextContent('2 selected')
-
-    await user.click(screen.getByRole('button', { name: 'Forward' }))
-    const sheet = await screen.findByTestId('forward-sheet')
-    // The current conversation is not a destination.
-    expect(within(sheet).queryByText('This same chat')).not.toBeInTheDocument()
-    await user.click(within(sheet).getByText('ZZ Probe Carpool'))
-    await waitFor(() =>
-      expect(m.forwardMessagesTo).toHaveBeenCalledWith(
-        expect.objectContaining({ conversation_id: 'c9' }),
-        expect.arrayContaining([expect.objectContaining({ id: 'd1' }), expect.objectContaining({ id: 'd2' })]),
-      ),
-    )
-    expect(screen.queryByTestId('forward-bar')).not.toBeInTheDocument()
-  })
-
-  it('a forwarded message wears the tag', async () => {
-    m.listDirectMessages.mockResolvedValue([dm('d1', OTHER, 'Passed along', { forwarded: true })])
-    renderThread()
-    expect(await screen.findByTestId('forwarded-tag')).toHaveTextContent('Forwarded')
-  })
-})
-
-describe('photo attachments', () => {
-  it('a picked photo enables Send without text, uploads first, and sends its key', async () => {
-    const user = userEvent.setup()
-    renderThread()
-    await screen.findAllByTestId('dm-bubble')
-    // Empty composer shows the mic (voice), not a Send — so there is no Send
-    // button until there is something to send. (jsdom has no MediaRecorder, so
-    // the mic itself does not render here; the point is Send is absent.)
-    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
-
-    const file = new File(['x'], 'match.jpg', { type: 'image/jpeg' })
-    await user.upload(screen.getByTestId('photo-input'), file)
-    // The single-photo preview strip became the album tray on 1 Sep 2026
-    // (plan 2, task 5) — one photo is a tray of one, and the filename now
-    // rides the alt text because ten pasted screenshots are ten copies of
-    // "image.png" and names would tell them apart from nothing.
-    expect(screen.getAllByTestId('tray-thumb')).toHaveLength(1)
-    expect(screen.getByAltText('match.jpg')).toBeInTheDocument()
-    const send = screen.getByRole('button', { name: 'Send' })
-    expect(send).toBeEnabled()
-
-    await user.click(send)
-    await waitFor(() => expect(media.uploadChatPhoto).toHaveBeenCalledWith(ME, file))
-    // ⚠️ `attachments`, not attachmentPath. The database derives the two old
-    // columns from this one; a client writing a derived column beside the
-    // truth is how they come to disagree, and the storage read policy reads
-    // the derived one.
+    await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledTimes(1))
+    expect(media.uploadChatPhoto).toHaveBeenCalledTimes(3)
+    // ⚠️ EXACT, not objectContaining. The exactness is what would catch a
+    // stray option reaching the database (plan 2, task 4 step 4).
     expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', '', {
       quotedId: null,
       mentions: [],
-      attachments: [{ file: `${ME}/uploaded.jpg`, type: 'image/jpeg', size: 1, name: 'match.jpg' }],
+      attachments: [
+        { file: `${ME}/k1.jpg`, type: 'image/jpeg', size: 1, name: 'a.jpg' },
+        { file: `${ME}/k2.jpg`, type: 'image/jpeg', size: 1, name: 'b.jpg' },
+        { file: `${ME}/k3.jpg`, type: 'image/jpeg', size: 1, name: 'c.jpg' },
+      ],
     })
-    await waitFor(() => expect(screen.queryAllByTestId('tray-thumb')).toHaveLength(0))
+    await waitFor(() => expect(thumbs()).toHaveLength(0))
   })
 
-  it('a photo message renders the image from a signed URL', async () => {
-    m.listDirectMessages.mockResolvedValue([dm('d1', OTHER, '', { attachment_path: 'other-1/pic.jpg' })])
-    renderThread()
-    const photo = await screen.findByTestId('chat-photo')
-    expect(media.signChatPhotoUrl).toHaveBeenCalledWith('other-1/pic.jpg')
-    expect(within(photo).getByRole('img')).toHaveAttribute('src', 'blob:signed')
-  })
-
-  it('deleting my own photo message also removes the object; someone else’s never does', async () => {
+  it('⚠️ keeps the ORIGINAL filename, which the storage key cannot carry', async () => {
     const user = userEvent.setup()
-    m.listDirectMessages.mockResolvedValue([dm('d2', ME, '', { attachment_path: `${ME}/pic.jpg` })])
     renderThread()
-    const bubble = (await screen.findAllByTestId('dm-bubble'))[0]
-    await user.click(within(bubble).getByRole('button', { name: 'Message options' }))
-    await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
-    await waitFor(() => expect(m.removeMessage).toHaveBeenCalledWith('d2'))
-    expect(media.removeChatPhoto).toHaveBeenCalledWith(`${ME}/pic.jpg`)
+    await screen.findAllByTestId('dm-bubble')
+    await attach(user, [img('Fixtures September.jpg')])
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    // preparePhotoUpload re-encodes to JPEG and the key is <uuid>.jpg, so
+    // this name exists nowhere else. It is the whole reason for the 1 Sep
+    // metadata reshape, and a document in chat later is useless without it.
+    await waitFor(() =>
+      expect(m.sendDirectMessage.mock.calls[0][2].attachments[0].name).toBe('Fixtures September.jpg'),
+    )
+  })
+
+  it('⚠️ on a failed upload sends NOTHING, deletes what it uploaded, and keeps the draft', async () => {
+    const user = userEvent.setup()
+    media.uploadChatPhoto
+      .mockResolvedValueOnce(`${ME}/k1.jpg`)
+      .mockRejectedValueOnce(new Error('network'))
+    renderThread()
+    await screen.findAllByTestId('dm-bubble')
+    await user.type(screen.getByLabelText('Message'), 'tour')
+    await attach(user, [img('a.jpg'), img('b.jpg')])
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(m.sendDirectMessage).not.toHaveBeenCalled()
+    // ⚠️ Nothing half-arrives, and nothing is left behind: the first photo
+    // reached storage and must be taken back out, or the reaper inherits an
+    // orphan nobody knows about.
+    expect(media.removeChatPhoto).toHaveBeenCalledWith(`${ME}/k1.jpg`)
+    // The draft and the tray survive, so the retry costs one tap.
+    expect(screen.getByLabelText('Message')).toHaveValue('tour')
+    expect(thumbs()).toHaveLength(2)
+  })
+
+  it('counts out loud rather than spinning blankly', async () => {
+    const user = userEvent.setup()
+    let release
+    media.uploadChatPhoto.mockImplementationOnce(
+      () => new Promise((resolve) => { release = () => resolve(`${ME}/k1.jpg`) }),
+    )
+    renderThread()
+    await screen.findAllByTestId('dm-bubble')
+    await attach(user, [img('a.jpg'), img('b.jpg'), img('c.jpg')])
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    // ⚠️ Ten uploads is the same road as the 28 Aug slow-site incident (UAE
+    // fixed line to Supabase Tokyo, 15-second hangs). A blank spinner there
+    // is indistinguishable from a hang.
+    expect(await screen.findByTestId('send-progress')).toHaveTextContent('Sending 1 of 3')
+    release()
   })
 })

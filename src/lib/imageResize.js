@@ -143,6 +143,18 @@ export const ACCEPTED_IMAGE_TYPES = UPLOAD_TYPES
 export function isAcceptableImage(file) {
   return Boolean(file) && ACCEPTED_IMAGE_TYPES.includes(file.type)
 }
+
+/**
+ * The same list again, in the comma-separated form an <input accept> wants.
+ *
+ * ⚠️ IT WAS THE LIST'S THIRD COPY. UPLOAD_TYPES and ACCEPTED_IMAGE_TYPES were
+ * merged in task 1 of plan 2, and the hand-typed
+ * "image/jpeg,image/png,image/webp,image/heic,image/heif" was still sitting
+ * in five components — free to drift from the gate that actually decides.
+ * DERIVED, so it cannot. Both chat composers use it; the three photo-field
+ * components still spell it out and should be converted next.
+ */
+export const PICKER_ACCEPT = ACCEPTED_IMAGE_TYPES.join(',')
 const HEIC_TYPES = ['image/heic', 'image/heif']
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 // every photo bucket's file_size_limit
 

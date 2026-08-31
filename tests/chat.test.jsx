@@ -206,7 +206,7 @@ describe('Chat — announce-only', () => {
     await user.type(await screen.findByLabelText('Message'), 'Anyone need a lift?')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'Anyone need a lift?', { eventId: null, mentions: [], attachmentPath: null })
+    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'Anyone need a lift?', { eventId: null, mentions: [], attachments: [] })
   })
 
   it('always opens the composer for a coach, and never shows them the lock', async () => {
@@ -344,7 +344,7 @@ describe('Chat — fixture threads', () => {
     await user.type(await screen.findByLabelText('Message'), 'Who needs a lift?')
     await user.click(screen.getByRole('button', { name: 'Start thread' }))
 
-    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'Who needs a lift?', { eventId: 'ev-1', mentions: [], attachmentPath: null })
+    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'Who needs a lift?', { eventId: 'ev-1', mentions: [], attachments: [] })
   })
 
   it('hides a fixture from the picker once it has a thread', async () => {
@@ -411,7 +411,7 @@ describe('Chat — @mentions', () => {
     await user.type(screen.getByLabelText('Message'), 'changed my mind')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'changed my mind', { eventId: null, mentions: [], attachmentPath: null })
+    expect(postMessageMock).toHaveBeenCalledWith('team-a', 'changed my mind', { eventId: null, mentions: [], attachments: [] })
   })
 
   it('shows no mention button when nobody can be mentioned', async () => {
@@ -505,7 +505,7 @@ describe('Chat — staff channel', () => {
 
     await user.type(screen.getByLabelText('Message'), 'Go with the big pack')
     await user.click(screen.getByRole('button', { name: 'Send' }))
-    expect(postStaffMessageMock).toHaveBeenCalledWith('team-a', 'Go with the big pack', { mentions: [], attachmentPath: null })
+    expect(postStaffMessageMock).toHaveBeenCalledWith('team-a', 'Go with the big pack', { mentions: [], attachments: [] })
     expect(postMessageMock).not.toHaveBeenCalled()
   })
 

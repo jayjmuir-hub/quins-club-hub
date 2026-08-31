@@ -236,7 +236,7 @@ describe('the floating chat dock', () => {
     expect(screen.getByPlaceholderText('Message Zz')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Message'), 'Zz on my way')
     await user.click(screen.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz on my way', { attachmentPath: null, quotedId: null, mentions: [] }))
+    await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz on my way', { attachments: [], quotedId: null, mentions: [] }))
   })
 
   it('a 1:1 does not print their name on every incoming bubble, and own is green with no You', async () => {
@@ -395,7 +395,7 @@ describe('the dock chevron menu — full parity for DMs and groups', () => {
     await user.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() =>
       expect(m.sendDirectMessage).toHaveBeenCalledWith('c1', 'Zz noted', {
-        attachmentPath: null,
+        attachments: [],
         quotedId: 'x1',
         mentions: [],
       }),

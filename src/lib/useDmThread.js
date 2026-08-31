@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { removeChatPhoto, uploadChatPhoto, uploadChatVoice } from '../data/chatMedia.js'
+import { removeChatPhoto, uploadChatVoice } from '../data/chatMedia.js'
 import { listMyNicknames } from '../data/nicknames.js'
+import { useAttachmentTray } from './useAttachmentTray.js'
+import { uploadAlbum } from './uploadAlbum.js'
 import {
   forwardMessagesTo,
   listChats,
@@ -82,14 +84,19 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   const [polls, setPolls] = useState(() => new Map())
   const [postingPoll, setPostingPoll] = useState(false)
   // Round 2 (claude/plans/2026-08-24-chat-round-2.md): reply-with-quote,
-  // multi-select forwarding, and a photo waiting in the composer.
+  // multi-select forwarding, and the photos waiting in the composer.
   const [replyTo, setReplyTo] = useState(null)
   // Group @ mentions (claude/plans/2026-08-31-group-chat-mentions.md): the
   // people picked via the @ button. Ids ride only while their @Full Name
   // survives in the draft — pruned at send, like MessageRow.submitReply.
   const [draftMentions, setDraftMentions] = useState([])
-  const [photo, setPhoto] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(null)
+  // ⚠️ The composer's photos live in useAttachmentTray, NOT in this hook —
+  // the same tray serves the picker, Ctrl+V and drag-and-drop, and the
+  // single `photo` state it replaces was byte-identical in BOTH thread
+  // hooks (plan 2, task 1).
+  const tray = useAttachmentTray()
+  // What the Send button says while an album climbs the wire. Null when idle.
+  const [progress, setProgress] = useState(null)
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState(() => new Set())
   const [forwardRows, setForwardRows] = useState(null)
@@ -278,45 +285,45 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   // is a PersonName needing the screen's cardFor state, so the screen builds
   // the JSX from `members` and `nameFor` here.
 
-  function clearPhoto() {
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhoto(null)
-    setPhotoPreview(null)
-  }
-
+  /**
+   * The picker door. ⚠️ `accept` on the input filters this door ONLY — the
+   * paste and drop doors bypass it entirely — so the real type gate is
+   * isAcceptableImage inside the tray, which all three share.
+   */
   function pickPhoto(domEvent) {
-    const file = domEvent.target.files?.[0]
+    const files = Array.from(domEvent.target.files ?? [])
+    // Reset FIRST: without this, picking the same file twice in a row fires
+    // no change event the second time.
     domEvent.target.value = ''
-    if (!file) return
-    if (photoPreview) URL.revokeObjectURL(photoPreview)
-    setPhoto(file)
-    try {
-      setPhotoPreview(URL.createObjectURL(file))
-    } catch {
-      setPhotoPreview(null)
-    }
+    tray.add(files)
   }
 
   async function send(domEvent) {
     domEvent.preventDefault()
-    if ((!draft.trim() && !photo) || sending) return
+    if ((!draft.trim() && tray.items.length === 0) || sending) return
     setSending(true)
     setError(null)
     try {
-      // Photo first, message second — the WhatsApp order, so a reader never
-      // meets a message whose image has not arrived yet.
-      const attachmentPath = photo ? await uploadChatPhoto(selfId, photo) : null
+      // Photos first, message second — the WhatsApp order, so a reader never
+      // meets a message whose images have not arrived yet. ⚠️ uploadAlbum is
+      // all-or-nothing: a failure here has already taken back anything it
+      // managed to upload, so the throw below leaves nothing behind.
+      const attachments = await uploadAlbum(selfId, tray.items, setProgress)
       // A deleted @name un-mentions — only ids whose name survives are sent.
       const mentions = draftMentions.filter((p) => draft.includes(`@${p.full_name}`)).map((p) => p.profile_id)
-      await sendDirectMessage(conversationId, draft, { quotedId: replyTo?.id ?? null, attachmentPath, mentions })
+      await sendDirectMessage(conversationId, draft, { quotedId: replyTo?.id ?? null, attachments, mentions })
       setDraft('')
       setDraftMentions([])
       setReplyTo(null)
-      clearPhoto()
+      tray.clear()
       await load()
     } catch (err) {
+      // ⚠️ The draft and the tray SURVIVE a failure. Everything the member
+      // typed and chose is still there, so the retry costs one tap — which
+      // matters most on exactly the slow connection that caused the failure.
       setError(err.message || 'Could not send that.')
     } finally {
+      setProgress(null)
       setSending(false)
     }
   }
@@ -535,9 +542,8 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     sending,
     replyTo,
     setReplyTo,
-    photo,
-    photoPreview,
-    clearPhoto,
+    tray,
+    progress,
     pickPhoto,
     send,
     draftRef,
