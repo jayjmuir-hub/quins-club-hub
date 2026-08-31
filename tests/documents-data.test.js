@@ -6,7 +6,7 @@ vi.mock('../src/lib/supabase.js', () => ({
 
 import { supabase } from '../src/lib/supabase.js'
 import {
-  listDocuments, uploadDocument, deleteDocument,
+  listDocuments, uploadDocument, deleteDocument, signDocumentUrl, updateDocument,
 } from '../src/data/documents.js'
 
 function createQueryBuilder(result = { data: [], error: null }) {
@@ -101,5 +101,56 @@ describe('deleteDocument', () => {
     supabase.storage.from.mockReturnValue(bucket)
     await expect(deleteDocument({ id: 'doc-1', storageKey: 't1/x.pdf' }))
       .resolves.not.toThrow()
+  })
+})
+
+describe('signDocumentUrl', () => {
+  it('calls createSignedUrl(storageKey, 600) on the documents bucket and returns data.signedUrl', async () => {
+    const bucket = storageBucket()
+    supabase.storage.from.mockReturnValue(bucket)
+    const url = await signDocumentUrl('t1/doc.pdf')
+    expect(supabase.storage.from).toHaveBeenCalledWith('documents')
+    expect(bucket.createSignedUrl).toHaveBeenCalledWith('t1/doc.pdf', 600)
+    expect(url).toBe('https://signed')
+  })
+
+  it('throws when storage returns an error', async () => {
+    const bucket = storageBucket()
+    bucket.createSignedUrl = vi.fn().mockResolvedValue(
+      { data: null, error: new Error('storage error') })
+    supabase.storage.from.mockReturnValue(bucket)
+    await expect(signDocumentUrl('t1/doc.pdf')).rejects.toThrow('storage error')
+  })
+})
+
+describe('updateDocument', () => {
+  it('calls supabase.rpc(\'update_document\', {...}) with exact arguments', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: null })
+    await updateDocument({ id: 'doc-1', title: 'New title', category: 'policies',
+      staffOnly: false, clubWide: true, teamIds: [] })
+    expect(supabase.rpc).toHaveBeenCalledWith('update_document',
+      expect.objectContaining({
+        _id: 'doc-1',
+        _title: 'New title',
+        _category: 'policies',
+        _staff_only: false,
+        _club_wide: true,
+        _team_ids: [],
+      }))
+  })
+
+  it('sets _team_ids to [] when clubWide is true', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: null })
+    await updateDocument({ id: 'doc-1', title: 'Title', category: 'policies',
+      staffOnly: false, clubWide: true, teamIds: ['t1', 't2'] })
+    expect(supabase.rpc).toHaveBeenCalledWith('update_document',
+      expect.objectContaining({ _team_ids: [] }))
+  })
+
+  it('throws when rpc returns an error', async () => {
+    supabase.rpc.mockResolvedValue({ data: null,
+      error: new Error('rpc failed') })
+    await expect(updateDocument({ id: 'doc-1', title: 'Title', category: 'policies',
+      staffOnly: false, clubWide: false, teamIds: ['t1'] })).rejects.toThrow('rpc failed')
   })
 })
