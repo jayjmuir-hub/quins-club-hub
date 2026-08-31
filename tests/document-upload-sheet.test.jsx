@@ -71,4 +71,47 @@ describe('DocumentUploadSheet', () => {
         clubWide: false, teamIds: ['t1'], prefixTeamId: 't1',
         notify: false })))
   })
+
+  // Drag-and-drop, mirroring PhotoPositioner's PhotoDropZone idiom
+  // (src/components/PhotoPositioner.jsx). The key requirement: dropping must
+  // not bypass validateDocumentFile — the same rules a picked file gets.
+  it('accepts a dropped PDF, shows its name, and submits it', async () => {
+    render(<DocumentUploadSheet open onClose={() => {}} teams={TEAMS}
+      memberships={coach} onUploaded={() => {}} />)
+    const zone = screen.getByTestId('document-drop-zone')
+    const file = pdf('festival-pack.pdf')
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } })
+
+    expect(await screen.findByText('festival-pack.pdf')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /add document/i }))
+    await waitFor(() => expect(uploadDocumentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ teamIds: ['t1'] })))
+    expect(uploadDocumentMock.mock.calls[0][0].file).toBe(file)
+  })
+
+  it('rejects a dropped bad file type inline, same as a picked one, and blocks submit', async () => {
+    render(<DocumentUploadSheet open onClose={() => {}} teams={TEAMS}
+      memberships={coach} />)
+    const zone = screen.getByTestId('document-drop-zone')
+    const bad = new File(['x'], 'movie.mp4', { type: 'video/mp4' })
+    fireEvent.drop(zone, { dataTransfer: { files: [bad] } })
+
+    expect(await screen.findByText(/not supported/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /add document/i }))
+    expect(uploadDocumentMock).not.toHaveBeenCalled()
+  })
+
+  it('only takes the first of several dropped files', async () => {
+    render(<DocumentUploadSheet open onClose={() => {}} teams={TEAMS}
+      memberships={coach} />)
+    const zone = screen.getByTestId('document-drop-zone')
+    const first = pdf('first.pdf')
+    const second = pdf('second.pdf')
+    fireEvent.drop(zone, { dataTransfer: { files: [first, second] } })
+
+    expect(await screen.findByText('first.pdf')).toBeInTheDocument()
+    expect(screen.queryByText('second.pdf')).toBeNull()
+  })
 })
