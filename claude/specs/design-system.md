@@ -33,6 +33,15 @@
 > 5. **No width gate on admin.** The "needs a bigger screen" card is gone;
 >    admin renders at every width and the More screen links it on the
 >    phone. Role gates unchanged.
+> 6. **Chrome-quarters (31 Aug 2026).** The clear liquid-glass bars from
+>    the 23–24 Aug passes retired: both bars are opaque premium dark
+>    chrome (`#151517→#0c0c0e`) with ghosted harlequin quarters (red ≤0.30
+>    from the left, green ≤0.26 from the right — a cap, not a taste, so
+>    the pill and dots dominate) and white content. Identical in both
+>    themes. Clear glass lost because its legibility depended on whatever
+>    scrolled beneath — the 24 Aug contrast arithmetic and the 28 Aug
+>    faint-ink fix were both symptoms. Spec and the arguments against:
+>    `claude/plans/2026-08-31-chrome-quarters-redesign.md`.
 >
 > **Identity:** the PWA installs as **"Club Hub"**, version 2.0.0.
 
