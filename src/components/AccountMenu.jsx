@@ -325,9 +325,12 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
           // exactly where the diagonal lands, and without this the avatar
           // dimmed and the chevron half-vanished — measured, not guessed:
           // the rects were inside the row, the paint order was the bug.
-          // text-ink since the clear-glass pass: only the chevron actually
-          // inherits this — the initial keeps explicit white on its red disc.
-          'group relative z-[1] ml-1 flex h-9 shrink-0 items-center gap-1 rounded-pill pl-[3px] pr-1.5 text-ink outline-none transition',
+          // text-white/90 since the chrome-quarters pass (31 Aug 2026): the
+          // masthead is opaque dark chrome again, and text-ink (near-black
+          // in light mode) made the chevron vanish on it — Jay's report the
+          // day the chrome shipped. Only the chevron actually inherits this;
+          // the initial keeps explicit white on its red disc.
+          'group relative z-[1] ml-1 flex h-9 shrink-0 items-center gap-1 rounded-pill pl-[3px] pr-1.5 text-white/90 outline-none transition',
           'hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-chrome',
         ].join(' ')}
       >
@@ -350,7 +353,7 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
           strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={['h-3 w-3 text-ink/60 transition group-hover:text-ink', open ? 'rotate-180' : ''].join(' ')}
+          className={['h-3 w-3 text-white/70 transition group-hover:text-white', open ? 'rotate-180' : ''].join(' ')}
         >
           <path d="M6 9l6 6 6-6" />
         </svg>

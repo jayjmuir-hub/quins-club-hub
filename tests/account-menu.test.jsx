@@ -41,6 +41,21 @@ beforeEach(() => {
 })
 
 describe('AccountMenu', () => {
+  // Chrome-quarters follow-up (31 Aug 2026, Jay: "the little arrow beside
+  // the profile initial is really hard to see when in light mode"). The
+  // trigger sits ON the dark chrome, so its chevron must be white-family
+  // like the rest of the masthead — text-ink is near-black in light mode
+  // and vanished. The dropdown SHEET keeps ink: it opens on a card.
+  it('the trigger and its chevron are white on the chrome, never ink', () => {
+    renderMenu()
+    const trigger = screen.getByTestId('account-button')
+    expect(trigger.className).toContain('text-white/90')
+    expect(trigger.className).not.toContain('text-ink')
+    const chevron = trigger.querySelector('svg')
+    expect(chevron.getAttribute('class')).toContain('text-white/70')
+    expect(chevron.getAttribute('class')).not.toContain('text-ink')
+  })
+
   it('says who this is, in full, as the first line', async () => {
     const user = userEvent.setup()
     renderMenu()
