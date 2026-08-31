@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Grok item 3 RECONCILED — the repo now records the pitch-occupancy fix
+- **31 Aug security re-review (Grok brief + peer probes) — hunt clean, three
+  items recorded.** Re-verified the 29 Aug sweep against live `main` and the
+  live DB, then hunted NEW holes on the surfaces that post-date the sweep
+  (role channels, message-edit, nested reply-privately, club-wide events,
+  pitch-share approvals, 9-column occupancy, hold-bare-signup, accent-blind
+  name match, `member_contact_card`) via three read-only agents. **No new
+  security holes** — every boundary holds against the live catalogue
+  (`member_contact_card`'s 26-Aug leak confirmed closed, `hold_bare_signup`
+  fails closed, role channels gate on `in_role_channel`, `touch_message`
+  enforces the 15-min author-only edit server-side). Recorded three items in
+  `claude/open-items.md` instead of fixing blind: (1) a **realtime**
+  question — does walrus filter role-channel/welfare/DM rows out of a
+  RAW-websocket non-member's `postgres_changes` stream? Policies are correct
+  and our client is RLS-safe (it refetches via PostgREST, never reads the
+  payload), and walrus is structurally equivalent to the REST path, but the
+  raw-websocket leak needs a live two-client measurement Claude can't
+  construct (no token handling) — handed to Jay; (2) `message_reads` INSERT
+  is exists-only (inert — unguessable UUID, no leak back); (3) an author can
+  pin their own post directly, bypassing `set_message_pinned` (cosmetic
+  boolean, pre-existing). `claude/open-items.md`. (SHA follows in the next
+  changelog-touching PR.)
+- `82952d2` — **Grok item 3 RECONCILED — the repo now records the pitch-occupancy fix
   production has run since 30 Aug.** The migration
   `20260830_pitch_occupancy_exclude_tournament_games` (adds `and
   e.tournament_id is null` so tournament GAMES stop counting as occupants and
@@ -26,8 +47,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the repository in line. `db/migrations/20260830_pitch_occupancy_exclude_
   tournament_games.sql` (recorded), `src/data/pitches.js`,
   `db/tests/pitch-occupancy.sql`, `db/schema/functions.sql`,
-  `tests/pitch-clashes.test.js`. (SHA follows in the next changelog-touching
-  PR.)
+  `tests/pitch-clashes.test.js`.
 - `1b7c59a` — **Documents repo SPECCED, not built** —
   `claude/plans/2026-08-31-documents-repo.md`. A private storage bucket plus
   metadata table so the club can distribute documents to age groups and squad
