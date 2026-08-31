@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Realtime raw-websocket question MEASURED — walrus filters, no action
+- **The wide tab bar grows for corner room; captions stay dead-centred.**
+  "SCHEDULE" sat 2.5px from the dock's glass edge, ON the 22px corner curve
+  (measured). Jay's fix, after an inward end-caption nudge was tried and
+  rejected as off-centre: the five-tab bar widens (inset 12px → 6px) and
+  spends the gain on px-5 end padding, gated at `min-[360px]` because at
+  320px the deeper padding makes neighbouring captions overlap — below 360
+  the shipped rendering is kept exactly. The four-tab parent/player island
+  is untouched. `src/components/Nav.jsx`, `tests/nav.test.jsx`. (SHA follows
+  in the next changelog-touching PR.)
+- `f952865` — **Realtime raw-websocket question MEASURED — walrus filters, no action
   needed.** Follow-up to the security re-review: rather than hand Jay a fiddly
   two-client websocket test, computed the exact per-row visibility check
   walrus applies, directly against live prod (rolled back). A keyless (anon)
@@ -21,8 +30,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   welfare / DM messages — the only residual is Supabase correctly invoking
   RLS on `postgres_changes`, a standard platform guarantee sitting on top of
   the anon grant-refusal. `claude/open-items.md` (item revised from "needs a
-  live measurement" to measured/closed). (SHA follows in the next
-  changelog-touching PR.)
+  live measurement" to measured/closed).
 - `e5adaa1` — **31 Aug security re-review (Grok brief + peer probes) — hunt clean, three
   items recorded.** Re-verified the 29 Aug sweep against live `main` and the
   live DB, then hunted NEW holes on the surfaces that post-date the sweep
