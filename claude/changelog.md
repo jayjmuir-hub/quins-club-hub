@@ -60,7 +60,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `db/migrations/20260901_fixture_push_diary_wording.sql`,
   `db/migrations/20260901_fixture_push_headline_pin_search_path.sql`,
   `db/tests/club-diary-push.sql`.
-- **PASTE AND DRAG-AND-DROP, AND SEVERAL PHOTOS IN ONE MESSAGE.** Plan 2 of the
+- `ebda2f3` — **PASTE AND DRAG-AND-DROP, AND SEVERAL PHOTOS IN ONE MESSAGE.** Plan 2 of the
   chat-albums series, tasks 2 to 6 — the thing Jay asked for on 31 Aug and did
   not have. ⚠️ **Paste had NEVER existed in this app** (`onPaste` and
   `clipboardData` in zero commits, all branches; control: `git log -S"pickPhoto"`
@@ -122,7 +122,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `src/components/ChatDropZone.jsx`, `src/lib/chatComposer.js`,
   `src/data/messages.js`, `src/lib/useDmThread.js`,
   `src/lib/useChannelThread.js`.
-  (SHA follows in the next changelog-touching PR.)
+  ⚠️ **VERIFIED LIVE, AND THE FIRST CONTROL WAS INVALID — worth recording.**
+  The entry hash moved (`index-j5FVPsQr` → `index-CYFFgl-T`) and the new bundle
+  carries the album strings. The obvious control — refetching the OLD bundle and
+  showing the strings absent — **proved nothing**: that URL no longer resolves
+  and Netlify answered 200 with the SPA's 4.8 KB fallback HTML, in which any
+  string is absent. Replaced with a control that discriminates:
+  `Drop photos to attach` exists nowhere in `src/` at `ebda2f3^` and does at
+  `ebda2f3`. ⚠️ A second candidate marker, `You can send up to`, was REJECTED —
+  it shipped with #602 and would have been present either way.
+  ⚠️ **Task 7 step 2 is NOT done:** nobody has sent a real album on the live site
+  and confirmed a SECOND account sees every photo. That needs two real sign-ins.
+  The storage read policy is the thing that would fail silently.
 
 - `87c1d3c` — **CLUB DIARY SHIPPED (phase 1) — dated items nobody replies to.** Four of the
   seven lines on the club's own "3 week look ahead" poster are dated,
