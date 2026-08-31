@@ -10,15 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The account-menu chevron is white on the chrome.** Jay, minutes after
+- **The 16 red db harnesses triaged — 14 repointed, 3 real drifts get
+  `db/migrations/20260831_harness_drift_fixes.sql` (NOT yet applied).** The
+  nightly had been red since 22 Aug, unnoticed. Every failure measured against
+  live, none assumed: no security regressions. Fourteen harnesses were stale
+  (welfare gate, ruling C, endpoint allowlist, availability self-lock,
+  hold_bare_signup, data growth, two born broken, two masking inlined-DDL
+  replays — chat-list and group-chats now assert against the LIVE schema);
+  three were production drifts the harnesses were RIGHT about (bare
+  `auth.uid()` in three policies, `push_endpoint_allowed` unpinned, anon
+  EXECUTE on `complete_signup_intent`). Those three stay red until Jay applies
+  the migration — proven green against it in a rolled-back run. Triage record:
+  `claude/open-items.md`. (SHA follows in the next changelog-touching PR.)
+- `99e8663` — **The account-menu chevron is white on the chrome.** Jay, minutes after
   chrome-quarters went live: the arrow beside the profile initial was
   invisible in light mode — the trigger kept clear-glass-era `text-ink`,
   near-black on the now-dark masthead, and it lives in `AccountMenu.jsx`,
   which the masthead ink sweep (scoped to AppShell's header block) never
   touched. Trigger and chevron are white-family now; the dropdown sheet
   keeps ink — it opens on a card. `src/components/AccountMenu.jsx`,
-  `tests/account-menu.test.jsx`. (SHA follows in the next
-  changelog-touching PR.)
+  `tests/account-menu.test.jsx`.
 - `c96add2` — **The crown sits properly: ProfileIcon component, and the dotted name
   underline retired.** Jay's polish notes off the first live crown (a real
   head coach wore 👑 within the hour of the deploy): the emoji left the
