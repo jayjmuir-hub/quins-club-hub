@@ -79,6 +79,30 @@ const ROLE_LABELS = {
 export const APPROVER_ROLES = ['coach', 'manager']
 
 /**
+ * The roles that may ADD or REMOVE a document in the documents repo.
+ *
+ * ⚠️ SHORTER THAN SQUAD_STAFF_ROLES, FOR THE SAME REASON APPROVER_ROLES IS.
+ * A medic READS staff documents — that is the point of the staff tier — but a
+ * coach or team manager curates them. The database splits the two sets
+ * explicitly: `private.can_read_document` admits ('coach','manager','medic')
+ * and `private.is_active_staff_of`, which `private.can_manage_document` and
+ * every storage write policy call, admits ('coach','manager') only.
+ *
+ * Mirrors `m.role in ('coach','manager')` in private.is_active_staff_of
+ * (db/migrations/20260831_documents.sql), which is the real boundary. If this
+ * list ever gains a role the SQL has not, the UI draws an Add or Remove
+ * control the database then refuses — which is exactly the dead medic Remove
+ * button caught in Task 6's review. If the SQL gains one this list has not,
+ * that person simply is not offered the control — safe. Change both.
+ *
+ * ⚠️ IT LIVES HERE, NOT IN src/lib/documents.js, so the role literals stay in
+ * the one file that names them — the same arrangement APPROVER_ROLES and
+ * SQUAD_STAFF_ROLES already have, and what tests/staff-roles.test.jsx's
+ * "no `=== 'coach'` outside scope.js" rule is reaching for.
+ */
+export const UPLOAD_ROLES = ['coach', 'manager']
+
+/**
  * Whether a membership row is GRANTED access rather than a request for it.
  *
  * ⚠️ EXACT EQUALITY, MATCHING THE SQL, AND NOT `!== 'pending'`. The Accounts

@@ -2,7 +2,7 @@
 // a UI convenience ONLY — RLS is the enforcement (see
 // db/migrations/20260831_documents.sql). Spec:
 // claude/plans/2026-08-31-documents-repo.md.
-import { isActiveMembership, isAdmin } from './scope'
+import { isActiveMembership, isAdmin, UPLOAD_ROLES } from './scope'
 
 export const DOCUMENT_CATEGORIES = [
   { key: 'registration', label: 'Registration' },
@@ -44,15 +44,20 @@ export function validateDocumentFile(file) {
   return null
 }
 
-const UPLOAD_ROLES = new Set(['coach', 'manager'])
-
+// ⚠️ UPLOAD_ROLES NOW LIVES IN scope.js, beside APPROVER_ROLES — 31 Aug 2026,
+// final review. It was a local `new Set(['coach','manager'])` here, which put a
+// third copy of the squad-role literals outside the one file that is supposed
+// to name them (and outside the reach of tests/staff-roles.test.jsx's rule).
+// Read its comment there for what the set mirrors in the database; an array
+// rather than a Set because that is the shape every sibling list in scope.js
+// uses, and these lists are two entries long.
 export function canUploadDocuments(memberships) {
   return isAdmin(memberships) || uploadableTeamIds(memberships).length > 0
 }
 
 export function uploadableTeamIds(memberships) {
   return (memberships ?? [])
-    .filter((m) => isActiveMembership(m) && UPLOAD_ROLES.has(m.role) && m.team_id)
+    .filter((m) => isActiveMembership(m) && UPLOAD_ROLES.includes(m.role) && m.team_id)
     .map((m) => m.team_id)
 }
 
@@ -79,7 +84,7 @@ export function mayDeleteDocument(doc, userId, memberships) {
   if (doc.club_wide) return false
   const targetedIds = new Set((doc.document_squads ?? []).map((s) => s.team_id))
   return (memberships ?? []).some(
-    (m) => isActiveMembership(m) && UPLOAD_ROLES.has(m.role) && targetedIds.has(m.team_id),
+    (m) => isActiveMembership(m) && UPLOAD_ROLES.includes(m.role) && targetedIds.has(m.team_id),
   )
 }
 
