@@ -2382,7 +2382,7 @@ CREATE TABLE public.notification_opt_outs (
   created_at  timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT notification_opt_outs_pkey            PRIMARY KEY (profile_id, category),
   CONSTRAINT notification_opt_outs_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
-  CONSTRAINT notification_opt_outs_category_check  CHECK ((category = ANY (ARRAY['feedback_reply'::text, 'notice'::text, 'fixture'::text, 'approval'::text, 'availability'::text, 'squad_chat'::text, 'direct_messages'::text])))
+  CONSTRAINT notification_opt_outs_category_check  CHECK ((category = ANY (ARRAY['feedback_reply'::text, 'notice'::text, 'fixture'::text, 'approval'::text, 'availability'::text, 'squad_chat'::text, 'direct_messages'::text, 'document'::text])))
 );
 ALTER TABLE public.notification_opt_outs ENABLE ROW LEVEL SECURITY;
 
