@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Documents repo SHIPPED — club distro to age groups, squad self-serve.** Nine
+- **Implementation plan 1 of 4: the data foundation for chat photo albums.**
+  The spec is four independently shippable pieces, not one; a single plan
+  would be a document nobody could review half of. Plan 1 is deliberately
+  INVISIBLE — the attachment list, its sync trigger, the storage boundary,
+  the data layer and the three tripwire harnesses — so it can ship with the
+  old app and every stale cached bundle still working. Writes the harness
+  BEFORE the migration and requires watching it fail; writes the
+  forward-an-album and delete-an-album tests to fail first, and says STOP if
+  either passes early. ⚠️ Carries the shared-working-tree hazard as a
+  standing constraint: another live session moved the checkout mid-rebase on
+  31 Aug. `claude/plans/2026-08-31-chat-photo-albums-implementation.md`.
+  (SHA follows in the next changelog-touching PR.)
+- `9fa2a69` — **Documents repo SHIPPED — club distro to age groups, squad self-serve.** Nine
   tasks, per-task review: pure helpers (`src/lib/documents.js` — categories,
   validation, upload scope), the data layer (`src/data/documents.js` —
   list, file-first upload, sign, row-first delete), the upload sheet
@@ -21,8 +33,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   migrations (tables/RLS/RPCs, the push-ACL fix, the storage-policy split,
   the grant trim) and push-send v13 are already LIVE on production; this
   entry ships the frontend. `claude/plans/2026-08-31-documents-repo.md`,
-  `claude/plans/2026-08-31-documents-repo-implementation.md`. (SHA follows
-  in the next changelog-touching PR.)
+  `claude/plans/2026-08-31-documents-repo-implementation.md`.
 - `02b5125` — **The nightly is GREEN, the alerting is armed, and the #589 issue step is
   fixed.** Three closings in one PR: (1) `harness_drift_fixes` APPLIED to
   production on Jay's "drive everything" — all harnesses pass, the first fully
