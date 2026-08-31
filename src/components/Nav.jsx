@@ -144,6 +144,12 @@ function labelClassName({ isActive }) {
 // between icons; kept tiny (9px condensed) so even "Squad Hub" clears its
 // neighbours. Hidden on the ACTIVE tab, whose label rides beside its icon in the
 // pill instead — so no tab shows the word twice.
+// Every caption is dead-centred under its icon — including the END tabs.
+// An inward "nudge" for the ends was tried on 31 Aug 2026 and REJECTED the
+// same day (Jay: didn't like Schedule and Chat off their icons). What keeps
+// the long end captions off the dock's 22px corner curve is instead the wide
+// bar's geometry: a narrower inset and px-5 end padding (see the nav
+// className below), which buys the room with the bar's own width.
 function captionClassName({ isActive }) {
   return [
     'pointer-events-none absolute bottom-[3px] left-1/2 -translate-x-1/2 whitespace-nowrap',
@@ -353,7 +359,7 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
         // rounded-[22px], not rounded-pill, since 24 Aug 2026 — Jay: the two
         // bars should be the same shape, and the masthead island's 22px won.
         // The ITEMS inside (glider, hover fills) stay capsules on purpose.
-        'glass-dock fixed bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-[22px] px-2 py-[7px] desktop:hidden',
+        'glass-dock fixed bottom-[calc(12px+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-[22px] py-[7px] desktop:hidden',
         // Width: the full-width bar (12px inset each edge) for five+ tabs; a
         // centred ~300px island that hugs its tabs for four (see `compact`).
         // `left-0 right-0 mx-auto` + a DEFINITE width is what centres a `fixed`
@@ -361,9 +367,27 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
         // re-centre each time the active pill swaps label. max-w keeps ≥12px of
         // air each side at the 320px floor. ⚠️ FULL CLASS NAMES so Tailwind
         // emits them — never build these from a variable.
+        // ══ THE WIDE BAR'S CORNER FIX — Jay, 31 Aug 2026 ══════════════════
+        // At inset-x-3/px-2 the end captions rode the 22px corner curve
+        // ("SCHEDULE" measured 2.5px from the glass edge; the curve intrudes
+        // ~11px at the caption's baseline). The fix Jay chose: make the BAR
+        // wider (inset 12px → 6px) and spend the gain on px-5 end padding,
+        // so the captions stay dead-centred under their icons — an inward
+        // nudge was tried first and rejected as off-centre. Centred
+        // "SCHEDULE" then starts padLeft−6.3 ≈ 13.7px inside the corner. The
+        // masthead keeps its px-3 inset; the 6px/side difference is a ruled
+        // trade, not drift — the bars share their RADIUS, not their width.
+        //
+        // ⚠️ GATED AT min-[360px], AND THE GATE IS MEASURED. The padding
+        // spends the room the captions breathe in: below 360px the interior
+        // caption gaps go negative (at 320px, "SCHEDULE" would overlap
+        // "ROSTER") — so under 360 the bar keeps the pre-31-Aug rendering
+        // exactly, trading the corner-ride back at the floor widths.
+        // The island keeps px-2: its end words are short, and its width was
+        // tuned around that padding (#530).
         compact
-          ? 'left-0 right-0 mx-auto w-[300px] max-w-[calc(100%-24px)]'
-          : 'inset-x-3',
+          ? 'left-0 right-0 mx-auto w-[300px] max-w-[calc(100%-24px)] px-2'
+          : 'inset-x-3 px-2 min-[360px]:inset-x-1.5 min-[360px]:px-5',
         'transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none',
         hidden ? 'translate-y-[calc(100%+24px)] opacity-0' : 'translate-y-0 opacity-100',
       ].join(' ')}

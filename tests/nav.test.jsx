@@ -114,6 +114,40 @@ describe('Nav', () => {
     expect(shown).toHaveLength(captions.length - 1)
   })
 
+  // The corner-ride fix (31 Aug 2026): the WIDE five-tab bar grows wider
+  // (inset-x-1.5) and wears px-5 end padding from 360px up, so the long end
+  // captions ("SCHEDULE") clear the dock's 22px corner curve while staying
+  // DEAD-CENTRED under their icons — an inward end-caption nudge was tried
+  // the same day and rejected by Jay as off-centre, so this also pins that
+  // no translate other than the plain centring one is present. Below 360px
+  // the pre-31-Aug rendering is kept exactly (at 320px the wider padding
+  // would make neighbouring captions overlap, measured). jsdom computes no
+  // pixels, so these pin the classes that produce the geometry — and that
+  // the island keeps its own tuned px-2 (#530).
+  it('widens the five-tab bar for corner room, captions dead-centred; the island is untouched', () => {
+    renderNav('/', { showSquadHub: true })
+
+    const wide = [...document.querySelectorAll('[data-testid="dock-caption"]')]
+    expect(wide.map((el) => el.textContent)).toEqual(['Schedule', 'Roster', 'Home', 'Squad Hub', 'Chat'])
+    for (const caption of wide) {
+      expect(caption.className).toContain('-translate-x-1/2')
+      expect(caption.className).not.toContain('calc(-50%')
+    }
+    const nav = document.querySelector('nav')
+    expect(nav.className).toContain('min-[360px]:inset-x-1.5')
+    expect(nav.className).toContain('min-[360px]:px-5')
+
+    cleanup()
+    renderNav('/')
+
+    const island = document.querySelector('nav')
+    expect(island.className).toContain('px-2')
+    expect(island.className).not.toContain('min-[360px]')
+    for (const caption of document.querySelectorAll('[data-testid="dock-caption"]')) {
+      expect(caption.className).toContain('-translate-x-1/2')
+    }
+  })
+
   // The motion pass (23 Aug 2026): the red pill is ONE element that slides to
   // the active tab. jsdom has no layout, so this pins the structure — a single
   // glider, keyed to the route so its bloom re-runs — not the geometry.
