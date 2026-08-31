@@ -14,9 +14,14 @@
 --   3. CONTROL: a DM whose latest message is TEXT -> last_body the text, last_attachment_path NULL
 --      (without this control an always-NULL / always-populated column passes vacuously)
 --
--- All five branches of my_chats (squad/staff/club/dm/group) select the same
--- lm.attachment_path; the DM branch is exercised here and the migration's
--- compile against the live schema covers the rest.
+-- ⚠️ SIX branches, not five — this line said "all five" and was made wrong the
+-- day after it was written, when 20260830_role_channels (#550) added a sixth
+-- arm whose kind is a column reference (`rc.key`), not a quoted literal, so a
+-- grep for `'x'::text as kind` returns a plausible-looking ONE row and hides
+-- it. Count `union all` (5 = six arms) when re-checking. All six select the
+-- same lm.attachment_path — but ⚠️ ONLY THE DM ARM IS EXERCISED HERE: the
+-- other five (squad/staff/club/group/role) have NO last-attachment coverage,
+-- and only the migration's compile against the live schema vouches for them.
 
 begin;
 
