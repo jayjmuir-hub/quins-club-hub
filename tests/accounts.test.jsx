@@ -2165,6 +2165,99 @@ describe('Accounts — a waiting person carries what they asked for', () => {
     expect(within(row).queryByTestId('missing-details')).toBeNull()
   })
 
+  // ── Possibly the same child, said where somebody can check it ─────────
+  //
+  // ⚠️ THE CASE THIS EXISTS FOR REACHED THE LIVE ROSTER ON 31 Aug 2026. A
+  // parent registered a child; weeks later the child registered himself, and
+  // the database guard could not see it because the two spellings were
+  // different transliterations of one name. The rule is
+  // src/lib/duplicateMatch.js; the reasoning, and the argument against doing
+  // this at registration instead, is in
+  // claude/specs/2026-08-31-duplicate-at-approval-design.md.
+  //
+  // ⚠️ THE NAMES ARE INVENTED and reproduce the shape only.
+  const ROSTER_WITH_CHIDI = [
+    ...PLAYERS,
+    { id: 'player-chidi', full_name: 'Chidi Farrow', team_id: 'team-u12' },
+  ]
+
+  it('warns that a pending registration may already be on the roster', async () => {
+    listPlayersMock.mockResolvedValue([
+      ...ROSTER_WITH_CHIDI,
+      // Already on the roster, spelled as the parent typed it: one edit from
+      // the pending row's spelling and carrying a middle name — the exact
+      // shape the database's exact-match guard is blind to.
+      { id: 'player-chidy', full_name: 'Chidy Amara Farrow', team_id: 'team-u12' },
+    ])
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    const warning = await within(row).findByTestId('possible-duplicate')
+    expect(warning).toHaveTextContent(/Chidy Amara Farrow/)
+
+    // ⚠️ THE HALF THAT MATTERS AS MUCH AS THE WARNING. A fuzzy match that
+    // stalls a real family is worse than the duplicate it prevents.
+    expect(within(row).getByRole('button', { name: /approve/i })).toBeEnabled()
+  })
+
+  // ⚠️ THE FIXTURE THE WHOLE RULE TURNS ON. The live roster holds twins who
+  // share a surname AND a birthday. A matcher keyed on the birthday would
+  // report them every time this queue was opened, and a warning that cries
+  // wolf weekly is a warning nobody reads.
+  //
+  // ⚠️ THE TWO FIRST NAMES ARE FOUR EDITS APART ON PURPOSE, WHICH IS WHAT MAKES
+  // THIS TEST WORTH HAVING. The real pair is four apart, and the matcher's
+  // ceiling is two. An earlier draft of this test used names FIVE apart — it
+  // passed, and it went on passing with the ceiling widened to 4, which means
+  // it would have passed against the exact bug it exists to catch. Keep the
+  // distance just outside the ceiling, never far outside it.
+  it('says nothing about twins who share a surname and a birthday', async () => {
+    const TWIN_PENDING = {
+      ...PENDING_REGISTRATION,
+      players: { full_name: 'Rowan Fairbairn', gender: 'male' },
+    }
+    listPlayersMock.mockResolvedValue([
+      ...PLAYERS,
+      { id: 'player-chidi', full_name: 'Rowan Fairbairn', team_id: 'team-u12' },
+      { id: 'player-reuben', full_name: 'Reuben Fairbairn', team_id: 'team-u12' },
+    ])
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, TWIN_PENDING])
+    listPlayerPrivateMock.mockResolvedValue([
+      { player_id: 'player-chidi', date_of_birth: '2015-03-04', plays_up_confirmed_at: null },
+      { player_id: 'player-reuben', date_of_birth: '2015-03-04', plays_up_confirmed_at: null },
+    ])
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    await within(row).findByRole('button', { name: /approve/i })
+    expect(within(row).queryByTestId('possible-duplicate')).toBeNull()
+  })
+
+  // The birthday never RAISES the flag; it strengthens the sentence once a
+  // name already has. ⚠️ It comes from a SECOND, narrower read — only the rows
+  // about to be named on the card — because the effect's first read is scoped
+  // to the pending rows deliberately. See the note above that effect.
+  it('adds the birthday to the warning when it matches', async () => {
+    listPlayersMock.mockResolvedValue([
+      ...ROSTER_WITH_CHIDI,
+      { id: 'player-chidy', full_name: 'Chidy Amara Farrow', team_id: 'team-u12' },
+    ])
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, PENDING_REGISTRATION])
+    listPlayerPrivateMock.mockImplementation(async (ids) => {
+      const rows = {
+        'player-chidi': { player_id: 'player-chidi', date_of_birth: '2015-03-04' },
+        'player-chidy': { player_id: 'player-chidy', date_of_birth: '2015-03-04' },
+      }
+      return (ids ?? []).map((id) => rows[id]).filter(Boolean)
+    })
+    setup()
+
+    const row = await screen.findByTestId('pending-membership')
+    const warning = await within(row).findByTestId('possible-duplicate')
+    expect(warning).toHaveTextContent(/same date of birth/i)
+  })
+
   // ⚠️ THE BUG THIS CHIP SHIPPED WITH FOR TEN MINUTES, AND THE RULE IT BROKE.
   // The queue's embed was `players(full_name)`, so the gender was UNDEFINED —
   // not absent — and every pending player in a single-gender squad was reported
