@@ -962,15 +962,33 @@ rollback;
 --
 -- EXPECTED: probe 02 flips to "❌ FAIL" and 01 and 05 stay green.
 --
--- ⚠️ MEASURED 31 Aug 2026, and that is exactly what happened:
+-- ⚠️ MEASURED 31 Aug 2026, on a scratch copy of this file with the block
+-- above spliced in after `begin;`, run through `npm run db:check`. The whole
+-- run went RED and the runner named the flipped steps:
 --
---     01 PARENT1 reads T1 members doc      1 row  — ✅ pass   (unchanged)
---     02 PARENT1 reads T1 staff-only doc   1 row  — ❌ FAIL   (flipped)
---     05 MEDIC1 reads T1 staff-only doc    1 row  — ✅ pass   (unchanged)
+--     FAIL: 02 PARENT1 reads T1 staff-only doc -> 1 rows — ❌ FAIL
+--         | 02b PARENT1 reads the staff doc's squad rows -> 1 rows — ❌ FAIL
 --
--- and the self-test block raised on probe 02, so `npm run db:check` would go
--- red rather than print a FAIL nobody reads. The tier claim is therefore a
--- measurement and not a restatement of the migration.
+--     01 PARENT1 reads T1 members doc     — ✅ pass, unchanged
+--     05 MEDIC1 reads T1 staff-only doc   — ✅ pass, unchanged
+--     every other step                    — ✅ pass, unchanged
+--
+-- ⚠️ 02b FLIPPING TOO IS THE CORRECT RESULT, NOT NOISE, and it is worth
+-- knowing before somebody reads this as an over-broad injection: "document
+-- squads read" is defined as can_read_document(document_id), so the junction
+-- table is the SAME claim seen through a second policy. A weakening that
+-- moved 02 without moving 02b would mean the two had drifted apart.
+--
+-- The self-test block raised, so `npm run db:check` went red rather than
+-- printing a FAIL nobody reads. The tier claim is therefore a measurement and
+-- not a restatement of the migration.
+--
+-- ⚠️ AND THE ROLLBACK WAS VERIFIED AFTERWARDS, not assumed:
+-- pg_get_functiondef('private.can_read_document(uuid)'::regprocedure) still
+-- contains `staff_only` and `medic` on production, checked against a negative
+-- control token that must NOT be found (rule 6 — a search that cannot come
+-- back empty proves nothing). The scratch copy was deleted, and `git status`
+-- confirmed clean before this was written.
 --
 -- ⚠️ IF PROBE 02 STAYS GREEN, THE HARNESS IS NOT TESTING THE TIER — most
 -- likely `set local role authenticated` was lost by a `reset role` earlier in
