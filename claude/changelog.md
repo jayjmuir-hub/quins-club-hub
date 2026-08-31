@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The nightly is GREEN, the alerting is armed, and the #589 issue step is
+- **Documents repo SHIPPED — club distro to age groups, squad self-serve.** Nine
+  tasks, per-task review: pure helpers (`src/lib/documents.js` — categories,
+  validation, upload scope), the data layer (`src/data/documents.js` —
+  list, file-first upload, sign, row-first delete), the upload sheet
+  (tiers, targeting, validation), the `/documents` screen (chips, signed
+  opens, upload door), delete gated to the DB manage set (medic excluded),
+  the squad-hub documents card, and push-send v13 wiring a `document`
+  category through the audience RPC and edge branch. The four DB
+  migrations (tables/RLS/RPCs, the push-ACL fix, the storage-policy split,
+  the grant trim) and push-send v13 are already LIVE on production; this
+  entry ships the frontend. `claude/plans/2026-08-31-documents-repo.md`,
+  `claude/plans/2026-08-31-documents-repo-implementation.md`. (SHA follows
+  in the next changelog-touching PR.)
+- `02b5125` — **The nightly is GREEN, the alerting is armed, and the #589 issue step is
   fixed.** Three closings in one PR: (1) `harness_drift_fixes` APPLIED to
   production on Jay's "drive everything" — all harnesses pass, the first fully
   green run since 22 Aug; a duplicate history row from two sessions applying
@@ -23,8 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `db-check nightly` (1 day / 6 h grace) was created via Jay's browser; the
   no-secret drill is running — the "missing" alert must fire before the
   `DB_CHECK_HEARTBEAT_URL` secret goes in. `claude/open-items.md` Category B
-  struck through with evidence. (SHA follows in the next changelog-touching
-  PR.)
+  struck through with evidence.
 - `fac8488` — **Spec: chat photo albums — paste, drag-and-drop, up to ten a message.**
   Jay could not paste a picture into a chat. ⚠️ **Paste never existed** —
   `onPaste`/`clipboardData` appear in zero commits, all branches, all history

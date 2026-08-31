@@ -2,9 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status: PLAN — nothing here is built yet.** The approved spec is
-`claude/plans/2026-08-31-documents-repo.md` (merged as `1b7c59a`). Flip this
-line task by task as things ship; Task 9 flips it for good.
+**Status: BUILT — awaiting merge (PR follows).** All nine tasks executed 31
+Aug 2026 with per-task review; migrations and push-send v13 already live.
+The approved spec is `claude/plans/2026-08-31-documents-repo.md` (merged as
+`1b7c59a`).
 
 **Goal:** A documents repo — the club distributes files to age groups, squad
 staff save their own — with two visibility tiers, multi-squad targeting,
