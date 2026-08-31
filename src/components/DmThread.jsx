@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react'
 import Button from './Button.jsx'
 import AttachmentTray from './AttachmentTray.jsx'
+import ChatDropZone from './ChatDropZone.jsx'
 import Card from './Card.jsx'
 import ChatBubble from './ChatBubble.jsx'
 import EmojiPicker from './EmojiPicker.jsx'
@@ -18,7 +19,7 @@ import { PICKER_ACCEPT } from '../lib/imageResize.js'
 import { canStillEdit } from '../lib/messageEdit.js'
 import { receiptState } from '../data/messages.js'
 import { backgroundStyle } from '../lib/chatBackgrounds.js'
-import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
+import { autoGrow, composerKeyDown, insertAtCursor, pasteImages } from '../lib/chatComposer.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { RowAvatar, scopeChatRows } from '../screens/ChatList.jsx'
@@ -61,7 +62,7 @@ export default function DmThread({ thread, compact = false }) {
   const [editingId, setEditingId] = useState(null)
 
   return (
-    <>
+    <ChatDropZone onFiles={thread.tray.add}>
       {/* ── The notice is REVIEWING-ONLY since 26 Aug 2026 — Jay: "remove
              the club admins can review notice", pointing at the dock, which
              never showed it. The member-facing "admins can review" line was
@@ -422,6 +423,9 @@ export default function DmThread({ thread, compact = false }) {
                   onChange={(e) => thread.setDraft(e.target.value)}
                   onInput={(e) => autoGrow(e.currentTarget)}
                   onKeyDown={composerKeyDown}
+                  // ⚠️ Ctrl+V a screenshot. Hands off entirely unless the
+                  // clipboard carries images — see pasteImages.
+                  onPaste={(e) => pasteImages(e, thread.tray.add)}
                   rows={1}
                   maxLength={2000}
                   placeholder={`Message ${(isGroup ? conversation?.title : otherName?.split(' ')[0]) ?? ''}`}
@@ -459,6 +463,6 @@ export default function DmThread({ thread, compact = false }) {
         }}
       />
       <PollVotes open={Boolean(votesFor)} onClose={() => setVotesFor(null)} poll={votesFor} />
-    </>
+    </ChatDropZone>
   )
 }

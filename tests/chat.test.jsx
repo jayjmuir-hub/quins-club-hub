@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
@@ -539,5 +539,35 @@ describe('Chat — reporting', () => {
     await user.click(screen.getByRole('button', { name: 'Message options' }))
     expect(screen.queryByRole('menuitem', { name: 'Report' })).toBeNull()
     expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
+  })
+})
+
+describe("Chat — the album composer is WIRED here too", () => {
+  // ⚠️ THE POINT OF THIS BLOCK IS THE SURFACE, NOT THE LOGIC. The tray, the
+  // paste gate and the drop gate are proved in tests/chat-album-send.test.jsx,
+  // tests/chat-paste.test.jsx and tests/chat-drop.test.jsx against the DM
+  // thread. What no pure test can see is a handler that was wired to ONE of
+  // the two composers — which is exactly the drift the shared hook exists to
+  // prevent, and exactly what a copy-paste implementation would have left.
+  beforeEach(() => {
+    getChannelSettingsMock.mockResolvedValue({ team_id: "team-a", announce_only: false })
+  })
+
+  it("multi-select, paste and drop all reach the channel tray", async () => {
+    renderAt("/chat/team-a")
+    await screen.findByTestId("message-row")
+    expect(screen.getByTestId("photo-input")).toHaveAttribute("multiple")
+
+    const box = screen.getByLabelText("Message")
+    const paste = new Event("paste", { bubbles: true, cancelable: true })
+    paste.clipboardData = { files: [new File(["x"], "image.png", { type: "image/png" })], getData: () => "" }
+    fireEvent(box, paste)
+    expect(await screen.findAllByTestId("tray-thumb")).toHaveLength(1)
+
+    const drop = new Event("drop", { bubbles: true, cancelable: true })
+    drop.dataTransfer = { files: [new File(["x"], "b.jpg", { type: "image/jpeg" })], types: ["Files"] }
+    fireEvent(screen.getByTestId("chat-drop-pane"), drop)
+    expect(drop.defaultPrevented).toBe(true)
+    await waitFor(() => expect(screen.getAllByTestId("tray-thumb")).toHaveLength(2))
   })
 })

@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react'
 import Button from './Button.jsx'
 import AttachmentTray from './AttachmentTray.jsx'
+import ChatDropZone from './ChatDropZone.jsx'
 import Card from './Card.jsx'
 import { Empty } from './Empty.jsx'
 import FixtureCard from './FixtureCard.jsx'
@@ -12,7 +13,7 @@ import PollVotes from './PollVotes.jsx'
 import Spinner from './Spinner.jsx'
 import VoiceComposer from './VoiceComposer.jsx'
 import { backgroundStyle } from '../lib/chatBackgrounds.js'
-import { autoGrow, composerKeyDown, insertAtCursor } from '../lib/chatComposer.js'
+import { autoGrow, composerKeyDown, insertAtCursor, pasteImages } from '../lib/chatComposer.js'
 import { PICKER_ACCEPT } from '../lib/imageResize.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { eventTitle } from '../lib/eventFormat.js'
@@ -60,7 +61,7 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
   const [votesFor, setVotesFor] = useState(null)
 
   return (
-    <>
+    <ChatDropZone onFiles={thread.tray.add}>
       {error && (
         <Card className="mb-3 px-4 py-3">
           <p role="alert" className="text-[13px] font-semibold text-danger-ink">
@@ -233,6 +234,9 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
                 onChange={(e) => thread.setDraft(e.target.value)}
                 onInput={(e) => autoGrow(e.currentTarget)}
                 onKeyDown={composerKeyDown}
+                // ⚠️ Ctrl+V a screenshot. Hands off entirely unless the
+                // clipboard carries images — see pasteImages.
+                onPaste={(e) => pasteImages(e, thread.tray.add)}
                 rows={1}
                 maxLength={2000}
                 placeholder={attachedEvent ? `Start the thread for ${eventTitle(attachedEvent)}` : 'Message'}
@@ -274,6 +278,6 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
         }}
       />
       <PollVotes open={Boolean(votesFor)} onClose={() => setVotesFor(null)} poll={votesFor} />
-    </>
+    </ChatDropZone>
   )
 }
