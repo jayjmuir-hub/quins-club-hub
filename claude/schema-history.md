@@ -20,6 +20,53 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### Club Diary phase 2 — four migrations, and the reasoning the SQL cannot carry
+
+**STATUS: ALL FOUR APPLIED to production 1 Sep 2026**, in this order, which was
+load-bearing (the push fixes land before anything can set `all_day`; the feed
+signature lands before the hand-deployed edge function reads it; the UI merges
+last). Files in `db/migrations/`, harnesses `db/tests/club-diary-allday.sql`
+and `club-diary-push.sql` steps 5–13.
+
+**`events_all_day`** — the THIRD time state, `check (not (all_day and
+time_tbd))`. ⚠️ **Never merge it with `time_tbd`**: that flag earns the feed's
+"Kick-off time to be confirmed" line, and printing it for an event that HAS no
+time is a false sentence in a subscribed parent's calendar. Nothing backfilled —
+inferring all-day from a midnight `starts_at` is the heuristic 20260814 refused.
+A one-day all-day event leaves `ends_at` NULL, enforced by the PRE-EXISTING
+`events_ends_after_starts`; harness step 6 asserts that coverage so relaxing the
+old check fails loudly here.
+
+**`fixture_push_all_day_when`** and **`availability_nudge_all_day_when`** — the
+push when-line said ", 00:00" for an all-day event (the invented value the
+`time_tbd` branch exists to avoid), and it existed as **two inline copies**, in
+`send_fixture_push` AND `send_availability_nudges`. The duplication is the
+defect; the midnight is a symptom. One IMMUTABLE implementation now
+(`private.fixture_push_when`, scalar; the row form delegates), pure so it can be
+asserted without `net.http_post` sending a real push a rollback cannot un-send.
+⚠️ **The nudge is match-only (`e.type = 'match'`) and a harness step asserts the
+filter survives any replacement** — that filter is also why phase 1 shipped no
+bug there. ⚠️ **Both bodies were captured from `pg_get_functiondef` on LIVE, and
+`send_fixture_push`'s live body did NOT match its own migration file** —
+`push_hardening` had rewritten it. Editing from the file would have silently
+reverted hardening with every test green. A migration file records an edit; only
+the database records the present.
+
+**`calendar_token_fn_all_day`** — `calendar_events_for_token` (⚠️ NOT
+`calendar_feed`; that is only the migration FILENAME convention) gains
+`info_only, all_day`. Widening a `RETURNS TABLE` is a return-type change, so
+Postgres forces **DROP + CREATE — and the drop drops the ACL. A fresh function
+grants EXECUTE to PUBLIC by default**, so the migration re-applies the measured
+grants (anon/authenticated/service_role, PUBLIC absent) and asserts them;
+forgetting that silently undoes `calendar_feed_revoke_public_execute` with a
+body that looks right. `anon` is load-bearing — calendar clients fetch the .ics
+unauthenticated and the URL token is the credential. ⚠️ The signature change
+also turned `db/tests/tournaments.sql` red: it carried a stale 17-column COPY of
+the function as pre-migration scaffolding, repointed (never deleted) to assert
+the live filter. A harness must not carry a copy of a function body.
+
+---
+
 ### `events_info_only` — Club Diary, and why it is a column and not a type
 
 **STATUS: APPLIED to production 31 Aug 2026.** Harness `db/tests/club-diary.sql`

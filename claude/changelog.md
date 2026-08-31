@@ -10,6 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
+- **Docs: the phase 2 schema reasoning, and the validator handoff rescued.**
+  The four phase 2 migrations reached `claude/schema-history.md` — the plan's
+  own task 7 listed it and the session skipped it, found by re-checking the
+  plan rather than memory when asked "anything left" (with a control: phase 1's
+  entry greps at 2, phase 2's at 0). Also commits
+  `claude/handoffs/2026-08-31-validator-session.md`, which sat UNTRACKED in the
+  shared working tree — written for whoever picks the validator role up, and
+  one branch switch from ceasing to exist. Scanned for real names and personal
+  mailboxes before entering this public repo.
+  ⚠️ This PR's first version cited 7c0cf58 and went RED with a conflict —
+  correctly: #615 had paid that debt while the PR sat unmerged overnight, and
+  the conflict is the mechanism that stopped a duplicate citation reaching
+  main. Re-pointed to a7b3c6d's successor after re-measuring, and the stale
+  "(SHA follows)" tail that #615 left on the phase 2 entry is removed below.
+  (SHA follows in the next changelog-touching PR.)
 - `a7b3c6d` — **Dependencies: the safe-updates group, six updates.** Sentry, supabase-js,
   libphonenumber-js and @testing-library/react patch/minor bumps. Full suite
   green.
@@ -20,7 +35,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   be pushed ONTO the Dependabot branch. This is the third time it has bitten;
   see the note in `claude/open-items.md`.
 
-- **eslint 10 IS BLOCKED UPSTREAM, and #568 stays open rather than merged.**
+- `134cdfe` — **eslint 10 IS BLOCKED UPSTREAM, and #568 stays open rather than merged.**
   `npm ci` fails `ERESOLVE`: `eslint-plugin-react`'s LATEST release (7.37.5)
   still caps at `eslint ^9.7`, so nothing published accepts eslint 10. Merging
   it would break `npm ci` for CI and for both clones. It will resolve itself
@@ -132,7 +147,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `availability_nudge_all_day_when`, `calendar_token_fn_all_day` — all applied
   and harness-verified (85/85). Full suite 4,272 green.
   `claude/plans/2026-09-01-club-diary-phase-2-implementation.md`.
-  (SHA follows in the next changelog-touching PR.)
 - `8f758a2` — **Shipped: the approvals queue names a possible duplicate.** A pending card
   now says "Possible duplicate: <name> is already in this squad", and adds
   ", with the same date of birth" when it does. ⚠️ It annotates and never
