@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **A red db-check nightly now opens a GitHub issue.** Nine red nights
+- **Spec: chat photo albums — paste, drag-and-drop, up to ten a message.**
+  Jay could not paste a picture into a chat. ⚠️ **Paste never existed** —
+  `onPaste`/`clipboardData` appear in zero commits, all branches, all history
+  (control: `git log -S"pickPhoto"` finds its three). Drag-and-drop DOES
+  exist, on the photo fields via `PhotoPositioner.jsx`, so "I've dropped one
+  before" was right and never into a chat. Grew on Jay's ruling into an album
+  of up to 10, retiring `messages.attachment_path` for a list. Spec only,
+  nothing built. Records the safeguarding boundary (the `chat media read`
+  storage policy is what makes photos 2–10 visible, or invisible), the
+  measured blast radius, the three-step PWA-safe rollout, and the arguments
+  AGAINST. ⚠️ Two counts corrected by measurement during review: **three**
+  harnesses go red under this change, not two (`my-chats-attachment.sql` was
+  missed), and `my_chats()` has **six** arms, not five —
+  `20260830_role_channels.sql` added the sixth the day before, and the
+  harness comment saying five was fixed by #589 while this PR was open. `claude/plans/2026-08-31-chat-photo-albums.md`. (SHA follows in the
+  next changelog-touching PR.)
+- `711f6cf` — **A red db-check nightly now opens a GitHub issue.** Nine red nights
   (22-30 Aug) went unseen because the failure emails demonstrably reached
   nobody; the issue ("The db-check nightly is red", one issue bumped per
   red run) needs no secret and notifies through a channel with a pulse.
@@ -20,7 +36,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   six (role channels made it wrong the day after it was written; only the
   DM arm has last-attachment coverage). The Better Stack heartbeat is
   still waiting on Jay's four steps in `claude/runbooks/monitoring.md`.
-  (SHA follows in the next changelog-touching PR.)
+ 
 - `b6b43fc` — **The 16 red db harnesses triaged — 14 repointed, 3 real drifts get
   `db/migrations/20260831_harness_drift_fixes.sql` (NOT yet applied).** The
   nightly had been red since 22 Aug, unnoticed. Every failure measured against
