@@ -5931,17 +5931,42 @@ end;
 $function$
 
 -- proacl: {=X/postgres,postgres=X/postgres,authenticated=X/postgres}  (note the PUBLIC grant)
+CREATE OR REPLACE FUNCTION private.attachments_well_formed(_a jsonb)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+  select jsonb_typeof(_a) = 'array'
+     and not exists (
+       select 1 from jsonb_array_elements(_a) e
+        where jsonb_typeof(e) <> 'object'
+           or nullif(btrim(coalesce(e ->> 'file', '')), '') is null)
+$function$
+
+-- Backs messages_attachments_shape. IMMUTABLE is what lets a CHECK use it.
+
+
 CREATE OR REPLACE FUNCTION private.sync_attachment_paths()
  RETURNS trigger
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
 begin
-  if cardinality(new.attachment_paths) > 0 then
-    new.attachment_path := new.attachment_paths[1];
+  if jsonb_array_length(new.attachments) > 0 then
+    select array_agg(e ->> 'file' order by ord)
+      into new.attachment_paths
+      from jsonb_array_elements(new.attachments) with ordinality as t(e, ord);
+  elsif cardinality(new.attachment_paths) > 0 then
+    select jsonb_agg(jsonb_build_object('file', p) order by ord)
+      into new.attachments
+      from unnest(new.attachment_paths) with ordinality as t(p, ord);
   elsif new.attachment_path is not null then
+    new.attachments      := jsonb_build_array(jsonb_build_object('file', new.attachment_path));
     new.attachment_paths := array[new.attachment_path];
   end if;
+
+  new.attachment_path := new.attachment_paths[1];
   return new;
 end $function$
 
