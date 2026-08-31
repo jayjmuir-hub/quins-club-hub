@@ -8,9 +8,31 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 1 Sep 2026
+
+- **Plan 2 of 4: the composer — paste, drag-and-drop and the ten-photo tray.**
+  The first plan in this series that DEPLOYS; plan 1 and the metadata reshape
+  were database-only and cost nothing. Seven tasks: one shared tray hook
+  replacing the byte-identical `pickPhoto` in both thread hooks before it grew
+  a third copy; paste that ⚠️ **does nothing at all unless the clipboard
+  carries image files**, because breaking ordinary text paste would be a worse
+  bug than the one being fixed; a whole-pane drop overlay with three traps
+  named and tested (the browser opening the photo and discarding the draft,
+  dragleave flicker across child elements, and reacting to dragged text); and
+  an all-or-nothing send that deletes what it uploaded and keeps the draft.
+  ⚠️ `name` comes from the ORIGINAL File, not the resized one — the resizer
+  re-encodes to JPEG, which is the whole reason the metadata reshape happened.
+  Carries forward Menu Bar’s `z-40` auto-hiding chrome (the bars slide
+  mid-drag; no unit test catches it) and Message Tagging’s four exact-shape
+  assertions that an added option breaks, with a note NOT to loosen them to
+  `objectContaining`. Reuses the house `take(file)` pattern proven twice today,
+  recording that both prior uses are BOUNDED zones while this is the first
+  whole-pane one. `claude/plans/2026-09-01-chat-albums-plan-2-composer.md`.
+  (SHA follows in the next changelog-touching PR.)
+
 ## 31 Aug 2026
 
-- **Documents become cells — staff-card rows on phones, a tile grid on
+- `fc44896` — **Documents become cells — staff-card rows on phones, a tile grid on
   desktop.** Jay picked the split from a mock (both variants drawn with a
   deliberately long title, the layout trap that has bitten before): phones
   get the age-group-staff row shape — round type swatch, one-line truncated
