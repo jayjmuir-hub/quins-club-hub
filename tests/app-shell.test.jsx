@@ -851,6 +851,20 @@ describe('AppShell — the masthead hides on scroll like the dock', () => {
     expect(wrapper.className).toContain('min-[360px]:px-1.5')
     expect(wrapper.className).toContain('desktop:px-4')
   })
+
+  // Chrome-quarters (31 Aug 2026): the masthead is opaque dark chrome, so
+  // its text returns to white-on-chrome tokens. The role chip and the
+  // avatar disc keep their own fills and are deliberately not asserted.
+  it('masthead text is white on the chrome-quarters island', () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    renderShell()
+    const header = document.querySelector('header')
+    expect(header.className).toContain('text-white/90')
+    expect(header.className).not.toContain('text-ink')
+    const wordmark = screen.getByText('Quins Club Hub')
+    expect(wordmark.className).toContain('text-white/80')
+    expect(wordmark.className).not.toContain('text-ink/80')
+  })
 })
 
 describe('chrome-free conversations (Jay, 25 Aug 2026)', () => {

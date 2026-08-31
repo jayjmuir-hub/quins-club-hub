@@ -10,6 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
+- **Chrome-quarters: both bars go premium dark with ghosted harlequin
+  quarters.** Jay picked the direction from rendered options (B+C hybrid,
+  hint intensity): near-black gradient chrome, red quarter sweeping from
+  the left (≤0.30), green from the right (≤0.26), white inner hairline,
+  white content — identical in both themes, geometry untouched. Retires
+  the clear-glass ink rules (24/28 Aug) with their premise. Spec:
+  `claude/plans/2026-08-31-chrome-quarters-redesign.md`.
+  `src/index.css`, `src/components/Nav.jsx`, `src/components/AppShell.jsx`.
+  (SHA follows in the next changelog-touching PR.)
 - `6d8d344` — **Profile icons SHIPPED — the crown for U11.** The 31-emoji library
   (`src/lib/profileIcons.js`, clipboard for coach), `profile_icons` with
   exactly-one-target check and super-admin-only writes under RLS,
@@ -22,12 +31,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   staff or a person with Revoke and Make primary. All four `db/schema/`
   captures updated; every assertion red-first. Awaiting Jay's first real
   grant as the live proof.
-- **Feature guides get a Drive PDF step.** `authoring-guides.md` now covers
+- `359b5cc` — **Feature guides get a Drive PDF step.** `authoring-guides.md` now covers
   rendering a guide to PDF for Google Drive (Drive shows `.html` as source, so
   HTML reads as code), with the print-only override that lays each screenshot
   beside its steps and halved the training-session guide to three pages, and the
   `G:\My Drive` sync-mount route that avoids inlining a ~1MB file.
-  (SHA follows in the next changelog-touching PR.)
 - `89dd1a7` — **Feature-guide template + method SHIPPED** — the head coaches'
   "Build a training session" walkthrough is now a reusable system, so the
   next feature guide is copy-and-screenshot, not a rebuild. A frozen

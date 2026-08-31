@@ -148,6 +148,21 @@ describe('Nav', () => {
     }
   })
 
+  // Chrome-quarters (31 Aug 2026): the dock is opaque dark chrome again,
+  // so idle items return to white — ink was for the clear-glass era when
+  // the bar had to read over whatever scrolled beneath it.
+  it('idle items are white on the chrome-quarters dock', () => {
+    renderNav('/roster')
+    const idle = [...document.querySelectorAll('nav a')].filter(
+      (a) => a.getAttribute('aria-current') !== 'page',
+    )
+    expect(idle.length).toBeGreaterThan(0)
+    for (const link of idle) {
+      expect(link.className).toContain('text-white/90')
+      expect(link.className).not.toContain('text-ink')
+    }
+  })
+
   // The motion pass (23 Aug 2026): the red pill is ONE element that slides to
   // the active tab. jsdom has no layout, so this pins the structure — a single
   // glider, keyed to the route so its bloom re-runs — not the geometry.

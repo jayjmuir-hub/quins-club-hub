@@ -493,12 +493,13 @@ export default function AppShell({ children }) {
             across the top edge, where it is decoration and carries no text, so
             full saturation is free there. `harlequin` adds the site's diagonal
             shapes bleeding off the right edge. */}
-        {/* text-ink, not text-white, since the clear-glass pass (24 Aug 2026):
-            the island is transparent, so its content reads in the theme's ink
-            — near-black over a light page, near-white in dark mode. Elements
-            with their own opaque fills (the initial's disc, the badges, the
+        {/* text-white/90 since the chrome-quarters pass (31 Aug 2026): the
+            island is opaque dark chrome again, so the clear-glass reason
+            for theme ink (24 Aug — content had to read over whatever
+            scrolled beneath) retired with the transparency. Elements with
+            their own opaque fills (the initial's disc, the badges, the
             dock's active pill) keep their own explicit colors. */}
-        <header className="glass-island pointer-events-auto overflow-hidden rounded-[22px] text-ink desktop:w-auto">
+        <header className="glass-island pointer-events-auto overflow-hidden rounded-[22px] text-white/90 desktop:w-auto">
           <div className="brand-rule" />
           <div className="harlequin relative mx-auto flex max-w-[1120px] items-center gap-2.5 overflow-hidden px-3 py-2.5 desktop:mx-0 desktop:max-w-none wide:max-w-none">
             {/* crest.png is 370x400 (portrait) — object-contain keeps its native
@@ -614,7 +615,7 @@ export default function AppShell({ children }) {
                   this repo could have caught the original — same blind spot as
                   the `wide:` vs `desktop:` note at the account link below. The
                   test that exists pins the class tokens instead. */}
-              <p className="truncate font-condensed text-[13px] font-semibold uppercase tracking-[1.2px] text-ink/80">
+              <p className="truncate font-condensed text-[13px] font-semibold uppercase tracking-[1.2px] text-white/80">
                 Quins Club Hub
               </p>
               {/* ⚠️ THE ROLE IS ON ITS OWN LINE NOW, 23 Aug 2026. It used to
