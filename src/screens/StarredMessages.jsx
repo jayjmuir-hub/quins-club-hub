@@ -83,7 +83,7 @@ export default function StarredMessages() {
                     <span className="shrink-0 text-[11px] font-semibold text-ink-faint">{postedLabel(m.created_at)}</span>
                   </span>
                   <span className="mt-0.5 block truncate text-[13px] text-ink-muted">
-                    {m.deleted_at ? 'Message removed' : m.body?.trim() ? m.body : attachmentPreviewLabel(m.attachment_path)}
+                    {m.deleted_at ? 'Message removed' : m.body?.trim() ? m.body : attachmentPreviewLabel(m.attachment_path, m.attachments?.length)}
                   </span>
                 </Link>
               </li>

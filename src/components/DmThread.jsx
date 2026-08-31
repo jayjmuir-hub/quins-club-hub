@@ -109,7 +109,7 @@ export default function DmThread({ thread, compact = false }) {
               <span aria-hidden="true" className="text-[12px]">📌</span>
               <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-muted">
                 <span className="font-bold text-ink">{m.author_id === selfId ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')}: </span>
-                {m.body?.trim() ? m.body : attachmentPreviewLabel(m.attachment_path)}
+                {m.body?.trim() ? m.body : attachmentPreviewLabel(m.attachment_path, m.attachments?.length)}
               </span>
             </button>
           ))}
@@ -204,7 +204,7 @@ export default function DmThread({ thread, compact = false }) {
                     {m.quoted.author_id === selfId ? 'You' : nameFor(m.quoted.author_id, m.quoted.author?.full_name ?? 'Member')}
                   </span>
                   <span className={`block truncate text-[12px] ${mine ? 'text-white/70' : 'text-ink-muted'}`}>
-                    {m.quoted.body?.trim() ? m.quoted.body : attachmentPreviewLabel(m.quoted.attachment_path)}
+                    {m.quoted.body?.trim() ? m.quoted.body : attachmentPreviewLabel(m.quoted.attachment_path, m.quoted.attachments?.length)}
                   </span>
                 </button>
               ))
@@ -256,6 +256,7 @@ export default function DmThread({ thread, compact = false }) {
                 createdAt={m.created_at}
                 body={m.body}
                 photoPath={m.attachment_path}
+                attachments={m.attachments}
                 photoCompact={compact}
                 reactions={tallies}
                 selfId={selfId}
@@ -362,7 +363,7 @@ export default function DmThread({ thread, compact = false }) {
                     <p className="text-[11px] font-extrabold text-brand-ink">
                       Replying to {thread.replyTo.author_id === selfId ? 'yourself' : nameFor(thread.replyTo.author_id, thread.replyTo.author?.full_name ?? 'Member')}
                     </p>
-                    <p className="truncate text-[12px] text-ink-muted">{thread.replyTo.body?.trim() ? thread.replyTo.body : attachmentPreviewLabel(thread.replyTo.attachment_path)}</p>
+                    <p className="truncate text-[12px] text-ink-muted">{thread.replyTo.body?.trim() ? thread.replyTo.body : attachmentPreviewLabel(thread.replyTo.attachment_path, thread.replyTo.attachments?.length)}</p>
                   </div>
                   <button
                     type="button"
