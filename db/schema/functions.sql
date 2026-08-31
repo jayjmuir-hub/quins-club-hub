@@ -5677,18 +5677,22 @@ $function$
 -- service_role execute arrived via default privileges, not the migration.
 -- The redacted club-wide booking read for squad staff; see the migration
 -- header for why this is a function and not a wider `event read` policy.
+-- ⚠️ RE-CAPTURED 30 Aug 2026: this capture had missed the 20260829
+-- pitch_portion re-create (9 columns). Now also carries the tournament-game
+-- exclusion (20260830_pitch_occupancy_exclude_tournament_games, Grok item 3).
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.pitch_occupancy(_from timestamp with time zone, _to timestamp with time zone)
- RETURNS TABLE(id uuid, team_id uuid, team_name text, type text, starts_at timestamp with time zone, ends_at timestamp with time zone, pitch text, group_id uuid)
+ RETURNS TABLE(id uuid, team_id uuid, team_name text, type text, starts_at timestamp with time zone, ends_at timestamp with time zone, pitch text, pitch_portion text, group_id uuid)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  select e.id, e.team_id, t.name, e.type, e.starts_at, e.ends_at, e.pitch, e.group_id
+  select e.id, e.team_id, t.name, e.type, e.starts_at, e.ends_at, e.pitch, e.pitch_portion, e.group_id
   from events e
   join teams t on t.id = e.team_id
   where e.starts_at >= _from
     and e.starts_at < _to
+    and e.tournament_id is null
     and exists (
       select 1 from memberships m
       where m.profile_id = auth.uid()

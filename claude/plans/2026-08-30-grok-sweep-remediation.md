@@ -1,7 +1,7 @@
 # Remediation plan — Grok full-sweep (30 Aug 2026)
 
-**Status: COMPLETE — 30 Aug 2026.** Every confirmed item (1–12, 14, 16, 17)
-shipped to production across PRs #556–#565; the item-15 residuals and the
+**Status: COMPLETE — 30 Aug 2026 (repo-reconciled 31 Aug).** Every confirmed
+item (1–12, 14, 16, 17) is live in production; the item-15 residuals and the
 item-18 UX residual are the only carry-forwards, both accepted and recorded
 in `claude/open-items.md`. Item 13 (S4–S8 matrix) remains HELD for Jay's D2
 ruling and is not part of this sweep. Two rulings settled it: report handling
@@ -9,9 +9,19 @@ SPLITS BY CONTEXT (conversation reports → welfare, channel reports → any
 admin), and PR 1 shipped immediately (Jay already held `welfare`). `main` is
 production (https://adhquins-clubhub.com); every PR was a live release.
 
-- **PR 3 — SHIPPED 30 Aug 2026** (item 3: tournament games out of
-  `pitch_occupancy`; harness repaired + red-then-green with a genuine-clash
-  positive control; client engine ignores `tournament_id` too).
+⚠️ **PR 3's DB change was applied to production 30 Aug but its PR did NOT
+merge** — a fact this file wrongly stamped "SHIPPED" for a day. The database
+carried the fix (families protected); the *repo* did not record it until the
+31 Aug reconcile PR. Grok's 31 Aug re-review caught the gap by reading the
+stale `functions.sql` capture. The lesson for the next sweep: **a green
+`apply_migration` is not a merged PR — verify the file is on `main`, not just
+that the DB changed.**
+
+- **PR 3 — DB applied 30 Aug, REPO RECONCILED 31 Aug 2026** (item 3:
+  tournament games out of `pitch_occupancy`; harness repaired; client engine
+  ignores `tournament_id` too). The migration was live from 30 Aug; the
+  reconcile PR only recorded the file, client guard, harness and 9-column
+  `functions.sql` recapture that the un-merged PR had left off `main`.
 - **PR 6 — SHIPPED 30 Aug 2026** (item 7 core: child-PII allowlist mirrors).
 - **PR 9 — SHIPPED 30 Aug 2026** (item 17: attacker-writable login fragment
   mapped to our copy; the flagged `setError(err.message)` sites gated through
