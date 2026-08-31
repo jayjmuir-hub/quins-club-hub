@@ -134,7 +134,8 @@ describe('SquadDocumentsCard — opening a row', () => {
   it('signs the row\'s storage key and opens the signed url in a new tab', async () => {
     const user = userEvent.setup()
     // A truthy return = the popup was allowed, which is the desktop path.
-    const openSpy = vi.spyOn(window, 'open').mockReturnValue({})
+    const fakeTab = {}
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeTab)
     renderCard()
 
     const row = (await screen.findByText('U10 kit list')).closest('[data-testid="squad-document-row"]')
@@ -142,13 +143,18 @@ describe('SquadDocumentsCard — opening a row', () => {
 
     expect(signDocumentUrlMock).toHaveBeenCalledWith('team-u10/d1.pdf')
     await screen.findByText('U10 kit list') // still there, nothing crashed
+    // ⚠️ EXACTLY TWO ARGUMENTS — 'noopener' MUST NOT COME BACK. With it,
+    // window.open returns null BY SPEC even on success, so the blocked-popup
+    // fallback also navigated the current tab and the document opened TWICE
+    // (Jay hit this live, 31 Aug 2026). Tabnabbing protection is the
+    // opener-nulling assertion below instead.
     await vi.waitFor(() =>
       expect(openSpy).toHaveBeenCalledWith(
         'https://signed.example/squad-doc?token=abc',
         '_blank',
-        'noopener',
       ),
     )
+    expect(fakeTab.opener).toBeNull()
 
     openSpy.mockRestore()
   })

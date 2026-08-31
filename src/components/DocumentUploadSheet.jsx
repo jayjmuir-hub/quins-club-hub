@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Sheet from './Sheet.jsx'
 import Button from './Button.jsx'
 import { uploadDocument } from '../data/documents.js'
@@ -21,6 +21,18 @@ import { friendlyMessage } from '../lib/friendlyError.js'
 const FIELD =
   'w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none transition focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
 const LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
+
+// Mirrors PhotoPositioner's UploadIcon (src/components/PhotoPositioner.jsx)
+// exactly — same drop-zone idiom, same glyph, so the two upload affordances
+// read as siblings.
+function UploadIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 16V4m0 0L8 8m4-4 4 4" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </svg>
+  )
+}
 
 export default function DocumentUploadSheet({
   open, onClose, teams, memberships, fixedTeamId, onUploaded,
@@ -59,11 +71,16 @@ export default function DocumentUploadSheet({
   const [notify, setNotify] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef(null)
 
-  function pickFile(event) {
-    const next = event.target.files?.[0] ?? null
-    setFile(next)
-    setFileError(validateDocumentFile(next))
+  // ⚠️ TAKES A FILE OBJECT DIRECTLY, not an event — so both the hidden
+  // <input>'s onChange AND the drop zone's onDrop can route through it, and
+  // a dropped file gets EXACTLY the same validateDocumentFile check a picked
+  // one does. Mirrors PhotoPositioner's PhotoDropZone `take` (same file).
+  function pickFile(next) {
+    setFile(next ?? null)
+    setFileError(validateDocumentFile(next ?? null))
     if (next && !title) setTitle(next.name.replace(/\.[^.]+$/, ''))
   }
 
@@ -134,13 +151,59 @@ export default function DocumentUploadSheet({
           <label className={LABEL} htmlFor="document-file">
             File
           </label>
+          {/* Drop zone, mirroring PhotoPositioner's PhotoDropZone shape
+              (src/components/PhotoPositioner.jsx) — a real <button> wrapping
+              a hidden, real <input type="file">, so the tap target, the
+              drag target and keyboard/screen-reader operability are all
+              covered by one control. */}
+          <button
+            type="button"
+            data-testid="document-drop-zone"
+            disabled={saving}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDragOver(true)
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragOver(false)
+              // Only the FIRST dropped file, like the photo zone — `accept`
+              // cannot filter a drop, so this still goes through pickFile's
+              // validateDocumentFile just like a picked file does.
+              pickFile(e.dataTransfer?.files?.[0] ?? null)
+            }}
+            className={`flex w-full flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed px-4 py-7 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60 ${
+              dragOver ? 'border-brand bg-brand/5' : 'border-line-strong bg-surface-mute'
+            }`}
+          >
+            <UploadIcon className="h-7 w-7 text-ink-faint" aria-hidden="true" />
+            <span className="text-[14px] font-bold text-ink">
+              {file ? file.name : 'Choose a document'}
+            </span>
+            <span className="text-[12.5px] text-ink-faint">
+              Tap to choose, or drag one in
+            </span>
+          </button>
+
+          {/* ⚠️ A REAL, FOCUSABLE INPUT — visually hidden, not `display:none`.
+              Keeps existing getByLabelText(/file/i) queries and keyboard/
+              screen-reader operability working exactly as before; the drop
+              zone above is an added affordance, not a replacement for it. */}
           <input
+            ref={fileInputRef}
             id="document-file"
             type="file"
             accept={documentAccept()}
             disabled={saving}
-            className={FIELD}
-            onChange={pickFile}
+            className="sr-only"
+            aria-label="File"
+            onChange={(event) => {
+              pickFile(event.target.files?.[0] ?? null)
+              // Allows choosing the SAME file again after removing it.
+              event.target.value = ''
+            }}
           />
           {fileError && (
             <p className="mt-1.5 text-[12.5px] font-semibold text-danger-ink">{fileError}</p>

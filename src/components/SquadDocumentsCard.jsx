@@ -56,14 +56,20 @@ export default function SquadDocumentsCard({ teamId, teamName }) {
       // to open one file: the browser hands the PDF to its viewer or to the OS,
       // and this app is still behind it in history.
       //
-      // ⚠️ STILL UNPROVEN ON A REAL IPHONE — the fallback is reasoned from the
-      // popup rule, not measured on a device. The check is listed in the
-      // live-verify (claude/plans/2026-08-31-documents-repo-implementation.md,
-      // Task 9 Step 5); do not tick it off this comment.
+      // ⚠️ NO 'noopener' IN THE FEATURES STRING — MEASURED LIVE, 31 Aug 2026,
+      // BY JAY ON THE FIRST REAL DOCUMENT. With 'noopener', window.open
+      // returns null BY SPEC even when the tab opens, so the fallback below
+      // fired on every successful open and the document opened in BOTH tabs
+      // at once. The jsdom test stub returned a truthy window and could not
+      // see it (the stub did not share the real API's failure mode). The
+      // opener handle is nulled by hand instead — same reverse-tabnabbing
+      // protection, and the return value means what this code needs it to
+      // mean: null = genuinely blocked.
       //
-      // ⚠️ src/screens/Documents.jsx CARRIES THE SAME THREE LINES. Change both.
-      const opened = window.open(url, '_blank', 'noopener')
-      if (!opened) window.location.assign(url)
+      // ⚠️ src/screens/Documents.jsx CARRIES THE SAME LINES. Change both.
+      const opened = window.open(url, '_blank')
+      if (opened) opened.opener = null
+      else window.location.assign(url)
     } catch (err) {
       setError(friendlyMessage(err, 'That document could not be opened.'))
     }

@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Spec + phase 1 plan: Club Diary — dated items nobody replies to.** Four of
+- **The document that opened twice, and drag-a-file-in.** Jay's first real
+  document opened in a new tab AND the current one: `window.open` with
+  `'noopener'` returns null BY SPEC even on success, so the iOS blocked-popup
+  fallback also navigated the current tab — and the jsdom stub returned a
+  truthy window, so no test could see it. Now opens without the flag, nulls
+  `opener` by hand (same tabnabbing protection), and the tests pin the exact
+  two-argument call so the flag cannot return. Plus the photo drop-zone idiom
+  on the upload sheet — drag a document in, same validation as picking one.
+  `src/screens/Documents.jsx`, `src/components/SquadDocumentsCard.jsx`,
+  `src/components/DocumentUploadSheet.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `474f3ac` — **Spec + phase 1 plan: Club Diary — dated items nobody replies to.** Four of
   the seven lines on the club's own "3 week look ahead" poster are dated,
   calendar-worthy items with nothing to RSVP to (shop opening, ball collection,
   kit collection), and the app can only file them as Socials carrying an
@@ -34,7 +45,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   receipts a Club Diary gives up by not being a notice.
   `claude/plans/2026-08-31-club-diary.md`,
   `claude/plans/2026-08-31-club-diary-implementation.md`.
-  (SHA follows in the next changelog-touching PR.)
 - `918fa59` — **Messages carry a LIST of attachments — the album migration is LIVE.**
   Plan 1 of 4, the expand half of expand-then-contract: `attachment_paths`
   added and backfilled, a `<= 10` check constraint, a sync trigger keeping
