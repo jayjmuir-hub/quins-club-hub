@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Group-chat @ mentions SHIPPED — and the harness caught a push leak before
+- **Documents repo implementation PLANNED, not built** —
+  `claude/plans/2026-08-31-documents-repo-implementation.md`. The merged spec
+  (`1b7c59a`) turned into nine executable tasks: migration with RLS + RPCs
+  (junction table over the notice fan-out precedent, with the argument
+  recorded), a rolled-back RLS harness with fault injection, pure helpers,
+  file-first data layer, upload sheet, the `/documents` member door, the
+  Squad Hub staff door, the push branch, and the live-verify sweep. (SHA
+  follows in the next changelog-touching PR.)
+- `517b6ab` — **Group-chat @ mentions SHIPPED — and the harness caught a push leak before
   the club could.** The channels' @ button in the group composer (dock
   included), fed from the loaded member list — no new RPC; `sendDirectMessage`
   carries pruned mention ids; the provenance trigger keeps a group's mentions
@@ -23,7 +31,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `db/migrations/20260831_group_mentions_no_punch_through.sql` adds the
   `channel <> 'dm'` guard; `db/tests/group-mentions.sql` pins both halves
   with a member-injection self-test. Both functions re-captured from live in
-  `db/schema/functions.sql`. (SHA follows in the next changelog-touching PR.)
+  `db/schema/functions.sql`.
 - `d54cfbe` — **The wide tab bar grows for corner room; captions stay dead-centred.**
   "SCHEDULE" sat 2.5px from the dock's glass edge, ON the 22px corner curve
   (measured). Jay's fix, after an inward end-caption nudge was tried and
@@ -31,8 +39,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   spends the gain on px-5 end padding, gated at `min-[360px]` because at
   320px the deeper padding makes neighbouring captions overlap — below 360
   the shipped rendering is kept exactly. The four-tab parent/player island
-  is untouched. `src/components/Nav.jsx`, `tests/nav.test.jsx`. (SHA follows
-  in the next changelog-touching PR.)
+  is untouched. `src/components/Nav.jsx`, `tests/nav.test.jsx`.
 - `f952865` — **Realtime raw-websocket question MEASURED — walrus filters, no action
   needed.** Follow-up to the security re-review: rather than hand Jay a fiddly
   two-client websocket test, computed the exact per-row visibility check
