@@ -1789,7 +1789,7 @@ CREATE POLICY "nickname remove own" ON public.nicknames
 CREATE POLICY "chat media read" ON storage.objects
   AS PERMISSIVE FOR SELECT TO authenticated
   USING (((bucket_id = 'chat-media'::text) AND ((private.chat_media_owner(name) = ( SELECT auth.uid() AS uid)) OR (EXISTS ( SELECT 1
-    FROM messages x WHERE ((x.attachment_path = objects.name) AND (x.deleted_at IS NULL)))))));
+    FROM messages x WHERE ((objects.name = ANY (x.attachment_paths)) AND (x.deleted_at IS NULL)))))));
 CREATE POLICY "chat media write" ON storage.objects
   AS PERMISSIVE FOR INSERT TO authenticated
   WITH CHECK (((bucket_id = 'chat-media'::text) AND (private.chat_media_owner(name) = ( SELECT auth.uid() AS uid))));

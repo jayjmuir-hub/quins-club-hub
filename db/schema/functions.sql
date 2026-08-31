@@ -5931,6 +5931,24 @@ end;
 $function$
 
 -- proacl: {=X/postgres,postgres=X/postgres,authenticated=X/postgres}  (note the PUBLIC grant)
+CREATE OR REPLACE FUNCTION private.sync_attachment_paths()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+begin
+  if cardinality(new.attachment_paths) > 0 then
+    new.attachment_path := new.attachment_paths[1];
+  elsif new.attachment_path is not null then
+    new.attachment_paths := array[new.attachment_path];
+  end if;
+  return new;
+end $function$
+
+-- INVOKER on purpose: it touches no table, only NEW, so SECURITY DEFINER would
+-- be privilege for nothing. search_path pinned empty per the standing rule.
+
+
 CREATE OR REPLACE FUNCTION private.chat_media_owner(_name text)
  RETURNS uuid
  LANGUAGE sql
