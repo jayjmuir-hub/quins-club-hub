@@ -110,24 +110,53 @@ const DM_CONV = {
 // (26 Aug 2026) need a thread SHORTER than the viewport, which 16 never is.
 const DM_COUNT = Math.min(16, Math.max(1,
   Number(new URLSearchParams(globalThis.location?.search ?? '').get('dmCount')) || 16))
+// ⚠️ INVENTED NAMES, INVENTED CAPTIONS, INVENTED KEYS — always. These stubs
+// render to PNGs that reach parent-facing guides, and that route is how a
+// member's name and a child's address were published in August 2026.
+//
+// The ALBUM row (1 Sep 2026, plan 2 of the chat-albums series): one message
+// carrying three photos, so the composer work has something shaped like its
+// own output to look at. ⚠️ It renders as ONE photo today — attachment_path
+// is the first key only, and the album GRID is plan 3. That gap is
+// deliberate, and visible here on purpose.
+const ALBUM_AT = 12
+const albumFor = (i) =>
+  i === ALBUM_AT
+    ? [
+        { file: `hz/kit-${i}.jpg`, type: 'image/jpeg', size: 184320, name: 'Home shirt.jpg' },
+        { file: `hz/kit-${i}-b.jpg`, type: 'image/jpeg', size: 201728, name: 'Away shirt.jpg' },
+        { file: `hz/kit-${i}-c.jpg`, type: 'image/jpeg', size: 176128, name: 'Socks.jpg' },
+      ]
+    : i >= 10 && i % 2 === 0
+      ? [{ file: `hz/kit-${i}.jpg`, type: 'image/jpeg', size: 190464, name: `Kit option ${i / 2 - 4}.jpg` }]
+      : []
+
 const DM_ROWS = Array.from({ length: DM_COUNT }, (_, i) => {
   const mine = i % 3 === 2
+  const attachments = albumFor(i)
   return {
     id: `hz-dm-${i + 1}`,
     conversation_id: 'hz-conv-1',
     channel: 'dm',
     author_id: mine ? DM_SELF : DM_OTHER,
     body:
-      i >= 10 && i % 2 === 0
-        ? `Kit option ${i / 2 - 4} attached`
-        : `Message ${i + 1} — logistics for Saturday.`,
+      i === ALBUM_AT
+        ? 'Three kit options — which do you prefer?'
+        : i >= 10 && i % 2 === 0
+          ? `Kit option ${i / 2 - 4} attached`
+          : `Message ${i + 1} — logistics for Saturday.`,
     created_at: new Date(Date.now() - (16 - i) * 7 * 60000).toISOString(),
     deleted_at: null,
     quoted_id: null,
     quoted: null,
     forwarded: false,
     pinned: false,
-    attachment_path: i >= 10 && i % 2 === 0 ? `hz/kit-${i}.jpg` : null,
+    // The database derives these two from `attachments`
+    // (private.sync_attachment_paths). Mirrored here so a fixture cannot
+    // show a shape the real thing never produces.
+    attachments,
+    attachment_paths: attachments.map((a) => a.file),
+    attachment_path: attachments[0]?.file ?? null,
     author: { full_name: mine ? 'You' : 'Sam Quillon' },
   }
 })
