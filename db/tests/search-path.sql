@@ -28,7 +28,16 @@ begin;
 
 -- ── The exemption list. One row per DELIBERATELY unpinned function. ────────
 create temporary table _exempt (proname text) on commit drop;
-insert into _exempt values ('squad_expects_gender');
+-- ⚠️ EMPTY SINCE 31 Aug 2026, AND THAT IS A MEASUREMENT, NOT AN OVERSIGHT.
+-- The list held squad_expects_gender — the one branch-3 function under
+-- db/schema/functions.sql's three-way rule (pure string helper, nothing to
+-- redirect). 20260830_pin_private_helper_search_path.sql then pinned it
+-- anyway (its ARGUMENT was schema-qualification of the register_my_player
+-- call chain) and did not touch this list, so the "exemption now PINNED" arm
+-- below fired — hidden for a day behind push_endpoint_allowed's own failure.
+-- The pin is deliberate and on main; the exemption is what went stale.
+-- To exempt a future function: `insert into _exempt values ('<name>');` and
+-- argue it in db/schema/functions.sql, together, or this file goes red.
 
 -- ── What live actually says ───────────────────────────────────────────────
 create temporary table _state on commit drop as
@@ -77,14 +86,17 @@ begin
   select bool_and(not s.pinned) into v_exempt_ok
   from _state s where s.proname in (select proname from _exempt);
 
-  if v_exempt_ok is distinct from true then
+  -- (bool_and over zero rows is NULL, so an EMPTY exemption list — the state
+  -- since 31 Aug 2026 — must not trip this arm. A non-empty list still must
+  -- name only unpinned functions.)
+  if exists (select 1 from _exempt) and v_exempt_ok is distinct from true then
     raise exception
       'a function on the exemption list is now PINNED. That may well be right — '
       'but db/schema/functions.sql argues for the exemption, so update that '
       'reasoning and this list together';
   end if;
 
-  raise notice 'search_path: % functions in `private`, all pinned except the named exemption', v_total;
+  raise notice 'search_path: % functions in `private`, all pinned except any named exemption (list currently empty)', v_total;
 end $$;
 
 -- ══ ⚠️ SELF-TEST — proves the check above can actually fail ════════════════

@@ -166,6 +166,18 @@ begin
       'profiles.first_name', 'profiles.full_name', 'profiles.last_name',
       'profiles.name_confirmed_at', 'profiles.no_player_confirmed_at',
       'profiles.no_role_confirmed_at', 'profiles.phone',
+      -- ⚠️ Phase 1b, 28 Aug 2026 (20260828_profiles_contact_revoke): SELECT on
+      -- `profiles` went COLUMN-LEVEL — table-level SELECT revoked, then granted
+      -- back per column on everything EXCEPT email and phone. That stamped a
+      -- read-only ACL on every column that had none, and this list rotted
+      -- exactly the way its own header predicts (third time: the no_* pair,
+      -- last_seen_at, now these). All ten are recorded in db/schema/grants.sql
+      -- §"SELECT ON `profiles` IS NOW COLUMN-LEVEL TOO". Repointed 31 Aug 2026.
+      'profiles.id', 'profiles.created_at', 'profiles.email_confirmed_at',
+      'profiles.last_seen_at', 'profiles.photo_focus_x',
+      'profiles.photo_focus_y', 'profiles.photo_path',
+      'profiles.signup_intent', 'profiles.signup_intent_applied_at',
+      'profiles.welcomed_at',
       -- feedback — the TRIAGE ceiling, added 18 Aug with help-and-feedback and
       -- recorded in db/schema/grants.sql section "public.feedback — COLUMN
       -- grants" on the same day. Only this list was missed.
@@ -368,7 +380,14 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.prokind = 'f'
      and has_function_privilege('anon', p.oid, 'execute')
-     and p.proname not in ('calendar_events_for_token');
+     -- list_signup_squads is DELIBERATELY anon-executable — the signup wizard
+     -- has no session yet, and squad names are already shown to strangers on
+     -- RequestAccess. Granted by name in 20260825_signup_before_confirm.sql
+     -- (line "grant execute ... to anon"); exempted here 31 Aug 2026.
+     -- ⚠️ complete_signup_intent is NOT exempted on purpose: the same migration
+     -- grants it only to `authenticated`, and anon holding it on live is the
+     -- named-grant trap this check's own message describes. Red until revoked.
+     and p.proname not in ('calendar_events_for_token', 'list_signup_squads');
   if _unexpected is not null then
     raise exception 'anon can EXECUTE functions it should not: %. A `revoke ... from public` in the migration does NOT remove Supabase''s named grant to anon, and a `revoke ... from anon` does not remove a PUBLIC grant. Both are required.', _unexpected;
   end if;

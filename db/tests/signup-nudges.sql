@@ -118,6 +118,16 @@ begin
          (refused,   'refused@adhq.example',   now(), now() - interval '9 days', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated'),
          (stuck,     'stuck@adhq.example',     now(), now() - interval '9 days', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated');
 
+  -- ⚠️ CLEAR THE TRIGGER-MINTED REQUESTS FIRST — repointed 31 Aug 2026.
+  -- 20260829_hold_bare_signup added a trigger that pre-DISMISSES every bare
+  -- signup (no name, no signup_intent) by inserting an access_requests row —
+  -- and all four fixture users are born bare, so the manual inserts below
+  -- started dying on access_requests_profile_id_key. The trigger's own
+  -- behaviour is a feature, not this harness's subject; each persona's row is
+  -- replaced with the exact state its scenario needs.
+  delete from public.access_requests
+   where profile_id in (finished, volunteer, refused, stuck);
+
   -- The candidate query reads p.first_name for the greeting, so give the one
   -- person who gets chased a name the email can open with.
   update public.profiles set first_name = 'Interrupted' where id = stuck;

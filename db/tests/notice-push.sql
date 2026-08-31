@@ -134,18 +134,29 @@ begin
   -- faked otherwise: a fabricated push_subscriptions row would test the
   -- fixture, not the rule.
 
-  select profile_id into v_sub from public.push_subscriptions limit 1;
+  -- ⚠️ A SUBSCRIBER WHO CAN ALSO POST — repointed 31 Aug 2026. This read
+  -- `from push_subscriptions limit 1` when the only subscribers were admins,
+  -- and 1d(b) has the subscriber POST a notice. As the club grew, row 1 became
+  -- a parent, the insert hit `announcement create` (is_admin = role 'admin'),
+  -- and the harness went red about the club's growth — the exact failure mode
+  -- claude/runbooks/db-harnesses.md documents for the two push harnesses.
+  -- Both picks now require role = 'admin', matching private.is_admin exactly.
+  select ps.profile_id into v_sub
+    from public.push_subscriptions ps
+    join public.memberships m on m.profile_id = ps.profile_id
+   where m.status = 'active' and m.role = 'admin'
+   limit 1;
   if v_sub is null then
-    raise notice 'NOTICE PUSH: no push subscriptions exist, so 1d is skipped.';
+    raise notice 'NOTICE PUSH: no subscribed admin exists, so 1d is skipped.';
     raise notice 'NOTICE PUSH: all checks passed.';
     return;
   end if;
 
   select club_id into v_club from public.memberships
-   where profile_id = v_sub and status = 'active' limit 1;
+   where profile_id = v_sub and status = 'active' and role = 'admin' limit 1;
   select m.profile_id into v_poster from public.memberships m
    where m.status = 'active' and m.club_id = v_club and m.profile_id <> v_sub
-     and (m.is_super or m.role = 'admin' or coalesce(array_length(m.admin_rights,1),0) > 0)
+     and m.role = 'admin'
    limit 1;
   if v_poster is null then
     raise notice 'NOTICE PUSH: no second poster in that club, so 1d is skipped.';

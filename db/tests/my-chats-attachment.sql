@@ -21,6 +21,12 @@
 begin;
 
 create temporary table _log(seq serial, line text) on commit drop;
+-- The asserts write to _log while running AS `authenticated` (as_user switches
+-- role before each probe). Without these grants every insert dies on
+-- "permission denied for table _log" — which is why this harness NEVER ran
+-- green: committed 28 Aug 2026 after that morning's nightly, red on its first.
+grant insert on _log to authenticated;
+grant usage on sequence _log_seq_seq to authenticated;
 
 insert into clubs (id, name) values ('f0000000-0000-4000-8000-0000000000c6','ZZ Attach Probe Club');
 
