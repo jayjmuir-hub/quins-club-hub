@@ -6853,3 +6853,67 @@ $function$
 REVOKE ALL ON FUNCTION public.channel_members(text, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.channel_members(text, uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.channel_members(text, uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.club_icon_map() and public.member_icons(uuid)  (31 Aug 2026 — profile icons)
+-- pg_get_functiondef from live, 31 Aug 2026. Read paths for the icon layer:
+-- the club-wide primary map chat shares, and the person card's full list.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.club_icon_map()
+ RETURNS TABLE(profile_id uuid, icon text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with my_club as (
+    select m.club_id from memberships m
+     where m.profile_id = auth.uid() and m.status = 'active'
+     order by m.created_at limit 1
+  ),
+  worn as (
+    select i.profile_id, i.icon, i.is_primary, i.created_at
+      from profile_icons i join my_club c on c.club_id = i.club_id
+     where i.profile_id is not null
+    union all
+    select m.profile_id, i.icon, i.is_primary, i.created_at
+      from profile_icons i
+      join my_club c on c.club_id = i.club_id
+      join memberships m on m.team_id = i.team_id and m.status = 'active'
+       and m.role in ('coach','manager','medic')
+     where i.team_id is not null
+  )
+  select distinct on (w.profile_id) w.profile_id, w.icon
+    from worn w
+   order by w.profile_id, w.is_primary desc, w.created_at desc;
+$function$
+
+;
+
+CREATE OR REPLACE FUNCTION public.member_icons(_profile uuid)
+ RETURNS TABLE(id uuid, icon text, reason text, is_primary boolean, team_name text, created_at timestamp with time zone)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with my_club as (
+    select m.club_id from memberships m
+     where m.profile_id = auth.uid() and m.status = 'active'
+     order by m.created_at limit 1
+  )
+  select i.id, i.icon, i.reason, i.is_primary, null::text, i.created_at
+    from profile_icons i join my_club c on c.club_id = i.club_id
+   where i.profile_id = _profile
+  union all
+  select i.id, i.icon, i.reason, i.is_primary, t.name, i.created_at
+    from profile_icons i
+    join my_club c on c.club_id = i.club_id
+    join teams t on t.id = i.team_id
+   where i.team_id is not null
+     and exists (select 1 from memberships m
+        where m.profile_id = _profile and m.team_id = i.team_id
+          and m.status = 'active' and m.role in ('coach','manager','medic'))
+   order by is_primary desc, created_at desc;
+$function$
+
+;

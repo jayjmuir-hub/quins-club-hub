@@ -1014,3 +1014,14 @@ REVOKE ALL ON public.message_deliveries FROM anon;
 -- ---------------------------------------------------------------------
 GRANT SELECT, INSERT, DELETE ON public.club_officers TO authenticated;
 REVOKE ALL ON public.club_officers FROM PUBLIC, anon;
+
+
+-- ---------------------------------------------------------------------
+-- profile_icons  (31 Aug 2026 — the crown for U11)
+-- Recorded with the migration (20260831_profile_icons): recognition
+-- emoji, super-admin-granted. SELECT/INSERT/UPDATE/DELETE for
+-- authenticated; RLS gates every write to super admins of the same
+-- club, reads to active members of the club.
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.profile_icons TO authenticated;
+REVOKE ALL ON public.profile_icons FROM PUBLIC, anon;
