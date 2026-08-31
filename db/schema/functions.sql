@@ -4419,6 +4419,7 @@ $function$
 -- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
 -- re-verify after the real apply.
 -- ---------------------------------------------------------------------
+-- ⚠️ REPLACED by 20260831_group_chat_mentions (a group keeps member mentions; 1:1 DMs still zeroed) — pg_get_functiondef from live, 31 Aug 2026.
 CREATE OR REPLACE FUNCTION private.set_message_provenance()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -4455,11 +4456,9 @@ begin
     new.conversation_id := null;
     new.pinned   := false;
   elsif new.conversation_id is not null then
-    -- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 — the group arm (25 Aug rewrite)
-    -- was MISSING from this capture; the header's selective-recapture warning
-    -- struck again. The conversation decides everything else. For a DM the
-    -- pair rule is re-checked on EVERY message; for a group, membership is
-    -- the whole rule (24 Aug ruling).
+    -- The conversation decides everything else. For a DM the pair rule is
+    -- re-checked on EVERY message; for a group, membership is the whole rule
+    -- (24 Aug ruling).
     select * into conv from conversations where id = new.conversation_id;
     if conv.id is null then
       raise exception 'no such conversation' using errcode = 'P0002';
@@ -4482,7 +4481,11 @@ begin
     new.team_id  := null;
     new.event_id := null;
     new.pinned   := false;
-    new.mentions := '{}';
+    -- GROUP MENTIONS (31 Aug 2026): a group's mentions survive to the
+    -- keep-filter below; a 1:1 DM's are still zeroed here.
+    if conv.kind <> 'group' then
+      new.mentions := '{}';
+    end if;
     update conversations set last_at = now() where id = conv.id;
   elsif new.event_id is not null then
     select * into ev from events where id = new.event_id;
@@ -4500,9 +4503,10 @@ begin
     raise exception 'a staff channel belongs to a squad' using errcode = '23514';
   end if;
 
-  -- 20260830_role_channels: a role-channel author's badge is their best role
-  -- ANYWHERE — a head coach has only a team-scoped row, which the team match
-  -- below would miss for a team-less message.
+  -- ROLE CHANNELS: the author's badge comes from their best role ANYWHERE in
+  -- the club — a head coach posting in Club Head Coaches has only a
+  -- team-scoped coach row, which the (team_id = new.team_id) arm below would
+  -- miss for a team-less message.
   select m.role, m.title into new.author_role, new.author_title
     from memberships m
    where m.profile_id = new.author_id and m.status = 'active'
@@ -4532,10 +4536,15 @@ begin
           where new.channel = 'squad'
          union
          select profile_id from private.staff_audience(new.team_id) where new.channel = 'staff'
-         -- 20260830_role_channels: the audience is the derived membership.
+         -- ROLE CHANNELS: the audience is the derived membership.
          union
          select rca.profile_id from private.role_channel_audience(new.channel, new.club_id) rca
-          where new.channel in ('headcoaches','managers','medics','welfare','clubstaff'));
+          where new.channel in ('headcoaches','managers','medics','welfare','clubstaff')
+         -- GROUP MENTIONS (31 Aug 2026): a group's audience is its members.
+         union
+         select gm.profile_id from conversation_members gm
+          where new.conversation_id is not null
+            and gm.conversation_id = new.conversation_id);
   end if;
 
   new.edited_at  := null;
@@ -4678,6 +4687,7 @@ $function$
 -- md5 verified against a rolled-back apply of 20260823_squad_chat.sql;
 -- re-verify after the real apply.
 -- ---------------------------------------------------------------------
+-- ⚠️ REPLACED by 20260831_group_mentions_no_punch_through (mentions arm excludes dm — the opt-out leak the harness caught) — pg_get_functiondef from live, 31 Aug 2026.
 CREATE OR REPLACE FUNCTION public.message_push_subscriptions(_message uuid)
  RETURNS TABLE(id uuid, endpoint text, p256dh text, auth text)
  LANGUAGE sql
@@ -4696,9 +4706,11 @@ AS $function$
       from staff_post a
       cross join lateral private.notice_audience(a.club_id, a.team_id) as aud(profile_id)
     union
+    -- mentions buzz in the CHANNELS; a dm/group mention adds nothing here —
+    -- the group arm below already reaches every member, opt-out respected.
     select m, 'squad_chat' from asked a, unnest(a.mentions) as m
+     where a.channel <> 'dm'
     union
-    -- a staff-channel top-level post reaches the squad's staff
     select s.profile_id, 'squad_chat'
       from asked a cross join lateral private.staff_audience(a.team_id) s
      where a.channel = 'staff' and a.parent_id is null
@@ -4706,7 +4718,13 @@ AS $function$
     -- a DM reaches the other side
     select case when c.profile_a = a.author_id then c.profile_b else c.profile_a end, 'direct_messages'
       from asked a join conversations c on c.id = a.conversation_id
-     where a.channel = 'dm'
+     where a.channel = 'dm' and c.kind = 'dm'
+    union
+    -- a group message reaches every other member
+    select gm.profile_id, 'direct_messages'
+      from asked a join conversations c on c.id = a.conversation_id
+      join conversation_members gm on gm.conversation_id = c.id
+     where a.channel = 'dm' and c.kind = 'group'
   )
   select s.id, s.endpoint, s.p256dh, s.auth
     from people p
