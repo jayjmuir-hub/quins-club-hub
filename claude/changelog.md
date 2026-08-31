@@ -43,7 +43,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Harness written first and watched failing, with a step 0 control and a step 4
   that asserts the TRIGGERS actually call the helper — a correct helper that
   nothing calls passes every other assertion in the file.
+  ⚠️ **AND THE SAME MISTAKE FAMILY, TWICE IN ONE DAY.** The new helper shipped
+  UNPINNED and was briefly the only function in `private` with a mutable
+  `search_path` — 109 functions, 108 pinned — which turned
+  `db/tests/search-path.sql` RED **against production**, not merely at risk on
+  the nightly. Caught by a concurrent session and verified here before acting
+  (the control matters: a probe returning exactly one row is as suspect as one
+  returning none). Pinned rather than exempted, because `''` is correct for a
+  CASE over two scalars and it keeps that harness's exemption list EMPTY — the
+  state #587 deliberately established the same morning.
+  **A new function is a new obligation to an EXISTING harness**, which is the
+  root cause #587 named for its sixteen reds, repeated within hours by the
+  session that read it. The whole defence is one command: run the full
+  `npm run db:check`, not `-- <your own file>`. Full suite now 84 harnesses
+  green, 0 failed.
   `db/migrations/20260901_fixture_push_diary_wording.sql`,
+  `db/migrations/20260901_fixture_push_headline_pin_search_path.sql`,
   `db/tests/club-diary-push.sql`.
   (SHA follows in the next changelog-touching PR.)
 - `87c1d3c` — **CLUB DIARY SHIPPED (phase 1) — dated items nobody replies to.** Four of the

@@ -3653,11 +3653,22 @@ $function$
 -- null from the CASE, and a null headline reaches the push body as SQL null —
 -- a notification with no title rather than a wrong one.
 -- Asserted by db/tests/club-diary-push.sql.
+--
+-- ⚠️ PINNED search_path, ADDED THE SAME DAY BY A CORRECTIVE MIGRATION
+-- (20260901_fixture_push_headline_pin_search_path.sql). It shipped WITHOUT the
+-- pin and was briefly the ONLY unpinned function in `private` — 109 functions,
+-- 108 pinned — which turned db/tests/search-path.sql RED against production.
+-- Pinned rather than exempted: `''` is correct for a CASE over two scalars that
+-- resolves nothing, and it keeps that harness's exemption list EMPTY, which is
+-- the stronger state.
+-- ⚠️ A NEW FUNCTION IS A NEW OBLIGATION TO AN EXISTING HARNESS. Run the FULL
+-- `npm run db:check`, not just your own new file.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION private.fixture_push_headline(_kind text, _info_only boolean)
  RETURNS text
  LANGUAGE sql
  IMMUTABLE
+ SET search_path TO ''
 AS $function$
   select case when coalesce(_info_only, false) then
            case _kind
