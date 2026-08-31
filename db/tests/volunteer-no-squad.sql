@@ -102,6 +102,17 @@ values
    'authenticated','authenticated','harness.rls.ok@example.invalid', now(),
    '{}'::jsonb, now(), now());
 
+-- ⚠️ CLEAR THE TRIGGER-MINTED REQUESTS — repointed 31 Aug 2026. These three
+-- are born bare (no name, no signup_intent), so 20260829_hold_bare_signup now
+-- pre-dismisses each with an access_requests row, and the RLS probes below —
+-- which insert their OWN requests as these users — started dying on
+-- access_requests_profile_id_key (23505), which step 3 misread as "the policy
+-- half of the fix is missing". The policy is fine; the fixture collided.
+delete from public.access_requests
+ where profile_id in ('fff00000-0000-4000-8000-0000000000b3',
+                      'fff00000-0000-4000-8000-0000000000b4',
+                      'fff00000-0000-4000-8000-0000000000b5');
+
 create temporary table _r (seq int, detail text) on commit drop;
 grant select, insert on _r to authenticated;
 grant select on _team to authenticated;

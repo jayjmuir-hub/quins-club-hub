@@ -1139,10 +1139,16 @@ GRANT EXECUTE ON FUNCTION private.shares_admin_club(uuid) TO anon;  -- inert: an
 --          contradicting its components.
 --
 --   3. Is it INVOKER, touches no table, calls nothing, and decides nothing?
---      → RECORDING IT IS ENOUGH. private.squad_expects_gender is the only
---      function here that reaches this branch: it takes a string, calls
+--      → RECORDING IT IS ENOUGH. private.squad_expects_gender was the only
+--      function that ever reached this branch: it takes a string, calls
 --      lower()/btrim() and the `~` operator, all pg_catalog, and returns a
 --      word. There is nothing for a search_path to redirect.
+--      ⚠️ PINNED ANYWAY on 30 Aug 2026 by
+--      20260830_pin_private_helper_search_path.sql (its argument was the
+--      register_my_player call chain, not a flaw in this reasoning), so the
+--      branch currently has NO inhabitants and db/tests/search-path.sql's
+--      exemption list is EMPTY. The three-way rule itself still stands —
+--      the branch is real, merely unoccupied.
 --
 -- ⚠️ AND PIN IT TO THE RIGHT VALUE, WHICH IS THE STEP THAT BITES. `''` is
 -- correct only for a function that resolves nothing outside pg_catalog

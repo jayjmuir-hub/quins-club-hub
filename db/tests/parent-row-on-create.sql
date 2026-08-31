@@ -46,9 +46,14 @@ end $$;
 insert into clubs (id, name) values
  ('c1000000-0000-4000-8000-0000000000c1','ZZ Parent Row Probe Club');
 
+-- Two squads: step 2 needs a SECOND one, because register_my_player writes the
+-- first parent membership itself and memberships_unique_grant refuses a literal
+-- duplicate — the idempotency probe re-fires the trigger from another team_id.
 insert into teams (id, club_id, name, sort_order, self_registration_allowed) values
  ('c1000000-0000-4000-8000-0000000000f1','c1000000-0000-4000-8000-0000000000c1',
-  'ZZ Parent Row Mixed', 994, true);
+  'ZZ Parent Row Mixed', 994, true),
+ ('c1000000-0000-4000-8000-0000000000f2','c1000000-0000-4000-8000-0000000000c1',
+  'ZZ Parent Row Second', 995, true);
 
 insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at,
                         raw_user_meta_data, created_at, updated_at)
@@ -107,8 +112,11 @@ begin
     'ZZ Kofi Mensah', team, null, false, false, false));
   reset role;
 
-  select count(*), min(full_name), min(email), min(phone), min(profile_id),
-         bool_or(is_primary)
+  -- ⚠️ min(profile_id::text)::uuid, NOT min(profile_id): Postgres has no
+  -- min(uuid), and the bare form is why this harness NEVER ran green — it was
+  -- committed 25 Aug 2026 after that morning's nightly and failed on its first.
+  select count(*), min(full_name), min(email), min(phone),
+         min(profile_id::text)::uuid, bool_or(is_primary)
     into n, nm, em, ph, pid, prim
     from public.player_parents where player_id = child;
 
@@ -143,9 +151,21 @@ begin
   end if;
 
   -- ── 2. A second parent membership for the same adult does not duplicate ─
+  -- ⚠️ ON A SECOND SQUAD, NOT THE SAME ONE — repointed 31 Aug 2026.
+  -- register_my_player itself now writes the (adult, club, parent, team, child)
+  -- membership, so a literally identical second insert dies on
+  -- memberships_unique_grant before the trigger under test ever fires. A
+  -- different team_id keeps the tuple unique while still firing the trigger
+  -- for the same adult+child pair — which is the idempotency being claimed.
   insert into public.memberships (profile_id, club_id, team_id, role, player_id, status)
   select adult, t.club_id, t.id, 'parent', child, 'pending'
-    from public.teams t where t.id = team;
+    from public.teams t
+   where t.club_id = (select club_id from public.teams where id = team)
+     and t.id <> team
+   order by t.sort_order limit 1;
+  if not found then
+    problems := problems || 'IDEMPOTENT: no second squad exists to probe with. ';
+  end if;
   select count(*) into n from public.player_parents where player_id = child;
   insert into _log(line) values (format('2 second membership: %s rows', n));
   if n <> 1 then
@@ -274,7 +294,10 @@ select pg_temp.assert_parent_row_create();
 -- ── SELF-TEST: a no-op helper means a parent membership writes nothing, ─
 -- and the check notices. CREATE OR REPLACE is transactional here and
 -- rolls back with the rest — no ACCESS EXCLUSIVE lock on memberships.
-create or replace function private.write_parent_row_from_profile(uuid, uuid)
+-- Parameter names must match the live signature (p_player, p_profile) —
+-- CREATE OR REPLACE refuses to rename a parameter, and the live function
+-- gained names this bare (uuid, uuid) form predates.
+create or replace function private.write_parent_row_from_profile(p_player uuid, p_profile uuid)
 returns void
 language plpgsql
 security definer

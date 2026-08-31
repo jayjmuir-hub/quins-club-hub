@@ -98,11 +98,20 @@ insert into results select 'PENDING',
 -- player made `avail own insert` (is_own_player) refuse, so the harness died
 -- here reporting "new row violates row-level security policy", which reads as
 -- the policy being wrong and was the fixture being empty.
+-- ⚠️ A SELF-EDITABLE EVENT, NOT THE EARLIEST — repointed 31 Aug 2026. This
+-- took `order by e.starts_at limit 1`, which lands on the squad's OLDEST
+-- fixture event. 20260827_availability_self_lock added
+-- private.availability_self_editable to `avail write insert`: parents cannot
+-- edit availability once the lock has passed (training locks 1 day before,
+-- matches 5), so a past event now refuses the write and the harness read as
+-- an RLS bug. Filter to events the lock still permits; the loud zero-row
+-- guard below already catches the none-left case.
 insert into public.availability (event_id, player_id, status)
 select e.id, m.player_id, 'in'   -- allowed values are in / out / maybe
   from public.memberships m
   join public.events e on e.team_id = m.team_id
  where m.profile_id = '00000000-1111-2222-3333-444444444444'
+   and private.availability_self_editable(e.id)
  order by e.starts_at
  limit 1;
 

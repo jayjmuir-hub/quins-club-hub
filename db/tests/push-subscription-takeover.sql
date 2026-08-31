@@ -54,11 +54,13 @@ insert into memberships (profile_id, club_id, team_id, player_id, role, status) 
  ('f0000000-0000-4000-8000-000000000011','f0000000-0000-4000-8000-0000000000c2','f0000000-0000-4000-8000-0000000000f2', null, 'coach','active'),
  ('f0000000-0000-4000-8000-000000000012','f0000000-0000-4000-8000-0000000000c2','f0000000-0000-4000-8000-0000000000f2', null, 'coach','active');
 
--- FIRST owns the phone AND a laptop. Endpoints are invented; Apple's real
--- ones look like https://web.push.apple.com/<opaque>.
+-- FIRST owns the phone AND a laptop. Endpoints are invented but must sit on a
+-- real push host: 20260830_push_hardening.sql added an endpoint allowlist
+-- (private.push_endpoint_allowed), and the old `push.example.invalid` fixture
+-- endpoints were refused by it — repointed here 31 Aug 2026.
 insert into push_subscriptions (profile_id, endpoint, p256dh, auth) values
- ('f0000000-0000-4000-8000-000000000011','https://push.example.invalid/zz-shared-phone','first-phone-p256dh','first-phone-auth'),
- ('f0000000-0000-4000-8000-000000000011','https://push.example.invalid/zz-first-laptop','first-laptop-p256dh','first-laptop-auth');
+ ('f0000000-0000-4000-8000-000000000011','https://web.push.apple.com/zz-harness-shared-phone','first-phone-p256dh','first-phone-auth'),
+ ('f0000000-0000-4000-8000-000000000011','https://web.push.apple.com/zz-harness-first-laptop','first-laptop-p256dh','first-laptop-auth');
 
 create function pg_temp.assert_takeover() returns void language plpgsql as $fn$
 declare
@@ -73,7 +75,7 @@ begin
   set local role authenticated;
   begin
     insert into push_subscriptions (profile_id, endpoint, p256dh, auth)
-    values ('f0000000-0000-4000-8000-000000000012','https://push.example.invalid/zz-shared-phone','second-phone-p256dh','second-phone-auth')
+    values ('f0000000-0000-4000-8000-000000000012','https://web.push.apple.com/zz-harness-shared-phone','second-phone-p256dh','second-phone-auth')
     on conflict (endpoint) do update
       set profile_id = excluded.profile_id, p256dh = excluded.p256dh, auth = excluded.auth;
     caught := null;
@@ -91,12 +93,12 @@ begin
     '{"sub":"f0000000-0000-4000-8000-000000000012","role":"authenticated"}', true);
   set local role authenticated;
   perform public.register_push_subscription(
-    'https://push.example.invalid/zz-shared-phone', 'second-phone-p256dh', 'second-phone-auth');
+    'https://web.push.apple.com/zz-harness-shared-phone', 'second-phone-p256dh', 'second-phone-auth');
   reset role;
 
-  select count(*) into n from push_subscriptions where endpoint = 'https://push.example.invalid/zz-shared-phone';
+  select count(*) into n from push_subscriptions where endpoint = 'https://web.push.apple.com/zz-harness-shared-phone';
   select profile_id, p256dh || '/' || auth into owner, keys
-    from push_subscriptions where endpoint = 'https://push.example.invalid/zz-shared-phone';
+    from push_subscriptions where endpoint = 'https://web.push.apple.com/zz-harness-shared-phone';
   if n <> 1 then
     raise exception 'ASSERT 2 FAILED: % row(s) for the shared endpoint (want 1)', n;
   end if;
@@ -110,7 +112,7 @@ begin
 
   -- 3. The control: FIRST's laptop is untouched.
   select count(*) into n from push_subscriptions
-   where endpoint = 'https://push.example.invalid/zz-first-laptop'
+   where endpoint = 'https://web.push.apple.com/zz-harness-first-laptop'
      and profile_id = 'f0000000-0000-4000-8000-000000000011'
      and p256dh = 'first-laptop-p256dh';
   if n <> 1 then
@@ -128,7 +130,7 @@ begin
   perform set_config('request.jwt.claims', '{"role":"authenticated"}', true);
   set local role authenticated;
   begin
-    perform public.register_push_subscription('https://push.example.invalid/zz-nobody', 'x', 'y');
+    perform public.register_push_subscription('https://web.push.apple.com/zz-harness-nobody', 'x', 'y');
     caught := null;
   exception when others then
     caught := sqlerrm;
@@ -158,10 +160,10 @@ begin
   end $w$;
 
   -- Reset the fixture so the wrong function has something to get wrong.
-  delete from push_subscriptions where endpoint like 'https://push.example.invalid/zz-%';
+  delete from push_subscriptions where endpoint like 'https://web.push.apple.com/zz-harness-%';
   insert into push_subscriptions (profile_id, endpoint, p256dh, auth) values
-   ('f0000000-0000-4000-8000-000000000011','https://push.example.invalid/zz-shared-phone','first-phone-p256dh','first-phone-auth'),
-   ('f0000000-0000-4000-8000-000000000011','https://push.example.invalid/zz-first-laptop','first-laptop-p256dh','first-laptop-auth');
+   ('f0000000-0000-4000-8000-000000000011','https://web.push.apple.com/zz-harness-shared-phone','first-phone-p256dh','first-phone-auth'),
+   ('f0000000-0000-4000-8000-000000000011','https://web.push.apple.com/zz-harness-first-laptop','first-laptop-p256dh','first-laptop-auth');
 
   begin
     perform pg_temp.assert_takeover();

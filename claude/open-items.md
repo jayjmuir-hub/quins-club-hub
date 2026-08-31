@@ -11,7 +11,58 @@ the evidence, never by removing the line.
 
 Everything is **not started** unless it says otherwise. Ordered by cost to fix.
 
-## Grok full-sweep — recorded 30 Aug 2026, all NOT STARTED
+## The 16 red db harnesses — triaged 31 Aug 2026, every one MEASURED
+
+**The nightly db-check had been red since 22 Aug and nobody triaged it for
+nine days** — the exact failure mode `claude/runbooks/db-harnesses.md` was
+written about ("a check nobody runs is not a check"; here, a check nobody
+READS). The 16 failures surfaced during the documents-repo build; each was
+measured against live production, none assumed. **No security regressions.**
+Two categories:
+
+**Category A — 14 stale harnesses, repointed (all green again):**
+
+| Harness | What actually happened |
+|---|---|
+| ~~`delete-for-good`, `squad-chat-phase3`, `group-chats` (assert 7)~~ | The welfare gate (`20260828_dm_review_welfare`, `20260830_welfare_review_gate`) deliberately took DM/group review off plain admins; the personas never got the grant. Repointed: the admin persona holds `welfare`; the negative lives in `db/tests/dm-review-welfare.sql` |
+| ~~`rls-staff-photos`~~ | Ruling C (26 Aug, in `can_see_staff_photo`'s own body): any active member sees any staff photo. Step 1's expectation FLIPPED; new discriminating arms added (caller demoted → false; non-staff subject → false), each proven against an injected fault |
+| ~~`push-subscription-takeover`~~ | `20260830_push_hardening`'s endpoint allowlist refused the `push.example.invalid` fixture endpoints. Repointed to an allowlisted host shape |
+| ~~`rls-pending-membership`~~ | Picked the squad's EARLIEST event; `20260827_availability_self_lock` rightly refuses availability writes on past events. Now filters to self-editable events |
+| ~~`signup-nudges`, `volunteer-no-squad`~~ | `20260829_hold_bare_signup` pre-dismisses bare signups with an `access_requests` row; the bare fixture users collided on the unique key (volunteer-no-squad's "policy half missing" message was a misread of that 23505). Trigger-minted rows now cleared before the probes |
+| ~~`notice-push`~~ | Picked `push_subscriptions limit 1` as a poster; subscriber №1 is now a PARENT (36 subscribers, 2 admins). The runbook's "grows red as the club grows" class. Both picks now require role `admin` |
+| ~~`training-plans`~~ | Published against the club's FIRST REAL squad; season trainings entered the 10-day window and the counts drifted (w=5). Now uses a synthetic squad — counts exact by construction |
+| ~~`parent-row-on-create`~~ | BORN BROKEN — committed 25 Aug after that morning's nightly, never green: `min(uuid)` does not exist; also collided with `register_my_player` now writing the parent membership itself, and the self-test's replace lost to live parameter names |
+| ~~`my-chats-attachment`~~ | BORN BROKEN — committed 28 Aug after that morning's nightly: wrote to a postgres-owned temp table while running as `authenticated` |
+| ~~`chat-list`, `group-chats`~~ | Inlined their migrations VERBATIM, so (a) every assertion tested the replay, not production — a live policy could regress unseen — and (b) the replay died once `my_chats` grew columns ("cannot change return type"). Replays deleted with tombstones; both now assert against LIVE, proven by injecting a live-policy fault and watching them go red |
+| ~~`grants` (two of its three complaints)~~ | Allowlist rot, its own header's predicted failure: the ten Phase 1b per-column `profiles` SELECTs (28 Aug, all captured in `db/schema/grants.sql`) and `list_signup_squads`' deliberate anon grant (25 Aug). Both allowlists extended |
+| ~~`search-path` (its second arm)~~ | `20260830_pin_private_helper_search_path` pinned `squad_expects_gender` but left it on the harness's exemption list — hidden behind the other failure. List now empty; `db/schema/functions.sql` branch-3 note updated |
+
+**Category B — 3 real production drifts. The harnesses are RIGHT and stay red
+until `db/migrations/20260831_harness_drift_fixes.sql` is applied — Jay's
+call, it is written and proven (rolled-back run: all three go green) but NOT
+applied.** None is exploitable; all are the repo's own hygiene rules missed by
+one migration each:
+
+1. **`rls-initplan`** — bare `auth.uid()` in `"officers read member"`
+   (`20260826_club_officers`) and BOTH `pitch_share_approvals` policies
+   (`20260830_pitch_share_approvals`); the harness reports one at a time, so
+   the queue was invisible. Per-row re-evaluation, a performance drift.
+2. **`search-path`** — `private.push_endpoint_allowed`
+   (`20260830_push_hardening`) has a mutable search_path. Pure SQL over its
+   argument, nothing to hijack today; pinned `''` like its siblings.
+3. **`grants`** — anon can EXECUTE `public.complete_signup_intent`:
+   `20260825_signup_before_confirm` revoked PUBLIC but not Supabase's NAMED
+   anon grant — the trap the harness's own message describes. Guarded inside
+   the function (raises on null uid), so defence in depth only.
+
+**The finding underneath all of it:** eight of the fourteen staleness cases are
+migrations that shipped WITHOUT updating the harnesses they invalidated —
+`claude/runbooks/db-harnesses.md`'s "add the harness in the same commit as the
+migration" has a missing half: **change the harness in the same commit as the
+migration that breaks it**. The nightly caught every one of these within a day;
+what failed was that nobody read the nightly. Worth deciding: should a red
+nightly page somebody (Better Stack email on workflow failure), or is a weekly
+glance at Actions enough?
 
 **Source:** Grok's 29 Aug 2026 read-only sweep, every item independently
 **verified by Claude** against the code on `main` and — for the two criticals —

@@ -11,7 +11,8 @@
 --   4. A real publish writes every training in range and never a match.
 --   5. A coach-edited session is SKIPPED and COUNTED, its content untouched.
 --   6. A coach cannot call publish_training at all.
---   7. A contact template published to a TAG squad is refused 42501.
+--   7. A contact template published to a non-contact squad is refused 42501
+--      (the tag-squad rule — teams.requires_contact is the column behind it).
 --   8. A team id that is not in this club is refused 42501.
 --
 -- ✅ 7 AND 8 TEST db/migrations/20260821_publish_training_fit_check.sql, APPLIED
@@ -30,21 +31,35 @@ begin;
 create temporary table _r(step text, outcome text) on commit drop;
 grant insert, select on _r to authenticated;
 
--- One invented coach on the first squad; the admin is the production admin
+-- One invented coach on an invented squad; the admin is the production admin
 -- profile the other harnesses use (a PROFILE id, not a membership id).
 insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
 values ('c0000000-0000-4000-8000-00000000d001','00000000-0000-0000-0000-000000000000','authenticated','authenticated','coach-tp@example.invalid', now(), '{}'::jsonb, now(), now());
 insert into profiles (id, full_name, email) values ('c0000000-0000-4000-8000-00000000d001','Coach TP','coach-tp@example.invalid') on conflict (id) do nothing;
-insert into memberships (profile_id, club_id, team_id, role, status)
-select 'c0000000-0000-4000-8000-00000000d001', club_id, id, 'coach','active' from teams order by sort_order limit 1;
+-- ⚠️ A SYNTHETIC SQUAD, NOT THE CLUB'S FIRST — repointed 31 Aug 2026. Every
+-- publish below ran against `teams order by sort_order limit 1`, a REAL squad,
+-- and expected will_write to equal the two fixture trainings. The moment the
+-- season's real trainings landed inside the 10-day window, w read 5 and the
+-- harness went red about the CALENDAR filling up — the fixture-not-the-feature
+-- rot claude/runbooks/db-harnesses.md documents. Same club (the production
+-- admin's is_admin check needs that), zero real events, rolled back with
+-- everything else.
+insert into teams (id, club_id, name, sort_order, requires_contact)
+select 'c0000000-0000-4000-8000-00000000d0f1', club_id, 'ZZ Harness TP Squad', 996, false
+  from teams order by sort_order limit 1;
 
--- Two training events and one MATCH in the window, for the first squad.
+insert into memberships (profile_id, club_id, team_id, role, status)
+select 'c0000000-0000-4000-8000-00000000d001', club_id, id, 'coach','active'
+  from teams where id = 'c0000000-0000-4000-8000-00000000d0f1';
+
+-- Two training events and one MATCH in the window, for the synthetic squad —
+-- the only events it has, so the publish counts below are exact by construction.
 insert into events (id, club_id, team_id, type, title, starts_at)
-select 'eee00000-0000-4000-8000-0000000000d1', club_id, id, 'training','HARNESS train 1', now() + interval '2 days' from teams order by sort_order limit 1;
+select 'eee00000-0000-4000-8000-0000000000d1', club_id, id, 'training','HARNESS train 1', now() + interval '2 days' from teams where id = 'c0000000-0000-4000-8000-00000000d0f1';
 insert into events (id, club_id, team_id, type, title, starts_at)
-select 'eee00000-0000-4000-8000-0000000000d2', club_id, id, 'training','HARNESS train 2', now() + interval '5 days' from teams order by sort_order limit 1;
+select 'eee00000-0000-4000-8000-0000000000d2', club_id, id, 'training','HARNESS train 2', now() + interval '5 days' from teams where id = 'c0000000-0000-4000-8000-00000000d0f1';
 insert into events (id, club_id, team_id, type, title, starts_at)
-select 'eee00000-0000-4000-8000-0000000000d3', club_id, id, 'match','HARNESS match', now() + interval '3 days' from teams order by sort_order limit 1;
+select 'eee00000-0000-4000-8000-0000000000d3', club_id, id, 'match','HARNESS match', now() + interval '3 days' from teams where id = 'c0000000-0000-4000-8000-00000000d0f1';
 
 -- A drill, and a template using it.
 insert into drills (id, club_id, title, category, minutes)
@@ -73,7 +88,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"df730ef7-dce2-4962-babe-96d9999b0173","role":"authenticated"}';
 do $$ declare w int; n int; begin
   select will_write into w from publish_training('a0000000-0000-4000-8000-0000000000a1',
-    array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, true);
+    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, true);
   select count(*) into n from training_sessions where event_id in ('eee00000-0000-4000-8000-0000000000d1','eee00000-0000-4000-8000-0000000000d2');
   insert into _r values ('preview counts 2 and writes 0', case when w = 2 and n = 0 then 'PASS' else 'FAIL w='||w||' n='||n end);
 end $$;
@@ -81,7 +96,7 @@ end $$;
 -- 4. Real publish writes 2 sessions, 2 blocks, and not the match.
 do $$ declare n int; m int; begin
   perform publish_training('a0000000-0000-4000-8000-0000000000a1',
-    array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, false);
+    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, false);
   select count(*) into n from training_sessions where event_id in ('eee00000-0000-4000-8000-0000000000d1','eee00000-0000-4000-8000-0000000000d2');
   select count(*) into m from training_sessions where event_id = 'eee00000-0000-4000-8000-0000000000d3';
   insert into _r values ('publish writes both trainings, not the match', case when n = 2 and m = 0 then 'PASS' else 'FAIL n='||n||' m='||m end);
@@ -97,7 +112,7 @@ reset role; set local role authenticated;
 set local request.jwt.claims = '{"sub":"df730ef7-dce2-4962-babe-96d9999b0173","role":"authenticated"}';
 do $$ declare s int; w int; kept text; begin
   select skipped_coach_edited, will_write into s, w from publish_training('a0000000-0000-4000-8000-0000000000a1',
-    array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, false);
+    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, false);
   select notes into kept from training_sessions where event_id = 'eee00000-0000-4000-8000-0000000000d1';
   insert into _r values ('publish skips the coach edit and reports it',
     case when s = 1 and w = 1 and kept = 'coach changed it' then 'PASS' else 'FAIL s='||s||' w='||w||' kept='||coalesce(kept,'null') end);
@@ -108,7 +123,7 @@ reset role; set local role authenticated;
 set local request.jwt.claims = '{"sub":"c0000000-0000-4000-8000-00000000d001","role":"authenticated"}';
 do $$ begin
   perform publish_training('a0000000-0000-4000-8000-0000000000a1',
-    array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, true);
+    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, true);
   insert into _r values ('coach calls publish','FAIL — allowed');
 exception when insufficient_privilege then insert into _r values ('coach calls publish','PASS — refused 42501'); end $$;
 
@@ -119,7 +134,7 @@ reset role;
 -- false here so the step does not depend on how production happens to have it
 -- set today, and the whole transaction rolls back.
 reset role;
-update teams set requires_contact = false where id = (select id from teams order by sort_order limit 1);
+update teams set requires_contact = false where id = 'c0000000-0000-4000-8000-00000000d0f1';
 insert into session_templates (id, club_id, name, total_minutes, requires_contact)
 select 'a0000000-0000-4000-8000-0000000000a2', club_id, 'HARNESS contact hour', 15, true from teams limit 1;
 insert into session_template_blocks (template_id, position, drill_id, minutes)
@@ -130,7 +145,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"df730ef7-dce2-4962-babe-96d9999b0173","role":"authenticated"}';
 do $$ begin
   perform publish_training('a0000000-0000-4000-8000-0000000000a2',
-    array[(select id from teams order by sort_order limit 1)], current_date, current_date + 10, true);
+    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, true);
   insert into _r values ('contact template to a tag squad','FAIL — allowed');
 exception when insufficient_privilege then insert into _r values ('contact template to a tag squad','PASS — refused 42501'); end $$;
 
