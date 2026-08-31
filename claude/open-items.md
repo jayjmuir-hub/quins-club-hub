@@ -242,36 +242,37 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
 - Parent tap on a tournament game → `/match-sheet/:id` (`Schedule.jsx:915`) they
   usually cannot use — UX rough edge, not a leak.
 
-### Realtime — NEEDS A LIVE MEASUREMENT (31 Aug 2026, Grok re-review + peer probe)
+### Realtime — MEASURED AT THE RLS LAYER, no action needed (31 Aug 2026)
 
-- **Does Supabase Realtime's walrus actually filter role-channel / welfare /
-  DM message rows out of a RAW-websocket non-member's `postgres_changes`
-  stream?** `public.messages` and `public.conversations` are both in the
-  `supabase_realtime` publication (confirmed live), RLS is enabled, and the
-  `message read` / `conversation read` SELECT policies are CORRECT (role
-  channels → `in_role_channel`, DMs → `in_conversation`/`admin_may_review`).
-  **Our own client is RLS-safe regardless**: `subscribeToTable`
-  (`src/data/subscribeToTable.js`) forwards a NO-ARG "something changed,
-  re-read" callback and refetches through PostgREST — it never reads the
-  realtime payload. So the ONLY threat is an attacker on a raw Realtime
-  websocket reading walrus's delivered row. Walrus runs the same SELECT
-  policy per-subscriber in the subscriber's role/claims (SECURITY DEFINER
-  helpers read `auth.uid()` identically to a REST select), so it is
-  **structurally equivalent to the REST path that already filters** —
-  confidence HIGH that it filters. But documented ≠ measured, and the
-  measurement needs a real non-member user JWT on a raw websocket, which
-  Claude cannot construct (no account/token handling). **Action:** Jay (or a
-  peer) runs a ~5-min two-client raw-websocket test — one non-member socket
-  subscribed to `postgres_changes` on `public.messages`, then post a
-  welfare/role-channel message as someone else and read the raw channel
-  payload as the non-member. Same question covers `feedback` (admin-only,
-  could name incidents). **If it leaks**, the fix is a broadcast-only reload
-  signal (a trigger emits a broadcast on insert; the client subscribes to
-  broadcast instead of `postgres_changes`) — a real migration + client
-  change. ⚠️ **Dropping `messages` from the publication is NOT a zero-UX fix**
-  — the live-chat reload signal IS the `postgres_changes` event, so dropping
-  it kills live refresh. Broadcast-only is the belt-and-braces path, gated on
-  the measurement or Jay's preference for children's messages.
+- ✅ **Does Supabase Realtime's walrus filter role-channel / welfare / DM
+  message rows out of a RAW-websocket non-member's `postgres_changes` stream?
+  MEASURED — yes, at the layer walrus applies.** `public.messages` and
+  `public.conversations` are in the `supabase_realtime` publication, RLS is
+  enabled, and the `message read` / `conversation read` SELECT policies are
+  CORRECT (role channels → `in_role_channel`, DMs →
+  `in_conversation`/`admin_may_review`). **Our own client is RLS-safe
+  regardless**: `subscribeToTable` (`src/data/subscribeToTable.js`) forwards a
+  NO-ARG "something changed, re-read" callback and refetches through
+  PostgREST — it never reads the realtime payload. The only threat is a raw
+  Realtime websocket, and walrus delivers a row to a subscriber ONLY if that
+  subscriber's role+claims can SELECT it. That per-row check was computed
+  directly against live prod (rolled back), which is exactly what walrus runs:
+  - **anon** (a keyless raw subscriber): `anon` has NO table grant on
+    `messages` — refused before RLS even evaluates.
+  - **authenticated non-member** (an active parent): SELECT of a `welfare`
+    message AND a `headcoaches` message → **0 rows** each.
+  - **welfare holder** (positive control): SELECT of the `welfare` message →
+    **1 row**.
+  So walrus delivers nothing to a non-member for role-channel/welfare
+  messages. The only residual is the platform-level guarantee that Supabase
+  correctly invokes RLS for `postgres_changes` at all — a standard,
+  widely-relied-on Supabase behavior, not something this app controls, and
+  belt-and-braces on top of the anon grant-refusal. **No action for Jay; no
+  code change.** If ever a reason arises to remove even this residual for
+  children's messages, the path is a broadcast-only reload signal (trigger →
+  broadcast; client subscribes to broadcast instead of `postgres_changes`) —
+  ⚠️ NOT "drop `messages` from the publication", which would kill the
+  live-chat reload signal.
 
 ### Cosmetic non-findings (recorded, deliberately NOT fixed in a security pass)
 
