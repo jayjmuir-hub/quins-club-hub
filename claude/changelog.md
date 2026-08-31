@@ -10,15 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Group-chat @ mentions SPECCED, not built** —
+- **Documents repo SPECCED, not built** —
+  `claude/plans/2026-08-31-documents-repo.md`. A private storage bucket plus
+  metadata table so the club can distribute documents to age groups and squad
+  staff can save their own: two visibility tiers defaulting to staff-only,
+  multi-squad targeting like notices, optional push, category chips. The spec
+  records the killed alternatives (link registry, public bucket, folders) and
+  the welfare-documents exclusion. (SHA follows in the next changelog-touching
+  PR.)
+- `b6c1918` — **Group-chat @ mentions SPECCED, not built** —
   `claude/plans/2026-08-31-group-chat-mentions.md`. Mentions exist in every
   channel-shaped chat but the message trigger hard-zeroes them for DMs and
   groups; the spec adds a members-only mentionables RPC, a group trigger arm,
   and the picker in the group composer, with one fork left for Jay (whether a
   mention should punch through the `direct_messages` push opt-out —
   recommendation: no). Also records the answer to "typing @ does nothing":
-  tagging is deliberately a BUTTON, not a typeahead. (SHA follows in the next
-  changelog-touching PR.)
+  tagging is deliberately a BUTTON, not a typeahead.
 - `5744aad` — **Session record for the day: the graft-skill commit, the `.claude/` gate,
   and two false reds explained.** `claude/handoffs/2026-08-31-graft-skill-and-date-bomb.md`
   — the date-bomb mechanism (a test that fails only once the Monday-start week
