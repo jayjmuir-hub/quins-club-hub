@@ -32,6 +32,13 @@ jobs:
   db-check:
     runs-on: ubuntu-latest
 
+    # issues:write is for the red-nightly issue below and nothing else;
+    # contents:read is what checkout needs. Declaring both narrows the
+    # default token rather than widening it.
+    permissions:
+      contents: read
+      issues: write
+
     steps:
       - uses: actions/checkout@v7
 
@@ -66,8 +73,9 @@ jobs:
           npm run db:check
           echo "ran=true" >> "$GITHUB_OUTPUT"
 
-      # ⚠️ THE HEARTBEAT CLOSES THE GAP GITHUB CANNOT SEE. Actions emails Jay
-      # when this run FAILS; nothing tells him when it stops HAPPENING — a
+      # ⚠️ THE HEARTBEAT CLOSES THE GAP GITHUB CANNOT SEE. A red run now opens
+      # an issue (above — the email this line used to rely on was proven not
+      # to reach anyone, 22-30 Aug); nothing tells him when it stops HAPPENING — a
       # schedule GitHub disables after 60 days without a commit, a deleted
       # workflow, a cron typo. Better Stack expects a ping inside its period
       # plus grace, and raises an alert on silence.
@@ -82,6 +90,37 @@ jobs:
       # Jay adds it — see claude/runbooks/monitoring.md, which also has the
       # proof-it-fires sequence. Claude never handles the URL: it is a
       # capability secret and this repo is public.
+      # ⚠️ A RED NIGHTLY OPENS AN ISSUE, BECAUSE EMAIL DEMONSTRABLY DID NOT
+      # WORK. This workflow was red every night from 22 to 30 Aug 2026 — nine
+      # days — and nobody reacted; the sixteen stale harnesses triaged in
+      # PR #587 accumulated in exactly that window. Whatever GitHub's
+      # failure-notification emails were doing, they were not reaching a
+      # human. An issue is visible on the repo front page, emails the owner
+      # through a channel he demonstrably reads (issue notifications), and
+      # holds the whole history as comments. One issue, bumped per red run —
+      # never one per night, which would train everyone to ignore them.
+      # Needs no secret, so unlike the heartbeat it cannot sit unarmed.
+      - name: Open or bump the red-nightly issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="The db-check nightly is red"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          existing=$(gh issue list --repo "${{ github.repository }}" \
+            --state open --search "in:title \"$title\"" \
+            --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            gh issue create --repo "${{ github.repository }}" \
+              --title "$title" \
+              --body "The nightly db harness run failed: $run_url
+
+A red run is a statement about PRODUCTION, not about any branch — the database drifted, or a harness went stale against a deliberate change. Triage per claude/runbooks/db-harnesses.md; the 31 Aug 2026 triage in claude/open-items.md is the worked example. This issue is bumped on every further red run and should be closed when the nightly is green again."
+          else
+            gh issue comment "$existing" --repo "${{ github.repository }}" \
+              --body "Still red: $run_url"
+          fi
+
       - name: Heartbeat
         if: steps.harnesses.outputs.ran == 'true'
         env:

@@ -380,6 +380,13 @@ begin
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.prokind = 'f'
      and has_function_privilege('anon', p.oid, 'execute')
+     -- ⚠️ THIS LIST IS EXHAUSTIVE OVER LIVE, WHICH COUPLES IT TO EVERY
+     -- SESSION'S MIGRATIONS, NOT ONLY THIS BRANCH'S. Any migration applied to
+     -- production that creates a public function Supabase default-grants to
+     -- anon turns this harness red the same night, whoever shipped it — the
+     -- 20260831 documents migrations were checked against exactly this arm
+     -- (they added none). That is the point of the check, but know the
+     -- coupling before blaming the branch you are on.
      -- list_signup_squads is DELIBERATELY anon-executable — the signup wizard
      -- has no session yet, and squad names are already shown to strangers on
      -- RequestAccess. Granted by name in 20260825_signup_before_confirm.sql

@@ -99,8 +99,14 @@ is the only thing that distinguishes a monitor from a decoration.
 
 ## The nightly-check heartbeat — wired 24 Aug 2026, waiting on Jay
 
-**GitHub emails Jay when the nightly `db-check` run FAILS. Nothing tells him
-when it stops HAPPENING** — GitHub disables a `schedule` after 60 days without
+⚠️ **"GitHub emails Jay when the run FAILS" was this section's opening claim,
+and it was DISPROVEN by events: the nightly was red every night from 22 to
+30 Aug 2026 — nine runs — and no human reacted.** Whatever those emails were
+doing, they were not functioning as an alert. Since 31 Aug a red run **opens or
+bumps a GitHub issue** ("The db-check nightly is red", one issue bumped per red
+run, closed when green) — visible on the repo, no secret to configure, and it
+notifies through issue notifications, a channel with a pulse. **Nothing tells
+anyone when the run stops HAPPENING** — GitHub disables a `schedule` after 60 days without
 repo activity, a workflow can be deleted, a cron line can rot. A heartbeat
 inverts the signal: the workflow pings Better Stack after every genuine green
 run, and **silence past the period + grace raises the alert**.

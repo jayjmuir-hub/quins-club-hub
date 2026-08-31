@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The 16 red db harnesses triaged — 14 repointed, 3 real drifts get
+- **A red db-check nightly now opens a GitHub issue.** Nine red nights
+  (22-30 Aug) went unseen because the failure emails demonstrably reached
+  nobody; the issue ("The db-check nightly is red", one issue bumped per
+  red run) needs no secret and notifies through a channel with a pulse.
+  Also: the monitoring runbook's disproven email claim corrected, the
+  grants harness's anon-arm coupling to concurrent sessions' migrations
+  documented, and my-chats-attachment's "five branches" comment fixed to
+  six (role channels made it wrong the day after it was written; only the
+  DM arm has last-attachment coverage). The Better Stack heartbeat is
+  still waiting on Jay's four steps in `claude/runbooks/monitoring.md`.
+  (SHA follows in the next changelog-touching PR.)
+- `b6b43fc` — **The 16 red db harnesses triaged — 14 repointed, 3 real drifts get
   `db/migrations/20260831_harness_drift_fixes.sql` (NOT yet applied).** The
   nightly had been red since 22 Aug, unnoticed. Every failure measured against
   live, none assumed: no security regressions. Fourteen harnesses were stale
@@ -21,7 +32,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `auth.uid()` in three policies, `push_endpoint_allowed` unpinned, anon
   EXECUTE on `complete_signup_intent`). Those three stay red until Jay applies
   the migration — proven green against it in a rolled-back run. Triage record:
-  `claude/open-items.md`. (SHA follows in the next changelog-touching PR.)
+  `claude/open-items.md`.
 - `99e8663` — **The account-menu chevron is white on the chrome.** Jay, minutes after
   chrome-quarters went live: the arrow beside the profile initial was
   invisible in light mode — the trigger kept clear-glass-era `text-ink`,
