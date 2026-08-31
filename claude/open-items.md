@@ -118,19 +118,18 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
 
 ### High — bites today, no narrowed grant required
 
-- **Tournament games leak into `pitch_occupancy` → false clashes.** `listEvents`
-  (`src/data/events.js:64`) and the token feed filter `tournament_id IS NULL`;
-  the `pitch_occupancy` RPC (`db/migrations/20260829_pitch_portion.sql:65-76`)
-  does not. Games inherit the container's pitch, carry no `ends_at`/`pitch_portion`
-  (`portionFraction(null)===1`, `src/lib/pitchPortion.js:41`), and the fan-out
-  exemption keys on `group_id` not `tournament_id` (`src/data/pitches.js:133-135`),
-  so on a home tournament day Allocation (reads `listEvents`) and Pitch Glance
-  (reads the RPC) disagree and the first game flags a false clash. #527/#528 are
-  FE/test-only and did **not** touch the RPC. **Fix:** add `and e.tournament_id
-  is null`. ⚠️ **Its harness is broken** — `db/tests/pitch-occupancy.sql:25-26`
-  `create or replace`s the OLD 8-col return type against the live 9-col
-  signature and would throw `cannot change return type`; repair it before it can
-  prove the fix.
+- ✅ **Item 3 FIXED — but the repo lagged production by a day.** The migration
+  `20260830_pitch_occupancy_exclude_tournament_games` (adds `and e.tournament_id
+  is null`) was **applied to production 30 Aug** — live `pg_get_functiondef`
+  carries the filter, so Pitch Glance already stopped crying wolf — **but the
+  PR never merged**, so the migration file, the client defence-in-depth
+  (`src/data/pitches.js` ignores `tournament_id` rows), the harness repair, and
+  the 9-column `functions.sql` recapture were absent from `main` until the
+  31 Aug reconcile PR. Grok's 31 Aug re-review correctly read the stale 8-column
+  `functions.sql` capture and flagged the repo as vulnerable; the *database* was
+  always ahead. Reconciled 31 Aug 2026 — the repo now records what production
+  has run since 30 Aug. **No DB change in the reconcile PR; the migration was
+  already live.**
 - ✅ **Item 5 FIXED, 30 Aug 2026**: `deleteConversation` and `resolveReport`
   carry the `.select('id')` + zero-rows-throws guard `removeMessage` already
   had; both directions pinned in `tests/messages-data.test.js`, and both

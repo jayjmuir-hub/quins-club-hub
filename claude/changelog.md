@@ -10,14 +10,31 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Documents repo SPECCED, not built** —
+- **Grok item 3 RECONCILED — the repo now records the pitch-occupancy fix
+  production has run since 30 Aug.** The migration
+  `20260830_pitch_occupancy_exclude_tournament_games` (adds `and
+  e.tournament_id is null` so tournament GAMES stop counting as occupants and
+  Pitch Glance stops flagging false clashes on a home tournament day) was
+  **applied to production 30 Aug but its PR never merged** — the migration
+  file, the client defence-in-depth (`src/data/pitches.js` ignores
+  `tournament_id` rows), the harness repair, and the 9-column `functions.sql`
+  recapture were all absent from `main`. Grok's 31 Aug re-review read the
+  stale 8-column `functions.sql` capture and correctly flagged the repo as
+  vulnerable; the *database* was always ahead. **No DB change here — the
+  migration was already live** (confirmed via `pg_get_functiondef` and the
+  Supabase migration history, version `20260830174219`); this PR only brings
+  the repository in line. `db/migrations/20260830_pitch_occupancy_exclude_
+  tournament_games.sql` (recorded), `src/data/pitches.js`,
+  `db/tests/pitch-occupancy.sql`, `db/schema/functions.sql`,
+  `tests/pitch-clashes.test.js`. (SHA follows in the next changelog-touching
+  PR.)
+- `1b7c59a` — **Documents repo SPECCED, not built** —
   `claude/plans/2026-08-31-documents-repo.md`. A private storage bucket plus
   metadata table so the club can distribute documents to age groups and squad
   staff can save their own: two visibility tiers defaulting to staff-only,
   multi-squad targeting like notices, optional push, category chips. The spec
   records the killed alternatives (link registry, public bucket, folders) and
-  the welfare-documents exclusion. (SHA follows in the next changelog-touching
-  PR.)
+  the welfare-documents exclusion.
 - `b6c1918` — **Group-chat @ mentions SPECCED, not built** —
   `claude/plans/2026-08-31-group-chat-mentions.md`. Mentions exist in every
   channel-shaped chat but the message trigger hard-zeroes them for DMs and
@@ -78,9 +95,10 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `player-photos` storage read/write (→ the S3 photos allowlists), and
   `welfare_access_log` "welfare log read" (`is_admin` → super + welfare,
   Phase 4). No live change — the database was already this; only the file
-  moved. Closes the last of item 14 (the `pitch_occupancy` signature was
-  recaptured in the PR-3 merge, `chat_media_owner` pinned by #552).
-  `db/schema/policies.sql`.
+  moved. ⚠️ **This entry claimed `pitch_occupancy` was "recaptured in the PR-3
+  merge" — that was FALSE: PR-3 never merged (see the 31 Aug reconcile entry
+  at the top). `functions.sql`'s pitch capture stayed 8-column until 31 Aug.**
+  `chat_media_owner` pinned by #552. `db/schema/policies.sql`.
 - `55d25e5` — **Grok items 10, 11 & 12 SHIPPED — the push/mail pipeline stops trusting
   its callers.** Item 12 (SSRF): `register_push_subscription` allowlists the
   endpoint — https + real push services only, built from the hosts measured
