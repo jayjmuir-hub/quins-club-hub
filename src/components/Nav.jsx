@@ -243,34 +243,35 @@ export default function Nav({ showSquadHub = false, badges = {} }) {
   // acres of space ("don't look good", Jay). Below five tabs the dock becomes a
   // fixed-width CENTRED ISLAND that hugs its tabs (see the nav className); at
   // five it stays the full-width bar it has always been, so squad staff see no
-  // change. Derived from `base` (before the Home reorder, which preserves
-  // length) so it can gate that reorder too.
+  // change. It gates the WIDTH only — nothing reorders the tabs any more (see
+  // the tombstone below), so `base` and the rendered order are the same list.
   const compact = base.length < 5
 
-  // ⚠️ HOME'S SLOT DEPENDS ON THE BAR — Jay, 29–30 Aug 2026.
-  // FIVE-TAB squad-staff bar: Home rides the CENTRE. The app opens on Home (the
-  // PWA `start_url` is `/`, which routes to the Dashboard), and the middle of a
-  // full-width bar is the thumb's natural resting slot — so the tab you land on
-  // is the tab under your thumb.
-  // FOUR-TAB parent/player ISLAND: Home stays FAR LEFT, its natural NAV_ITEMS
-  // slot (Jay, 30 Aug 2026). On the narrow centred island the middle is no
-  // longer where the thumb rests, and Home anchoring the left edge reads
-  // cleaner than stranded in the centre.
+  // 🪦 TOMBSTONE — HOME WAS CENTRED ON THE FIVE-TAB BAR, 29–31 Aug 2026.
+  // Home now sits FAR LEFT in EVERY view — its natural NAV_ITEMS slot — so there
+  // is no reorder here at all and `items` is `base`, read but never mutated.
   //
-  // ⚠️ MOBILE-BAR-ONLY EITHER WAY. NAV_ITEMS — and so the desktop Sidebar, which
-  // imports it — keep Home FIRST, where the top of a vertical nav belongs; only
-  // this horizontal dock ever moves it, and only when it is the wide bar.
-  // `findIndex` + splice, not a hard index, so it survives a NAV_ITEMS reorder;
-  // Home lands at `floor(count/2)`, dead centre of the five-tab bar.
-  const items = (() => {
-    if (compact) return [...base]
-    const list = [...base]
-    const homeAt = list.findIndex((item) => item.to === '/')
-    if (homeAt < 0) return list
-    const [home] = list.splice(homeAt, 1)
-    list.splice(Math.floor(base.length / 2), 0, home)
-    return list
-  })()
+  // What stood here, so nobody rebuilds it cold: a `findIndex` + `splice` that
+  // pulled Home out and re-inserted it at `floor(count/2)`, dead centre, but
+  // ONLY on the wide five-tab squad-staff bar (#526, 29 Aug 2026). THE ARGUMENT
+  // FOR IT, which was a good one: the app opens on Home (the PWA `start_url` is
+  // `/`, which routes to the Dashboard) and the middle of a full-width bar is
+  // the thumb's natural resting slot, so the tab you land on would be the tab
+  // already under your thumb.
+  //
+  // It never applied to the four-tab parent/player island, which was pulled
+  // back to Home-on-the-left within a day (#531, 30 Aug 2026) because the
+  // middle of a narrow centred island is not where the thumb rests. That split
+  // was the real cost: the same app put Home in two different places depending
+  // on who was looking at it, so its position could not be learned, and every
+  // test, screenshot and doc had to carry both cases. Jay reverted the
+  // remaining half on 31 Aug 2026 — Home left, one rule, all views.
+  // Reinstating the centre reinstates the split; don't, without an argument
+  // that answers it.
+  //
+  // NAV_ITEMS itself never moved — it has always led with Home, and the desktop
+  // Sidebar that imports it was untouched throughout.
+  const items = base
 
   const { pathname } = useLocation()
   const navRef = useRef(null)
