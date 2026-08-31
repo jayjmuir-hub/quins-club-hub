@@ -10,15 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **The crown sits properly: ProfileIcon component, and the dotted name
+- **The account-menu chevron is white on the chrome.** Jay, minutes after
+  chrome-quarters went live: the arrow beside the profile initial was
+  invisible in light mode — the trigger kept clear-glass-era `text-ink`,
+  near-black on the now-dark masthead, and it lives in `AccountMenu.jsx`,
+  which the masthead ink sweep (scoped to AppShell's header block) never
+  touched. Trigger and chevron are white-family now; the dropdown sheet
+  keeps ink — it opens on a card. `src/components/AccountMenu.jsx`,
+  `tests/account-menu.test.jsx`. (SHA follows in the next
+  changelog-touching PR.)
+- `c96add2` — **The crown sits properly: ProfileIcon component, and the dotted name
   underline retired.** Jay's polish notes off the first live crown (a real
   head coach wore 👑 within the hour of the deploy): the emoji left the
   name string for `src/components/ProfileIcon.jsx` — centred
   (`align-middle`, `leading-none`, a 1px optical lift) and 15px against
   the 12-13px names — and the dotted tappable-hint came off ChatBubble's
   author button and `PersonName` ("do we need the giant row of dots?"):
-  the styled name is the door, desktop keeps a hover underline. (SHA
-  follows in the next changelog-touching PR.)
+  the styled name is the door, desktop keeps a hover underline.
 - `1379a24` — **Chrome-quarters: both bars go premium dark with ghosted harlequin
   quarters.** Jay picked the direction from rendered options (B+C hybrid,
   hint intensity): near-black gradient chrome, red quarter sweeping from
