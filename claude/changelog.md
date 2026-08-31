@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **`chat-list.sql` assert 5 was green by luck — `now()` is
+- **Chat attachments carry METADATA — the door to documents-in-chat, left
+  open for half an hour instead of a day.** Jay wants PDFs in chat and turned
+  down share-a-link, so the list had to be able to hold what a photo never
+  needs: ⚠️ **a document is useless without its ORIGINAL FILENAME, and that
+  name is unrecoverable** — storage keys are `<uuid>/<random>.pdf`, so a PDF
+  could only ever have rendered as "a PDF". Done the same day as the list and
+  BEFORE any app code, because nothing wrote the column yet (9 rows): half an
+  hour now against a migration over live album data plus rewritten composer
+  code later. `attachments jsonb` is the truth; `attachment_paths` and
+  `attachment_path` are DERIVED by trigger. ⚠️ **The storage policy is
+  byte-identical** — still `name = any(x.attachment_paths)` — which was the
+  design goal: a jsonb-reading policy would have rewritten the one piece of
+  SQL protecting photographs of children and re-opened a boundary proved by
+  fault injection an hour earlier. The third trigger arm is a CORRECTNESS
+  requirement, not a nicety: a phone on a cached PWA bundle still writes
+  `attachment_path`, and without derivation its photo would be unreadable by
+  everyone, silently and per-device. Harness grew to 15 arms including write
+  PRECEDENCE asserted rather than implied. Schema captured in the SAME commit.
+  `db/migrations/20260901_attachment_metadata.sql`.
+  (SHA follows in the next changelog-touching PR.)
+- `d49a2ff` — **`chat-list.sql` assert 5 was green by luck — `now()` is
   transaction-constant.** The squad post and the DM shared one `created_at`,
   `my_chats`' recency ordering tied, and 'dm' won on a label tie-break
   against empty fixture names — "newest first" was never tested. Staggered
@@ -18,8 +38,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `conversations.last_at`, not `messages.created_at`, as the DM rows'
   driver). Both latent defect classes — now()-tie luck and the 30
   still-unclassified function-replay files — recorded in
-  `claude/open-items.md` for the full audit. (SHA follows in the next
-  changelog-touching PR.)
+  `claude/open-items.md` for the full audit.
 - `e2c0a10` — **The schema captures caught up with production — including a child-photo
   access rule that had gone stale.** #594 changed the database and did not
   update `db/schema/`, so for a short while `policies.sql` documented the

@@ -91,6 +91,10 @@ declare
   peer     constant uuid := 'f0000000-0000-4000-8000-000000000062';
   outsider constant uuid := 'f0000000-0000-4000-8000-000000000063';
   photo7   text;
+  -- 20260901_attachment_metadata (arms 7-10)
+  meta_msg uuid; legacy_msg uuid;
+  meta_paths text[]; meta_first text; meta_name text;
+  legacy_attachments jsonb;
 begin
   -- An eight-photo album, every object under the sender's own prefix (the
   -- `chat media write` policy allows nothing else).
@@ -163,6 +167,86 @@ begin
   alter table messages enable trigger sync_attachment_paths;
   delete from messages where attachment_path = sender::text || '/zz-stranded.jpg';
   perform pg_temp._chk(n = 1, '5-control: the stranded-row count can report non-zero');
+
+  -- ── 20260901_attachment_metadata: the three columns stay in step ────────
+  -- ⚠️ THE POINT OF THESE ARMS. `attachments` jsonb carries what a DOCUMENT
+  -- needs and a photo does not: its ORIGINAL FILENAME. Storage keys are
+  -- <uuid>/<random>.pdf, so without this a document could only ever render as
+  -- "a PDF". attachment_paths and attachment_path are DERIVED from it by
+  -- private.sync_attachment_paths, so the storage policy is untouched.
+
+  -- 7. new code writes `attachments` -> the other two are derived
+  insert into messages (conversation_id, channel, body, attachments)
+       values (conv, 'dm', 'Fixtures',
+               jsonb_build_array(
+                 jsonb_build_object('file', sender::text || '/zz-a.pdf',
+                                    'type', 'application/pdf',
+                                    'size', 284000,
+                                    'name', 'Fixtures September.pdf'),
+                 jsonb_build_object('file', sender::text || '/zz-b.jpg',
+                                    'type', 'image/jpeg',
+                                    'size', 120000,
+                                    'name', 'Team.jpg')))
+    returning id into meta_msg;
+  select attachment_paths, attachment_path into meta_paths, meta_first
+    from messages where id = meta_msg;
+  perform pg_temp._chk(
+    meta_paths = array[sender::text || '/zz-a.pdf', sender::text || '/zz-b.jpg'],
+    '7 writing attachments derives attachment_paths, in order');
+  perform pg_temp._chk(meta_first = sender::text || '/zz-a.pdf',
+    '7b and derives attachment_path as element 1');
+
+  -- 8. ⚠️ THE ORIGINAL FILENAME SURVIVES — the entire reason for the reshape.
+  select attachments -> 0 ->> 'name' into meta_name from messages where id = meta_msg;
+  perform pg_temp._chk(meta_name = 'Fixtures September.pdf',
+    '8 a document keeps its original filename, which a storage key cannot carry');
+
+  -- 9. CONTROL, and it is the one that matters for a PWA. A CACHED OLD BUNDLE
+  --    writes only attachment_path; both new columns must still be derived, or
+  --    that member''s photo becomes unreadable to everyone the moment the
+  --    policy reads a list they are not in.
+  insert into messages (conversation_id, channel, body, attachment_path)
+       values (conv, 'dm', '', sender::text || '/zz-legacy.jpg')
+    returning id into legacy_msg;
+  select attachment_paths, attachments into meta_paths, legacy_attachments
+    from messages where id = legacy_msg;
+  perform pg_temp._chk(meta_paths = array[sender::text || '/zz-legacy.jpg'],
+    '9 an old client writing attachment_path still gets attachment_paths');
+  perform pg_temp._chk(legacy_attachments -> 0 ->> 'file' = sender::text || '/zz-legacy.jpg',
+    '9b and gets an attachments entry, so nothing is stranded');
+
+  -- 9c. ⚠️ WRITE PRECEDENCE, ASSERTED RATHER THAN IMPLIED. Three writable
+  --     columns means one statement can set two of them with DISAGREEING
+  --     values — new code writing `attachments` while something stale also
+  --     sets attachment_path, or a bulk UPDATE touching both. The trigger's
+  --     if/elsif arms imply a winner; without this arm that implication rots
+  --     into "whichever the trigger happened to check first". THE RULE:
+  --     `attachments` wins whenever it is present and non-empty, then
+  --     attachment_paths, then attachment_path. The loser is silently
+  --     derived, never an error — erroring would break the cached-bundle
+  --     case that arm 9 exists to protect.
+  insert into messages (conversation_id, channel, body, attachments, attachment_path)
+       values (conv, 'dm', 'conflict',
+               jsonb_build_array(jsonb_build_object('file', sender::text || '/zz-winner.jpg')),
+               sender::text || '/zz-loser.jpg')
+    returning id into meta_msg;
+  select attachment_path, attachment_paths into meta_first, meta_paths
+    from messages where id = meta_msg;
+  perform pg_temp._chk(meta_first = sender::text || '/zz-winner.jpg',
+    '9c precedence: attachments beats a conflicting attachment_path');
+  perform pg_temp._chk(meta_paths = array[sender::text || '/zz-winner.jpg'],
+    '9d and the derived list follows the winner, not the loser');
+
+  -- 10. the cap counts the jsonb, not just the derived array
+  begin
+    insert into messages (conversation_id, channel, body, attachments)
+    select conv, 'dm', 'eleven',
+           jsonb_agg(jsonb_build_object('file', sender::text || '/zz-many-' || i || '.jpg'))
+      from generate_series(1, 11) i;
+    caught := null;
+  exception when check_violation then caught := 'capped';
+  end;
+  perform pg_temp._chk(caught = 'capped', '10 the cap counts attachments, not only the derived list');
 
   -- 6. the cap is the database''s rule, not the client''s suggestion
   begin
