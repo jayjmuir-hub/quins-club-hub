@@ -119,6 +119,23 @@ describe('nextEventLabel', () => {
     expect(nextEventLabel({ type: 'social' })).not.toMatch(/fixture/i)
   })
 
+  // ⚠️ SAME BUG SHAPE AS THE ONE ABOVE, ONE LAYER DOWN. A Club Diary entry is
+  // stored as type='social', so the social branch would claim a kit collection
+  // and the Home card would head it "Next social". The fix is a branch placed
+  // BEFORE the type checks — and the ORDER is the whole fix, which is why the
+  // second test here exists separately from the first.
+  // claude/plans/2026-08-31-club-diary.md.
+  it('does NOT call an information-only event a social', () => {
+    expect(nextEventLabel({ type: 'social', info_only: true })).toBe('Next up')
+    expect(nextEventLabel({ type: 'social', info_only: true })).not.toMatch(/social/i)
+  })
+
+  it('still calls an ordinary social a social', () => {
+    // The control. Without this, the assertion above would pass just as well if
+    // the social branch had been deleted for everyone.
+    expect(nextEventLabel({ type: 'social', info_only: false })).toBe('Next social')
+  })
+
   it.each([[undefined], [null], [{}], [{ type: 'unknown' }]])(
     'says something true rather than guessing for %s',
     (event) => {

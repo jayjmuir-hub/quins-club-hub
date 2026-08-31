@@ -227,6 +227,12 @@ export function eventChipKind(event) {
 }
 
 export function nextEventLabel(event) {
+  // ⚠️ FIRST, BEFORE THE TYPE CHECKS, AND THE ORDER IS THE ENTIRE FIX. A Club
+  // Diary entry is stored as type='social', so the social branch below would
+  // claim a kit collection and the Home card would head it "Next social".
+  // Moving this line down is a silent regression — tests/event-format.test.js
+  // fails if you do. claude/plans/2026-08-31-club-diary.md.
+  if (event?.info_only === true) return 'Next up'
   if (event?.type === 'match') return 'Next fixture'
   if (event?.type === 'training') return 'Next training'
   if (event?.type === 'social') return 'Next social'
