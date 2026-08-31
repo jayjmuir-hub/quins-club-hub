@@ -18,6 +18,15 @@ vi.mock('../src/data/messages.js', () => ({
   openConversation: (...args) => openConversation(...args),
 }))
 
+// Profile icons (claude/plans/2026-08-31-profile-icons.md): the card lists
+// ALL of a person's icons with their meaning lines. Empty by default so the
+// rest of this file stays about its own subject.
+const listMemberIconsMock = vi.fn(async () => [])
+vi.mock('../src/data/profileIcons.js', () => ({
+  listMemberIcons: (...a) => listMemberIconsMock(...a),
+  listClubIconMap: async () => new Map(),
+}))
+
 const coach = {
   profileId: 'p-coach',
   name: 'Zz Probe Coach',
@@ -57,6 +66,32 @@ describe('PersonCard', () => {
   beforeEach(() => {
     getPersonCard.mockReset()
     openConversation.mockReset()
+    listMemberIconsMock.mockReset()
+    listMemberIconsMock.mockResolvedValue([])
+  })
+
+  it('lists the icons with reason, default meaning and squad label', async () => {
+    getPersonCard.mockResolvedValue(coach)
+    listMemberIconsMock.mockResolvedValue([
+      { id: 'g1', icon: 'crown', reason: 'Best age group users of Club Hub', is_primary: true, team_name: 'U10 ZZ Cardprobe', created_at: '2026-08-31T00:00:00Z' },
+      { id: 'g2', icon: 'star', reason: null, is_primary: false, team_name: null, created_at: '2026-08-30T00:00:00Z' },
+      { id: 'g3', icon: 'not_in_library', reason: 'ghost', is_primary: false, team_name: null, created_at: '2026-08-29T00:00:00Z' },
+    ])
+    mount('p-coach')
+    const strip = await screen.findByTestId('person-card-icons')
+    // The custom reason line wins; a squad grant names its squad.
+    expect(strip).toHaveTextContent('👑 Best age group users of Club Hub · U10 ZZ Cardprobe')
+    // No reason → the library's default meaning.
+    expect(strip).toHaveTextContent('⭐ Star of the club — above and beyond')
+    // A key the library retired renders NOTHING, not a broken row.
+    expect(strip).not.toHaveTextContent('ghost')
+  })
+
+  it('a person with no icons shows no icon strip at all', async () => {
+    getPersonCard.mockResolvedValue(parent)
+    mount('p-parent')
+    await screen.findByTestId('person-card')
+    expect(screen.queryByTestId('person-card-icons')).toBeNull()
   })
 
   it('renders nothing while no profile is picked', () => {

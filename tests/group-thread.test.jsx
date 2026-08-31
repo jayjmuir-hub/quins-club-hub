@@ -106,6 +106,15 @@ vi.mock('../src/data/personCard.js', () => ({
   getPersonCard: (...args) => getPersonCardMock(...args),
 }))
 
+// Profile icons (claude/plans/2026-08-31-profile-icons.md): decoration, off
+// unless a test arms the map — which is why every OTHER test in this file
+// keeps passing with exact-name queries.
+const listClubIconMapMock = vi.fn(async () => new Map())
+vi.mock('../src/data/profileIcons.js', () => ({
+  listClubIconMap: (...a) => listClubIconMapMock(...a),
+  listMemberIcons: async () => [],
+}))
+
 import DirectMessages from '../src/screens/DirectMessages.jsx'
 
 const ME = 'me-1'
@@ -150,6 +159,7 @@ function renderAt(path) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  listClubIconMapMock.mockResolvedValue(new Map())
   useAuthMock.mockReturnValue({ user: { id: ME } })
   useMembershipsMock.mockReturnValue({ memberships: PARENT })
   m.getConversation.mockResolvedValue(GROUP)
@@ -220,6 +230,30 @@ describe('a group thread', () => {
     await user.click(screen.getByRole('button', { name: 'Leave group' }))
     await waitFor(() => expect(m.leaveGroup).toHaveBeenCalledWith('g1'))
     expect(await screen.findByText('the list')).toBeInTheDocument()
+  })
+})
+
+// Profile icons in the thread (claude/plans/2026-08-31-profile-icons.md):
+// the primary icon rides after the author name on bubbles and after the
+// name-button in the member line — AFTER the button, so the accessible name
+// stays the bare first name the person-card tests already pin.
+describe('profile icons in a group thread', () => {
+  it('a crowned author shows 👑 on their bubble and in the member line', async () => {
+    listClubIconMapMock.mockResolvedValue(new Map([['p-2', 'crown']]))
+    renderAt('/chat/dm/g1')
+    const bubble = await screen.findByTestId('dm-bubble')
+    await waitFor(() => expect(within(bubble).getByText(/Mira Vantel 👑/)).toBeInTheDocument())
+    const subtitle = screen.getByTestId('chat-subtitle')
+    await waitFor(() => expect(subtitle).toHaveTextContent('Mira 👑'))
+    // The name button keeps its bare accessible name — the icon sits outside.
+    expect(within(subtitle).getByRole('button', { name: 'Mira' })).toBeInTheDocument()
+  })
+
+  it('an unknown icon key decorates nothing', async () => {
+    listClubIconMapMock.mockResolvedValue(new Map([['p-2', 'retired_icon_key']]))
+    renderAt('/chat/dm/g1')
+    const bubble = await screen.findByTestId('dm-bubble')
+    expect(within(bubble).getByText('Mira Vantel')).toBeInTheDocument()
   })
 })
 

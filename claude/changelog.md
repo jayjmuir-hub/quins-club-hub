@@ -10,7 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 31 Aug 2026
 
-- **Profile icons SPECCED, not built** —
+- **Profile icons SHIPPED — the crown for U11.** The 31-emoji library
+  (`src/lib/profileIcons.js`, clipboard for coach), `profile_icons` with
+  exactly-one-target check and super-admin-only writes under RLS,
+  `club_icon_map` + `member_icons` read paths — both migrations applied,
+  harness green with a drop-the-policy self-test
+  (`db/tests/profile-icons.sql`). The primary emoji rides the author label
+  on channel, group and DM bubbles and after the member-line name buttons;
+  the person card lists every icon with its reason or library meaning;
+  `/admin/icons` (super-only, AdminOfficers' shape) grants to a squad's
+  staff or a person with Revoke and Make primary. All four `db/schema/`
+  captures updated; every assertion red-first. Awaiting Jay's first real
+  grant as the live proof. (SHA follows in the next changelog-touching PR.)
+- `c98c2c8` — **Profile icons SPECCED, not built** —
   `claude/plans/2026-08-31-profile-icons.md`. Jay's idea: crown the U11
   staff (best age group users of Club Hub), grantable by super admins to a
   squad's staff or an individual. Rulings captured: emoji beside the name,

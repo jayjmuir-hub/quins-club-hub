@@ -1845,3 +1845,29 @@ CREATE POLICY "message reads for author" ON public.message_reads
   USING ((EXISTS ( SELECT 1
    FROM messages m
   WHERE ((m.id = message_reads.message_id) AND (m.author_id = ( SELECT auth.uid() AS uid))))));
+
+-- profile_icons (20260831_profile_icons — pg_policies verbatim, 31 Aug 2026)
+
+CREATE POLICY "icons read" ON public.profile_icons
+  FOR SELECT
+  USING ((EXISTS ( SELECT 1
+   FROM memberships m
+  WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = profile_icons.club_id) AND (m.status = 'active'::text)))));
+
+CREATE POLICY "icons grant" ON public.profile_icons
+  FOR INSERT
+  WITH CHECK ((private.is_super_admin() AND (EXISTS ( SELECT 1
+   FROM memberships m
+  WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = profile_icons.club_id) AND (m.status = 'active'::text))))));
+
+CREATE POLICY "icons update" ON public.profile_icons
+  FOR UPDATE
+  USING ((private.is_super_admin() AND (EXISTS ( SELECT 1
+   FROM memberships m
+  WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = profile_icons.club_id) AND (m.status = 'active'::text))))));
+
+CREATE POLICY "icons revoke" ON public.profile_icons
+  FOR DELETE
+  USING ((private.is_super_admin() AND (EXISTS ( SELECT 1
+   FROM memberships m
+  WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = profile_icons.club_id) AND (m.status = 'active'::text))))));

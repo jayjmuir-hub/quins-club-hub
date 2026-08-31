@@ -25,6 +25,7 @@ import TrainingTemplates from './screens/TrainingTemplates.jsx'
 import TrainingPublish from './screens/TrainingPublish.jsx'
 import AdminClub from './screens/AdminClub.jsx'
 import AdminNeedsAttention from './screens/AdminNeedsAttention.jsx'
+import AdminIcons from './screens/AdminIcons.jsx'
 import AdminRightsLog from './screens/AdminRightsLog.jsx'
 import AdminOfficers from './screens/AdminOfficers.jsx'
 import AdminStaff from './screens/AdminStaff.jsx'
@@ -276,6 +277,10 @@ export default function App() {
                 rights-log pattern: the tab hides, the screen re-checks, and
                 club_officers' RLS actually decides. */}
             <Route path="officers" element={<AdminOfficers />} />
+            {/* Recognition emoji, super admins only — same shape as officers:
+                the door hides, the screen re-checks, profile_icons' RLS
+                actually decides. */}
+            <Route path="icons" element={<AdminIcons />} />
             {/* Pitch setup. The `pitches` admin right decides whether the TAB
                 is shown; the screen itself repeats the check, because a route
                 is linkable and somebody will paste the URL. Neither is

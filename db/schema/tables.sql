@@ -2492,3 +2492,19 @@ CREATE TABLE public.club_officers (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (club_id, profile_id, title)
 );
+
+-- profile_icons (20260831_profile_icons — the crown for U11, 31 Aug 2026).
+-- Exactly one target: a person, or a squad's staff (the crown follows the
+-- job). Icon is a KEY into the client library; format-checked, not an enum.
+CREATE TABLE public.profile_icons (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  club_id    uuid NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
+  profile_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
+  team_id    uuid REFERENCES public.teams(id) ON DELETE CASCADE,
+  icon       text NOT NULL CHECK (icon ~ '^[a-z0-9_]{1,32}$'),
+  reason     text CHECK (reason IS NULL OR length(btrim(reason)) BETWEEN 1 AND 200),
+  is_primary boolean NOT NULL DEFAULT false,
+  granted_by uuid NOT NULL DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT profile_icons_one_target CHECK ((profile_id IS NULL) <> (team_id IS NULL))
+);
