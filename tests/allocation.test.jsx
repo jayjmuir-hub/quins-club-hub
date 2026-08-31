@@ -344,7 +344,11 @@ describe('direct assignment', () => {
     listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD' })])
     const user = await setup()
 
-    await user.click(await screen.findByRole('button', { name: /U16B Contact/i }))
+    // findAll, like throughDetail: when today falls in the fixture's week the
+    // event renders in BOTH the waiting list and the calendar grid, and a
+    // singular findByRole throws on the duplicate (bit on 31 Aug 2026, the
+    // Monday the default week view first contained 5 Sep).
+    await user.click((await screen.findAllByRole('button', { name: /U16B Contact/i }))[0])
     // The details are really there — the key-value rows, not just a picker.
     expect(await screen.findByText('Age group')).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: /assign pitch/i }))
@@ -379,7 +383,8 @@ describe('direct assignment', () => {
     listEventsMock.mockResolvedValue([ev({ id: 'x', pitch: 'Pitch TBD' })])
     const user = await setup()
 
-    await user.click(await screen.findByRole('button', { name: /U16B Contact/i }))
+    // findAll for the same reason as above — the event can appear twice.
+    await user.click((await screen.findAllByRole('button', { name: /U16B Contact/i }))[0])
     await user.click(await screen.findByRole('button', { name: /assign pitch/i }))
     // Not offered until there is a pitch to split.
     expect(screen.queryByLabelText('How much of the pitch')).not.toBeInTheDocument()

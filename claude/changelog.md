@@ -8,9 +8,30 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 31 Aug 2026
+
+- **The graft skill now says how to run `build --deep` on Jay's PCs.**
+  `.claude/skills/graft/SKILL.md` splits plain `build` (structural graph, free,
+  no key) from `build --deep` (LLM concept map — spends tokens, goes stale as
+  fast as the code, skip unless asked), and records the exact command for the
+  deep build through the local `hermes proxy` with a dummy key, since there is
+  no `GRAFT_API_KEY` to set. The edit had been live-but-uncommitted on cafnet.
+  And since this was the repo's first committed `.claude/` file, `.claude/` is
+  now on `scripts/netlify-ignore.mjs`'s DEPLOY_IRRELEVANT list beside
+  `.cursor/` — it steers Claude sessions and can never reach `dist/`, so a
+  skill edit no longer spends a build. Proven red-then-green in
+  `tests/netlify-ignore.test.js`. Also defused a date bomb this PR trod on:
+  two `tests/allocation.test.jsx` direct-assignment tests used a singular
+  `findByRole` for the U16B event button, which went ambiguous the Monday
+  (31 Aug) the default week view first contained the 5 Sep fixture — the
+  event then renders in both the waiting list and the grid. Now
+  `findAllByRole(...)[0]`, matching `throughDetail` beside them, which is why
+  only two of the three broke. (SHA follows in the next changelog-touching
+  PR.)
+
 ## 30 Aug 2026
 
-- **Grok item 17 SHIPPED — what an error may SAY to a parent, plus the item-6
+- `c021bff` — **Grok item 17 SHIPPED — what an error may SAY to a parent, plus the item-6
   cache residue.** `RequireAuth` maps the login URL fragment through
   `friendlyAuthError`: the fragment is attacker-writable (any link can end
   `#error_description=…`), so Login now receives a sentence this app wrote,
@@ -26,8 +47,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   device that never switches user. `src/lib/friendlyError.js` (new),
   `src/lib/apiCache.js`, `src/components/RequireAuth.jsx`, the six screens,
   `tests/error-hygiene.test.jsx` (new), `tests/api-cache.test.js`,
-  `tests/require-auth.test.jsx`. (SHA follows in the next changelog-touching
-  PR.)
+  `tests/require-auth.test.jsx`.
 - `bb3490d` — **Grok item 14 SHIPPED — `db/schema/policies.sql` re-captured to match
   live.** The 28 Aug admin-rights redesign turned four surfaces into real
   allowlist boundaries and this capture had lagged them by two days — the
