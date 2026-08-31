@@ -502,6 +502,39 @@ anyone a child's photograph has been erased on the strength of a Supabase delete
 15 Aug totalled 203 KB — the cost was never storage. `deletePlayer` still removes the row
 and leaves the file, so a departed child's photograph outlives their record.
 
+### `FOR ALL` on a storage bucket makes the WRITE predicate a READ predicate
+
+⚠️ **A `for all` policy on `storage.objects` is not "the write rule" — its `using`
+arm is also the bucket's SELECT arm, so whatever authority it grants to write, it
+grants to READ.** Postgres applies `for all`'s `using` to every command including
+`select`; `with check` only constrains the insert/update. So a policy written to
+mean "a T1 coach may put files under `T1/`" silently also means "a T1 coach may
+read anything under `T1/`" — including objects no metadata row points at.
+
+**Measured on the documents bucket, 31 Aug 2026, the day it was applied.** The
+migration header claimed *"an orphan key is signable by NOBODY, which is what makes
+the app's file-first upload order safe"*, and that claim was false on arrival: the
+single `for all` "document write" policy handed every T1 coach SELECT on every
+object under `T1/`, row or no row. The read policy that was supposed to be the only
+SELECT path had a second one sitting beside it. Fixed by splitting the policy into
+separate `insert`/`update`/`delete` policies, leaving exactly one SELECT policy on
+the bucket — `db/migrations/20260831_documents_policy_split.sql`.
+
+⚠️ **THE SPLIT HAS A SECOND CONSEQUENCE THAT LOOKS LIKE A BUG AND IS NOT.** A
+`delete` whose `where` clause reads the table's own columns applies the SELECT
+policies too. Once "document read" is the bucket's only SELECT path, an orphan —
+invisible to everyone by design — is by that same fact undeletable by anyone
+holding a user JWT, prefix authority or not. Invisibility and unreachability are
+one fact seen twice. Only `service_role` can clear an orphan. Probes 13d/13e in
+`db/tests/rls-documents.sql` measure it and 13f is the control that diagnoses it.
+
+⚠️ **TWO OTHER BUCKETS STILL CARRY `FOR ALL` WRITE POLICIES AND HAVE NOT BEEN
+AUDITED** — the player-photo write and the training-diagram write. They may well be
+fine (a bucket whose read rule is already as wide as its write rule loses nothing),
+but "probably fine" is what the documents header said. Tracked in
+`claude/open-items.md`; the cheap check is to count permissive SELECT policies
+mentioning the bucket, the way probe 10b in `db/tests/rls-documents.sql` does.
+
 ### Safeguarding — contact details
 
 **Never render a loading state for `getPlayerContact`.** Render nothing until a row arrives.

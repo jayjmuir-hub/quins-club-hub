@@ -7,6 +7,7 @@ import Segmented from '../components/Segmented.jsx'
 import { Sheet } from '../components/Sheet.jsx'
 import { SquadHubPickerSkeleton, SquadHubSkeleton } from '../components/Skeleton.jsx'
 import Spinner from '../components/Spinner.jsx'
+import SquadDocumentsCard from '../components/SquadDocumentsCard.jsx'
 import { listAttendanceForEvents } from '../data/attendance.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
@@ -685,6 +686,11 @@ export default function SquadHub() {
                 Open training plans
               </Link>
             </Card>
+            {/* The Squad Hub's own door onto the documents repo — task-7
+                (claude/plans/2026-08-31-documents-repo.md). Staff-only by
+                construction, same as the rest of this page; no extra gate
+                here. */}
+            <SquadDocumentsCard teamId={teamId} teamName={team?.name} />
           </div>
           </div>
         </>

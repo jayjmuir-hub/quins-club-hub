@@ -1,6 +1,7 @@
 # Documents repo — club distributes, age groups self-serve
 
-**Status: SPEC ONLY — nothing here is built.** Requested by Jay, 31 Aug 2026:
+**Status: see `claude/plans/2026-08-31-documents-repo-implementation.md`** —
+BUILT — awaiting merge (PR follows). Requested by Jay, 31 Aug 2026:
 "we need a document repo on the site and in the app, the club should be able
 to distro documents to age groups and age groups should be able to save
 documents themselves."

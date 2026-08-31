@@ -42,6 +42,13 @@ vi.mock('../src/data/announcements.js', () => ({
   listNotices: (...args) => listNoticesMock(...args),
   listMyReads: (...args) => listMyReadsMock(...args),
 }))
+// SquadDocumentsCard mounts inside the hub (31 Aug 2026); without this mock
+// every hub test rendered the card in a silent error state — harmless to the
+// assertions, but a suite should not exercise a component it thinks it mocked.
+vi.mock('../src/data/documents.js', () => ({
+  listDocuments: async () => [],
+  signDocumentUrl: async () => 'https://signed.example.invalid',
+}))
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))

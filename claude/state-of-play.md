@@ -25,6 +25,13 @@ history was a rotted measurement; the rulings never rotted. Measure it.
 **Live at https://adhquins-clubhub.com with real families on it.** The club went
 live 13 Aug 2026. Assume a real parent is looking at whatever you touch.
 
+📄 **THE DOCUMENTS REPO IS BUILT, PR OPEN, NOT YET MERGED.** Club distro to
+age groups plus squad self-serve uploads, two visibility tiers, multi-squad
+targeting, push on new documents. The four DB migrations and push-send v13
+are already LIVE on production; the PR ships the frontend only — merging it
+is a deploy, gated on the Session Validator's no-overlap check plus Jay's
+explicit yes. `claude/plans/2026-08-31-documents-repo-implementation.md`.
+
 💬 **The whole 26 Aug chat-and-identity stack is LIVE** — shared chat
 thread (the dock IS the main chat), person card, presence dots, identity
 badges (every hat, sticky), and the club-officers titles, all merged and

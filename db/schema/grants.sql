@@ -1025,3 +1025,45 @@ REVOKE ALL ON public.club_officers FROM PUBLIC, anon;
 -- ---------------------------------------------------------------------
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.profile_icons TO authenticated;
 REVOKE ALL ON public.profile_icons FROM PUBLIC, anon;
+
+-- ---------------------------------------------------------------------
+-- documents, document_squads  (31 Aug 2026 — the documents repo)
+-- Migration: db/migrations/20260831_documents.sql
+-- MEASURED from pg_class.relacl after applying, not transcribed.
+--
+-- What the migration WRITES:
+--     GRANT SELECT, DELETE ON public.documents TO authenticated;
+--     GRANT SELECT         ON public.document_squads TO authenticated;
+--
+-- ⚠️ THE TABLES WERE BORN WIDER THAN THE MIGRATION'S COMMENT CLAIMED, AND
+--    THE GAP IS NOW CLOSED. 20260831_documents.sql said "INSERT and UPDATE
+--    have no policy and no grant on purpose"; the policy half was always
+--    true, the grant half was not — Supabase birth defaults handed
+--    `authenticated` the write verbs anyway (not exploitable: RLS with no
+--    INSERT/UPDATE policy denied them regardless). Jay ruled to trim it,
+--    and db/migrations/20260831_documents_grant_trim.sql revoked INSERT and
+--    UPDATE from authenticated on both tables, with rolled-back proofs that
+--    reads, policy-path deletes and the SECURITY DEFINER RPCs (owner:
+--    postgres) all survive.
+--
+-- ⚠️ MEASURED AFTER THE TRIM (31 Aug 2026) FROM pg_class.relacl — NOT from
+--    information_schema.role_table_grants, WHICH CANNOT SEE PG17's MAINTAIN
+--    AND MADE THE FIRST VERSION OF THIS PARAGRAPH DROP IT SILENTLY (a
+--    re-review caught the "exactly" overclaim). relacl says
+--    authenticated=rdxtm: SELECT, DELETE, REFERENCES, TRIGGER, MAINTAIN on
+--    both tables; anon holds nothing. REFERENCES, TRIGGER and MAINTAIN are
+--    birth defaults left deliberately — inert without DDL/ownership paths,
+--    same shape as the league_teams-class tables, and revoking them was
+--    beyond the ruling. document_squads' DELETE is also inert (no delete
+--    policy; rows go via the FK cascade, which runs as the table owner).
+-- ---------------------------------------------------------------------
+--   documents         authenticated: DELETE, MAINTAIN, REFERENCES, SELECT, TRIGGER; anon NONE
+--   document_squads   authenticated: DELETE, MAINTAIN, REFERENCES, SELECT, TRIGGER; anon NONE
+GRANT SELECT, DELETE ON public.documents TO authenticated;
+GRANT SELECT ON public.document_squads TO authenticated;
+
+-- ⚠️ FUNCTION EXECUTE grants for this feature are in functions.sql as
+-- proacl lines, per the rule at the top of this file — including the one
+-- that had to be corrected by a second migration the same day
+-- (public.document_push_subscriptions was born anon-executable; see
+-- db/migrations/20260831_documents_push_acl.sql).

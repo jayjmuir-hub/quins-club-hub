@@ -32,6 +32,11 @@
 --   RETURNS TABLE and a LEFT JOIN to league_teams. See the block at its
 --   definition for what the DROP did to its grants.
 --
+-- ⚠️ RE-CAPTURED 2026-08-31 — public.update_document only
+--   (20260831_documents_policy_split): the key-prefix invariant guard. Body
+--   diffed against pg_get_functiondef and identical; proacl re-read from
+--   pg_proc and unchanged by the CREATE OR REPLACE.
+--
 -- This is a CAPTURE, not a migration. Do not run this file. See README.md.
 --
 -- ── ⚠️ RE-CAPTURED 2026-08-11 AFTER THIS FILE WENT TWO DAYS BEHIND ───
@@ -6923,3 +6928,410 @@ AS $function$
 $function$
 
 ;
+
+
+-- =====================================================================
+-- 2026-08-31 — THE DOCUMENTS REPO (db/migrations/20260831_documents.sql
+-- and db/migrations/20260831_documents_push_acl.sql)
+--
+-- Seven functions, captured verbatim from pg_get_functiondef AFTER
+-- applying, with proacl read from pg_proc rather than assumed from the
+-- GRANT lines in the migration. That distinction earned its keep here —
+-- see the ⚠️ block on document_push_subscriptions below.
+-- =====================================================================
+
+
+-- ---------------------------------------------------------------------
+-- private.document_key_team(text)
+-- proacl: postgres=X/postgres | authenticated=X/postgres
+--
+-- The write authority for a storage key. A storage policy sees only a
+-- filename, so the FIRST PATH SEGMENT is the authority: `club/…` for
+-- admins, `<team_id>/…` for that squad's staff. IMMUTABLE and pinned to
+-- an EMPTY search_path — it is called from storage RLS, which is the
+-- ruling private.staff_photo_owner records. Fails CLOSED: anything that
+-- is not a bare uuid in segment 1 yields null, and null comparisons are
+-- never true.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.document_key_team(_key text)
+ RETURNS uuid
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+  select case
+    when split_part(_key, '/', 1) ~
+      '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    then split_part(_key, '/', 1)::uuid
+  end;
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.document_key_team(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.document_key_team(text) FROM anon;
+GRANT EXECUTE ON FUNCTION private.document_key_team(text) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.is_active_staff_of(uuid)
+-- proacl: postgres=X/postgres | authenticated=X/postgres
+--
+-- ⚠️ THE MANAGE SET, AND IT EXCLUDES medic ON PURPOSE. The READ set in
+-- can_read_document below DOES include medic. A medic reads a staff
+-- document; a coach or manager curates one. Do not "fix" the asymmetry.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_active_staff_of(_team uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from memberships m
+    where m.profile_id = auth.uid()
+      and m.team_id = _team
+      and m.status = 'active'
+      and m.role in ('coach','manager'));
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.is_active_staff_of(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.is_active_staff_of(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION private.is_active_staff_of(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.can_read_document(uuid)
+-- proacl: postgres=X/postgres | authenticated=X/postgres
+--
+-- The read gate, used by BOTH the documents/document_squads select
+-- policies and the storage READ policy. Four arms: admin anywhere, the
+-- uploader, a club_wide document, or a targeted squad via the junction.
+-- staff_only narrows the last two to coach/manager/medic.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_read_document(_doc uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from documents d
+    where d.id = _doc
+      and (
+        private.is_admin_anywhere()
+        or d.created_by = auth.uid()
+        or (d.club_wide and exists (
+              select 1 from memberships m
+              where m.profile_id = auth.uid() and m.status = 'active'
+                and (not d.staff_only
+                     or m.role in ('coach','manager','medic'))))
+        or (not d.club_wide and exists (
+              select 1 from document_squads ds
+              join memberships m
+                on m.team_id = ds.team_id
+               and m.profile_id = auth.uid()
+               and m.status = 'active'
+              where ds.document_id = _doc
+                and (not d.staff_only
+                     or m.role in ('coach','manager','medic'))))));
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.can_read_document(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.can_read_document(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION private.can_read_document(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.can_manage_document(uuid)
+-- proacl: postgres=X/postgres | authenticated=X/postgres
+--
+-- The delete/edit gate. Note the club_wide arm is ABSENT by design: a
+-- club-wide document is manageable by an admin or its uploader only —
+-- squad staff cannot delete something the club published to everyone.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_manage_document(_doc uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from documents d
+    where d.id = _doc
+      and (
+        private.is_admin_anywhere()
+        or d.created_by = auth.uid()
+        or (not d.club_wide and exists (
+              select 1 from document_squads ds
+              where ds.document_id = _doc
+                and private.is_active_staff_of(ds.team_id)))));
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.can_manage_document(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.can_manage_document(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION private.can_manage_document(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.create_document(text, text, boolean, boolean, uuid[], text,
+--                        text, bigint, text, boolean)
+-- proacl: postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres
+--
+-- ⚠️ THE ONLY WAY A ROW IS INSERTED. There is no INSERT policy on
+-- documents. Three gates before the insert: club_wide needs admin; every
+-- targeted squad must be one the caller staffs; and the storage key's
+-- PREFIX must be an authority the caller holds AND — for a squad prefix —
+-- one of the squads the document actually names, so a coach cannot park a
+-- file under a squad the document does not target.
+--
+-- The push is best-effort inside its own BEGIN/EXCEPTION: a push that
+-- cannot be sent must never fail the upload.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.create_document(_title text, _category text, _staff_only boolean, _club_wide boolean, _team_ids uuid[], _storage_key text, _file_name text, _file_size bigint, _content_type text, _notify boolean DEFAULT false)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  _doc uuid;
+  _club uuid;
+  _team uuid;
+  _prefix_team uuid;
+  _endpoint text;
+  _secret text;
+begin
+  select club_id into _club from teams order by sort_order limit 1;
+
+  if _club_wide then
+    if not private.is_admin_anywhere() then
+      raise exception 'Only an admin can publish a club-wide document.'
+        using errcode = '42501';
+    end if;
+  else
+    if _team_ids is null or cardinality(_team_ids) = 0 then
+      raise exception 'Choose at least one age group.' using errcode = '22023';
+    end if;
+    foreach _team in array _team_ids loop
+      if not (private.is_admin_anywhere()
+              or private.is_active_staff_of(_team)) then
+        raise exception 'You can only publish to squads you staff.'
+          using errcode = '42501';
+      end if;
+    end loop;
+  end if;
+
+  -- The key's prefix must be an authority the CALLER holds and, for a
+  -- squad-prefixed key, one of the targeted squads — otherwise a coach
+  -- could park a file under a squad the document does not name.
+  _prefix_team := private.document_key_team(_storage_key);
+  if split_part(_storage_key, '/', 1) = 'club' then
+    if not private.is_admin_anywhere() then
+      raise exception 'Only an admin can file under club/.'
+        using errcode = '42501';
+    end if;
+  elsif _prefix_team is null
+     or (not _club_wide and not (_prefix_team = any(_team_ids))) then
+    raise exception 'The storage key must live under club/ or a targeted squad.'
+      using errcode = '22023';
+  end if;
+
+  insert into documents (club_id, title, category, staff_only, club_wide,
+                         storage_key, file_name, file_size, content_type,
+                         created_by)
+  values (_club, trim(_title), _category, _staff_only, _club_wide,
+          _storage_key, _file_name, _file_size, _content_type, auth.uid())
+  returning id into _doc;
+
+  if not _club_wide then
+    insert into document_squads (document_id, team_id)
+    select _doc, distinct_team from unnest(_team_ids) as distinct_team
+    on conflict do nothing;
+  end if;
+
+  -- Optional push. Same vault plumbing as private.notify_notice_push; a
+  -- push that cannot be sent must never fail the upload.
+  if _notify then
+    select decrypted_secret into _endpoint
+      from vault.decrypted_secrets where name = 'push_notify_url';
+    select decrypted_secret into _secret
+      from vault.decrypted_secrets where name = 'approval_notify_secret';
+    if _endpoint is null or _secret is null then
+      raise warning 'create_document: vault secrets missing, no push sent';
+    else
+      begin
+        perform net.http_post(
+          url     := _endpoint,
+          headers := jsonb_build_object('Content-Type', 'application/json',
+                                        'x-approval-secret', _secret),
+          body    := jsonb_build_object('document_id', _doc));
+      exception when others then
+        raise warning 'create_document push: % (document %)', sqlerrm, _doc;
+      end;
+    end if;
+  end if;
+
+  return _doc;
+end;
+$function$
+;
+
+REVOKE ALL ON FUNCTION public.create_document(text,text,boolean,boolean,uuid[],text,text,bigint,text,boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.create_document(text,text,boolean,boolean,uuid[],text,text,bigint,text,boolean) FROM anon;
+GRANT EXECUTE ON FUNCTION public.create_document(text,text,boolean,boolean,uuid[],text,text,bigint,text,boolean) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.update_document(uuid, text, text, boolean, boolean, uuid[])
+-- proacl: postgres=X/postgres | authenticated=X/postgres | service_role=X/postgres
+-- ⚠️ RE-CAPTURED 31 Aug 2026 from pg_get_functiondef after
+--   20260831_documents_policy_split — the prefix-invariant guard below.
+--   proacl re-read from pg_proc after the CREATE OR REPLACE and is
+--   unchanged (byte-identical to create_document's), which is the 20260821
+--   ruling holding for a function that already existed — the case
+--   20260831_documents_push_acl had to correct for one that did not.
+--
+-- ⚠️ METADATA ONLY. storage_key, file_name, file_size, content_type and
+-- created_by are NOT in the column list and cannot be reached from the
+-- app at all — there is no UPDATE policy on documents. That is the
+-- set_my_photo reasoning: RLS grants rows, not columns.
+--
+-- ⚠️ THE PREFIX GUARD NARROWS STRANDING; IT DOES NOT ELIMINATE IT, AND A
+-- RE-REVIEW (31 Aug 2026) CAUGHT THIS COMMENT CLAIMING MORE THAN IT PROVED.
+-- What the guard guarantees: a squad-prefixed file's squad is always among
+-- the document's targets, so THAT squad's staff (and admins) always hold
+-- file authority. What it does not guarantee: that every row-deleter holds
+-- it. Two residual arms, both accepted with eyes open: (1) on a MULTI-SQUAD
+-- document, any targeted squad's staff may delete the row (Jay ruled to
+-- keep the spec's manage rule) while only the prefix squad's staff or an
+-- admin may remove the file; (2) created_by keeps row authority after their
+-- memberships lapse. Either arm can orphan a file — invisible (no row, and
+-- the bucket's only SELECT path is "document read") and, MEASURED in
+-- db/tests/rls-documents.sql 13d-13f, removable by NO user JWT — DELETE
+-- applies SELECT policies too, so only service_role clears an orphan (an
+-- earlier version of this sentence claimed prefix staff or admins could).
+-- It also names an admin restriction:
+-- the guard has no admin bypass, so retargeting a squad-filed document to a
+-- DIFFERENT squad requires delete-and-re-upload even for admins.
+-- ⚠️ RESIDUAL: the club-wide flip does not check this. It is admin-only, so
+-- it is a trusted actor's choice rather than an escalation; moving the object
+-- is not something an RPC can do inside its own transaction. See the
+-- 20260831_documents_policy_split header.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.update_document(_id uuid, _title text, _category text, _staff_only boolean, _club_wide boolean, _team_ids uuid[])
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  _team uuid;
+  _prefix_team uuid;
+begin
+  if not private.can_manage_document(_id) then
+    raise exception 'Not your document to change.' using errcode = '42501';
+  end if;
+
+  if _club_wide then
+    if not private.is_admin_anywhere() then
+      raise exception 'Only an admin can make a document club-wide.'
+        using errcode = '42501';
+    end if;
+  else
+    if _team_ids is null or cardinality(_team_ids) = 0 then
+      raise exception 'Choose at least one age group.' using errcode = '22023';
+    end if;
+    foreach _team in array _team_ids loop
+      if not (private.is_admin_anywhere()
+              or private.is_active_staff_of(_team)) then
+        raise exception 'You can only target squads you staff.'
+          using errcode = '42501';
+      end if;
+    end loop;
+
+    select private.document_key_team(storage_key) into _prefix_team
+      from documents where id = _id;
+    if _prefix_team is not null and not (_prefix_team = any(_team_ids)) then
+      raise exception
+        'The targeted squads must keep the squad the file is stored under.'
+        using errcode = '22023';
+    end if;
+  end if;
+
+  update documents
+     set title = trim(_title), category = _category,
+         staff_only = _staff_only, club_wide = _club_wide
+   where id = _id;
+
+  delete from document_squads where document_id = _id;
+  if not _club_wide then
+    insert into document_squads (document_id, team_id)
+    select _id, t from unnest(_team_ids) as t
+    on conflict do nothing;
+  end if;
+end;
+$function$
+;
+
+REVOKE ALL ON FUNCTION public.update_document(uuid,text,text,boolean,boolean,uuid[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.update_document(uuid,text,text,boolean,boolean,uuid[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.update_document(uuid,text,text,boolean,boolean,uuid[]) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.document_push_subscriptions(uuid)
+-- proacl: postgres=X/postgres | service_role=X/postgres
+--
+-- ⚠️⚠️ THIS proacl IS THE SECOND MIGRATION, AND THE REASON THE CAPTURE
+--   RULE IS "READ pg_proc, DO NOT TRANSCRIBE THE MIGRATION'S GRANTS".
+--   20260831_documents.sql deliberately wrote NO grant lines here, citing
+--   the 20260821 ruling that `create or replace` preserves the ACL. That
+--   ruling is true only for a function that ALREADY EXISTS. This one was
+--   NEW, so there was nothing to preserve and it was born with Supabase's
+--   default `functions EXECUTE to PUBLIC/anon/authenticated` — the exact
+--   trap db/schema/grants.sql section 1 warns about, measured live as:
+--     =X | postgres=X | anon=X | authenticated=X | service_role=X
+--   while all five siblings (notice_/squad_/message_/approval_/
+--   availability_push_subscriptions) are postgres + service_role only.
+--   It is SECURITY DEFINER and returns endpoint + p256dh + auth, which is
+--   the material needed to push to a person's device. Closed the same day
+--   by db/migrations/20260831_documents_push_acl.sql; re-measured after,
+--   has_function_privilege('anon', …, 'EXECUTE') = false on all six.
+--
+-- distinct: a person in two targeted squads is pushed once — the
+-- notice_multi_squad lesson. The uploader is excluded, and the 'document'
+-- opt-out is respected.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.document_push_subscriptions(_document uuid)
+ RETURNS TABLE(id uuid, endpoint text, p256dh text, auth text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with doc as (select * from documents where id = _document),
+  people as (
+    select distinct m.profile_id
+      from doc d
+      join memberships m
+        on m.status = 'active'
+       and (d.club_wide
+            or m.team_id in (select team_id from document_squads
+                              where document_id = d.id))
+     where (not d.staff_only or m.role in ('coach','manager','medic')))
+  select s.id, s.endpoint, s.p256dh, s.auth
+    from people p
+    join push_subscriptions s on s.profile_id = p.profile_id
+    cross join doc d
+   where p.profile_id <> d.created_by
+     and not exists (
+       select 1 from notification_opt_outs o
+        where o.profile_id = p.profile_id and o.category = 'document');
+$function$
+;
+
+REVOKE ALL ON FUNCTION public.document_push_subscriptions(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.document_push_subscriptions(uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.document_push_subscriptions(uuid) FROM authenticated;

@@ -9,6 +9,7 @@ import Schedule from './screens/Schedule.jsx'
 import Roster from './screens/Roster.jsx'
 import More from './screens/More.jsx'
 import Notices from './screens/Notices.jsx'
+import Documents from './screens/Documents.jsx'
 import Chat from './screens/Chat.jsx'
 import ChatList from './screens/ChatList.jsx'
 import StarredMessages from './screens/StarredMessages.jsx'
@@ -199,6 +200,14 @@ export default function App() {
               RLS, and the composer is offered only where the database would
               accept it. */}
           <Route path="/notices" element={<AppShell><Notices /></AppShell>} />
+
+          {/* THE DOCUMENTS REPO (Task 6, claude/plans/2026-08-31-documents-repo.md).
+              ⚠️ NOT under /admin — same reasoning as /notices directly above:
+              the people who upload SQUAD documents are coaches and team
+              managers, and AdminDashboard gates on isAdmin() before rendering
+              its <Outlet/>. The screen self-gates on who may upload; who may
+              read is decided by RLS. */}
+          <Route path="/documents" element={<AppShell><Documents /></AppShell>} />
 
           {/* SQUAD CHAT (23 Aug 2026, phase 1) — a channel per squad.
               /chat picks (or redirects to the only squad); /chat/club is the

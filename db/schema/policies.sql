@@ -1871,3 +1871,106 @@ CREATE POLICY "icons revoke" ON public.profile_icons
   USING ((private.is_super_admin() AND (EXISTS ( SELECT 1
    FROM memberships m
   WHERE ((m.profile_id = ( SELECT auth.uid() AS uid)) AND (m.club_id = profile_icons.club_id) AND (m.status = 'active'::text))))));
+
+-- ---------------------------------------------------------------------
+-- documents (2), document_squads (1), and FOUR on storage.objects
+-- (31 Aug 2026 — the documents repo, 20260831_documents.sql, CORRECTED the
+--  same day by 20260831_documents_policy_split.sql)
+-- CAPTURED FROM pg_policies after applying both.
+--
+-- ⚠️ SELECT AND DELETE ONLY. There is no INSERT policy and no UPDATE policy
+-- on documents, and that is the design, not an omission: writes go through
+-- public.create_document / public.update_document. RLS grants access to
+-- ROWS, not COLUMNS, so an update policy would let a squad manager repoint
+-- storage_key at another document's file — no policy violated, and their
+-- readers would then sign URLs for a file they were never granted. The RPCs
+-- have hard-coded column lists and never touch storage_key after creation.
+--
+-- ⚠️ FOUR STORAGE POLICIES, ONE PER COMMAND — AND THE COUNT IS THE POINT.
+-- This capture said TWO until the review of 31 Aug, because the write side
+-- was a single `FOR ALL` policy. `FOR ALL` is not "the write verbs": it
+-- covers SELECT as well, and its USING arm becomes a SELECT arm that ORs
+-- with "document read". So the prefix rule was ALSO a read rule, and any
+-- squad's staff could sign any object under their prefix — including an
+-- ORPHAN with no documents row — while an admin could sign anything in the
+-- bucket. The comment three lines below claiming an orphan is signable by
+-- nobody was false for as long as that policy existed. Splitting per command
+-- makes it true, and it is now the property to check from pg_policy: NO
+-- permissive SELECT-capable policy matches this bucket except "document read".
+--
+-- READ resolves THROUGH a documents row ("is there a row with this
+-- storage_key that you may read"), so an ORPHAN key — file uploaded, row
+-- insert failed — is signable by NOBODY. That is what makes the app's
+-- file-first upload order safe.
+-- INSERT/UPDATE/DELETE resolve by PREFIX instead, because the delete path
+-- removes the row FIRST and file authority cannot depend on the row still
+-- existing.
+--   club/<uuid>.<ext>      admins only
+--   <team_id>/<uuid>.<ext> that squad's coach/manager (private.is_active_staff_of)
+-- private.document_key_team parses the first path segment and fails CLOSED
+-- (null) on any other shape — the private.staff_photo_owner ruling.
+-- WITH CHECK repeats USING on the UPDATE policy per the
+-- 20260804_self_service_profile trap: USING alone lets a row you may reach be
+-- renamed into a prefix you may not.
+--
+-- ⚠️ THE PREFIX RULE IS A WRITE RULE ONLY BECAUSE update_document HOLDS THE
+-- INVARIANT. A squad-prefixed file's squad is always among the document's
+-- targets — create_document refuses otherwise at upload, and since the
+-- policy-split migration update_document refuses to retarget away from it.
+-- ⚠️ BUT ROW AUTHORITY AND FILE AUTHORITY ARE STILL NOT THE SAME SET, AND
+-- SAYING OTHERWISE WAS A REVIEW FINDING (31 Aug 2026). Two residual arms,
+-- both accepted with eyes open: (1) on a MULTI-SQUAD document, any targeted
+-- squad's staff may delete the ROW (can_manage_document — Jay ruled to keep
+-- the spec's rule) while only the PREFIX squad's staff or an admin may
+-- remove the FILE; (2) created_by keeps row authority even after their
+-- memberships lapse. Either arm can orphan a file. An orphan is invisible
+-- (no row, and "document read" is the bucket's only SELECT path) and costs
+-- only storage. ⚠️ AND MEASURED (db/tests/rls-documents.sql 13d-13f): an
+-- orphan is removable by NOBODY on a user JWT — a DELETE ... WHERE applies
+-- SELECT policies too, so the same fact that makes orphans invisible makes
+-- them unclearable except by service_role. An earlier version of this
+-- paragraph claimed prefix staff or admins could remove them; the harness
+-- refuted it. A service-role sweeper in the photo-orphans style is the
+-- cleanup route if storage ever cares.
+-- Weaken the update_document guard and this gets worse, not better.
+--
+-- ⚠️ TO authenticated, not the default TO public, matching "player photo",
+-- "chat media" and "social idea image". Both original policies landed on
+-- `public` by omission. A policy's role list cannot be ALTERed, which is why
+-- "document read" was dropped and recreated with an identical predicate.
+-- ---------------------------------------------------------------------
+CREATE POLICY "document read" ON public.documents
+  FOR SELECT
+  USING (private.can_read_document(id));
+
+CREATE POLICY "document delete" ON public.documents
+  FOR DELETE
+  USING (private.can_manage_document(id));
+
+CREATE POLICY "document squads read" ON public.document_squads
+  FOR SELECT
+  USING (private.can_read_document(document_id));
+
+CREATE POLICY "document read" ON storage.objects
+  AS PERMISSIVE FOR SELECT TO authenticated
+  USING (((bucket_id = 'documents'::text) AND (EXISTS ( SELECT 1
+   FROM documents d
+  WHERE ((d.storage_key = objects.name) AND private.can_read_document(d.id))))));
+
+CREATE POLICY "document insert" ON storage.objects
+  AS PERMISSIVE FOR INSERT TO authenticated
+  WITH CHECK (((bucket_id = 'documents'::text) AND (((split_part(name, '/'::text, 1) = 'club'::text) AND private.is_admin_anywhere()) OR private.is_active_staff_of(private.document_key_team(name)) OR ((private.document_key_team(name) IS NOT NULL) AND private.is_admin_anywhere()))));
+
+CREATE POLICY "document update" ON storage.objects
+  AS PERMISSIVE FOR UPDATE TO authenticated
+  USING (((bucket_id = 'documents'::text) AND (((split_part(name, '/'::text, 1) = 'club'::text) AND private.is_admin_anywhere()) OR private.is_active_staff_of(private.document_key_team(name)) OR ((private.document_key_team(name) IS NOT NULL) AND private.is_admin_anywhere()))))
+  WITH CHECK (((bucket_id = 'documents'::text) AND (((split_part(name, '/'::text, 1) = 'club'::text) AND private.is_admin_anywhere()) OR private.is_active_staff_of(private.document_key_team(name)) OR ((private.document_key_team(name) IS NOT NULL) AND private.is_admin_anywhere()))));
+
+CREATE POLICY "document delete" ON storage.objects
+  AS PERMISSIVE FOR DELETE TO authenticated
+  USING (((bucket_id = 'documents'::text) AND (((split_part(name, '/'::text, 1) = 'club'::text) AND private.is_admin_anywhere()) OR private.is_active_staff_of(private.document_key_team(name)) OR ((private.document_key_team(name) IS NOT NULL) AND private.is_admin_anywhere()))));
+
+-- The `documents` bucket itself: PRIVATE (public=false), 25 MB limit
+-- (26214400), 10 allowed MIME types — pdf, the six Office types, and
+-- jpeg/png/webp. Reads are signed URLs only, like every bucket here except
+-- training-diagrams.

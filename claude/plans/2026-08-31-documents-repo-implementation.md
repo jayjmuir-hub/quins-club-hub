@@ -2,9 +2,37 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status: PLAN — nothing here is built yet.** The approved spec is
-`claude/plans/2026-08-31-documents-repo.md` (merged as `1b7c59a`). Flip this
-line task by task as things ship; Task 9 flips it for good.
+**Status: BUILT — awaiting merge (PR #588).** All nine tasks executed 31
+Aug 2026 with per-task review, plus a whole-branch review and its fix round;
+migrations and push-send v13 already live. The approved spec is
+`claude/plans/2026-08-31-documents-repo.md` (merged as `1b7c59a`).
+Every task box below is ticked except Task 9 Step 5, which is the post-merge
+live verification and has not happened — see the note there, and the iPhone
+check it now carries.
+
+## Deviations recorded at final review
+
+⚠️ **TWO SPEC DETAILS WERE DROPPED DURING THE BUILD AND NEITHER WAS WRITTEN
+DOWN UNTIL NOW.** Both are deliberate and both are small, but an undocumented
+omission reads as an oversight to the next person, who then "fixes" it.
+
+1. **The uploader's name is NOT shown on a document row.** `listDocuments`
+   selects `created_by` and the screen never renders it — the row shows title,
+   category, audience, size and date only. Kept lean on purpose: the row is
+   already three lines on a phone, and "who uploaded it" is the least useful of
+   the candidates for a fourth. ⚠️ **`created_by` is still load-bearing and must
+   not be dropped from the select** — it drives the delete gate
+   (`mayDeleteDocument`'s uploader arm) and the push audience's uploader
+   exclusion. To add the name later you need a join to `profiles`, not just the
+   existing column.
+
+2. **A document push deep-links to bare `/documents`, without highlighting the
+   document it announced.** Tapping the notification lands on the list, and the
+   member finds the new file at the top because the list is newest-first. The
+   route accepts no anchor or query today, so highlighting would mean teaching
+   `/documents` to read one and scroll to a row — real work for a feature whose
+   list is short. Recorded so that "the push doesn't take you to the document"
+   is understood as a known cut rather than a bug.
 
 **Goal:** A documents repo — the club distributes files to age groups, squad
 staff save their own — with two visibility tiers, multi-squad targeting,
@@ -52,7 +80,7 @@ functions), vitest. No new dependencies — do not touch `package.json`.
 
 ### Task 0: Branch
 
-- [ ] **Step 1: Create the branch — in a worktree, not the shared clone.**
+- [x] **Step 1: Create the branch — in a worktree, not the shared clone.**
 Two sessions have already collided in the shared cafnet tree; use the
 `superpowers:using-git-worktrees` skill, or plainly:
 
@@ -86,7 +114,7 @@ publishable key).
   bucket `documents` with read/write/delete policies;
   `public.document_push_subscriptions(_document uuid)` for Task 8.
 
-- [ ] **Step 1: Write the migration file.** Complete content:
+- [x] **Step 1: Write the migration file.** Complete content:
 
 ```sql
 -- 31 Aug 2026 — the documents repo: club distributes, age groups self-serve.
@@ -523,28 +551,28 @@ copy its exact list plus `'document'` — the list shown here was read from
 `src/data/notificationPreferences.js` on 31 Aug and the database is the
 authority. `tests/notification-categories.test.js` goes red if they drift.
 
-- [ ] **Step 2: Dry-run the whole migration inside a rolled-back
+- [x] **Step 2: Dry-run the whole migration inside a rolled-back
 transaction.** Via the Supabase MCP `execute_sql`, run the entire file
 wrapped in `begin;` … `rollback;`. Expected: completes with no error.
 Any error here (a missing helper name, a type mismatch, `min(uuid)`-class
 surprises) is a bug found for free.
 
-- [ ] **Step 3: Prove the rollback rolled back.** Still via `execute_sql`:
+- [x] **Step 3: Prove the rollback rolled back.** Still via `execute_sql`:
 `select count(*) from information_schema.tables where table_name = 'documents'`
 → expected `0`, WITH the control
 `select count(*) from information_schema.tables where table_name = 'announcements'`
 → expected `1` (proves the probe can see real tables).
 
-- [ ] **Step 4: Apply.** Supabase MCP `apply_migration` with name
+- [x] **Step 4: Apply.** Supabase MCP `apply_migration` with name
 `20260831_documents` and the file's content. Expected: success.
 
-- [ ] **Step 5: Re-capture `db/schema/`.** Follow the procedure at the top
+- [x] **Step 5: Re-capture `db/schema/`.** Follow the procedure at the top
 of `db/schema/tables.sql` (each capture file documents its own query).
 The new tables, policies, functions, and the two `grant` lines must appear.
 Run `npm run docs:check` — expected: all green, including "table and column
 grants captured".
 
-- [ ] **Step 6: Commit.**
+- [x] **Step 6: Commit.**
 
 ```bash
 git add db/migrations/20260831_documents.sql db/schema/tables.sql db/schema/policies.sql db/schema/functions.sql db/schema/grants.sql
@@ -562,7 +590,7 @@ git commit -m "feat(db): documents repo — tables, bucket, RLS, RPCs, push audi
 - Consumes: everything Task 1 created.
 - Produces: a harness `npm run db:check` runs; nothing imports it.
 
-- [ ] **Step 1: Write the harness**, copying the exact shape of
+- [x] **Step 1: Write the harness**, copying the exact shape of
 `db/tests/rls-social-upload.sql` (temp `_r` table, `set local role
 authenticated` + `request.jwt.claims` per persona, the self-test `do` block
 that raises on FAIL or on zero steps, `rollback` at the end, and a
@@ -598,11 +626,11 @@ paths). The probes, each `insert into _r` PASS/FAIL:
 10. Control: the `staff photo write` policy still exists (the
     wrong-bucket-fix canary, same as the social harness's step 4).
 
-- [ ] **Step 2: Run it and watch it pass.** `npm run db:check` (see
+- [x] **Step 2: Run it and watch it pass.** `npm run db:check` (see
 `claude/runbooks/db-harnesses.md`). Expected: `SELF-TEST PASSED` for
 `rls-documents` and every other harness still green.
 
-- [ ] **Step 3: Commit, THEN inject the fault** (rule 6 — commit first).
+- [x] **Step 3: Commit, THEN inject the fault** (rule 6 — commit first).
 
 ```bash
 git add db/tests/rls-documents.sql
@@ -635,7 +663,7 @@ appendix comment.
   `uploadableTeamIds(memberships) → string[]`,
   `filterDocuments(docs, {category, teamId}) → docs`.
 
-- [ ] **Step 1: Write the failing tests** (`tests/documents-lib.test.js`):
+- [x] **Step 1: Write the failing tests** (`tests/documents-lib.test.js`):
 
 ```js
 import { describe, it, expect } from 'vitest'
@@ -703,11 +731,11 @@ describe('documents lib', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure.**
+- [x] **Step 2: Run to verify failure.**
 `npm run test:related -- tests/documents-lib.test.js`
 Expected: FAIL — cannot resolve `src/lib/documents.js`.
 
-- [ ] **Step 3: Implement** (`src/lib/documents.js`):
+- [x] **Step 3: Implement** (`src/lib/documents.js`):
 
 ```js
 // Pure helpers for the documents repo. Everything permission-shaped here is
@@ -784,10 +812,10 @@ export function filterDocuments(docs, { category, teamId } = {}) {
 before leaning on it — if it checks a different field than `status`, adjust
 the test fixtures, not the helper.
 
-- [ ] **Step 4: Run to verify pass.**
+- [x] **Step 4: Run to verify pass.**
 `npm run test:related -- tests/documents-lib.test.js` — expected: PASS.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/lib/documents.js tests/documents-lib.test.js
@@ -810,7 +838,7 @@ git commit -m "feat(lib): documents pure helpers — categories, validation, upl
   `signDocumentUrl(storageKey)`, `deleteDocument({id, storageKey})`,
   `updateDocument({id, title, category, staffOnly, clubWide, teamIds})`.
 
-- [ ] **Step 1: Write the failing tests** (`tests/documents-data.test.js`),
+- [x] **Step 1: Write the failing tests** (`tests/documents-data.test.js`),
 copying the chainable-and-thenable `createQueryBuilder` mock strategy from
 the top of `tests/data.test.js` (read its header comment — a mock that is
 only chainable OR only thenable passes for the wrong reasons):
@@ -923,11 +951,11 @@ describe('deleteDocument', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure.**
+- [x] **Step 2: Run to verify failure.**
 `npm run test:related -- tests/documents-data.test.js` — expected: FAIL,
 module not found.
 
-- [ ] **Step 3: Implement** (`src/data/documents.js`):
+- [x] **Step 3: Implement** (`src/data/documents.js`):
 
 ```js
 // Data access for the documents repo. RLS scopes every read server-side;
@@ -1019,10 +1047,10 @@ export async function updateDocument({
 }
 ```
 
-- [ ] **Step 4: Run to verify pass.**
+- [x] **Step 4: Run to verify pass.**
 `npm run test:related -- tests/documents-data.test.js` — expected: PASS.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/data/documents.js tests/documents-data.test.js
@@ -1066,7 +1094,7 @@ comments before writing):
   errors render via `friendlyMessage(err, 'Could not upload that document.')`
   — never the raw error.
 
-- [ ] **Step 1: Write the failing tests** — render with
+- [x] **Step 1: Write the failing tests** — render with
 `@testing-library/react` the way `tests/notice-composer.test.jsx` does
 (read it first and copy its render/provider scaffolding). Cases:
 
@@ -1141,11 +1169,11 @@ describe('DocumentUploadSheet', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure.**
+- [x] **Step 2: Run to verify failure.**
 `npm run test:related -- tests/document-upload-sheet.test.jsx` — expected:
 FAIL, component missing.
 
-- [ ] **Step 3: Implement the component.** Structure (complete the JSX with
+- [x] **Step 3: Implement the component.** Structure (complete the JSX with
 the app's form idioms — copy field markup from `NoticeComposer`, which is
 the same Sheet-with-checkbox-grid shape):
 
@@ -1246,12 +1274,12 @@ The commented lines are the fields to write out — each is a labelled
 control bound to the state above it; copy the exact input/checkbox markup
 classes from `NoticeComposer` so it looks native. No new styling decisions.
 
-- [ ] **Step 4: Run to verify pass.**
+- [x] **Step 4: Run to verify pass.**
 `npm run test:related -- tests/document-upload-sheet.test.jsx` — expected:
 PASS. If a label query fails, fix the component's labels (the tests state
 the contract), not the test.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/components/DocumentUploadSheet.jsx tests/document-upload-sheet.test.jsx
@@ -1295,7 +1323,7 @@ Screen contract:
   admin, or staff of a targeted squad (client-side mirror only — RLS
   enforces); confirm before calling `deleteDocument`.
 
-- [ ] **Step 1: Write the failing tests** (`tests/documents-screen.test.jsx`)
+- [x] **Step 1: Write the failing tests** (`tests/documents-screen.test.jsx`)
 — mock `../src/data/documents.js` and `../src/lib/memberships.jsx` (copy
 the provider-mock scaffolding from `tests/notices.test.js` /
 `tests/roster.test.jsx`, whichever mocks `useMemberships`; read one first).
@@ -1309,10 +1337,10 @@ Cases, with real assertions:
      `window.open` with the signed URL (spy on `window.open`);
   6. staff-only rows carry the "Staff only" badge.
 
-- [ ] **Step 2: Run to verify failure.**
+- [x] **Step 2: Run to verify failure.**
 `npm run test:related -- tests/documents-screen.test.jsx` — expected: FAIL.
 
-- [ ] **Step 3: Implement the screen**, then register it:
+- [x] **Step 3: Implement the screen**, then register it:
   - `src/App.jsx`: `import Documents from './screens/Documents'` and, next
     to the notices route,
     `<Route path="/documents" element={<AppShell><Documents /></AppShell>} />`
@@ -1322,12 +1350,12 @@ Cases, with real assertions:
   - `src/components/Sidebar.jsx`: an entry pointing at `/documents`,
     copying the Notices entry's markup.
 
-- [ ] **Step 4: Run to verify pass, plus neighbours.**
+- [x] **Step 4: Run to verify pass, plus neighbours.**
 `npm run test:related -- src/screens/Documents.jsx` — expected: new tests
 PASS, and the App/More/Sidebar suites (`tests/app.test.jsx`,
 `tests/more.test.jsx`, `tests/sidebar-submenu.test.jsx`) still green.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/screens/Documents.jsx src/App.jsx src/screens/More.jsx src/components/Sidebar.jsx tests/documents-screen.test.jsx
@@ -1358,21 +1386,21 @@ first, capped at 8 rows with a "See all" link to `/documents`; an "Add"
 button opening `DocumentUploadSheet` with `fixedTeamId={teamId}`. Squad
 Hub is staff-only by construction, so no extra gating in the card.
 
-- [ ] **Step 1: Write the failing tests**: renders that squad's and
+- [x] **Step 1: Write the failing tests**: renders that squad's and
 club-wide docs but not another squad's; "Add" opens the sheet with the
 squad locked (assert the sheet renders without squad checkboxes); row
 click signs and opens. Mock the data layer as in Task 6.
 
-- [ ] **Step 2: Run to verify failure.**
+- [x] **Step 2: Run to verify failure.**
 `npm run test:related -- tests/squad-documents-card.test.jsx`
 
-- [ ] **Step 3: Implement the card and mount it in `SquadHub.jsx`.**
+- [x] **Step 3: Implement the card and mount it in `SquadHub.jsx`.**
 
-- [ ] **Step 4: Run to verify pass, plus the hub's own suites.**
+- [x] **Step 4: Run to verify pass, plus the hub's own suites.**
 `npm run test:related -- src/screens/SquadHub.jsx` — expected: all green,
 including `tests/squad-hub.test.jsx`.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add src/components/SquadDocumentsCard.jsx src/screens/SquadHub.jsx tests/squad-documents-card.test.jsx
@@ -1398,13 +1426,13 @@ git commit -m "feat(ui): squad hub documents card — the staff door"
   the vault-posted `{ document_id }` body `create_document` already sends.
 - Produces: a push titled from the document, deep-linking `/documents`.
 
-- [ ] **Step 1: Run the categories test to see the current contract.**
+- [x] **Step 1: Run the categories test to see the current contract.**
 `npm run test:related -- tests/notification-categories.test.js` — expected:
 currently green (Task 1's migration restated the full list including
 `document`; the app list doesn't know it yet — read the test's failure
 direction carefully; if it is already red after Task 1, this task fixes it).
 
-- [ ] **Step 2: Add the category** to `NOTIFICATION_CATEGORIES` in
+- [x] **Step 2: Add the category** to `NOTIFICATION_CATEGORIES` in
 `src/data/notificationPreferences.js`:
 
 ```js
@@ -1415,11 +1443,11 @@ direction carefully; if it is already red after Task 1, this task fixes it).
 },
 ```
 
-- [ ] **Step 3: Run to verify the pair now agree.**
+- [x] **Step 3: Run to verify the pair now agree.**
 `npm run test:related -- tests/notification-categories.test.js` — expected:
 PASS.
 
-- [ ] **Step 4: Add the edge branch.** In
+- [x] **Step 4: Add the edge branch.** In
 `supabase/functions/push-send/index.ts`, copy `noticeTargets`
 (`index.ts:504-518`) as `documentTargets(documentId)` calling
 `document_push_subscriptions` with `{ _document: documentId }`, and add a
@@ -1430,13 +1458,13 @@ docTitle, url: '/documents' }`, and send to `documentTargets`. Follow the
 existing notice branch line by line — same allowlisting, same 404/410
 subscription purge.
 
-- [ ] **Step 5: Deploy the edge function** via Supabase MCP
+- [x] **Step 5: Deploy the edge function** via Supabase MCP
 `deploy_edge_function` (`push-send`). ⚠️ This is live the moment it
 deploys, but it changes nothing until a `document_id` payload arrives, and
 `create_document` only sends one when `_notify` is true — which no UI can
 produce until this branch exists. Order is safe.
 
-- [ ] **Step 6: Prove it end-to-end against a fault.** Via `execute_sql`
+- [x] **Step 6: Prove it end-to-end against a fault.** Via `execute_sql`
 (NOT rolled back — use a real but throwaway document created as yourself,
 then delete it): call `create_document` with `_notify => true` on a
 staff-only doc targeted at a squad with a known push subscription;
@@ -1444,7 +1472,7 @@ expected: a push arrives on the subscribed device. Then the fault: an
 opted-out profile (insert an opt-out row for `document`, re-notify a fresh
 doc) must NOT receive one. Delete the probe docs and the opt-out row after.
 
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
 
 ```bash
 git add supabase/functions/push-send/index.ts src/data/notificationPreferences.js
@@ -1463,22 +1491,22 @@ git commit -m "feat(push): document category — edge branch, audience RPC wirin
   code, add `documents`; if it reads all buckets dynamically, record that
   no change was needed.
 
-- [ ] **Step 1: Storage card.** `graft grep "player-photos" --in src/` to
+- [x] **Step 1: Storage card.** `graft grep "player-photos" --in src/` to
 find whether bucket names are hard-coded in the usage card; add
 `documents` wherever siblings are listed, or note in the commit message
 that usage is bucket-agnostic.
 
-- [ ] **Step 2: Full suite.** `npm test` — expected: everything green.
+- [x] **Step 2: Full suite.** `npm test` — expected: everything green.
 `npm run build` — expected: clean.
 
-- [ ] **Step 3: Docs.** Changelog entry (unSHA'd; check `claude/changelog.md`
+- [x] **Step 3: Docs.** Changelog entry (unSHA'd; check `claude/changelog.md`
 head first — cite the newest merged squash SHA for any entry still marked
 "(SHA follows)"). Flip this plan's status line to
 "**Status: SHIPPED <date>**" and the spec's status line to point here.
 `npm run docs:check` after the commit as well as before (the one-behind
 trap).
 
-- [ ] **Step 4: Commit and open the PR.**
+- [x] **Step 4: Commit and open the PR.**
 
 ```bash
 git add claude/changelog.md claude/state-of-play.md claude/plans/2026-08-31-documents-repo-implementation.md claude/plans/2026-08-31-documents-repo.md
@@ -1496,3 +1524,17 @@ one squad, confirm a parent account of that squad cannot see it on
 `/documents` (the negative must fail at the RLS gate — check the network
 response is an empty list, not an error), confirm the signed URL opens, and
 confirm the deploy id moved (this one SHOULD move — it is code).
+
+⚠️ **THIS IS THE ONE BOX LEFT UNTICKED IN THE WHOLE PLAN, DELIBERATELY.**
+Every other step is executed; this one happens AFTER Jay merges, so ticking it
+would be a claim about something that has not happened.
+
+⚠️ **ADD ONE CHECK TO IT, ON A REAL IPHONE: tap a document and confirm it
+opens.** `src/screens/Documents.jsx` and `src/components/SquadDocumentsCard.jsx`
+both fall back to `window.location.assign` when `window.open` returns null,
+because the `await` on the signed URL ends the user-gesture context and iOS
+blocks the popup silently — nothing throws, so no error path can catch it. The
+fallback is reasoned from the popup rule and pinned by unit tests that stub
+`window.open` to return null; it has **not** been measured on a device, and both
+components' comments point here for that. Do the check as an installed PWA as
+well as in Safari — the installed case is the stricter one.

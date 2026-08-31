@@ -83,6 +83,19 @@ export const NOTIFICATION_CATEGORIES = [
     label: 'Availability reminders',
     hint: 'A reminder before a game if you have not said whether your child is playing.',
   },
+  // The documents repo. db/migrations/20260831_documents.sql restates the FULL
+  // constraint list including this key — the pair is what
+  // tests/notification-categories.test.js asserts.
+  //
+  // ⚠️ THE AUDIENCE IS NARROWER THAN THE SWITCH, like `approval`. A staff-only
+  // document only ever reaches squad staff (public.document_push_subscriptions
+  // filters on the membership role), so a parent turning this off is often
+  // turning off something they were never in the audience for.
+  {
+    key: 'document',
+    label: 'New documents',
+    hint: 'When the club or your coaches share a document with your squad.',
+  },
 ]
 
 /**
