@@ -482,6 +482,43 @@ function checkRealInboxes() {
   }
 }
 
+// --------------------------------------------- unresolved conflict markers
+//
+// 31 Aug 2026: fourteen changelog conflicts were hand-resolved in one day —
+// the one-behind rule serialises every PR through claude/changelog.md — and
+// this script would have PASSED a file still carrying <<<<<<< / ======= /
+// >>>>>>> markers straight onto main. Verified against the script with a
+// control before writing this check. Scope is every tracked file this script
+// already reads (markdown, code, fixtures, migrations): a marker anywhere in
+// them is never prose, it is an unfinished merge.
+//
+// ⚠️ The ======= form matches only at line START and only the exact 7-char
+// git marker followed by nothing — a markdown heading underline (=== of any
+// other length) stays legal, and this file's own examples stay legal because
+// the patterns here are split so they cannot match themselves.
+const MARKER_RE = /^(<{7}( .*)?|={7}|>{7}( .*)?)$/
+
+function checkConflictMarkers() {
+  const scanned = new Set([
+    ...trackedMarkdown(), ...trackedCode(),
+    ...execSync('git ls-files "db/*" "scripts/*" "harness/*" ".github/*"', { encoding: 'utf8' })
+      .split('\n').filter(Boolean),
+  ])
+  for (const f of scanned) {
+    if (!existsSync(join(ROOT, f))) continue
+    const text = readFileSync(join(ROOT, f), 'utf8')
+    if (!text.includes('<'.repeat(7)) && !text.includes('='.repeat(7)) && !text.includes('>'.repeat(7))) continue
+    text.split('\n').forEach((line, i) => {
+      if (MARKER_RE.test(line)) {
+        fail(f, i + 1,
+          'unresolved git conflict marker. This file was hand-merged and the ' +
+          'resolution is not finished - the marker would land on main as text. ' +
+          'Finish the resolution; there is no exemption for this one')
+      }
+    })
+  }
+}
+
 // ---------------------------------------------------------------- run
 
 const files = trackedMarkdown()
@@ -495,6 +532,7 @@ const checks = [
   ['table and column grants captured', () => checkGrantCapture()],
   ['real inboxes in code and fixtures', () => checkRealInboxes()],
   ['the deploy ignore gate is wired', () => checkIgnoreGate()],
+  ['no unresolved conflict markers', () => checkConflictMarkers()],
 ]
 
 console.log(`docs-check: ${files.length} tracked markdown files\n`)
