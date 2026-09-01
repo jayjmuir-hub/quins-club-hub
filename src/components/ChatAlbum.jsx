@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { signChatPhotoUrl, isAudioAttachment } from '../data/chatMedia.js'
 
 // Several photos in one bubble — plan 3 of the chat photo albums work
@@ -78,6 +79,9 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
   // horizontally is a scroll attempt — stepping the album on that would make
   // the lightbox feel like it fires at random.
   const [touchStart, setTouchStart] = useState(null)
+  // ⚠️ A SWIPE ON A PHONE IS FOLLOWED BY A CLICK on some browsers. Without this
+  // flag the swipe would step the album AND then the click would close it.
+  const [justSwiped, setJustSwiped] = useState(false)
 
   function onTouchStart(e) {
     const t = e.changedTouches?.[0]
@@ -91,6 +95,7 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
     const dy = t.clientY - touchStart.y
     setTouchStart(null)
     if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return
+    setJustSwiped(true)
     step(dx < 0 ? 1 : -1)
   }
 
@@ -161,7 +166,23 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
         })}
       </div>
 
-      {openAt !== null && (
+      {/*
+        ⚠️ PORTALLED TO <body>, AND THAT IS THE WHOLE REASON THE OVERLAY WORKS.
+        Jay, 1 Sep 2026, on desktop: "clicking to get out of the pictures is
+        currently just a tiny area of the remaining chat screen, clicking
+        anywhere on the left menu bar does not close the pics".
+
+        This renders inside FloatingChatDock, which is `fixed … z-30` — a
+        STACKING CONTEXT. A `fixed inset-0 z-50` child of it is z-50 *within the
+        dock*, and the dock as a whole is z-30, so the sidebar (z-30) and the
+        masthead (z-40) paint OVER the backdrop and swallow every click that
+        lands on them. The overlay looked full-screen and was not.
+
+        `position: fixed` alone cannot escape that; only leaving the subtree
+        can. Same fix, same reason, as ReactionBar and AccountMenu — see
+        ReactionBar's note about a padded/overflow-hidden chat row clipping it.
+      */}
+      {openAt !== null && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
           role="dialog"
@@ -201,11 +222,29 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
               if (e.target === e.currentTarget) close()
             }}
           >
+            {/*
+              ⚠️ THE PHOTO ITSELF CLOSES. Jay, 1 Sep 2026: "clicking to get out of
+              the pictures is currently just a tiny area of the remaining chat
+              screen". With the portal below the backdrop is the whole viewport
+              again, but the picture is the biggest target on screen and the
+              first thing a thumb lands on — so everything except the three
+              controls now dismisses.
+              ⚠️ EXCEPT STRAIGHT AFTER A SWIPE, which some browsers follow with a
+              click: without the guard a swipe would step the album and then
+              close it.
+            */}
             {urls[openAt] && (
               <img
                 src={urls[openAt]}
                 alt={`Shared photo ${openAt + 1} of ${photos.length}`}
-                className="max-h-full max-w-full rounded-[12px] object-contain"
+                onClick={() => {
+                  if (justSwiped) {
+                    setJustSwiped(false)
+                    return
+                  }
+                  close()
+                }}
+                className="max-h-full max-w-full cursor-zoom-out rounded-[12px] object-contain"
               />
             )}
 
@@ -273,7 +312,8 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

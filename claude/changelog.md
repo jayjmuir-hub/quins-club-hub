@@ -10,7 +10,32 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **THE ALBUM LIGHTBOX WAS STILL BUGGY, AND THE FIRST FIX ONLY MOVED THE
+- **THE PHOTO OVERLAY WAS NEVER FULL-SCREEN — IT WAS TRAPPED IN THE CHAT DOCK'S
+  STACKING CONTEXT.** Jay, 1 Sep 2026, desktop: *"clicking to get out of the
+  pictures is currently just a tiny area of the remaining chat screen, clicking
+  anywhere on the left menu bar does not close the pics"*, with a screenshot
+  showing the sidebar, masthead, squad bar and composer all painting OVER the
+  photo.
+  ⚠️ **`FloatingChatDock` is `fixed … z-30`, which is a STACKING CONTEXT.** A
+  `fixed inset-0 z-50` child of it is z-50 *within the dock*, and the dock as a
+  whole is z-30 — so the sidebar (z-30) and masthead (z-40) paint above the
+  backdrop and swallow every click landing on them. `position: fixed` cannot
+  escape that; only leaving the subtree can. **Portalled to `<body>`**, the same
+  fix and the same reason as `ReactionBar` and `AccountMenu`.
+  ⚠️ **`ChatPhoto` HAD THE IDENTICAL BUG and nobody had reported it** — one
+  instance was visible, both were broken. Fixed together.
+  ⚠️ **The photo itself now closes**, so the exit target is everything except the
+  three controls — with a guard, because some browsers follow a swipe with a
+  click and the album would otherwise step AND dismiss.
+  ⚠️ **A TEST WENT VACUOUS THE MOMENT THE PORTAL LANDED, AND STILL PASSED.** It
+  found the image via `container.querySelectorAll`; the portal moved the
+  lightbox OUT of `container`, so it matched nothing, clicked `undefined` and
+  asserted something trivially true. **A test that clicks nothing is not a
+  test** — `screen` queries and a `container.contains(box) === false` assertion
+  replace it. That is the third assertion-that-cannot-fail in this one feature.
+  `src/components/ChatAlbum.jsx`, `src/components/ChatPhoto.jsx`.
+
+- `3572163` — **THE ALBUM LIGHTBOX WAS STILL BUGGY, AND THE FIRST FIX ONLY MOVED THE
   PROBLEM.** Jay, 1 Sep 2026, from the live site: *"sometimes when the first pic
   opens and you click the forward arrow the pictures close, the back button
   shows sometimes but doesn't work, sometimes the buttons are in the middle and
