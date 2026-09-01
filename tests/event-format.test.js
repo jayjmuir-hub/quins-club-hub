@@ -17,6 +17,7 @@ import {
   formatTime,
   formatTimeRange,
   hasResult,
+  homeAwayLabel,
   nextEventLabel,
   resultLabel,
   resultOutcome,
@@ -177,6 +178,56 @@ describe('eventTitle', () => {
   it('falls back to "Club event" for anything else with no title', () => {
     expect(eventTitle({ type: 'training', title: null })).toBe('Club event')
     expect(eventTitle(undefined)).toBe('Club event')
+  })
+
+  // ══ LEAGUE PLACEHOLDERS (1 Sep 2026) ═══════════════════════════════════
+  it('⚠️ titles a league fixture with no opponent by its round, not "Quins match"', () => {
+    expect(
+      eventTitle({ type: 'match', opponent: null, competition_type: 'league', round: 1 }),
+    ).toBe('Round 1')
+    // Round 0 is a legal round and is falsy — the standing trap.
+    expect(
+      eventTitle({ type: 'match', opponent: null, competition_type: 'league', round: 0 }),
+    ).toBe('Round 0')
+  })
+
+  it('⚠️ but a named opponent still wins, and a friendly never borrows a stale round', () => {
+    // The placeholder title is for the gap before the fixture is out; once an
+    // opponent exists the title is the fixture again.
+    expect(
+      eventTitle({ type: 'match', opponent: 'Dubai Exiles', competition_type: 'league', round: 1 }),
+    ).toBe('Quins vs Dubai Exiles')
+    // The control: a round left behind on a friendly (no competition_type)
+    // must not surface through this new branch.
+    expect(eventTitle({ type: 'match', opponent: null, round: 4 })).toBe('Quins match')
+  })
+})
+
+describe('homeAwayLabel', () => {
+  // ⚠️ THE TABLE EVERY SCREEN MUST SHARE. `event.home ? 'Home' : 'Away'` at a
+  // call site is a bug since the 1 Sep 2026 placeholders — it reads every
+  // "not decided yet" (null) as Away.
+  it('reads the two booleans as themselves', () => {
+    expect(homeAwayLabel({ type: 'match', home: true })).toBe('Home')
+    expect(homeAwayLabel({ type: 'match', home: false })).toBe('Away')
+  })
+
+  it('⚠️ reads null on a plain match as TBD — it must SHOW, like Pitch TBD', () => {
+    expect(homeAwayLabel({ type: 'match', home: null })).toBe('TBD')
+    expect(homeAwayLabel({ type: 'match', home: null, competition_type: 'league' })).toBe('TBD')
+  })
+
+  it('⚠️ but a tournament container gets NOTHING — the question was never asked', () => {
+    // A tournament is named, not home or away; printing TBD there would claim
+    // an answer is coming.
+    expect(
+      homeAwayLabel({ type: 'match', home: null, competition_type: 'tournament' }),
+    ).toBeNull()
+  })
+
+  it('is null for anything that is not a match', () => {
+    expect(homeAwayLabel({ type: 'training', home: true })).toBeNull()
+    expect(homeAwayLabel(undefined)).toBeNull()
   })
 })
 

@@ -25,6 +25,7 @@ import {
   resultOutcome,
   resultScore,
   eventPitchLabel,
+  homeAwayLabel,
 } from '../lib/eventFormat.js'
 
 // The compact share tag (¼/⅓/½) ONLY when a booking takes part of a pitch. A
@@ -572,7 +573,15 @@ export default function EventDetail({
       <div className="mb-4">
         <KeyValue label="Type">
           {typeLabel}
-          {event.type === 'match' ? ` · ${event.home ? 'Home' : 'Away'}` : ''}
+          {/* ⚠️ homeAwayLabel, NOT `event.home ? … : …` — since the league
+              placeholders (1 Sep 2026) a match may store null meaning "not
+              decided yet", and the old ternary read every placeholder as Away.
+              TBD must SHOW (the Pitch TBD rule: nobody can tell "not decided"
+              from "the app didn't say"), spelled out because a bare "TBD"
+              after "Match ·" would not say what is undecided. */}
+          {homeAwayLabel(event)
+            ? ` · ${homeAwayLabel(event) === 'TBD' ? 'Home or away TBD' : homeAwayLabel(event)}`
+            : ''}
         </KeyValue>
         <KeyValue label="Age group">{clubWide ? 'Whole club' : team?.name ?? 'Not set'}</KeyValue>
         {/* ⚠️ A SEPARATE ROW, NOT A REPLACEMENT FOR "Age group". The squad and
@@ -587,6 +596,14 @@ export default function EventDetail({
           <KeyValue label="League team">
             {fixtureLabel(event, event.league_team, team?.name ?? '')}
           </KeyValue>
+        )}
+        {/* ⚠️ A PLACEHOLDER SAYS SO (1 Sep 2026). league_team_tbd is a third
+            answer — "a league fixture whose side is not known yet" — and it
+            must render, or a placeholder's detail sheet is indistinguishable
+            from a friendly's. Strict === true so a row read through a path
+            that does not select the column stays exactly what it was. */}
+        {!event.league_team && event.league_team_tbd === true && (
+          <KeyValue label="League team">TBD — not known yet</KeyValue>
         )}
         <KeyValue label="Venue">{event.venue || 'To be confirmed'}</KeyValue>
         {/* Only when set. Unlike Venue, which falls back to "To be

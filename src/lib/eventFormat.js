@@ -152,9 +152,42 @@ export function eventTitle(event) {
     return event.competition
   }
   if (event?.type === 'match' && event.opponent) return `Quins vs ${event.opponent}`
+  // ⚠️ A LEAGUE PLACEHOLDER IS TITLED BY ITS ROUND, NOT "Quins match" (Jay,
+  // 1 Sep 2026). The league publishes rounds months before fixtures, so a
+  // round with no opponent is the normal state of a freshly entered season —
+  // and "Quins match" told a parent nothing while the one known fact (which
+  // round) sat hidden on the detail sheet. Gated on competition_type, the
+  // same gate fixtureLabel uses, so a stale round on a friendly stays hidden.
+  if (event?.type === 'match' && event.competition_type === 'league' && event.round != null) {
+    return `Round ${event.round}`
+  }
   if (event?.title) return event.title
   if (event?.type === 'match') return 'Quins match'
   return 'Club event'
+}
+
+/**
+ * 'Home' | 'Away' | 'TBD' | null — the one reading of `events.home` every
+ * screen must share.
+ *
+ * ⚠️ NULL IS TWO DIFFERENT THINGS AND THIS FUNCTION IS WHERE THEY ARE TOLD
+ * APART. Since the 1 Sep 2026 league placeholders, a plain match may store
+ * home = null meaning "asked, not answered yet" — the same TBD pattern as
+ * Pitch TBD, and it must SHOW as TBD (nobody can tell "not decided" from
+ * "the app didn't say" otherwise, Jay's standing rule for Pitch TBD). But a
+ * tournament CONTAINER also stores null, because a tournament is named, not
+ * home or away — the question was never asked, and printing TBD there would
+ * claim an answer is coming. Hence the competition_type gate.
+ *
+ * ⚠️ `event.home ? 'Home' : 'Away'` AT A CALL SITE IS NOW A BUG — it reads
+ * every placeholder as Away. tests/event-format.test.js pins this table.
+ */
+export function homeAwayLabel(event) {
+  if (event?.type !== 'match') return null
+  if (event.home === true) return 'Home'
+  if (event.home === false) return 'Away'
+  if (event.competition_type === 'tournament') return null
+  return 'TBD'
 }
 
 /**

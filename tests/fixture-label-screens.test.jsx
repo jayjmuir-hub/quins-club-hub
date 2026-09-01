@@ -73,6 +73,27 @@ const FRIENDLY = {
   league_team: null,
 }
 
+// ⚠️ THE LEAGUE PLACEHOLDER (1 Sep 2026): a known league round whose side,
+// tier, ground and opponent are not out yet. It must read as a Round
+// placeholder — never as a friendly, and never as "Quins match" against
+// nobody. The FRIENDLY above is the control that keeps this honest: it also
+// has a stale round and no league team, and it must keep rendering nothing,
+// because it has no competition_type.
+const PLACEHOLDER = {
+  ...base,
+  id: 'e-3',
+  opponent: null,
+  home: null,
+  venue: null,
+  pitch: null,
+  competition_type: 'league',
+  round: 1,
+  league_team_id: null,
+  league_team: null,
+  league_team_tbd: true,
+  tier: 'TBD',
+}
+
 describe('fixtureLabel — the one formatter these screens share', () => {
   it('is what all four consumers are expected to render', () => {
     expect(fixtureLabel(LEAGUE_FIXTURE, LEAGUE_FIXTURE.league_team, SQUAD.name)).toBe(
@@ -110,6 +131,18 @@ describe('FixtureRow — the Dashboard and all three Schedule tabs', () => {
     render(<FixtureRow event={FRIENDLY} onSelect={vi.fn()} />)
     expect(screen.getByTestId('fixture-row')).toBeInTheDocument()
   })
+
+  it('⚠️ a league placeholder shows its round WITHOUT a league team', () => {
+    // The one fact the league has published is the round; hiding it made a
+    // placeholder indistinguishable from a friendly on the list a parent
+    // actually reads. Gated on competition_type — the FRIENDLY control above
+    // proves a stale round without it still renders nothing.
+    render(<FixtureRow event={PLACEHOLDER} teamName={SQUAD.name} onSelect={vi.fn()} />)
+    expect(screen.getByText('U14B Contact · Round 1')).toBeInTheDocument()
+    // And the bold line is the round, not the useless "Quins match".
+    expect(screen.getByTestId('fixture-title')).toHaveTextContent('Round 1')
+    expect(screen.queryByText('Quins match')).not.toBeInTheDocument()
+  })
 })
 
 describe('EventDetail — the sheet', () => {
@@ -133,5 +166,19 @@ describe('EventDetail — the sheet', () => {
     expect(screen.getByText('U14B Contact')).toBeInTheDocument()
     expect(screen.queryByText('League team')).not.toBeInTheDocument()
     expect(screen.queryByText(/Round 4/)).not.toBeInTheDocument()
+  })
+
+  it('⚠️ a league placeholder says TBD, not nothing and not Away', () => {
+    // Three assertions, three lies this sheet used to be capable of: hiding
+    // the League team row (reads as a friendly), rendering `home: null` as
+    // Away (the old ternary), and hiding the round.
+    render(<EventDetail event={PLACEHOLDER} team={SQUAD} {...detailProps} />)
+
+    expect(screen.getByText('League team')).toBeInTheDocument()
+    expect(screen.getByText('TBD — not known yet')).toBeInTheDocument()
+    expect(screen.getByText(/Home or away TBD/)).toBeInTheDocument()
+    expect(screen.queryByText(/Away/)).not.toBeInTheDocument()
+    // The Competition row already carried the round; list and detail agree.
+    expect(screen.getByText('League · Round 1')).toBeInTheDocument()
   })
 })
