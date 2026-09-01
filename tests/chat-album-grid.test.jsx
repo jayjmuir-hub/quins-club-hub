@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Plan 3 of the chat photo albums work — the GRID.
@@ -98,17 +98,90 @@ describe('ChatAlbum', () => {
       expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('1 / 4')
     })
 
-    it('⚠️ clamps at both ends rather than wrapping', async () => {
+    it('⚠️ both arrows always EXIST — disabled at the ends, never removed', async () => {
+      // Jay, 1 Sep 2026, on the first real album: "there is no back button when
+      // clicking through them, there is a forward button though." He had opened
+      // the FIRST photo, where the old guard removed the control entirely, so
+      // the lightbox read as one-way and broken. A disabled arrow says "you are
+      // at the start" without the button vanishing.
       const user = userEvent.setup()
       render(<ChatAlbum attachments={album(2)} />)
       await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(2))
-      // At the first photo there is no "previous" to press at all...
+
       await user.click(screen.getAllByTestId('chat-album-tile')[0])
-      expect(screen.queryByLabelText('Previous photo')).toBeNull()
-      // ...and at the last there is no "next".
+      const back = screen.getByLabelText('Previous photo')
+      // ⚠️ toBeVisible, NOT just "is in the document". getByLabelText finds an
+      // element even when it carries `hidden`, so an assertion that only looks
+      // it up passes against the ORIGINAL BUG — proven by injecting exactly
+      // that and watching all 17 tests stay green.
+      expect(back).toBeVisible()
+      expect(back).toBeDisabled()
+      expect(screen.getByLabelText('Next photo')).toBeEnabled()
+      // ⚠️ DISABLED MUST STILL BE VISIBLE. An invisible disabled arrow is the
+      // original complaint again wearing a different hat, and `toBeDisabled()`
+      // passes either way — this caught exactly that mistake once already.
+      expect(back.className).not.toContain('disabled:opacity-0"')
+      expect(back.className).toMatch(/disabled:opacity-[1-9]/)
+
       await user.click(screen.getByLabelText('Next photo'))
       expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('2 / 2')
-      expect(screen.queryByLabelText('Next photo')).toBeNull()
+      // ...and at the last photo it is the forward arrow that goes quiet.
+      expect(screen.getByLabelText('Next photo')).toBeDisabled()
+      expect(screen.getByLabelText('Previous photo')).toBeEnabled()
+    })
+
+    it('⚠️ a disabled arrow does not move the album', async () => {
+      // pointer-events-none plus `disabled` — if either were missing, clicking
+      // the dimmed control would still step and the clamp would be cosmetic.
+      const user = userEvent.setup()
+      render(<ChatAlbum attachments={album(3)} />)
+      await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(3))
+      await user.click(screen.getAllByTestId('chat-album-tile')[0])
+      await user.click(screen.getByLabelText('Previous photo')).catch(() => {})
+      expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('1 / 3')
+    })
+
+    it('⚠️ the arrows are vertically centred, not left to the static position', () => {
+      // They carried left-3/right-3 and NO top/bottom inside a
+      // `grid place-items-center` parent, which left the block axis undefined
+      // by intent. jsdom does no layout, so this pins the CLASS rather than the
+      // geometry — the honest limit of what a unit test can see here.
+      render(<ChatAlbum attachments={album(2)} />)
+      return waitFor(() => {
+        const tiles = screen.getAllByTestId('chat-album-tile')
+        expect(tiles).toHaveLength(2)
+      }).then(async () => {
+        const user = userEvent.setup()
+        await user.click(screen.getAllByTestId('chat-album-tile')[0])
+        for (const label of ['Previous photo', 'Next photo']) {
+          const cls = screen.getByLabelText(label).className
+          expect(cls).toContain('top-1/2')
+          expect(cls).toContain('-translate-y-1/2')
+        }
+      })
+    })
+
+    it('swipes left and right, and ignores a vertical drag', async () => {
+      render(<ChatAlbum attachments={album(3)} />)
+      await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(3))
+      const user = userEvent.setup()
+      await user.click(screen.getAllByTestId('chat-album-tile')[0])
+      const box = screen.getByTestId('chat-album-lightbox')
+
+      const swipe = (fromX, toX, fromY = 100, toY = 100) => {
+        fireEvent.touchStart(box, { changedTouches: [{ clientX: fromX, clientY: fromY }] })
+        fireEvent.touchEnd(box, { changedTouches: [{ clientX: toX, clientY: toY }] })
+      }
+
+      swipe(300, 100) // leftwards -> forward
+      expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('2 / 3')
+      swipe(100, 300) // rightwards -> back
+      expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('1 / 3')
+
+      swipe(300, 280) // under the 40px threshold: a shaky tap, not a swipe
+      expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('1 / 3')
+      swipe(300, 100, 100, 400) // travels further vertically: a scroll attempt
+      expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('1 / 3')
     })
 
     it('closes on the backdrop and on Escape', async () => {
