@@ -10,7 +10,33 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **THE ALBUM LIGHTBOX HAD NO BACK ARROW ON DESKTOP — reported from the first
+- **THE ALBUM LIGHTBOX WAS STILL BUGGY, AND THE FIRST FIX ONLY MOVED THE
+  PROBLEM.** Jay, 1 Sep 2026, from the live site: *"sometimes when the first pic
+  opens and you click the forward arrow the pictures close, the back button
+  shows sometimes but doesn't work, sometimes the buttons are in the middle and
+  sometimes the bottom, very buggy"*. Three symptoms, one shape — **controls
+  that move, and a backdrop that closed on anything.**
+  ⚠️ **The stage was sized TO THE IMAGE** (`max-h-full max-w-full`, no height),
+  so every control shifted as each photo loaded and as portrait/landscape
+  alternated. `h-full w-full max-w-3xl` makes the box independent of its
+  contents; the picture floats inside it.
+  ⚠️ **The backdrop ran `onClick={close}`, which fires for ANY bubbled click** —
+  so a tap that narrowly missed a moved arrow dismissed the album. Now it closes
+  only when `e.target === e.currentTarget`. A miss costs nothing.
+  ⚠️ **`disabled:pointer-events-none` made the dimmed back arrow DESTRUCTIVE** —
+  the click fell through to the backdrop and closed everything. Removed; a
+  disabled button refuses its own click and should swallow it.
+  ⚠️ **`z-10`, because the arrows are siblings of the photo** and a large image
+  covered them exactly when it was big enough to reach them.
+  ⚠️ **TWO OF THE FOUR INJECTED FAULTS PASSED FIRST TIME, and both were the
+  TEST's fault.** `toContain('h-full')` matches `max-h-full`, so the substring
+  check passed against the very regression it pinned; and
+  `disabled:pointer-events-none` computes to nothing in jsdom, which loads no
+  Tailwind, so behaviour is identical with or without it. Exact class TOKENS fix
+  the first; the second can only ever be a class assertion here, and says so.
+  `src/components/ChatAlbum.jsx`.
+
+- `da597e4` — **THE ALBUM LIGHTBOX HAD NO BACK ARROW ON DESKTOP — reported from the first
   real album.** Jay, 1 Sep 2026: *"there is no back button when clicking through
   them, there is a forward button though"*, then *"the back arrow is there on
   phone, but I don't see it on desktop"*. Two separate causes, and the

@@ -163,15 +163,44 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
 
       {openAt !== null && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/85 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
           role="dialog"
           aria-label={`Photo ${openAt + 1} of ${photos.length}`}
           data-testid="chat-album-lightbox"
-          onClick={close}
+          // ⚠️ CLOSE ONLY ON THE BACKDROP ITSELF, never on a bubbled click.
+          // Jay, 1 Sep 2026: "sometimes when the first pic opens and you click
+          // the forward arrow the pictures close". A bare onClick={close} here
+          // fires for ANY click that reaches this element — so a tap that
+          // narrowly missed a moving arrow, or one that fell through the
+          // disabled arrow's `pointer-events-none`, dismissed the whole album
+          // instead of doing nothing. Comparing target to currentTarget makes
+          // a miss cost nothing, which is what a miss should cost.
+          onClick={(e) => {
+            if (e.target === e.currentTarget) close()
+          }}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >
-          <div className="relative flex max-h-full max-w-full items-center justify-center">
+          {/*
+            ⚠️ THE STAGE HAS FIXED GEOMETRY, AND THAT IS THE WHOLE POINT.
+            Jay, 1 Sep 2026: "sometimes the buttons are in the middle and
+            sometimes the bottom, very buggy". The previous version sized this
+            wrapper TO THE IMAGE (`max-h-full max-w-full` with no height), so its
+            box — and every control positioned against it — moved as each photo
+            loaded and as portrait/landscape alternated. Controls that move
+            between renders are also controls you miss when you click.
+
+            `h-full w-full` makes the stage independent of what is inside it, and
+            `max-w-3xl` keeps the arrows beside the picture on a wide desktop
+            rather than out at the viewport edges (the 1 Sep desktop report).
+            The image floats inside it and can be any size it likes.
+          */}
+          <div
+            className="relative flex h-full w-full max-w-3xl items-center justify-center"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) close()
+            }}
+          >
             {urls[openAt] && (
               <img
                 src={urls[openAt]}
@@ -179,69 +208,60 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
                 className="max-h-full max-w-full rounded-[12px] object-contain"
               />
             )}
+
+            {/*
+              ⚠️ BOTH ARROWS ALWAYS RENDER, DIMMED AND DISABLED AT THE ENDS.
+              Jay, 1 Sep 2026: "there is no back button when clicking through
+              them, there is a forward button though" — he had opened the FIRST
+              photo, where an `openAt > 0` guard removed the control entirely, so
+              the lightbox read as one-way and broken rather than "you are at the
+              start". A control that vanishes IS the complaint.
+
+              ⚠️ NO `pointer-events-none` ON THE DISABLED STATE. It was there,
+              and it meant a click on the dimmed back arrow passed straight
+              through to the backdrop and CLOSED the album — "the back button
+              shows sometimes but doesn't work". A disabled <button> already
+              refuses its own click; letting it swallow the event is the fix.
+
+              ⚠️ z-10 because the image is a sibling: without it the arrows sit
+              UNDER a large photo and are unclickable exactly when the photo is
+              big enough to reach them.
+            */}
+            <button
+              type="button"
+              aria-label="Previous photo"
+              disabled={openAt === 0}
+              onClick={(e) => {
+                e.stopPropagation()
+                step(-1)
+              }}
+              className="absolute left-1 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 disabled:opacity-30"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+            </button>
+            <button
+              type="button"
+              aria-label="Next photo"
+              disabled={openAt >= photos.length - 1}
+              onClick={(e) => {
+                e.stopPropagation()
+                step(1)
+              }}
+              className="absolute right-1 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 disabled:opacity-30"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+
+          {/* Counter and close belong to the BACKDROP, not the stage — they are
+              about the album, not about this photo, and pinning them here keeps
+              them still while the picture changes. */}
           <span
-            className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-white/15 px-3 py-1 text-[12px] font-semibold text-white"
+            className="pointer-events-none absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-[12px] font-semibold text-white backdrop-blur-sm"
             data-testid="chat-album-counter"
           >
             {openAt + 1} / {photos.length}
           </span>
-          {/*
-            ⚠️ BOTH ARROWS ARE ALWAYS RENDERED, DISABLED AT THE ENDS RATHER THAN
-            REMOVED. Jay, 1 Sep 2026, on the first real album: "there is no back
-            button when clicking through them, there is a forward button though."
-            He had opened the FIRST photo, where the old `openAt > 0` guard
-            removed the control entirely — so the lightbox looked one-way and
-            broken rather than "you are at the start". A dimmed, disabled arrow
-            says the same thing without the control vanishing, and it keeps the
-            two arrows in fixed positions instead of the forward one moving.
-
-            ⚠️ AND THEY ARE ANCHORED TO THE IMAGE, NOT THE VIEWPORT. They used to
-            sit on the `fixed inset-0` backdrop, so on a PHONE they landed close
-            to a full-bleed photo and looked right, while on DESKTOP they flew to
-            the screen edges — the back arrow ending ~1800px from the picture, on
-            top of the app sidebar, where it does not read as part of the dialog.
-            Jay saw it on his phone and not on his desktop for exactly that
-            reason. The wrapper below is sized to the image, so the controls stay
-            beside the thing they act on at every width.
-
-            ⚠️ NOT a vertical problem, though it looked like one at first: they
-            were ALREADY centred, because `place-items-center` centres an abspos
-            child's static position too. `top-1/2 -translate-y-1/2` is kept only
-            so the position is stated rather than inherited.
-
-            ⚠️ DISABLED IS DIMMED, NEVER INVISIBLE. `disabled:opacity-0` was
-            written here once and is the original complaint wearing a different
-            hat — `toBeDisabled()` passes either way, so the test now pins the
-            opacity as well.
-          */}
-          <button
-            type="button"
-            aria-label="Previous photo"
-            disabled={openAt === 0}
-            // stopPropagation on every control: the backdrop closes on click,
-            // and without this the arrows would dismiss the lightbox instead
-            // of moving through it.
-            onClick={(e) => {
-              e.stopPropagation()
-              step(-1)
-            }}
-            className="absolute left-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:pointer-events-none disabled:opacity-30"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-          </button>
-          <button
-            type="button"
-            aria-label="Next photo"
-            disabled={openAt >= photos.length - 1}
-            onClick={(e) => {
-              e.stopPropagation()
-              step(1)
-            }}
-            className="absolute right-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:pointer-events-none disabled:opacity-30"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-            </button>
-          </div>
           <button
             type="button"
             aria-label="Close photo"
@@ -249,7 +269,7 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
               e.stopPropagation()
               close()
             }}
-            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white hover:bg-white/25"
+            className="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
