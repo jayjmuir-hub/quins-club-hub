@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **Docs: the phase 2 schema reasoning, and the validator handoff rescued.**
+- **ESLINT 10 IS UNBLOCKED — by an `overrides` entry, not by dropping anything.**
+  `eslint-plugin-react`'s latest release (7.37.5, April 2025) peer-caps at
+  `eslint ^9.7`, so `npm ci` refused eslint 10 with ERESOLVE. **The cap is stale
+  METADATA, not a real incompatibility:** measured with eslint 10.9.1 genuinely
+  installed, `npm ci`, `lint`, `build` and the full suite all exit 0 and give the
+  SAME 0 errors / 66 warnings as eslint 9. Upstream
+  `jsx-eslint/eslint-plugin-react#4022` is open but unreleased and that project
+  has not published since April 2025, so waiting was indefinite.
+  ⚠️ **DO NOT "SIMPLIFY" BY DROPPING THE PLUGIN.** `react/jsx-uses-vars` is
+  load-bearing — core `no-unused-vars` cannot see JSX, so every component used
+  only in markup reads as unused. Dropping it took the warnings from 66 to
+  **1,237**, and the exit code stayed 0, which is exactly why that damage would
+  go unnoticed.
+  ⚠️ **The override permanently silences the peer check for this one plugin**, so
+  a future genuine break arrives as a runtime error rather than an install
+  refusal. Remove it when the plugin publishes eslint 10 support.
+  `package.json`, `eslint.config.js`.
+
+- `9894eb9` — **Docs: the phase 2 schema reasoning, and the validator handoff rescued.**
   The four phase 2 migrations reached `claude/schema-history.md` — the plan's
   own task 7 listed it and the session skipped it, found by re-checking the
   plan rather than memory when asked "anything left" (with a control: phase 1's

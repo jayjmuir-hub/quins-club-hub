@@ -1618,3 +1618,20 @@ green suite and has never been exercised by a human on the live site.
   not a failure; it is an un-awaited promise nobody owns**, and the next person
   to chase it should look for a fetch that outlives its test rather than at
   either file's assertions.
+
+## A Dependabot PR cannot satisfy `docs:check` on its own
+
+**1 Sep 2026, third occurrence.** `docs:check` demands main's current tip SHA be
+cited in `claude/changelog.md`. A Dependabot PR only ever touches `package.json`
+and the lockfile, so it can never cite anything — and `@dependabot rebase` simply
+moves it onto a NEWER uncited tip. #567, #568 and #616 were all red for exactly
+this, and no amount of rebasing would have cleared any of them.
+
+**The fix:** push the changelog citation ONTO the Dependabot branch
+(`git push origin <local>:<dependabot/…>` — same repo, not a fork), then merge.
+Do the citation and the merge back to back, because every merge creates the next
+uncited tip.
+
+⚠️ **Not proposed as a rule change.** The one-behind rule is load-bearing and has
+caught real omissions; this is a known cost of it, written down so the next
+session does not spend an hour rediscovering it.
