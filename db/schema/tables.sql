@@ -773,8 +773,8 @@ CREATE TABLE public.events (
   -- ("ADHQ2"). One squad can enter three of them, one per division.
   league_team_id uuid,
   round          smallint,
-  -- Added 2026-09-01 (league_placeholders) — NOT YET APPLIED when captured;
-  -- delete this parenthetical on capture after applying. Column comment as
+  -- Added 2026-09-01 (league_placeholders) — applied to live the same day,
+  -- harness green (all steps, rollback verified). Column comment as
   -- stored: "A league fixture whose side (ADHQ1/ADHQ2/…) is not known yet.
   -- DISTINCT from league_team_id being null, which means 'not a league match'
   -- — a friendly. Never both: see events_league_team_not_both."

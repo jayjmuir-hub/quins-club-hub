@@ -21,14 +21,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   is `'TBD'` in the existing text column (`events_tier_check` widened); home
   TBD is null in the existing nullable boolean, which no plain match could
   hold before. Migration `db/migrations/20260901_league_placeholders.sql` —
-  NOT yet applied.
+  **applied to live 1 Sep 2026** (Jay's go-ahead, same session), harness
+  `db/tests/league-placeholders.sql` green against production, rollback
+  verified with a control. ⚠️ Applied is not merged — the file rides PR #624.
   ⚠️ **fixtureLabel now shows the round WITHOUT a league team, gated on
   `competition_type = 'league'`** — `U16B · Round 1` — so a stale round on a
   friendly stays hidden exactly as before. Same rule mirrored by hand in the
   calendar feed (`leagueLabel`/`summaryFor`), which needs its own deploy.
   Opponent is optional for a league fixture, matching tournaments.
 
-- **`my_chats()` ALBUM COUNT — SPECIFIED, NOT BUILT.**
+- `755c7af` — **`my_chats()` ALBUM COUNT — SPECIFIED, NOT BUILT.**
   `claude/plans/2026-09-01-my-chats-album-count.md`. The Chats list still
   previews a ten-photo message as "📷 Photo" because `my_chats()` returns
   `last_attachment_path` and no count. Half of plan 4; the other half — dropping
