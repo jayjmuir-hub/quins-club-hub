@@ -773,6 +773,18 @@ CREATE TABLE public.events (
   -- ("ADHQ2"). One squad can enter three of them, one per division.
   league_team_id uuid,
   round          smallint,
+  -- Added 2026-09-01 (league_placeholders) — NOT YET APPLIED when captured;
+  -- delete this parenthetical on capture after applying. Column comment as
+  -- stored: "A league fixture whose side (ADHQ1/ADHQ2/…) is not known yet.
+  -- DISTINCT from league_team_id being null, which means 'not a league match'
+  -- — a friendly. Never both: see events_league_team_not_both."
+  --
+  -- ⚠️ A SEPARATE BOOLEAN, NOT AN OVERLOADED NULL, and that is the feature:
+  -- league_team_id is a uuid FK, so a 'TBD' sentinel cannot live in it, and
+  -- null already means "a friendly" (the null rule above). The league (U11+)
+  -- publishes ROUNDS months before fixtures, so "Round 1, side unknown" is a
+  -- real state a placeholder must be able to hold without inventing ADHQ1.
+  league_team_tbd boolean NOT NULL DEFAULT false,
   -- Added 2026-08-12 (competition_type). Column comment as stored:
   --   "league | tournament. NULL means neither - a friendly - and is a real
   --   answer, never 'assume league'. round belongs to league; competition holds
@@ -916,8 +928,15 @@ CREATE TABLE public.events (
   -- arm: a NULL end time stays legal, so the CHECK only ever fires on an end
   -- time that is actually before or equal to the start.
   CONSTRAINT events_ends_after_starts CHECK (((ends_at IS NULL) OR (ends_at > starts_at))),
-  -- Re-captured 25 Aug 2026, with `tier` above.
-  CONSTRAINT events_tier_check CHECK (((tier IS NULL) OR (tier = ANY (ARRAY['A'::text, 'B'::text, 'C'::text]))))
+  -- Added 2026-09-01 (league_placeholders). A fixture cannot name a league
+  -- team and simultaneously claim not to know it. The form's single select
+  -- makes it unreachable; the constraint is the boundary.
+  CONSTRAINT events_league_team_not_both CHECK ((NOT (league_team_tbd AND (league_team_id IS NOT NULL)))),
+  -- Re-captured 25 Aug 2026, with `tier` above. Widened 2026-09-01
+  -- (league_placeholders): 'TBD' is a league/tournament fixture whose
+  -- division is not chosen yet. NULL keeps meaning "no tier — a friendly or
+  -- untiered", the answer, never collapsed into TBD.
+  CONSTRAINT events_tier_check CHECK (((tier IS NULL) OR (tier = ANY (ARRAY['A'::text, 'B'::text, 'C'::text, 'TBD'::text]))))
 );
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 

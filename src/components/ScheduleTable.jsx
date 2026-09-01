@@ -12,6 +12,7 @@ import {
   resultScore,
   venueLine,
   eventChipKind,
+  homeAwayLabel,
 } from '../lib/eventFormat.js'
 import {
   groupEventsByMonth,
@@ -122,9 +123,14 @@ function EventRow({ event, teamsById, onSelect }) {
 
       <td className={`${CELL} font-semibold`}>
         <span data-testid="schedule-fixture">{eventTitle(event)}</span>
-        {event.type === 'match' && (
+        {/* ⚠️ homeAwayLabel, NOT `event.home ? 'H' : 'A'` — a league
+            placeholder stores null ("not decided yet", 1 Sep 2026) and the old
+            ternary stamped it A. TBD is shown in full: it is a status, not a
+            side, and a bare "T" pill would be a riddle. A tournament container
+            gets no pill at all — the question was never asked of it. */}
+        {event.type === 'match' && homeAwayLabel(event) && (
           <span className="ml-2 rounded-[100px] bg-surface-sunk px-1.5 py-0.5 text-[11px] font-extrabold text-ink-muted">
-            {event.home ? 'H' : 'A'}
+            {homeAwayLabel(event) === 'TBD' ? 'TBD' : homeAwayLabel(event).charAt(0)}
           </span>
         )}
         {event.competition && (

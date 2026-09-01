@@ -82,11 +82,34 @@ describe('the feed and the app agree about what a league fixture is called', () 
     expect(FEED).toContain("' · '")
   })
 
-  it('⚠️ the feed drops the round when there is no league team, like the app', () => {
+  it('⚠️ the feed drops a STALE round when there is no league team, like the app', () => {
     // The rule a later "improvement" is most likely to break with a
-    // friendly-looking default, in both places at once.
+    // friendly-looking default, in both places at once. Since the 1 Sep 2026
+    // placeholders the gate is competition_type, not the team: a friendly
+    // (no competition_type) still renders nothing, whatever its round holds.
     expect(fixtureLabel({ round: 4 }, null, 'U14B Contact')).toBe('U14B Contact')
-    expect(FEED).toMatch(/if \(!event\.league_team_name\) return ''/)
+    expect(FEED).toMatch(/if \(!event\.league_team_name\) \{/)
+    expect(FEED).toMatch(/event\.competition_type === 'league'/)
+  })
+
+  it('⚠️ and shows the round for a league PLACEHOLDER, like the app (1 Sep 2026)', () => {
+    // A league round whose side is not picked yet is a real state; its one
+    // known fact must reach a subscribed calendar. Both sides of the mirror:
+    expect(fixtureLabel({ competition_type: 'league', round: 1 }, null, 'U16B Contact')).toBe(
+      'U16B Contact · Round 1',
+    )
+    // …and the feed titles the placeholder by its round rather than inventing
+    // "v TBC" (summaryFor) and pushes "Round N" into DESCRIPTION (leagueLabel).
+    expect(FEED).toContain('· Round ${event.round}`')
+    expect(FEED).toContain('return `Round ${event.round}`')
+  })
+
+  it('⚠️ the feed never reads home:null as Away (1 Sep 2026)', () => {
+    // `home` is tri-state now — null means "not decided yet". A truthiness
+    // read would print Away into every subscribed parent's calendar for a
+    // placeholder, an invented fact. Both call sites are pinned.
+    expect(FEED).toMatch(/typeof event\.home === 'boolean'/)
+    expect(FEED).toMatch(/event\.home === false \? `\$\{opponent\} v \$\{squad\}`/)
   })
 
   it('⚠️ the feed falls back to the SQUAD name, never to nothing', () => {

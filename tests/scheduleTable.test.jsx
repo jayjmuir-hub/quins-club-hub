@@ -136,6 +136,22 @@ describe('ScheduleTable — content', () => {
     expect(screen.queryByText('A')).not.toBeInTheDocument()
   })
 
+  it('⚠️ marks a league placeholder TBD, never A (1 Sep 2026)', async () => {
+    // `home: null` means "not decided yet" since the league placeholders, and
+    // the old `event.home ? 'H' : 'A'` stamped every placeholder as away. The
+    // title comes from eventTitle's round branch, not "Quins match".
+    listEventsMock.mockResolvedValue([{
+      id: 'e5', team_id: 'team-u12', type: 'match', opponent: null, home: null,
+      competition_type: 'league', round: 1,
+      starts_at: '2030-03-21T05:00:00Z', result_us: null, result_them: null,
+    }])
+    render(withRouter(<Schedule />))
+    await screen.findByTestId('schedule-table')
+    expect(screen.getByText('TBD')).toBeInTheDocument()
+    expect(screen.queryByText('A')).not.toBeInTheDocument()
+    expect(screen.getByTestId('schedule-fixture')).toHaveTextContent('Round 1')
+  })
+
   it('formats the kick-off in club time, not the browser zone', async () => {
     render(withRouter(<Schedule />))
     const table = await screen.findByTestId('schedule-table')

@@ -10,6 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
+- **LEAGUE PLACEHOLDERS — a known league Saturday whose side, tier, ground and
+  opponent are not known yet (Jay, 1 Sep 2026, putting the 2026–27 RCM juniors
+  calendar on).** A U11+ Match can now save with Competition League, a Round,
+  League team **TBD**, Tier **TBD**, Home/away **TBD** and no opponent — and it
+  reads as a Round placeholder, not as a friendly and not as "Quins match".
+  ⚠️ **"Not a league match" and "TBD" are DIFFERENT ANSWERS and are stored
+  differently** — a new `events.league_team_tbd` column, because
+  `league_team_id` is a uuid FK and null already means "a friendly". Tier TBD
+  is `'TBD'` in the existing text column (`events_tier_check` widened); home
+  TBD is null in the existing nullable boolean, which no plain match could
+  hold before. Migration `db/migrations/20260901_league_placeholders.sql` —
+  NOT yet applied.
+  ⚠️ **fixtureLabel now shows the round WITHOUT a league team, gated on
+  `competition_type = 'league'`** — `U16B · Round 1` — so a stale round on a
+  friendly stays hidden exactly as before. Same rule mirrored by hand in the
+  calendar feed (`leagueLabel`/`summaryFor`), which needs its own deploy.
+  Opponent is optional for a league fixture, matching tournaments.
+
 - **`my_chats()` ALBUM COUNT — SPECIFIED, NOT BUILT.**
   `claude/plans/2026-09-01-my-chats-album-count.md`. The Chats list still
   previews a ten-photo message as "📷 Photo" because `my_chats()` returns

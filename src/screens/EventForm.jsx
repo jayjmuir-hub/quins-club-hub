@@ -39,6 +39,22 @@ const COMPETITION_TOURNAMENT = 'tournament'
 // why this does not reopen the 'friendly' ruling that was refused on 12 Aug.
 const COMPETITION_TBD = 'tbd'
 
+// ══ LEAGUE PLACEHOLDERS (Jay, 1 Sep 2026) ═════════════════════════════════
+//
+// The league (U11+) publishes ROUNDS months before it publishes fixtures, so
+// "Round 1, Saturday, side/tier/ground unknown" is a real state the form must
+// be able to say without lying. Same TBD pattern as Pitch TBD and Time TBD.
+//
+// ⚠️ "TBD" AND "NOT A LEAGUE MATCH" ARE DIFFERENT ANSWERS AND ARE STORED
+// DIFFERENTLY. league_team_id is a uuid FK whose null already means "a
+// friendly", so TBD gets its own column (events.league_team_tbd) — this
+// sentinel only ever lives in the select's value, never in league_team_id.
+// See db/migrations/20260901_league_placeholders.sql.
+const LEAGUE_TEAM_TBD = 'tbd'
+// The tier is a text column, so TBD is stored literally — the migration
+// widens events_tier_check to admit it. Null keeps meaning "no tier".
+const TIER_TBD = 'TBD'
+
 // ⚠️ ZERO TO EIGHT. R0 added 14 Aug 2026 (Jay) — a qualifying/pre-season round
 // the league numbers from nought. A SELECT rather than a number box because the
 // set is small and closed. The column is a bare `smallint` with NO check
@@ -412,7 +428,11 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
         : teamIds.includes(event.team_id)
           ? event.team_id
           : fallbackTeamId,
-    home: event.home !== false,
+    // ⚠️ TRI-STATE SINCE THE LEAGUE PLACEHOLDERS (1 Sep 2026). Null means
+    // "home or away not decided yet" and must reopen as TBD, not silently
+    // become Home — which is what the old `event.home !== false` did, and
+    // what would then be SAVED as an answer nobody gave.
+    home: typeof event.home === 'boolean' ? event.home : null,
     venue: event.venue ?? '',
     pitch: duplicating ? PITCH_TBD : event.pitch ?? '',
     // ⚠️ THE STORED PORTION WINS, and the default only fills a genuine blank.
@@ -443,7 +463,11 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     // to the SQUAD, and the squad carries over — so ADHQ2's next fixture is
     // still ADHQ2's. Clearing it would make the commonest duplicate (same
     // side, another week) worse than typing it fresh.
-    leagueTeamId: event.league_team_id ?? '',
+    // ⚠️ TBD ROUND-TRIPS. league_team_tbd is its own column precisely so a
+    // reopened placeholder shows "TBD — not known yet" rather than falling
+    // back to "Not a league match", which is a different answer.
+    leagueTeamId:
+      event.league_team_tbd === true ? LEAGUE_TEAM_TBD : event.league_team_id ?? '',
     // ⚠️ CLEARED ON A DUPLICATE. A round belongs to one fixture in a season's
     // sequence; "Round 4" twice is not an obvious typo, it is a WRONG RESULT
     // filed with the governing body — the same class of harm the league-team
@@ -585,6 +609,11 @@ export default function EventForm({
   // named side. Decides that the opponent is optional, and how the field is
   // labelled — see the `opponent` guard in handleSubmit.
   const isTournament = isMatch && values.competitionType === COMPETITION_TOURNAMENT
+  // A league fixture. Since the placeholders (1 Sep 2026) this makes the
+  // opponent optional too — the league publishes rounds before fixtures, so
+  // "leave blank until the fixture is out" is the same courtesy tournaments
+  // already get, and demanding a dummy opponent was the lie being told.
+  const isLeague = isMatch && values.competitionType === COMPETITION_LEAGUE
   // ⚠️ A DUPLICATE IS NOT EDITING, and this single line is what makes that
   // true everywhere. `editing` gates the id on the payload, the series
   // checkbox, the Repeats panel, the extra-squads picker, the sheet title and
@@ -1054,7 +1083,11 @@ export default function EventForm({
       // type the tournament's NAME into the box, which then rendered as
       // "Quins vs Al Ain Tournament" everywhere. This is the bug; eventTitle's
       // tournament branch is the cosmetic half.
-      opponent: isMatch && !isTournament && !values.opponent.trim(),
+      // ⚠️ NOR FOR A LEAGUE FIXTURE (Jay, 1 Sep 2026) — the league publishes
+      // rounds months before fixtures, and requiring an opponent forced a
+      // dummy one onto every placeholder. A FRIENDLY still requires it: a
+      // friendly IS the opponent, there is nothing else to identify it by.
+      opponent: isMatch && !isTournament && !isLeague && !values.opponent.trim(),
       title: !isMatch && !values.title.trim(),
       // ⚠️ THE TOURNAMENT'S NAME IS REQUIRED, and only in tournament mode — it
       // is that fixture's whole identity (there is no opponent or title to fall
@@ -1275,11 +1308,18 @@ export default function EventForm({
     // fixture whose team had not been picked yet silently discarded the round.
     // fixtureLabel still refuses to RENDER a round without a league team, which
     // is a separate and still-correct rule about display.
-    const leagueTeamId = isMatch && values.leagueTeamId ? values.leagueTeamId : null
+    // ⚠️ THE TBD SENTINEL NEVER REACHES league_team_id — it is a uuid FK, and
+    // the sentinel's whole design is that it lives in the select's value and
+    // nowhere else. TBD writes league_team_id null + league_team_tbd true; the
+    // database refuses the contradictory pair (events_league_team_not_both).
+    const leagueTeamTbd = isMatch && values.leagueTeamId === LEAGUE_TEAM_TBD
+    const leagueTeamId =
+      isMatch && values.leagueTeamId && !leagueTeamTbd ? values.leagueTeamId : null
     const isLeagueFixture = isMatch && values.competitionType === COMPETITION_LEAGUE
     const roundText = String(values.round ?? '').trim()
     const leagueFields = {
       league_team_id: leagueTeamId,
+      league_team_tbd: leagueTeamTbd,
       round:
         isLeagueFixture && roundText !== '' && Number.isFinite(Number(roundText))
           ? Number(roundText)
@@ -1539,7 +1579,13 @@ export default function EventForm({
               onChange={setFromInput('opponent')}
               aria-invalid={invalid.opponent ? 'true' : undefined}
               aria-describedby={isTournament ? 'event-opponent-note' : undefined}
-              placeholder={isTournament ? 'Leave blank until the draw is out' : 'e.g. Dubai Exiles'}
+              placeholder={
+                isTournament
+                  ? 'Leave blank until the draw is out'
+                  : isLeague
+                    ? 'Leave blank until the fixture is out'
+                    : 'e.g. Dubai Exiles'
+              }
               className={inputClasses(invalid.opponent)}
             />
             {isTournament && (
@@ -1976,6 +2022,14 @@ export default function EventForm({
           </fieldset>
         )}
 
+        {/* ⚠️ THREE OPTIONS SINCE THE LEAGUE PLACEHOLDERS (1 Sep 2026). TBD is
+            null in the nullable `home` column — a plain match could never hold
+            null before, so no migration and no overloading: "asked, not
+            answered yet". Choosing TBD also stops the form forcing the default
+            venue onto a fixture whose ground is unknown — the prefill is
+            cleared only while it is still the untouched default, and restored
+            on leaving TBD only into a blank, the same prefill-don't-clobber
+            rule the tier and pitch-portion fields follow. */}
         {isMatch && !tournamentMode && (
           <Segmented
             legend="Home or away"
@@ -1983,9 +2037,18 @@ export default function EventForm({
             options={[
               { value: 'home', label: 'Home' },
               { value: 'away', label: 'Away' },
+              { value: 'tbd', label: 'TBD' },
             ]}
-            value={values.home ? 'home' : 'away'}
-            onChange={(next) => set('home')(next === 'home')}
+            value={values.home === false ? 'away' : values.home === true ? 'home' : 'tbd'}
+            onChange={(next) =>
+              setValues((current) => {
+                const home = next === 'home' ? true : next === 'away' ? false : null
+                let venue = current.venue
+                if (home === null && venue.trim() === DEFAULT_VENUE) venue = ''
+                if (home !== null && current.home === null && !venue.trim()) venue = DEFAULT_VENUE
+                return { ...current, home, venue }
+              })
+            }
           />
         )}
 
@@ -2122,7 +2185,14 @@ export default function EventForm({
                   setValues((current) => ({
                     ...current,
                     leagueTeamId: chosen,
-                    tier: current.tier || (division ?? ''),
+                    // ⚠️ A TIER OF 'TBD' COUNTS AS A BLANK HERE (1 Sep 2026).
+                    // "Not chosen yet" is not a choice to protect — a
+                    // placeholder being upgraded to ADHQ2 should get Div B
+                    // without being asked twice, exactly like a fresh fixture.
+                    tier:
+                      current.tier && current.tier !== TIER_TBD
+                        ? current.tier
+                        : (division ?? current.tier),
                   }))
                 }}
                 className={inputClasses(false)}
@@ -2132,6 +2202,12 @@ export default function EventForm({
                     matches with no league team, and they are the common case.
                     Wording it as "Select…" would read as an unfilled field. */}
                 <option value="">Not a league match</option>
+                {/* ⚠️ A DIFFERENT ANSWER FROM THE ONE ABOVE, never merged: a
+                    league round whose SIDE is unknown is still a league round,
+                    not a friendly. Stored as events.league_team_tbd, its own
+                    column — see LEAGUE_TEAM_TBD at the top of this file. Same
+                    wording as the Round select's TBD. */}
+                <option value={LEAGUE_TEAM_TBD}>TBD — not known yet</option>
                 {leagueTeamOptions.map((leagueTeam) => (
                   <option key={leagueTeam.id} value={leagueTeam.id}>
                     {leagueTeam.division
@@ -2173,6 +2249,12 @@ export default function EventForm({
                 className={inputClasses(false)}
               >
                 <option value="">None — a friendly or untiered</option>
+                {/* ⚠️ NOT THE SAME AS "None" ABOVE, and the two must never be
+                    merged. None is an ANSWER — this fixture has no tier. TBD
+                    is the absence of one: a league or tournament fixture whose
+                    division is not chosen yet. Stored literally ('TBD') in the
+                    tier column; the migration widened events_tier_check. */}
+                <option value={TIER_TBD}>TBD — not decided yet</option>
                 <option value="A">A</option>
                 <option value="B">B</option>
                 <option value="C">C</option>

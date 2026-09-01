@@ -56,4 +56,46 @@ describe('fixtureLabel', () => {
       'ADHQ2 · Div C',
     )
   })
+
+  // ══ LEAGUE PLACEHOLDERS (1 Sep 2026) ══════════════════════════════════════
+  //
+  // The league publishes ROUNDS months before it publishes fixtures, so "a
+  // league fixture whose side is not picked yet" is a real state — and its one
+  // known fact, the round, must show. The gate is competition_type, never the
+  // round's mere presence: the stale-round tests above are the control and
+  // they still pass, because a friendly has no competition_type.
+  it('⚠️ shows the round WITHOUT a league team when the event is filed as league', () => {
+    expect(
+      fixtureLabel({ competition_type: 'league', round: 1 }, null, 'U16B Contact'),
+    ).toBe('U16B Contact · Round 1')
+  })
+
+  it('⚠️ round 0 survives the placeholder path too', () => {
+    // Same falsy trap as the league-team path: `if (round)` would swallow it.
+    expect(
+      fixtureLabel({ competition_type: 'league', round: 0 }, null, 'U16B Contact'),
+    ).toBe('U16B Contact · Round 0')
+  })
+
+  it('⚠️ a league fixture with NO round yet stays the bare squad name', () => {
+    // Nothing to say is nothing said — no invented "Round TBD" decoration.
+    expect(
+      fixtureLabel({ competition_type: 'league', round: null }, null, 'U16B Contact'),
+    ).toBe('U16B Contact')
+  })
+
+  it('⚠️ a TOURNAMENT or TBD competition never borrows the round', () => {
+    // The round belongs to the league. A round left behind on a fixture whose
+    // competition later changed must not leak back out through this new path.
+    expect(
+      fixtureLabel({ competition_type: 'tournament', round: 4 }, null, 'U16B Contact'),
+    ).toBe('U16B Contact')
+    expect(fixtureLabel({ competition_type: 'tbd', round: 4 }, null, 'U16B Contact')).toBe(
+      'U16B Contact',
+    )
+  })
+
+  it('falls back to the round alone when there is no squad name either', () => {
+    expect(fixtureLabel({ competition_type: 'league', round: 2 }, null, '')).toBe('Round 2')
+  })
 })

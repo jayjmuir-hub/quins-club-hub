@@ -143,12 +143,20 @@ type Event = {
  * on screen and ADHQ1 in their calendar is a family at the wrong pitch.
  * tests/fixture-label.test.js pins the app side.
  *
- * ⚠️ NO LEAGUE TEAM MEANS NO LEAGUE DECORATION, and `round` is ignored
- * entirely without one — a round number left on a fixture later changed to a
- * friendly is stale data, not a label.
+ * ⚠️ NO LEAGUE TEAM MEANS NO LEAGUE DECORATION — UNLESS THE EVENT IS FILED AS
+ * A LEAGUE FIXTURE (competition_type), matching src/lib/fixtureLabel.js since
+ * the 1 Sep 2026 league placeholders. A league round whose side nobody has
+ * picked yet still shows its round; a round left on a fixture later changed
+ * to a friendly stays hidden, because a friendly has no competition_type —
+ * stale data, not a label, exactly as before.
  */
 function leagueLabel(event: Event): string {
-  if (!event.league_team_name) return ''
+  if (!event.league_team_name) {
+    if (event.competition_type === 'league' && event.round !== null && event.round !== undefined) {
+      return `Round ${event.round}`
+    }
+    return ''
+  }
   const parts = [event.league_team_name]
   if (event.league_division) parts.push(`Div ${event.league_division}`)
   if (event.round !== null && event.round !== undefined) parts.push(`Round ${event.round}`)
@@ -181,8 +189,23 @@ function summaryFor(event: Event): string {
     return `${squad} — ${event.competition}`
   }
   if (event.type === 'match') {
+    // ⚠️ A LEAGUE PLACEHOLDER IS TITLED BY ITS ROUND (1 Sep 2026) — the app's
+    // eventTitle() says "Round 1" for the same fixture, and "U16B v TBC"
+    // invents an opposition where the true fact is "Round 1, fixture not out
+    // yet". Same competition_type gate as leagueLabel above.
+    if (
+      !event.opponent &&
+      event.competition_type === 'league' &&
+      event.round !== null &&
+      event.round !== undefined
+    ) {
+      return `${squad} · Round ${event.round}`
+    }
     const opponent = event.opponent ?? 'TBC'
-    return event.home ? `${squad} v ${opponent}` : `${opponent} v ${squad}`
+    // ⚠️ STRICT === false. `home` is tri-state since the placeholders — null
+    // means "not decided yet" and must not flip the title to opposition-first,
+    // which would assert an away fixture nobody has confirmed.
+    return event.home === false ? `${opponent} v ${squad}` : `${squad} v ${opponent}`
   }
   if (event.title) return `${squad} — ${event.title}`
   return event.type === 'training' ? `${squad} training` : `${squad} — club event`
@@ -334,7 +357,11 @@ function toVEvent(event: Event, stamp: string): string[] {
   if (event.competition && !(event.type === 'match' && event.competition_type === 'tournament')) {
     description.push(event.competition)
   }
-  if (event.type === 'match' && event.opponent) {
+  // ⚠️ BOOLEANS ONLY. `home` is tri-state since the 1 Sep 2026 placeholders:
+  // null means "not decided yet", and the old `event.home ? 'Home' : 'Away'`
+  // would have printed Away into a subscribed calendar for it — an invented
+  // fact, the exact class this feed keeps refusing to emit.
+  if (event.type === 'match' && event.opponent && typeof event.home === 'boolean') {
     description.push(event.home ? 'Home' : 'Away')
   }
   // Last, so the fixed facts (competition, home/away) stay at the front of
