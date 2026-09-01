@@ -197,6 +197,69 @@ describe('ChatAlbum', () => {
       expect(screen.queryByTestId('chat-album-lightbox')).toBeNull()
     })
 
+    it('⚠️ clicking the DISABLED back arrow does not close the album', async () => {
+      // Jay, 1 Sep 2026: "the back button shows sometimes but doesn't work".
+      // With `pointer-events-none` on the disabled state the click fell straight
+      // through to the backdrop, which closed the whole album — so the dead
+      // control was worse than dead, it was destructive.
+      const user = userEvent.setup()
+      render(<ChatAlbum attachments={album(3)} />)
+      await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(3))
+      await user.click(screen.getAllByTestId('chat-album-tile')[0])
+      const back = screen.getByLabelText('Previous photo')
+      // ⚠️ ASSERTED AS A CLASS, NOT AS BEHAVIOUR, AND THAT IS A REAL LIMIT.
+      // jsdom loads no Tailwind stylesheet, so `disabled:pointer-events-none`
+      // computes to nothing here and clicking behaves identically with or
+      // without it — injecting the class back left all 20 tests green. The class
+      // list is the only thing this suite can actually see.
+      expect(back.className.split(/\s+/)).not.toContain('disabled:pointer-events-none')
+      await user.click(back)
+      expect(screen.getByTestId('chat-album-lightbox')).toBeTruthy()
+      expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('1 / 3')
+    })
+
+    it('⚠️ clicking the photo does not close it — only the backdrop does', async () => {
+      // Jay, 1 Sep 2026: "sometimes when the first pic opens and you click the
+      // forward arrow the pictures close". A bare onClick={close} on the
+      // backdrop fires for ANY bubbled click, so a tap that narrowly missed a
+      // moving arrow dismissed the album. A miss should cost nothing.
+      const user = userEvent.setup()
+      const { container } = render(<ChatAlbum attachments={album(3)} />)
+      await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(3))
+      await user.click(screen.getAllByTestId('chat-album-tile')[0])
+
+      const shown = [...container.querySelectorAll('img')].find((i) => i.alt.includes('Shared photo 1 of 3'))
+      await user.click(shown)
+      expect(screen.getByTestId('chat-album-lightbox')).toBeTruthy()
+
+      // ...but the backdrop itself still dismisses.
+      await user.click(screen.getByTestId('chat-album-lightbox'))
+      expect(screen.queryByTestId('chat-album-lightbox')).toBeNull()
+    })
+
+    it('⚠️ the stage geometry does not depend on the image', async () => {
+      // Jay, 1 Sep 2026: "sometimes the buttons are in the middle and sometimes
+      // the bottom, very buggy". The stage used to size itself to the photo, so
+      // every control moved as images loaded and as portrait/landscape
+      // alternated. jsdom does no layout, so this pins the CLASSES that make the
+      // box independent of its contents — the honest limit of a unit test here.
+      const user = userEvent.setup()
+      render(<ChatAlbum attachments={album(2)} />)
+      await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(2))
+      await user.click(screen.getAllByTestId('chat-album-tile')[0])
+      const stage = screen.getByLabelText('Next photo').parentElement
+      // ⚠️ EXACT CLASS TOKENS, NOT toContain. `max-h-full` CONTAINS the substring
+      // `h-full`, so a substring check passes against the very regression this
+      // pins — proven by injecting the old image-sized stage and watching all 20
+      // stay green.
+      const stageClasses = stage.className.split(/\s+/)
+      expect(stageClasses).toContain('h-full')
+      expect(stageClasses).toContain('w-full')
+      expect(stageClasses).not.toContain('max-h-full')
+      // and the arrows must sit ABOVE the photo, or a big picture covers them
+      expect(screen.getByLabelText('Next photo').className.split(/\s+/)).toContain('z-10')
+    })
+
     it('⚠️ an arrow press does not dismiss the lightbox', async () => {
       // The backdrop closes on click and the arrows sit inside it, so without
       // stopPropagation the first tap on "next" would close the album instead
