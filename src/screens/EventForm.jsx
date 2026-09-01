@@ -1021,9 +1021,27 @@ export default function EventForm({
     const nextInvalid = {
       date: !values.date,
       time: timeTbd || allDay ? false : !values.time || !starts_at,
-      // REQUIRED (Jay's ruling, 8 Aug 2026) even though the column is
-      // nullable — see the migration for why those two are not in conflict.
-      endTime: timeTbd || allDay ? false : !values.endTime || !ends_at || !endsAfterStart,
+      // ⚠️ OPTIONAL SINCE 1 Sep 2026, REVERSING JAY'S 8 AUG RULING, AT HIS ASK.
+      // It was required then because every event was a fixture, a training or a
+      // social, and all three genuinely finish. Club Diary (#603) introduced
+      // dated items that do not: "the online shop opens at 7pm" has a real
+      // start and no end anyone could name, and the only ways to enter it were
+      // to invent a finish time or to lie and call it all-day.
+      //
+      // ⚠️ THE COLUMN WAS ALWAYS NULLABLE and the calendar feed has always
+      // coped — `endFor()` in supabase/functions/calendar/index.ts falls back to
+      // a per-type duration. Nothing below the form had to change; the form was
+      // simply stricter than the model. Measured 1 Sep 2026: of 529 live events,
+      // 27 carry a NULL end and every one of them is `time_tbd`, so no existing
+      // row changes meaning.
+      //
+      // ⚠️ STILL NOT ALLOWED TO BE WRONG. Blank is fine; a filled end that does
+      // not land after the start is not, or the database's
+      // events_ends_after_starts surfaces as a raw 23514.
+      // claude/decisions/2026-09-01-optional-end-time.md.
+      endTime: timeTbd || allDay || !values.endTime
+        ? false
+        : !ends_at || !endsAfterStart,
       // ⚠️ OPTIONAL, BUT NOT ALLOWED TO BE WRONG. An empty until-date is a
       // one-day event; a filled one must land strictly after the start, or the
       // database's events_ends_after_starts surfaces as a raw 23514.
@@ -1762,7 +1780,15 @@ export default function EventForm({
             renders it either way and no test noticed. */}
         {!values.timeTbd && !values.allDay && (
           <p id="event-time-note" className="-mt-2 mb-3.5 text-[12.5px] text-ink-muted">
-            Times are Abu Dhabi time.
+            {/* ⚠️ THE "optional" GOES IN THE DESCRIPTION, NOT THE LABEL. It is
+                announced by a screen reader (this element is the TimePicker's
+                aria-describedby) and visible to everyone, WITHOUT changing the
+                field's accessible name — which about fifty assertions across
+                eight test files query as exactly "End time". Renaming it would
+                have meant a fifty-line diff through tests that have nothing to
+                do with this change. */}
+            Times are Abu Dhabi time. Leave the end time blank for something that
+            starts but has no finish — a shop opening, a deadline.
           </p>
         )}
 

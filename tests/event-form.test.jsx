@@ -242,7 +242,9 @@ describe('EventForm — validation', () => {
 
     expect(screen.getByLabelText('Opponent')).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByLabelText('Time')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByLabelText('End time')).toHaveAttribute('aria-invalid', 'true')
+    // ⚠️ END TIME IS OPTIONAL SINCE 1 Sep 2026 and must NOT be flagged when
+    // blank — it flags only when filled in wrongly. See the 'end time' block.
+    expect(screen.getByLabelText('End time')).not.toHaveAttribute('aria-invalid', 'true')
     // Venue is prefilled and optional — it must not be flagged.
     expect(screen.getByLabelText('Venue')).not.toHaveAttribute('aria-invalid', 'true')
   })
@@ -261,12 +263,18 @@ describe('EventForm — validation', () => {
   })
 })
 
-// --- end time (8 Aug 2026) ------------------------------------------------
+// --- end time (8 Aug 2026; made OPTIONAL 1 Sep 2026) ----------------------
 //
-// REQUIRED in the form, NULLABLE in the database — see
-// db/migrations/20260808_event_end_time_and_notes.sql for why those two are
-// not in conflict. The form is the only place the requirement exists, so
-// these tests are the only thing holding it.
+// ⚠️ IT WAS REQUIRED IN THE FORM AND NULLABLE IN THE DATABASE until 1 Sep 2026,
+// when Jay reversed his own 8 Aug ruling. Club Diary (#603) introduced dated
+// items that genuinely have no finish — "the online shop opens at 7pm" — and
+// the only ways to enter one were to invent an end or to lie and call it
+// all-day. claude/decisions/2026-09-01-optional-end-time.md.
+//
+// ⚠️ OPTIONAL IS NOT UNCHECKED. A blank end is fine; a filled one that does not
+// land after the start is still refused, or the database's
+// events_ends_after_starts surfaces as a raw 23514. The tests below hold both
+// halves, and the second half is the one worth not losing.
 
 describe('EventForm — end time', () => {
   it('offers an end time next to the start time', () => {
@@ -275,19 +283,31 @@ describe('EventForm — end time', () => {
     expect(screen.getByLabelText('End time')).toBeInTheDocument()
   })
 
-  it('refuses to save without one, however complete the rest of the form is', async () => {
+  it('⚠️ SAVES with no end time, and writes ends_at as null', async () => {
+    // The 1 Sep 2026 reversal, and the whole point of it: a start with no
+    // finish. Reaches the database as an explicit null, not an omitted key or
+    // an invented time.
     const user = userEvent.setup()
-    const { onSaved } = renderForm()
+    renderForm()
 
     await user.type(screen.getByLabelText('Opponent'), 'Dubai Exiles')
     await user.type(screen.getByLabelText('Time'), '20:00')
     // ...and no end time.
     await user.click(screen.getByRole('button', { name: /add event/i }))
 
-    expect(upsertEventMock).not.toHaveBeenCalled()
-    expect(onSaved).not.toHaveBeenCalled()
-    expect(screen.getByLabelText('End time')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByRole('alert')).toHaveTextContent(/fill in|before saving/i)
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ ends_at: null })
+    expect(screen.getByLabelText('End time')).not.toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('says the end time is optional, where a screen reader will hear it', () => {
+    // ⚠️ IN THE DESCRIPTION, NOT THE LABEL. The field's accessible name is
+    // queried as exactly "End time" by about fifty assertions across eight
+    // files; renaming it would have been a fifty-line diff through tests that
+    // have nothing to do with this change. The note is the TimePicker's
+    // aria-describedby, so it is announced AND visible.
+    renderForm()
+    expect(screen.getByText(/leave the end time blank/i)).toBeInTheDocument()
   })
 
   it('refuses an end BEFORE the start, and says which rule was broken', async () => {
@@ -344,18 +364,20 @@ describe('EventForm — end time', () => {
     expect(screen.getByLabelText('End time')).toHaveValue('22:00')
   })
 
-  it('opens blank on an event with no ends_at, and then requires one to save', async () => {
+  it('opens blank on an event with no ends_at, and saves it back unchanged', async () => {
     // ⚠️ THE ORDINARY CASE FOR EVERY EVENT CREATED BEFORE 8 AUG 2026, and for
-    // anything a future external fixture feed sends. Editing one must not
-    // show "Invalid Date", and must not save until an end time is supplied.
+    // anything a future external fixture feed sends. Editing one must not show
+    // "Invalid Date" — and since 1 Sep 2026 must not demand an end either, or
+    // opening such a row to change the venue would force one to be invented.
     const user = userEvent.setup()
     renderForm({ event: { ...EXISTING_MATCH, ends_at: null } })
 
     expect(screen.getByLabelText('End time')).toHaveValue('')
 
     await user.click(screen.getByRole('button', { name: /save changes/i }))
-    expect(upsertEventMock).not.toHaveBeenCalled()
-    expect(screen.getByLabelText('End time')).toHaveAttribute('aria-invalid', 'true')
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ ends_at: null })
+    upsertEventMock.mockClear()
 
     await user.type(screen.getByLabelText('End time'), '22:00')
     await user.click(screen.getByRole('button', { name: /save changes/i }))

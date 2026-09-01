@@ -10,6 +10,38 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
+- **THE END TIME IS OPTIONAL — Jay reversing his own 8 Aug ruling, 1 Sep 2026.**
+  He hit it entering a real club item: *"the online shop opens at 7pm tonight"* —
+  a start that matters and no end anyone could name. The only ways in were to
+  invent a finish nobody meant, or call it all-day and throw away the 7pm, which
+  is the actual information.
+  ⚠️ **THE RULING WAS NOT WRONG; ITS PREMISE EXPIRED.** On 8 Aug every event was
+  a fixture, a training or a social, and all three genuinely finish. Club Diary
+  (#603) introduced dated items that do not. Worth separating, because the
+  temptation on finding a rule inconvenient is to decide it was always a mistake.
+  ⚠️ **NOTHING BELOW THE FORM HAD TO CHANGE.** `ends_at` was always nullable, the
+  CHECK always permitted null, and the calendar feed's `endFor()` has fallen back
+  to a per-type duration since 8 Aug. The form was simply stricter than the
+  model — one boolean moved, no migration, no edge deploy.
+  ⚠️ **Measured first: of 529 live events, 27 have a NULL end and every one is
+  `time_tbd`** — zero plain-timed rows, so no existing row changed meaning.
+  ⚠️ **"Optional" is said in the field's DESCRIPTION, not its label.** The
+  accessible name is queried as exactly "End time" by ~50 assertions across 8
+  test files; renaming it would have been a 50-line diff through unrelated tests,
+  each edit a chance to change behaviour by accident. The note is the
+  TimePicker's `aria-describedby`, so it is announced and visible.
+  ⚠️ **Optional is not unchecked** — a filled end that does not land after the
+  start is still refused. `claude/decisions/2026-09-01-optional-end-time.md`,
+  and the fourth-state version is specified but NOT built in
+  `claude/plans/2026-09-01-starts-at-time-state.md`.
+
+- `7f6dd3a` — **The album two-account check is DONE.** Jay sent a real album to
+  a second account; every photo visible. That was the one failure no test could
+  stand in for, because the storage read policy would have failed silently.
+  ⚠️ **It also found three lightbox bugs 4,348 passing tests could not** — the
+  back arrow missing on the first photo, controls that moved, and an overlay
+  trapped in the chat dock's stacking context. **The suite does not see layout.**
+
 - `cf3290a` — **THE PHOTO OVERLAY WAS NEVER FULL-SCREEN — IT WAS TRAPPED IN THE CHAT DOCK'S
   STACKING CONTEXT.** Jay, 1 Sep 2026, desktop: *"clicking to get out of the
   pictures is currently just a tiny area of the remaining chat screen, clicking
