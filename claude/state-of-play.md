@@ -34,9 +34,14 @@ documents. Merged as #588 with the document cells following in #599.
 onto the whole conversation, multi-select and an all-or-nothing send of up to
 ten photos (#605); the tiled grid and lightbox that draw them (#613), verified
 on the deployed bundle.
-⚠️ **STILL NOT DONE: nobody has sent a real album on the live site and checked
-a SECOND account sees every photo.** The storage read policy is what would fail
-silently there, and no test can stand in for it — it needs two real accounts.
+✅ **THE TWO-ACCOUNT CHECK IS DONE — Jay, 1 Sep 2026.** A real album sent to a
+second account, every photo visible. That was the one failure no test could
+stand in for, because the storage read policy would have failed silently.
+⚠️ **It also found three lightbox bugs the suite could not** — the back arrow
+missing on the first photo, controls that moved because the stage was sized to
+the image, and an overlay TRAPPED in the chat dock's stacking context so the
+sidebar and masthead ate its clicks (#618, #619, #620). **Use the app; the
+suite does not see layout.**
 ⚠️ **The chat LIST still previews an album as one photo**, because `my_chats()`
 returns `last_attachment_path` and no count. That is plan 4's, along with
 dropping the `attachment_path` contract, which must wait on cached service

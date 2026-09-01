@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **THE PHOTO OVERLAY WAS NEVER FULL-SCREEN — IT WAS TRAPPED IN THE CHAT DOCK'S
+- `cf3290a` — **THE PHOTO OVERLAY WAS NEVER FULL-SCREEN — IT WAS TRAPPED IN THE CHAT DOCK'S
   STACKING CONTEXT.** Jay, 1 Sep 2026, desktop: *"clicking to get out of the
   pictures is currently just a tiny area of the remaining chat screen, clicking
   anywhere on the left menu bar does not close the pics"*, with a screenshot
