@@ -13,6 +13,28 @@
 //     nineteen on day one, none of them a bug. Burn them down; do not block on
 //     them.
 //
+// ⚠️ ESLINT 10 NEEDS AN `overrides` ENTRY IN package.json, AND IT IS NOT A HACK
+// TO BE TIDIED AWAY — 1 Sep 2026. `eslint-plugin-react`'s LATEST published
+// release (7.37.5, April 2025) peer-caps at `eslint ^9.7`, so `npm ci` refuses
+// eslint 10 with ERESOLVE. The plugin itself WORKS: measured with eslint 10.9.1
+// genuinely installed, lint/build/suite are byte-for-byte the same result as on
+// eslint 9 — 0 errors, the same 66 warnings. The cap is stale METADATA, not a
+// real incompatibility, and upstream PR jsx-eslint/eslint-plugin-react#4022
+// ("complete ESLint 10 compatibility") is open but unreleased.
+//
+// ⚠️ WHAT THE OVERRIDE COSTS: it permanently silences the peer check for this
+// one plugin, so a FUTURE genuine incompatibility would arrive as a runtime
+// error rather than an install refusal. That is the trade, and it is worth it
+// only because the three rules taken from this plugin are narrow
+// (jsx-uses-react, jsx-uses-vars, jsx-no-undef). REMOVE THE OVERRIDE the moment
+// the plugin publishes a release accepting eslint 10.
+//
+// ⚠️ AND DO NOT "SIMPLIFY" BY DROPPING THE PLUGIN — measured, 1 Sep 2026.
+// `react/jsx-uses-vars` is load-bearing: core `no-unused-vars` cannot see JSX,
+// so every component used only in markup reports as unused. Removing the plugin
+// took the warning count from 66 to 1,237. Exit code stays 0, which is exactly
+// why the damage would go unnoticed — it buries the real warnings.
+//
 // supabase/functions/ is Deno and is not linted here — different globals,
 // different runtime, and its own deploy path.
 import js from '@eslint/js'
