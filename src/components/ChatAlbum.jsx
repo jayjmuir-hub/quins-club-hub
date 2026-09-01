@@ -67,6 +67,33 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
     })
   }
 
+  // ⚠️ SWIPE, BECAUSE THE ARROWS ARE NOT HOW ANYONE MOVES THROUGH PHOTOS ON A
+  // PHONE. Added 1 Sep 2026 alongside the always-present arrows: the first real
+  // album was read on a phone, where two 44px targets either side of a
+  // full-bleed image are the whole navigation. A horizontal drag is what a
+  // parent will actually try first.
+  //
+  // ⚠️ THRESHOLD, AND A VERTICAL GUARD. Under ~40px is a tap with a shaky
+  // thumb, not a swipe. And a drag that travels further vertically than
+  // horizontally is a scroll attempt — stepping the album on that would make
+  // the lightbox feel like it fires at random.
+  const [touchStart, setTouchStart] = useState(null)
+
+  function onTouchStart(e) {
+    const t = e.changedTouches?.[0]
+    setTouchStart(t ? { x: t.clientX, y: t.clientY } : null)
+  }
+
+  function onTouchEnd(e) {
+    const t = e.changedTouches?.[0]
+    if (!touchStart || !t) return
+    const dx = t.clientX - touchStart.x
+    const dy = t.clientY - touchStart.y
+    setTouchStart(null)
+    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return
+    step(dx < 0 ? 1 : -1)
+  }
+
   useEffect(() => {
     if (openAt === null) return undefined
     const onKey = (e) => {
@@ -141,49 +168,80 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
           aria-label={`Photo ${openAt + 1} of ${photos.length}`}
           data-testid="chat-album-lightbox"
           onClick={close}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
         >
-          {urls[openAt] && (
-            <img
-              src={urls[openAt]}
-              alt={`Shared photo ${openAt + 1} of ${photos.length}`}
-              className="max-h-full max-w-full rounded-[12px] object-contain"
-            />
-          )}
+          <div className="relative flex max-h-full max-w-full items-center justify-center">
+            {urls[openAt] && (
+              <img
+                src={urls[openAt]}
+                alt={`Shared photo ${openAt + 1} of ${photos.length}`}
+                className="max-h-full max-w-full rounded-[12px] object-contain"
+              />
+            )}
           <span
             className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-white/15 px-3 py-1 text-[12px] font-semibold text-white"
             data-testid="chat-album-counter"
           >
             {openAt + 1} / {photos.length}
           </span>
-          {openAt > 0 && (
-            <button
-              type="button"
-              aria-label="Previous photo"
-              // stopPropagation on every control: the backdrop closes on click,
-              // and without this the arrows would dismiss the lightbox instead
-              // of moving through it.
-              onClick={(e) => {
-                e.stopPropagation()
-                step(-1)
-              }}
-              className="absolute left-3 grid h-11 w-11 place-items-center rounded-full bg-white/15 text-white hover:bg-white/25"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          {/*
+            ⚠️ BOTH ARROWS ARE ALWAYS RENDERED, DISABLED AT THE ENDS RATHER THAN
+            REMOVED. Jay, 1 Sep 2026, on the first real album: "there is no back
+            button when clicking through them, there is a forward button though."
+            He had opened the FIRST photo, where the old `openAt > 0` guard
+            removed the control entirely — so the lightbox looked one-way and
+            broken rather than "you are at the start". A dimmed, disabled arrow
+            says the same thing without the control vanishing, and it keeps the
+            two arrows in fixed positions instead of the forward one moving.
+
+            ⚠️ AND THEY ARE ANCHORED TO THE IMAGE, NOT THE VIEWPORT. They used to
+            sit on the `fixed inset-0` backdrop, so on a PHONE they landed close
+            to a full-bleed photo and looked right, while on DESKTOP they flew to
+            the screen edges — the back arrow ending ~1800px from the picture, on
+            top of the app sidebar, where it does not read as part of the dialog.
+            Jay saw it on his phone and not on his desktop for exactly that
+            reason. The wrapper below is sized to the image, so the controls stay
+            beside the thing they act on at every width.
+
+            ⚠️ NOT a vertical problem, though it looked like one at first: they
+            were ALREADY centred, because `place-items-center` centres an abspos
+            child's static position too. `top-1/2 -translate-y-1/2` is kept only
+            so the position is stated rather than inherited.
+
+            ⚠️ DISABLED IS DIMMED, NEVER INVISIBLE. `disabled:opacity-0` was
+            written here once and is the original complaint wearing a different
+            hat — `toBeDisabled()` passes either way, so the test now pins the
+            opacity as well.
+          */}
+          <button
+            type="button"
+            aria-label="Previous photo"
+            disabled={openAt === 0}
+            // stopPropagation on every control: the backdrop closes on click,
+            // and without this the arrows would dismiss the lightbox instead
+            // of moving through it.
+            onClick={(e) => {
+              e.stopPropagation()
+              step(-1)
+            }}
+            className="absolute left-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:pointer-events-none disabled:opacity-30"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          </button>
+          <button
+            type="button"
+            aria-label="Next photo"
+            disabled={openAt >= photos.length - 1}
+            onClick={(e) => {
+              e.stopPropagation()
+              step(1)
+            }}
+            className="absolute right-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/65 disabled:pointer-events-none disabled:opacity-30"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
             </button>
-          )}
-          {openAt < photos.length - 1 && (
-            <button
-              type="button"
-              aria-label="Next photo"
-              onClick={(e) => {
-                e.stopPropagation()
-                step(1)
-              }}
-              className="absolute right-3 grid h-11 w-11 place-items-center rounded-full bg-white/15 text-white hover:bg-white/25"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-            </button>
-          )}
+          </div>
           <button
             type="button"
             aria-label="Close photo"

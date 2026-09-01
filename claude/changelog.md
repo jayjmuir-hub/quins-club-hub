@@ -10,7 +10,34 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **ESLINT 10 IS UNBLOCKED — by an `overrides` entry, not by dropping anything.**
+- **THE ALBUM LIGHTBOX HAD NO BACK ARROW ON DESKTOP — reported from the first
+  real album.** Jay, 1 Sep 2026: *"there is no back button when clicking through
+  them, there is a forward button though"*, then *"the back arrow is there on
+  phone, but I don't see it on desktop"*. Two separate causes, and the
+  screenshot settled both:
+  ⚠️ **The arrows sat on the `fixed inset-0` BACKDROP, so they flew to the
+  VIEWPORT edges.** On a phone that is beside a full-bleed photo and looks
+  right; on desktop the back arrow landed ~1800px from the picture, on top of
+  the app sidebar, reading as part of the app rather than the dialog. They are
+  now anchored to a wrapper sized to the IMAGE.
+  ⚠️ **And the back arrow did not exist at all on the first photo** (`openAt > 0`
+  removed it), so the lightbox read as one-way. Both arrows now always render,
+  DIMMED and disabled at the ends — a control that vanishes is the complaint.
+  ⚠️ **NOT a vertical bug, though it looked like one:** the arrows were already
+  centred, because `place-items-center` centres an abspos child's static
+  position too. That guess was wrong and the screenshot disproved it.
+  ⚠️ **`disabled:opacity-0` was written here once mid-fix** — the same complaint
+  wearing a different hat, and `toBeDisabled()` passes against it. The test pins
+  the opacity now.
+  ⚠️ **AND THE FIRST VERSION OF THAT TEST DID NOT CATCH THE ORIGINAL BUG.**
+  Injecting `hidden={openAt === 0}` left all 17 green, because `getByLabelText`
+  finds a hidden element. `toBeVisible()` is what makes the assertion real —
+  a test that cannot fail on the reported defect is not a test.
+  **Swipe added too**, with a 40px threshold and a vertical guard, because two
+  44px targets are not how anyone moves through photos on a phone.
+  `src/components/ChatAlbum.jsx`.
+
+- `9083907` — **ESLINT 10 IS UNBLOCKED — by an `overrides` entry, not by dropping anything.**
   `eslint-plugin-react`'s latest release (7.37.5, April 2025) peer-caps at
   `eslint ^9.7`, so `npm ci` refused eslint 10 with ERESOLVE. **The cap is stale
   METADATA, not a real incompatibility:** measured with eslint 10.9.1 genuinely
