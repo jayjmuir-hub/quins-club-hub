@@ -24,6 +24,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the conflict is the mechanism that stopped a duplicate citation reaching
   main. Re-pointed to a7b3c6d's successor after re-measuring, and the stale
   "(SHA follows)" tail that #615 left on the phase 2 entry is removed below.
+  ⚠️ THEN THE REBASED PR WENT RED AGAIN, on tests/allocation.test.jsx — a
+  TUESDAY BUG on main, not this branch: the 30 Aug "Week→Day opens the FIRST
+  day" ruling expired the test's assumption that Day opens on today, so on
+  the week's second day one "next" click lands ON today and the Today button
+  is correctly absent. Green on the Sunday and Monday runs, red the first
+  Tuesday, reproduced locally on a docs-only diff and fixed here: the test
+  now steps until off today and asserts the button VANISHES on coming back.
+  Its fetch-count waits were also date-dependent (stepping only refetches
+  across a window boundary) and are replaced by heading waits.
   (SHA follows in the next changelog-touching PR.)
 - `a7b3c6d` — **Dependencies: the safe-updates group, six updates.** Sentry, supabase-js,
   libphonenumber-js and @testing-library/react patch/minor bumps. Full suite

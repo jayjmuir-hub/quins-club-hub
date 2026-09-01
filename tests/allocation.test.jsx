@@ -300,14 +300,40 @@ describe('the screen', () => {
   })
 
   it('moves a day at a time and can come back to today', async () => {
+    // ⚠️ REWRITTEN 1 Sep 2026, THE FIRST TUESDAY AFTER THE 30 Aug WEEK→DAY
+    // CHANGE, WHICH IS EXACTLY WHEN ITS OLD ASSUMPTION EXPIRED. Day view now
+    // opens on the week's FIRST day (Jay's 30 Aug ruling, pinned by the test
+    // above), so on the week's second day a single "next" click lands ON
+    // today — where the Today button is CORRECTLY absent — and the old body,
+    // which assumed Day opens on today and stepped once, went red. Sunday and
+    // Monday runs stayed green, which is why it survived review: a
+    // date-dependent assumption is invisible until the calendar reaches the
+    // date that breaks it.
+    //
+    // ⚠️ NO FETCH-COUNT WAITS. Stepping only refetches when the day crosses
+    // the query window, so waiting on listEvents is itself date-dependent —
+    // the heading is what always changes.
     const user = await setup()
     await openDay(user)
     await screen.findByTestId('allocation-grid')
-    const before = listEventsMock.mock.calls.length
+    const heading = () => screen.getByRole('heading', { level: 2 }).textContent
 
-    await user.click(screen.getByRole('button', { name: /next/i }))
-    await waitFor(() => expect(listEventsMock.mock.calls.length).toBeGreaterThan(before))
-    expect(await screen.findByRole('button', { name: /^today$/i })).toBeInTheDocument()
+    // Step forward until the visible day is not today (at most twice: Day
+    // view opens at worst one day behind today, per the week-first ruling).
+    for (let i = 0; i < 2 && !screen.queryByRole('button', { name: /^today$/i }); i++) {
+      const before = heading()
+      await user.click(screen.getByRole('button', { name: /^next$/i }))
+      await waitFor(() => expect(heading()).not.toBe(before))
+    }
+
+    // Off today: the button offers the way back…
+    const todayButton = await screen.findByRole('button', { name: /^today$/i })
+    await user.click(todayButton)
+    // …and coming back makes it disappear, which is the "can come back"
+    // half actually asserted rather than assumed.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /^today$/i })).not.toBeInTheDocument(),
+    )
   })
 
   it('says "not your job" without the right', async () => {
