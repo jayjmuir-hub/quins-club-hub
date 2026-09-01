@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 1 Sep 2026
 
-- **THE END TIME IS OPTIONAL — Jay reversing his own 8 Aug ruling, 1 Sep 2026.**
+- **`my_chats()` ALBUM COUNT — SPECIFIED, NOT BUILT.**
+  `claude/plans/2026-09-01-my-chats-album-count.md`. The Chats list still
+  previews a ten-photo message as "📷 Photo" because `my_chats()` returns
+  `last_attachment_path` and no count. Half of plan 4; the other half — dropping
+  `attachment_path` — stays blocked on cached service workers.
+  ⚠️ **The blocker is now MEASURABLE.** Of 11 messages carrying an attachment,
+  **11 carry the new array and 0 carry only the old column**, none in the last
+  24h. Eleven is a small sample: it proves nobody HAS written the old shape, not
+  that nobody WILL. Re-run after a fortnight.
+  ⚠️ **The six-arm trap was reproduced on purpose while writing the plan.** A
+  regex for the kind literal finds **1** arm; there are **5** `union all` lines,
+  so **6**. The sixth names its kind from a column (`rc.key`). Count `union all`
+  and add one.
+  ⚠️ **The real risk is the ACL, not the count.** Adding a column forces
+  DROP+CREATE, and a fresh function grants EXECUTE to **PUBLIC** — on a
+  SECURITY DEFINER function spanning every conversation in the club. Measured
+  current grants: `authenticated`, `postgres`, `service_role`, no PUBLIC, no
+  anon. #610 hit this same trap the same day.
+
+- `6209bf5` — **THE END TIME IS OPTIONAL — Jay reversing his own 8 Aug ruling, 1 Sep 2026.**
   He hit it entering a real club item: *"the online shop opens at 7pm tonight"* —
   a start that matters and no end anyone could name. The only ways in were to
   invent a finish nobody meant, or call it all-day and throw away the 7pm, which
