@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { signChatPhotoUrl } from '../data/chatMedia.js'
 
 // One chat photo in a bubble — round 2
@@ -38,7 +39,16 @@ export default function ChatPhoto({ path, compact = false }) {
           className={`${compact ? 'max-h-40' : 'max-h-64'} w-auto max-w-full object-cover`}
         />
       </button>
-      {full && (
+      {/*
+        ⚠️ PORTALLED TO <body>, FOR THE SAME REASON ChatAlbum IS. This renders
+        inside FloatingChatDock, which is `fixed … z-30` and therefore a
+        STACKING CONTEXT: a `fixed inset-0 z-50` child of it is z-50 *within the
+        dock*, so the sidebar (z-30) and masthead (z-40) paint over the backdrop
+        and eat every click that lands on them. Found 1 Sep 2026 while fixing
+        the album, which had the identical bug — one instance was reported, both
+        were broken.
+      */}
+      {full && createPortal(
         <div
           className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4"
           role="dialog"
@@ -55,7 +65,8 @@ export default function ChatPhoto({ path, compact = false }) {
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

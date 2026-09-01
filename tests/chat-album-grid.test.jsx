@@ -218,21 +218,66 @@ describe('ChatAlbum', () => {
       expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('1 / 3')
     })
 
-    it('⚠️ clicking the photo does not close it — only the backdrop does', async () => {
-      // Jay, 1 Sep 2026: "sometimes when the first pic opens and you click the
-      // forward arrow the pictures close". A bare onClick={close} on the
-      // backdrop fires for ANY bubbled click, so a tap that narrowly missed a
-      // moving arrow dismissed the album. A miss should cost nothing.
+    it('⚠️ the lightbox is PORTALLED out of the component subtree', async () => {
+      // Jay, 1 Sep 2026, desktop: "clicking to get out of the pictures is
+      // currently just a tiny area of the remaining chat screen, clicking
+      // anywhere on the left menu bar does not close the pics". This renders
+      // inside FloatingChatDock, which is `fixed … z-30` — a STACKING CONTEXT —
+      // so a `fixed inset-0 z-50` child is z-50 *within the dock* and the
+      // sidebar (z-30) and masthead (z-40) paint over it. Only leaving the
+      // subtree fixes that; `position: fixed` cannot.
       const user = userEvent.setup()
       const { container } = render(<ChatAlbum attachments={album(3)} />)
       await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(3))
       await user.click(screen.getAllByTestId('chat-album-tile')[0])
 
-      const shown = [...container.querySelectorAll('img')].find((i) => i.alt.includes('Shared photo 1 of 3'))
-      await user.click(shown)
-      expect(screen.getByTestId('chat-album-lightbox')).toBeTruthy()
+      const box = screen.getByTestId('chat-album-lightbox')
+      expect(box).toBeTruthy()
+      // ⚠️ THE ASSERTION THAT MATTERS: not merely "it exists" (it did before),
+      // but that it is NOT a descendant of this component's own container.
+      expect(container.contains(box)).toBe(false)
+      expect(document.body.contains(box)).toBe(true)
+    })
 
-      // ...but the backdrop itself still dismisses.
+    it('⚠️ clicking the photo closes it — the exit target is the whole screen', async () => {
+      // The complaint was that the closable area was tiny. With the portal the
+      // backdrop is the viewport again, and the picture — the biggest thing on
+      // screen — now dismisses too. Everything except the three controls.
+      const user = userEvent.setup()
+      render(<ChatAlbum attachments={album(3)} />)
+      await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(3))
+      await user.click(screen.getAllByTestId('chat-album-tile')[0])
+
+      // ⚠️ screen, NOT container — the portal put it outside. An earlier version
+      // of this test queried `container`, found NOTHING after the portal landed,
+      // clicked undefined and still passed. A test that clicks nothing is not a
+      // test.
+      await user.click(screen.getByAltText('Shared photo 1 of 3'))
+      expect(screen.queryByTestId('chat-album-lightbox')).toBeNull()
+    })
+
+    it('⚠️ a swipe does not also close it', async () => {
+      // Some browsers follow a swipe with a click. Without the guard the swipe
+      // would step the album and the click would then dismiss it.
+      const user = userEvent.setup()
+      render(<ChatAlbum attachments={album(3)} />)
+      await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(3))
+      await user.click(screen.getAllByTestId('chat-album-tile')[0])
+      const box = screen.getByTestId('chat-album-lightbox')
+
+      fireEvent.touchStart(box, { changedTouches: [{ clientX: 300, clientY: 100 }] })
+      fireEvent.touchEnd(box, { changedTouches: [{ clientX: 100, clientY: 100 }] })
+      expect(screen.getByTestId('chat-album-counter')).toHaveTextContent('2 / 3')
+
+      await user.click(screen.getByAltText('Shared photo 2 of 3'))
+      expect(screen.getByTestId('chat-album-lightbox')).toBeTruthy()
+    })
+
+    it('the backdrop still dismisses', async () => {
+      const user = userEvent.setup()
+      render(<ChatAlbum attachments={album(3)} />)
+      await waitFor(() => expect(screen.getAllByTestId('chat-album-tile')).toHaveLength(3))
+      await user.click(screen.getAllByTestId('chat-album-tile')[0])
       await user.click(screen.getByTestId('chat-album-lightbox'))
       expect(screen.queryByTestId('chat-album-lightbox')).toBeNull()
     })
