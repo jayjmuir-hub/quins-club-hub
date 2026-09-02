@@ -164,6 +164,7 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
         <PlayerRegistrationForm
           teams={sortedTeams}
           collectOnly
+          initialRows={players}
           defaultSelfRegister={Boolean(answers.self) && !answers.child}
           submitLabel="Continue"
           onCollect={handlePlayersCollected}
