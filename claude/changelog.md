@@ -8,9 +8,25 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 2 Sep 2026
+
+- **fix(push): the "Waiting to be approved" push sent squad staff to a screen
+  that refused them.** A team manager (not an admin) was pushed about a coach
+  registering for their squad — the right audience, super admins plus that
+  squad's head coach and managers since 19 Aug — and the tap opened
+  `/admin/accounts`, whose parent `/admin` is gated on `isAdmin()` in
+  `src/screens/AdminDashboard.jsx` before any child renders. "Not authorised",
+  for a request they are allowed to approve. The email for the same request
+  already linked to `/approvals`, which mounts Accounts directly and
+  self-gates. The push now links there too. Rot detector
+  `tests/push-approval-link.test.js`, with controls, fails on any link under
+  `/admin`. ⚠️ **Edge function `push-send` must be REDEPLOYED with
+  `--no-verify-jwt`** for this to reach a phone — merging alone changes
+  nothing.
+
 ## 1 Sep 2026
 
-- **LEAGUE PLACEHOLDERS — a known league Saturday whose side, tier, ground and
+- `9fb736c` — **LEAGUE PLACEHOLDERS — a known league Saturday whose side, tier, ground and
   opponent are not known yet (Jay, 1 Sep 2026, putting the 2026–27 RCM juniors
   calendar on).** A U11+ Match can now save with Competition League, a Round,
   League team **TBD**, Tier **TBD**, Home/away **TBD** and no opponent — and it

@@ -812,11 +812,19 @@ Deno.serve(async (request) => {
             ? `${parentName} has registered ${playerName} in ${teamName}.`
             : `${parentName} says they are a ${roleLabel} for ${teamName}.`,
         ).slice(0, 200),
-        // ⚠️ THE CANONICAL PATH, NOT `/accounts`. That one still exists but is
-        // only a <Navigate> redirect to this (src/App.jsx). A notification is
-        // the worst place to spend a redirect: the tap already costs a cold
-        // start, and the deep-link fix of 19 Aug is what makes it land at all.
-        url: `${APP_URL}/admin/accounts`,
+        // ⚠️ `/approvals`, NOT `/admin/accounts` — WHERE THE EMAIL LINKS.
+        // This said `/admin/accounts` until 2 Sep 2026, chosen as "the
+        // canonical path, not the /accounts redirect" — reasoning that was
+        // right about redirects and wrong about the audience. The audience
+        // (approval_push_subscriptions) is super admins PLUS the squad's head
+        // coach and managers, and /admin is gated on isAdmin() in
+        // src/screens/AdminDashboard.jsx before any child renders. A team
+        // manager tapped this and got "Not authorised" for a coach request
+        // they are allowed to approve. /approvals mounts Accounts directly,
+        // which self-gates: admins get the full screen, squad staff get their
+        // queue. Still not a redirect, so the 19 Aug cold-start point holds.
+        // tests/push-approval-link.test.js pins it.
+        url: `${APP_URL}/approvals`,
         // Per REQUEST, so two people waiting are two notifications rather
         // than one replacing the other — unlike a notice, where repeats are
         // about the same thing.
