@@ -30,12 +30,15 @@ const setSessionVisibilityMock = vi.fn()
 const saveSquadTemplateMock = vi.fn()
 const upsertDrillMock = vi.fn()
 const submitTemplateToClubMock = vi.fn()
+const getSuggestionMock = vi.fn()
+const decideSuggestionMock = vi.fn()
 const shareElementAsImageMock = vi.fn()
 
 // ⚠️ MOCKED BECAUSE AN UNMOCKED DATA MODULE MAKES A REAL REQUEST. CI sets
 // placeholder Supabase env vars, so the client constructs happily, the promise
 // never settles, and the card sits in `loading` forever.
 vi.mock('../src/data/trainingPlans.js', () => ({
+  listPendingSuggestions: async () => [],
   getSession: (...args) => getSessionMock(...args),
   saveSessionBlocks: (...args) => saveSessionBlocksMock(...args),
   listFocus: (...args) => listFocusMock(...args),
@@ -46,6 +49,8 @@ vi.mock('../src/data/trainingPlans.js', () => ({
   saveSquadTemplate: (...args) => saveSquadTemplateMock(...args),
   upsertDrill: (...args) => upsertDrillMock(...args),
   submitTemplateToClub: (...args) => submitTemplateToClubMock(...args),
+  getSuggestion: (...args) => getSuggestionMock(...args),
+  decideSuggestion: (...args) => decideSuggestionMock(...args),
 }))
 vi.mock('../src/lib/shareImage.js', () => ({
   shareElementAsImage: (...args) => shareElementAsImageMock(...args),
@@ -277,6 +282,8 @@ function show(props = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   getSessionMock.mockResolvedValue(null)
+  getSuggestionMock.mockResolvedValue(null)
+  decideSuggestionMock.mockResolvedValue('s-1')
   listFocusMock.mockResolvedValue([])
   listDrillsMock.mockResolvedValue([GRID, LADDER, SENIORS_ONLY])
   listTemplatesMock.mockResolvedValue([])
@@ -894,5 +901,104 @@ describe('SessionPlan — Share', () => {
     const liveItems = screen.getAllByRole('listitem')
     expect(liveItems).toHaveLength(6)
     expect(within(liveItems[1]).getByText('How it runs')).toBeInTheDocument()
+  })
+})
+
+describe("the director's suggestion", () => {
+  // ⚠️ A SUGGESTION IS NOT A PLAN. Since 2 Sep 2026 (a coach, via Jay) the
+  // director's publish lands beside the session as a question. Pinned here:
+  // the card shows the running order BEFORE the coach decides; accept goes to
+  // the server and then opens the editor on the RELOADED session; an existing
+  // plan is asked about once before it is replaced; decline carries the note;
+  // and a parent's card never even asks for the row.
+  const SUGGESTION = {
+    id: 'sg-1',
+    event_id: 'e-1',
+    template_id: 'tpl-dir',
+    status: 'pending',
+    suggested_at: '2026-09-01T08:00:00.000Z',
+    decided_at: null,
+    decline_note: null,
+    template: {
+      id: 'tpl-dir',
+      name: 'Contact & conditioning',
+      total_minutes: 35,
+      blocks: [
+        { id: 'sb-1', position: 1, drill_id: 'd-grid', minutes: 15, coach_note: null, drill: GRID },
+        { id: 'sb-2', position: 2, drill_id: 'd-ladder', minutes: 20, coach_note: null, drill: LADDER },
+      ],
+    },
+  }
+
+  it('shows a coach the running order before they decide, and a parent nothing', async () => {
+    getSuggestionMock.mockResolvedValue(SUGGESTION)
+    show({ canEdit: true })
+    const card = await screen.findByTestId('director-suggestion')
+    expect(card).toHaveTextContent('Suggested by the performance director — Contact & conditioning · 35 min')
+    expect(card).toHaveTextContent('1. Grid passing · 15 min')
+    expect(card).toHaveTextContent('2. Tackle ladder · 20 min')
+    expect(within(card).getByRole('button', { name: 'Accept and adjust' })).toBeEnabled()
+    expect(within(card).getByRole('button', { name: 'Decline…' })).toBeEnabled()
+    expect(decideSuggestionMock).not.toHaveBeenCalled()
+  })
+
+  it('never asks for the suggestion on a parent-facing card', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    show({ canEdit: false })
+    await screen.findByText('Grid passing')
+    expect(getSuggestionMock).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('director-suggestion')).not.toBeInTheDocument()
+  })
+
+  it('Accept and adjust decides on the server, reloads, and opens the editor on the new session', async () => {
+    // Before: no session, one pending suggestion. After the server copies the
+    // blocks in: a session, and the suggestion is accepted.
+    getSessionMock.mockResolvedValueOnce(null).mockResolvedValue(SESSION)
+    getSuggestionMock.mockResolvedValueOnce(SUGGESTION).mockResolvedValue({ ...SUGGESTION, status: 'accepted' })
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByRole('button', { name: 'Accept and adjust' }))
+
+    await waitFor(() => expect(decideSuggestionMock).toHaveBeenCalledWith('sg-1', true, null))
+    // The editor is open on the reloaded session — "accept, then adjust".
+    // (An existing session's editor says "Save"; "Save plan" is the first-plan builder.)
+    expect(await screen.findByRole('button', { name: /^save$/i })).toBeInTheDocument()
+    expect(screen.queryByTestId('director-suggestion')).not.toBeInTheDocument()
+    // Nothing was written from the browser: the server did the copy.
+    expect(createSessionMock).not.toHaveBeenCalled()
+    expect(saveSessionBlocksMock).not.toHaveBeenCalled()
+  })
+
+  it('asks once before replacing an existing plan, and only then decides', async () => {
+    getSessionMock.mockResolvedValue(SESSION)
+    getSuggestionMock.mockResolvedValue(SUGGESTION)
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByRole('button', { name: 'Replace my plan…' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(/Replace your plan with this one\?/)
+    expect(decideSuggestionMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(decideSuggestionMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Replace my plan…' }))
+    await user.click(screen.getByRole('button', { name: 'Replace my plan' }))
+    await waitFor(() => expect(decideSuggestionMock).toHaveBeenCalledWith('sg-1', true, null))
+  })
+
+  it('Decline asks for an optional note, sends it, and collapses to a grey line', async () => {
+    getSuggestionMock
+      .mockResolvedValueOnce(SUGGESTION)
+      .mockResolvedValue({ ...SUGGESTION, status: 'declined', decided_at: '2026-09-02T10:00:00.000Z', decline_note: 'did it last week' })
+    const { user } = show({ canEdit: true })
+    await user.click(await screen.findByRole('button', { name: 'Decline…' }))
+    expect(decideSuggestionMock).not.toHaveBeenCalled()
+    await user.type(screen.getByLabelText('Reason for declining'), 'did it last week')
+    await user.click(screen.getByRole('button', { name: 'Decline' }))
+
+    await waitFor(() => expect(decideSuggestionMock).toHaveBeenCalledWith('sg-1', false, 'did it last week'))
+    const line = await screen.findByTestId('director-suggestion-declined')
+    expect(line).toHaveTextContent(/Director's suggestion declined — 2026-09-02/)
+    expect(screen.queryByTestId('director-suggestion')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument()
   })
 })

@@ -100,3 +100,6 @@ export async function upsertFocus(f) { return { id: 'f-new', ...f } }
 export async function deleteFocus() { return {} }
 export function previewPublish() { return { blocks: BLOCKS, minutes: totalMinutes(BLOCKS) } }
 export function publish() { return { ...SESSION } }
+export async function getSuggestion() { return null }
+export async function listPendingSuggestions() { return [] }
+export async function decideSuggestion() { return null }

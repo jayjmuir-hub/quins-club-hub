@@ -177,11 +177,16 @@ export function squadFitsTemplate(team, template, subject = 'template') {
   return { ok: true, reason: null, guidance: null }
 }
 
-/** One line per squad on the publish preview. */
+/**
+ * One line per squad on the publish preview. Rows are suggest_training's:
+ * `will_suggest` sessions get a suggestion, `unchanged` already carry this
+ * template (any status — the director is never told "declined" here, that is
+ * the uptake view's job), `no_events` means nothing in range.
+ */
 export function describePublishRow(row) {
   if (!row || row.no_events) return 'No training in this range'
-  const n = row.will_write ?? 0
-  const parts = [`${n} ${n === 1 ? 'session' : 'sessions'} will get the plan`]
-  if (row.skipped_coach_edited > 0) parts.push(`${row.skipped_coach_edited} kept (coach edited)`)
+  const n = row.will_suggest ?? 0
+  const parts = [`${n} ${n === 1 ? 'session' : 'sessions'} will get the suggestion`]
+  if (row.unchanged > 0) parts.push(`${row.unchanged} already ${row.unchanged === 1 ? 'has' : 'have'} it`)
   return parts.join(' · ')
 }

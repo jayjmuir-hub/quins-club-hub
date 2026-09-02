@@ -22,6 +22,9 @@ const html2canvasMock = vi.hoisted(() => vi.fn())
 const shareElementAsImageMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   getSession: (...args) => getSessionMock(...args),
   saveSessionBlocks: async () => {},
   listFocus: (...args) => listFocusMock(...args),

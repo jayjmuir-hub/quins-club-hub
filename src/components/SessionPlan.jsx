@@ -7,7 +7,9 @@ import DrillDiagram from './DrillDiagram.jsx'
 import { safeHttpUrl } from '../lib/safeUrl.js'
 import {
   createSession,
+  decideSuggestion,
   getSession,
+  getSuggestion,
   listDrills,
   listFocus,
   listTemplates,
@@ -273,6 +275,21 @@ export default function SessionPlan({ event, team, canEdit }) {
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
 
+  // The director's suggestion for this event (staff only — a parent's read is
+  // refused by policy and asked for by nobody). `deciding` covers both
+  // buttons; `declining` opens the optional-note box; `replacing` is the one
+  // confirm, asked only when a plan already exists.
+  const [suggestion, setSuggestion] = useState(null)
+  const [deciding, setDeciding] = useState(false)
+  const [declining, setDeclining] = useState(false)
+  const [declineNote, setDeclineNote] = useState('')
+  const [replacing, setReplacing] = useState(false)
+  // ⚠️ ACCEPT OPENS THE EDITOR ON THE RELOADED SESSION, NOT THE STALE ONE.
+  // The copy happens on the server; the session in state is whatever was there
+  // before. So accept sets this, reloads, and the load effect opens the editor
+  // once the fresh row is in hand — "accept, then adjust" as the coach asked.
+  const adjustAfterLoad = useRef(false)
+
   // The inline "create a drill" form, so a coach is not limited to the club
   // library while planning. A squad-owned drill (team_id = this squad).
   const [newDrillOpen, setNewDrillOpen] = useState(false)
@@ -324,9 +341,11 @@ export default function SessionPlan({ event, team, canEdit }) {
       listFocus(),
       canEdit ? listDrills({ teamId: event.team_id }) : Promise.resolve([]),
       canEdit ? listTemplates({ teamId: event.team_id }) : Promise.resolve([]),
+      canEdit ? getSuggestion(event.id) : Promise.resolve(null),
     ])
-      .then(([sessionResult, focusResult, drillResult, templateResult]) => {
+      .then(([sessionResult, focusResult, drillResult, templateResult, suggestionResult]) => {
         if (!mounted) return
+        setSuggestion(suggestionResult.status === 'fulfilled' ? suggestionResult.value : null)
 
         const loaded = sessionResult.status === 'fulfilled' ? sessionResult.value : null
         setSession(loaded)
@@ -342,6 +361,12 @@ export default function SessionPlan({ event, team, canEdit }) {
           // An existing session with no visibility is a legacy 'squad' one;
           // openCreate sets 'staff' for a brand-new coach plan.
           setVisibility(loaded?.visibility ?? 'squad')
+          if (adjustAfterLoad.current && loaded) {
+            adjustAfterLoad.current = false
+            setPicked('')
+            setError(null)
+            setEditing(true)
+          }
         }
 
         const focusRows = focusResult.status === 'fulfilled' ? focusResult.value ?? [] : []
@@ -396,6 +421,44 @@ export default function SessionPlan({ event, team, canEdit }) {
     const value = Number(block.minutes)
     return String(block.minutes).trim() !== '' && Number.isInteger(value) && value >= 1 && value <= 120
   })
+
+  // ── The director's suggestion: accept (then adjust) or decline ──────────
+  async function acceptSuggestion() {
+    if (!suggestion) return
+    if (session && !replacing) {
+      // A plan exists. Ask once — the server REPLACES its blocks.
+      setReplacing(true)
+      return
+    }
+    setDeciding(true)
+    setError(null)
+    try {
+      await decideSuggestion(suggestion.id, true, null)
+      adjustAfterLoad.current = true
+      setReplacing(false)
+      setReloadToken((token) => token + 1)
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setDeciding(false)
+    }
+  }
+
+  async function declineSuggestion() {
+    if (!suggestion) return
+    setDeciding(true)
+    setError(null)
+    try {
+      await decideSuggestion(suggestion.id, false, declineNote)
+      setDeclining(false)
+      setDeclineNote('')
+      setReloadToken((token) => token + 1)
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setDeciding(false)
+    }
+  }
 
   function openEdit() {
     setBlocks(draftFrom(session))
@@ -630,6 +693,88 @@ export default function SessionPlan({ event, team, canEdit }) {
       {focus && (
         <p data-testid="session-focus" className="mb-2 text-[13px] text-ink-muted">
           Focus: <span className="font-bold text-ink">{focus.title}</span>
+        </p>
+      )}
+
+      {/* ⚠️ A SUGGESTION IS NOT A PLAN. Since 2 Sep 2026 the director's publish
+          lands here as a question; nothing below it changes until the coach
+          answers. Staff only — canEdit gates the fetch, the policy gates the
+          row. A declined one collapses to a grey line so the coach can see
+          they answered; a re-publish with a different template asks again. */}
+      {canEdit && suggestion && suggestion.status === 'pending' && !building && (
+        <div
+          data-testid="director-suggestion"
+          className="mb-3 rounded-[10px] border-[1.5px] border-brand bg-surface-mute p-3"
+        >
+          <p className="text-[13px] font-bold text-ink">
+            Suggested by the performance director
+            {suggestion.template ? ` — ${suggestion.template.name}` : ''}
+            {suggestion.template?.blocks?.length ? ` · ${totalMinutes(suggestion.template.blocks)} min` : ''}
+          </p>
+          {suggestion.template?.blocks?.length > 0 && (
+            <ol className="mt-1.5 text-[13px] text-ink-muted">
+              {suggestion.template.blocks.map((block, index) => (
+                <li key={block.id ?? index}>
+                  {index + 1}. {block.drill?.title ?? 'Drill'} · {block.minutes} min
+                </li>
+              ))}
+            </ol>
+          )}
+          {replacing && (
+            <p role="alert" className="mt-2 text-[13px] font-bold text-ink">
+              Replace your plan with this one? Your running order goes; the notes stay.
+            </p>
+          )}
+          {declining && (
+            <label className="mt-2 block">
+              <span className={LABEL}>Why not? (optional, the director sees it)</span>
+              <input
+                aria-label="Reason for declining"
+                value={declineNote}
+                maxLength={200}
+                disabled={deciding}
+                onChange={(domEvent) => setDeclineNote(domEvent.target.value)}
+                className={INPUT}
+              />
+            </label>
+          )}
+          <div className="mt-2.5 flex flex-wrap gap-2.5">
+            {!declining && (
+              <Button size="sm" disabled={deciding} onClick={acceptSuggestion}>
+                {replacing ? 'Replace my plan' : session ? 'Replace my plan…' : 'Accept and adjust'}
+              </Button>
+            )}
+            {!replacing && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={deciding}
+                onClick={declining ? declineSuggestion : () => setDeclining(true)}
+              >
+                {declining ? 'Decline' : 'Decline…'}
+              </Button>
+            )}
+            {(replacing || declining) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={deciding}
+                onClick={() => {
+                  setReplacing(false)
+                  setDeclining(false)
+                  setDeclineNote('')
+                }}
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+      {canEdit && suggestion && suggestion.status === 'declined' && !building && (
+        <p data-testid="director-suggestion-declined" className="mb-2 text-[12.5px] font-medium text-ink-muted">
+          Director&apos;s suggestion declined
+          {suggestion.decided_at ? ` — ${clubDateTimeInputs(new Date(suggestion.decided_at)).date}` : ''}
         </p>
       )}
 

@@ -334,13 +334,15 @@ function PublishBody() {
       // no training in the range comes back as a row too, and counting rows
       // told a director the plan had reached a squad whose sessions were never
       // touched — the one sentence they had to go on, and it was wrong.
-      const squadCount = result.filter((row) => (row.will_write ?? 0) > 0).length
-      const written = result.reduce((sum, row) => sum + (row.will_write ?? 0), 0)
-      const kept = result.reduce((sum, row) => sum + (row.skipped_coach_edited ?? 0), 0)
+      // Since 2 Sep 2026 the thing that reaches a squad is a SUGGESTION its
+      // coaches accept or decline; nothing here writes a plan.
+      const squadCount = result.filter((row) => (row.will_suggest ?? 0) > 0).length
+      const written = result.reduce((sum, row) => sum + (row.will_suggest ?? 0), 0)
+      const unchanged = result.reduce((sum, row) => sum + (row.unchanged ?? 0), 0)
       setDone(
-        `Published to ${squadCount} ${squadCount === 1 ? 'squad' : 'squads'} — ${written} ${
+        `Suggested to ${squadCount} ${squadCount === 1 ? 'squad' : 'squads'} — ${written} ${
           written === 1 ? 'session' : 'sessions'
-        } updated, ${kept} kept.`,
+        }${unchanged > 0 ? `, ${unchanged} already had it` : ''}. The coaches decide from here.`,
       )
       // The preview described what WOULD happen; it has happened. Leaving the
       // button up would invite a second identical publish.
@@ -545,7 +547,7 @@ function PublishBody() {
                 does not exist until a preview for these exact boxes does. */}
             {rows.length > 0 && (
               <Button variant="secondary" disabled={running} onClick={doPublish}>
-                {`Publish to ${teamIds.length} ${teamIds.length === 1 ? 'squad' : 'squads'}`}
+                {`Suggest to ${teamIds.length} ${teamIds.length === 1 ? 'squad' : 'squads'}`}
               </Button>
             )}
           </div>

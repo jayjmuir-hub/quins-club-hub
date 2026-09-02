@@ -18,7 +18,15 @@ import {
   toggleTemplateLike,
   usedThisWeekById,
 } from '../data/trainingShelf.js'
-import { getSession, listDrills, listTemplates, submitTemplateToClub } from '../data/trainingPlans.js'
+import {
+  decideSuggestion,
+  getSession,
+  listDrills,
+  listPendingSuggestions,
+  listTemplates,
+  submitTemplateToClub,
+} from '../data/trainingPlans.js'
+import { clubDateTimeInputs, eventDate } from '../lib/eventFormat.js'
 import { useAuth } from '../lib/auth.jsx'
 import { CATEGORIES, CATEGORY_LABELS, squadFitsTemplate, totalMinutes } from '../lib/trainingPlans.js'
 import {
@@ -60,6 +68,9 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
   const [pendingChip, setPendingChip] = useState(null)
   const [applying, setApplying] = useState(false)
   const [error, setError] = useState(null)
+  // The director's pending suggestions on this squad's upcoming training.
+  const [suggestions, setSuggestions] = useState([])
+  const [deciding, setDeciding] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -73,6 +84,7 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
       listLikes('drill_favorites', 'drill_id'),
       listLikes('template_favorites', 'template_id'),
       listRecentTrainingUsage().catch(() => []),
+      teamId ? listPendingSuggestions(teamId).catch(() => []) : Promise.resolve([]),
     ]).then(async (results) => {
       if (!mounted) return
       const value = (i, fallback) => (results[i].status === 'fulfilled' ? results[i].value : fallback)
@@ -86,6 +98,7 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
       setDrillFavorites(value(5, []))
       setTemplateFavorites(value(6, []))
       setUsage(value(7, []))
+      setSuggestions(value(8, []))
       const ids = [...nextTemplates, ...nextDrills].map((row) => row.created_by)
       try {
         const names = await listCoachNames(ids)
@@ -120,6 +133,28 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
     () => idsForProfile(templateFavorites, 'template_id', profileId),
     [templateFavorites, profileId],
   )
+
+  /**
+   * Accept or decline one suggestion — or every pending one at once. Accept is
+   * the server copying the template's blocks into that session; the shelf
+   * then reloads so tonight's hour and the date strip catch up (onApplied is
+   * what Squad Training listens to). Nothing here touches the plan directly.
+   */
+  async function decide(rows, accept) {
+    setDeciding(true)
+    setError(null)
+    try {
+      for (const row of rows) {
+        await decideSuggestion(row.id, accept, null)
+      }
+      onApplied?.()
+      bump()
+    } catch (failure) {
+      setError(failure)
+    } finally {
+      setDeciding(false)
+    }
+  }
 
   function bump() {
     setReloadToken((n) => n + 1)
@@ -248,6 +283,44 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
           )
         })}
       </div>
+
+      {/* ⚠️ A SUGGESTION IS NOT A PLAN. Since 2 Sep 2026 the director's publish
+          lands here, as a question, and nothing reaches tonight's hour until a
+          coach says yes. Parents never see this card: the rows come through a
+          policy that resolves for squad staff and admins only. */}
+      {suggestions.length > 0 && (
+        <Card className="mb-4 p-4" data-testid="director-suggestions">
+          <h3 className="font-accent text-[18px] font-semibold italic text-ink">
+            {`${suggestions.length} ${suggestions.length === 1 ? 'suggestion' : 'suggestions'} from the director`}
+          </h3>
+          <ul className="mt-2 divide-y divide-line/60">
+            {suggestions.map((row) => {
+              const when = row.event?.starts_at ? clubDateTimeInputs(eventDate(row.event)).date : ''
+              return (
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]">
+                  <span className="font-semibold text-ink">
+                    {when ? `${when} · ` : ''}{row.template?.name ?? 'Suggested hour'}
+                    {row.template?.total_minutes ? ` · ${row.template.total_minutes} min` : ''}
+                  </span>
+                  <span className="flex gap-2">
+                    <Button size="sm" disabled={deciding} onClick={() => decide([row], true)}>
+                      Accept
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={deciding} onClick={() => decide([row], false)}>
+                      Decline
+                    </Button>
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+          {suggestions.length > 1 && (
+            <Button variant="secondary" size="sm" className="mt-2" disabled={deciding} onClick={() => decide(suggestions, true)}>
+              Accept all
+            </Button>
+          )}
+        </Card>
+      )}
 
       <Card className="mb-4 p-4" data-testid="tonight-hour">
         <h3 className="font-accent text-[18px] font-semibold italic text-ink">

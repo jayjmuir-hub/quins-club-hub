@@ -32,6 +32,9 @@ vi.mock('../src/data/events.js', () => ({
 // Mocked for the same reason every other EventDetail test mocks it: an
 // unmocked module makes a real request and the promise never settles.
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   getSession: async () => null,
   saveSessionBlocks: async () => {},
   listFocus: async () => [],

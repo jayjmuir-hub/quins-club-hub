@@ -31,6 +31,9 @@ vi.mock('../src/data/events.js', () => ({
 // Mocked because an unmocked data module makes a real request — the sheet
 // mounts SessionPlan on a training event and the promise never settles.
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   getSession: async () => null,
   saveSessionBlocks: async () => {},
   listFocus: async () => [],

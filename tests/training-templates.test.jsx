@@ -40,6 +40,9 @@ const listSubmittedTemplatesMock = vi.fn(async () => [])
 const approveTemplateToClubMock = vi.fn(async () => ({}))
 const dismissTemplateSubmissionMock = vi.fn(async () => ({}))
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   listTemplates: (...args) => listTemplatesMock(...args),
   listDrills: (...args) => listDrillsMock(...args),
   saveTemplate: (...args) => saveTemplateMock(...args),

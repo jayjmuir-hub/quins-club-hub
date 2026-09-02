@@ -20,6 +20,9 @@ const listSessionsForEventsMock = vi.fn()
 const useMembershipsMock = vi.fn()
 
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   getSession: (...args) => getSessionMock(...args),
   saveSessionBlocks: async () => {},
   listFocus: (...args) => listFocusMock(...args),
