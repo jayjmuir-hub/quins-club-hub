@@ -28,7 +28,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   learn a player's leaver status from the refusal. `Mark as left` replaces
   `Delete` for squad staff (Delete stays admin-only, still broken for most
   players — `claude/open-items.md`); a staff-only "Left the squad" roster
-  group and an admin "Left this season" list both offer Restore.
+  group and an admin "Left this season" list both offer Restore. A final
+  whole-branch review then produced a THIRD migration,
+  `db/migrations/20260902_player_leavers_pending_and_feed.sql` — **written but
+  NOT applied, pending Jay's go-ahead** — which stops a mark-and-restore
+  promoting a `'pending'` membership to `'active'` (and stops a leaver's stale
+  request being approved instead), adds the missing `status <> 'left'` test to
+  `public.calendar_events_for_token`, whose memberships join had none at all so
+  a family who had left kept receiving the squad's fixtures in their phone
+  calendar, removes the leaver's FUTURE availability and lineup rows while
+  keeping past ones, stops both RPCs revealing whether a player exists to a
+  caller who may not write players, and locks the players row it reads.
 - `6c5729e` — **fix(login): the "Check your email" panel after a password reset now says to
   check the Junk or Spam folder.** A squad manager's reset mail sat in Hotmail's
   Junk folder and she reported it as never having arrived; the diagnosis found

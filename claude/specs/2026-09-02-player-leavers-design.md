@@ -107,10 +107,54 @@ this. In one transaction it:
 1. Sets `players.left_at = now()`, `left_by = auth.uid()`. Refuses with a clear
    message if already left.
 2. Updates every `memberships` row with `player_id = p_player_id` and
-   `role IN ('parent','player')` from `'active'` or `'pending'` to `'left'`.
+   `role IN ('parent','player')` from `'active'` to `'left'`.
    A parent with two children in the squad has two membership rows, one per
    `player_id`; only this child's row changes.
-3. Returns the player row.
+   ⚠️ **DEVIATION, and it is the critical one. This said `'active'` OR
+   `'pending'` until the whole-branch review on 2 Sep 2026, and that was a way
+   past the approvals queue.** `restore_player` flips **every** `'left'` row on
+   the child back to `'active'`, so a mark followed by a restore **approved a
+   parent nobody had ever approved** — no sign-in, no admin, no trace. A
+   `'pending'` row grants nothing already, so leaving has nothing to take from
+   it; leaving it alone is exactly what makes the blanket restore safe. The two
+   halves are one change and must not be separated.
+   `db/migrations/20260902_player_leavers_pending_and_feed.sql`, harness steps
+   6a and 11a.
+3. Deletes the child's `availability` and `lineup_players` rows for events
+   whose `starts_at` is in the FUTURE. Past rows stay.
+   ⚠️ **ADDED by the same review.** Leaving took a child off the roster and off
+   selection *screens*, but the rows themselves survived — so a Saturday
+   selection made on Thursday still named a child who had quit on Friday, and
+   a team sheet already built still listed them. **History is kept; a fixture
+   that has not happened is not history.** `lineup_players` has no `event_id`
+   of its own and links through `lineups(event_id)`; the join was checked
+   against the live schema, not assumed. Harness step 6b, whose past-row half
+   is the assertion that discriminates.
+4. Returns the player row.
+
+⚠️ **NEITHER RPC REVEALS WHETHER A PLAYER EXISTS**, added by the same review.
+Both used to raise `22023 'That player no longer exists.'` before checking
+authorisation at all, so the error message was an oracle: an unauthorised
+caller could tell a uuid that names a real child from one that names nothing.
+A null row now raises `42501 'You are not allowed to change this player.'`
+unless the caller holds `private.can_write_child()`, who is entitled to the
+honest answer. Same failure, and the same fix, as the `invite_parent` guard
+ordering below. Harness step 4b.
+
+⚠️ **BOTH RPCs TAKE `for update` ON THE PLAYERS ROW.** Without it two
+concurrent calls both read `left_at` as null and both pass the guard.
+
+⚠️ **AND A LEAVER'S STALE PENDING REQUEST CANNOT BE APPROVED.** Leaving a
+`'pending'` row alone closes the promotion route above but leaves the request
+itself sitting in the squad's approvals queue for a child who has quit;
+approving it would hand the family full access by a completely different door.
+`public.approve_membership` gained a guard — refuses with
+`22023 'That player has left the squad. Restore them first if they are back.'`
+while the membership's player is a leaver, placed after `can_approve_team` so
+the message tells an unauthorised caller nothing. **Restore is the only way
+back in, by both doors.** Harness step 6c, with a control that the same coach
+approving the same parent's other row — for the sibling who is still there —
+succeeds.
 
 The **photo** is removed by the app after the RPC succeeds, exactly as
 `deletePlayer` in `src/data/players.js` does today: `deletePlayerPhoto(path)`
@@ -149,6 +193,23 @@ a second row.
 `private.can_dm`, `private.guard_staff_dm_opt_in` and `private.photo_team` also
 read `players`; they are gated by an active membership upstream, so a `'left'`
 row already closes them. Verify in the harness rather than assume (§6).
+
+⚠️ **THE THIRD BACK DOOR, AND IT IS NOT A `players` READ AT ALL: THE CALENDAR
+FEED.** `public.calendar_events_for_token(uuid)` joined `memberships` with **no
+status test of any kind**, so a family whose memberships were all `'left'` kept
+receiving every fixture of the squad in their phone calendar — measured at 54
+events in the injected-fault run of harness step 12b-2 — for as long as the ICS
+token existed. Nothing about ending somebody's access anywhere revokes a token.
+`and m.status <> 'left'` added by
+`db/migrations/20260902_player_leavers_pending_and_feed.sql`.
+
+⚠️ **WHY THE EARLIER AUDIT MISSED IT, WHICH IS THE PART WORTH KEEPING.** §1's
+count and the second migration both went looking through the bodies of
+`private.*` helper functions. This one is an **inline join inside a
+`security definer` function** — a membership predicate that is not a predicate
+function — and it was invisible to a search shaped like that. Recorded in
+`claude/open-items.md` so the next status-blind sweep covers inline joins as
+well as helpers.
 
 ⚠️ **Do not confuse "skipped by the re-match" with "Restore".** The first
 version of this design said a restored parent "gets access back at next

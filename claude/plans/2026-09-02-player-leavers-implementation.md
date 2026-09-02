@@ -19,6 +19,33 @@ to live 2 Sep 2026 on Jay's explicit go-ahead; harness
   check**, not before — the first version checked it first, letting an
   unauthorised caller learn a player's leaver status from the error message
   before being told they cannot invite anyone. Fixed same-session, `9bd5276`.
+- **A THIRD migration came out of the whole-branch review on 2 Sep 2026, and
+  it is WRITTEN BUT NOT APPLIED** —
+  `db/migrations/20260902_player_leavers_pending_and_feed.sql`. Applying it
+  needs Jay's explicit go-ahead, and `db/schema/functions.sql` must be
+  re-captured from live afterwards. Until then
+  `npm run db:check -- player-leavers` fails at **step 4b**, which is correct
+  and is the point. What it changes:
+  - **`mark_player_left` no longer touches a `'pending'` membership.** It moved
+    `'active'` and `'pending'` alike to `'left'`, and `restore_player` flips
+    every `'left'` row to `'active'` — so a mark followed by a restore
+    **approved a parent nobody had ever approved.** The two are one change.
+  - **`public.approve_membership` refuses while the membership's player is a
+    leaver**, so the stale request the fix above leaves in the approvals queue
+    cannot be granted by the other door.
+  - **`public.calendar_events_for_token` gained `and m.status <> 'left'`.** Its
+    memberships join had no status test at all: a family who had left kept
+    receiving the squad's fixtures in their phone calendar indefinitely. This
+    is the third status-blind membership predicate found, and the first that is
+    an **inline join** rather than a `private.*` helper — which is why the
+    audit behind the second migration did not see it.
+  - **Neither RPC reveals whether a player exists** to a caller who may not
+    write players: `42501`, not `22023`.
+  - **Marking removes FUTURE `availability` and `lineup_players` rows**, past
+    ones kept.
+  - **Both RPCs take `for update`** on the players row.
+  - `private.is_team_staff` was captured live, compared with the 28 Aug
+    migration, found identical, and deliberately **not** restated.
 - **The harness's own impersonation bug**: fixture ids must be resolved into
   plpgsql variables (the `fx` temp table) *before* `set role authenticated` —
   the impersonated role has no grant on a temp table owned by this

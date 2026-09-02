@@ -400,6 +400,31 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   exposed or destroyed. Pre-existing from the 24 Aug pin work, not introduced
   by any 30 Aug surface. Backlog fix if wanted: freeze `pinned` for non-staff
   in `touch_message`, or drop `pinned` from the column grant.
+- **`public.clubs` `"club read"` is status-blind — recorded 2 Sep 2026, NOT
+  fixed.** Its USING is, in full,
+  `EXISTS (SELECT 1 FROM memberships m WHERE m.profile_id = auth.uid() AND m.club_id = clubs.id)`
+  — no `status` test, so a `'left'` or a never-approved `'pending'` membership
+  reads the club row just as an active one does. Benign: `clubs` holds the
+  club's own name and settings, which are on the sign-in screen anyway, and
+  every table that hangs off it is separately gated. Tightening it would also
+  need care — a pending parent seeing "no club at all" is the failure mode
+  `private.is_own_player` exists to avoid (see
+  `db/migrations/20260902_player_leavers_left_grants_nothing.sql`). Recorded so
+  the next person who counts status-blind predicates finds it already counted
+  rather than thinking it is new.
+- **⚠️ THE STATUS-BLIND SWEEP MUST COVER INLINE JOINS, NOT ONLY `private.*`
+  HELPERS — and this is the process finding, not the bullet above.** The
+  leavers work counted membership predicates twice and both counts were wrong
+  in the same way: they searched the bodies of `private.*` helper functions.
+  The second migration caught `is_own_player` and `is_attached_to_team` that
+  way; the third caught `public.calendar_events_for_token`, which is an
+  **inline `join public.memberships` inside a `security definer` function** and
+  therefore invisible to a search shaped around helper names. A family who had
+  left kept receiving the squad's fixtures in their phone calendar — 54 events
+  in the injected-fault run — because of it. **A membership predicate is any
+  place a `memberships` row is read to decide access, wherever it is written.**
+  Next sweep: `grep` the live catalogue for `from memberships` / `join
+  memberships` across `pg_proc` and `pg_policy` bodies, not for helper names.
 
 ## Needs Jay (account creations — Claude does not do these)
 

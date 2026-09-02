@@ -513,7 +513,30 @@ every membership predicate in `functions.sql`/`policies.sql` tests `status = 'ac
 two, `private.is_own_player` and `private.is_attached_to_team`, which tested no status at all
 until a second migration the same day
 (`db/migrations/20260902_player_leavers_left_grants_nothing.sql`) added `AND status <> 'left'`
-to both — deliberately not `= 'active'`, so a `'pending'` row is untouched. ⚠️ **Hiding a leaver
+to both — deliberately not `= 'active'`, so a `'pending'` row is untouched.
+⚠️ **"GRANTS NOTHING" WAS SAID TWICE AND WAS WRONG BOTH TIMES, AND THE THIRD PREDICATE WAS NOT A
+`private.*` HELPER AT ALL.** A whole-branch review on 2 Sep 2026 found
+`public.calendar_events_for_token` joining `memberships` with **no status test of any kind**,
+so a family who had left kept every fixture of the squad arriving in their phone calendar for
+as long as their ICS token existed — and nothing about ending access anywhere revokes a token.
+`db/migrations/20260902_player_leavers_pending_and_feed.sql` adds `and m.status <> 'left'`
+there. The audit that found the first two searched `private.*` helper bodies; this one is an
+**inline join inside a function**, which is why it survived. Recorded in
+`claude/open-items.md`: the status-blind sweep has to cover inline joins too.
+⚠️ **AND A `'pending'` MEMBERSHIP IS NEVER TOUCHED BY MARKING, WHICH IS A RULE AND NOT A
+DETAIL.** `mark_player_left` moves `'active'` rows only. It used to move `'pending'` ones as
+well, and because `restore_player` flips **every** `'left'` row to `'active'`, a mark followed
+by a restore **approved a parent nobody had ever approved** — a way past the approvals queue
+that needed no sign-in and no admin. A pending row grants nothing already, so leaving has
+nothing to take from it; leaving it alone is what makes the blanket restore safe. The stale
+request it leaves behind cannot be approved while the child is a leaver either
+(`public.approve_membership` refuses with *"That player has left the squad. Restore them first
+if they are back."*), so **Restore is the only route back in, by both doors.**
+⚠️ **Marking also removes the child's FUTURE `availability` and `lineup_players` rows** — past
+ones stay. History is kept; a Saturday selection made on Thursday is not history.
+⚠️ **Neither RPC tells an unauthorised caller whether a player exists**: a null row raises
+`42501`, not the `22023` "no longer exists", unless the caller holds `private.can_write_child()`.
+⚠️ **Hiding a leaver
 is a query default, not an RLS change.** `listPlayers({ includeLeft })` in `src/data/players.js`
 filters `left_at IS NULL` by default across its twelve call sites; the `"player read"` policy
 itself is unchanged, because `MatchSheet.jsx` and `GameTime.jsx` legitimately pass

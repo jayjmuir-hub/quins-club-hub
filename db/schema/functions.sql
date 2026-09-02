@@ -7626,3 +7626,69 @@ end $function$
 
 REVOKE ALL ON FUNCTION public.restore_player(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.restore_player(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.is_team_staff(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+--
+-- ⚠️ CAPTURED FROM LIVE 2 Sep 2026, and it had been MISSING from this file
+-- since it was created on 28 Aug (20260828_child_contacts_allowlist.sql).
+-- That gap is why it is worth a note rather than a silent addition: this
+-- function is the squad-staff arm of the "player edit" policy, of the
+-- player_contacts / player_parents / player_private allowlists, of the
+-- player-photo storage policy, and of both leavers RPCs — and a reader
+-- auditing membership predicates from this file alone would not have seen it.
+--
+-- The non-admin arm of can_edit_team, split out on 28 Aug so a coach keeps
+-- their own squad's contacts and DOB when the admin arm narrows. Note it
+-- requires status = 'active': an unapproved coach is a REQUEST to be staff,
+-- not staff. (Harness step 4a of db/tests/player-leavers.sql pins that.)
+-- Live body on 2 Sep 2026 is equivalent to the creating migration's, so the
+-- 2 Sep leavers work deliberately did not restate it.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_team_staff(_team uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from memberships m
+     where m.profile_id=auth.uid() and m.status='active'
+       and m.role in ('coach','manager','medic') and m.team_id=_team); $function$
+;
+
+REVOKE ALL ON FUNCTION private.is_team_staff(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION private.is_team_staff(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.can_write_child()
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+--
+-- ⚠️ CAPTURED FROM LIVE 2 Sep 2026, missing from this file since 28 Aug
+-- (20260828_child_write_allowlist.sql) for the same reason as is_team_staff
+-- above, and it matters more: this is the ADMIN arm of every write gate on a
+-- child. It is deliberately NOT `is_admin` — a club admin with no relevant
+-- job cannot write a child's row. Only a super admin, or one holding
+-- clubadmin / youth / media.
+--
+-- ⚠️ It is also the ONE predicate that can be evaluated with no player row in
+-- hand, which is why the leavers RPCs use it to decide whether a caller is
+-- entitled to be told a player does not exist
+-- (db/migrations/20260902_player_leavers_pending_and_feed.sql).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_write_child()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from memberships m
+     where m.profile_id = auth.uid() and m.role = 'admin' and m.status = 'active'
+       and (m.is_super or m.admin_rights && array['clubadmin','youth','media']));
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.can_write_child() FROM public, anon;
+GRANT EXECUTE ON FUNCTION private.can_write_child() TO authenticated;
