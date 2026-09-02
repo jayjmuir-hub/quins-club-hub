@@ -1,8 +1,28 @@
 # Marking a player as left — implementation plan
 
-**STATUS: NOT SHIPPED — plan only, 2 Sep 2026.** Nothing in this file has been
-built. Update this line the moment it has, and record any deviation from the
-spec here rather than leaving the code as the only account of it.
+**STATUS: BUILT — pull request pending, 2 Sep 2026.** Both migrations applied
+to live 2 Sep 2026 on Jay's explicit go-ahead; harness
+`db/tests/player-leavers.sql` green against live. Deviations from the spec:
+
+- **`register_my_player` / `apply_signup_intent` UNCHANGED on purpose**
+  (decided in this task). Their duplicate check still sees leavers, so a
+  returning child is refused with "ask the club to connect you" — the cue for
+  Restore. Skipping leavers here would create a second row for the same child.
+- **A second migration was needed.** `db/migrations/20260902_player_leavers_left_grants_nothing.sql`
+  — the harness's step 12 found `private.is_own_player` and
+  `private.is_attached_to_team` were the only two membership predicates
+  testing neither `status` nor `left_at`, so a `'left'` row (now possible)
+  passed both. Both gained `AND status <> 'left'` — not `= 'active'`, so a
+  `'pending'` row is unaffected. This corrects the spec's §1 claim that
+  "every predicate tests `status = 'active'`".
+- **The `invite_parent` leaver guard sits AFTER the `may_edit` authorisation
+  check**, not before — the first version checked it first, letting an
+  unauthorised caller learn a player's leaver status from the error message
+  before being told they cannot invite anyone. Fixed same-session, `9bd5276`.
+- **The harness's own impersonation bug**: fixture ids must be resolved into
+  plpgsql variables (the `fx` temp table) *before* `set role authenticated` —
+  the impersonated role has no grant on a temp table owned by this
+  connection's role, so reading `fx` after switching role fails 42501.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

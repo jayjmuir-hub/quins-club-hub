@@ -503,6 +503,25 @@ harmless, available if a senior side ever wants it) but nothing in the UI reads 
 and the PlayerDetail hero show initials instead, via `src/lib/playerFormat.js`. Never add a
 jersey field to the event/player forms.
 
+**A player who has quit is marked LEFT, never deleted.** `players.left_at` non-null is a
+leaver; `left_at IS NULL` means current. `mark_player_left`/`restore_player`
+(`db/migrations/20260902_player_leavers.sql`,
+`claude/specs/2026-09-02-player-leavers-design.md`) are the only way in or out of that state —
+same `security definer` authorisation as `"player edit"`. Marking also moves that child's
+`parent`/`player` memberships to a third status, `'left'`, which grants nothing anywhere:
+every membership predicate in `functions.sql`/`policies.sql` tests `status = 'active'` except
+two, `private.is_own_player` and `private.is_attached_to_team`, which tested no status at all
+until a second migration the same day
+(`db/migrations/20260902_player_leavers_left_grants_nothing.sql`) added `AND status <> 'left'`
+to both — deliberately not `= 'active'`, so a `'pending'` row is untouched. ⚠️ **Hiding a leaver
+is a query default, not an RLS change.** `listPlayers({ includeLeft })` in `src/data/players.js`
+filters `left_at IS NULL` by default across its twelve call sites; the `"player read"` policy
+itself is unchanged, because `MatchSheet.jsx` and `GameTime.jsx` legitimately pass
+`includeLeft: true` to keep a historic team sheet or appearance readable. **Delete is
+admin-only and still broken for most real players** — see `claude/open-items.md` — because
+this design deliberately did not touch it: keeping history was the whole point, and fixing
+Delete's cascades is separate work.
+
 **"Upcoming" and "not yet scored" are two different questions that happen to look similar.**
 Schedule's Upcoming *tab* deliberately shows unscored events regardless of date — a match still
 needing a score stays visible until someone scores it. That's correct and must not change.

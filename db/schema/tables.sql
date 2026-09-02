@@ -636,7 +636,11 @@ CREATE TABLE public.memberships (
   CONSTRAINT memberships_notify_approvals_role CHECK ((NOT notify_approvals OR (role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text])))),
   -- Added 2026-08-08 (membership_pending_status). Two values only, as found;
   -- there is no 'rejected'/'dismissed' value on this column.
-  CONSTRAINT memberships_status_check     CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text]))),
+  -- ⚠️ WIDENED 2 Sep 2026 (20260902_player_leavers.sql) to add 'left'. A
+  -- 'left' row grants nothing anywhere -- 122 sites tested status = 'active'
+  -- and none tested <> 'pending' or an IN list, per the leavers spec. The
+  -- mirror below (invites_grant_status_check) widened in the SAME migration.
+  CONSTRAINT memberships_status_check     CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'left'::text]))),
   -- Added 2026-08-14 (family_role_needs_player). Jay's ruling: "nobody outside
   -- staff should be able to create an account without a player".
   --
@@ -1117,7 +1121,9 @@ CREATE TABLE public.invites (
   CONSTRAINT invites_role_check      CHECK ((role = ANY (ARRAY['admin'::text, 'coach'::text, 'manager'::text, 'medic'::text, 'parent'::text, 'player'::text]))),
   -- Re-captured 25 Aug 2026: the check the grant_status comment above
   -- described was live all along but had no constraint line here.
-  CONSTRAINT invites_grant_status_check CHECK ((grant_status = ANY (ARRAY['active'::text, 'pending'::text])))
+  -- ⚠️ WIDENED 2 Sep 2026 (20260902_player_leavers.sql), in the SAME
+  -- migration as memberships_status_check above, to keep the mirror true.
+  CONSTRAINT invites_grant_status_check CHECK ((grant_status = ANY (ARRAY['active'::text, 'pending'::text, 'left'::text])))
 );
 ALTER TABLE public.invites ENABLE ROW LEVEL SECURITY;
 
@@ -2654,3 +2660,52 @@ CREATE INDEX document_squads_team_idx ON public.document_squads USING btree (tea
 -- production carries 'availability', not 'availability_nudge'. Live now:
 --   CHECK (category = ANY (ARRAY['feedback_reply','notice','fixture',
 --          'approval','availability','squad_chat','direct_messages','document']))
+
+-- ── players.left_at / left_by, 2 Sep 2026 (20260902_player_leavers.sql) ─────
+--
+-- `claude/specs/2026-09-02-player-leavers-design.md`. left_at IS NULL means
+-- current; a non-null left_at is a leaver. Never a delete -- every history
+-- row (attendance, availability, lineup_players, player_positions,
+-- player_units, player_grades, match_sheet_slots) keeps pointing at a real
+-- name. left_by is who marked it, ON DELETE SET NULL so a departed staff
+-- member's account being closed does not block a query.
+--
+-- The membership status widening that makes 'left' grant nothing is above,
+-- in-place on memberships_status_check and invites_grant_status_check (both
+-- widened in the SAME migration, to keep the mirror true).
+alter table public.players
+  add column left_at timestamptz,
+  add column left_by uuid;
+
+alter table public.players
+  add constraint players_left_by_fkey foreign key (left_by) references profiles(id) on delete set null;
+
+-- The second migration, 20260902_player_leavers_left_grants_nothing.sql:
+-- the harness (step 12 of db/tests/player-leavers.sql) found two membership
+-- predicates in private.sql that tested neither status NOR left_at --
+-- private.is_own_player and private.is_attached_to_team -- so a 'left'
+-- membership row (which the CHECKs above now allow to exist) still passed
+-- them. Both gained `AND left_at IS NULL` alongside their existing joins.
+-- ⚠️ NOT `status = 'active'`: a pending membership is deliberately still
+-- let through by these two, only a leaver is excluded. See functions.sql.
+
+-- ── fixture format, 2 Sep 2026 -- captured from live, applied by a
+-- concurrent session (not this one) ─────────────────────────────────────────
+--
+-- events.format and teams.default_format: player count per side (7s/10s/12s/
+-- 15s aside). NULL means not recorded / no per-squad default. Same
+-- rename-cannot-change-behaviour shape as teams.is_senior /
+-- self_registration_allowed / requires_contact above: a column, never
+-- parsed from a name.
+alter table public.teams
+  add column default_format smallint;
+
+alter table public.teams
+  add constraint teams_default_format_check check (default_format is null or default_format = any (array[7,10,12,15]));
+
+alter table public.events
+  add column format smallint;
+
+alter table public.events
+  add constraint events_format_check check (format is null or format = any (array[7,10,12,15])),
+  add constraint events_league_is_fifteen check (competition_type is distinct from 'league' or format is null or format = 15);

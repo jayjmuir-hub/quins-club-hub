@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(login): the "Check your email" panel after a password reset now says to
+- **feat(roster): MARKING A PLAYER AS LEFT — shipped.**
+  `claude/specs/2026-09-02-player-leavers-design.md`,
+  `claude/plans/2026-09-02-player-leavers-implementation.md`. Two migrations
+  applied to live 2 Sep 2026 (Jay's go-ahead): `db/migrations/20260902_player_leavers.sql`
+  (`players.left_at`/`left_by`, membership status `'left'`, `mark_player_left`/
+  `restore_player`) and `db/migrations/20260902_player_leavers_left_grants_nothing.sql`
+  (the harness found `private.is_own_player` and `private.is_attached_to_team`
+  were the only membership predicates untouched by any status test, so a
+  `'left'` row passed both — both now add `status <> 'left'`, correcting the
+  spec's claim that every predicate already tested `status = 'active'`).
+  Harness `db/tests/player-leavers.sql` green against live. Deviations:
+  `register_my_player`/`apply_signup_intent` are unchanged on purpose, so a
+  returning leaver is refused as a duplicate rather than silently re-attached
+  — the cue for Restore; and the `invite_parent` leaver guard sits after its
+  `may_edit` authorisation check, not before, so an unauthorised caller cannot
+  learn a player's leaver status from the refusal. `Mark as left` replaces
+  `Delete` for squad staff (Delete stays admin-only, still broken for most
+  players — `claude/open-items.md`); a staff-only "Left the squad" roster
+  group and an admin "Left this season" list both offer Restore.
+- `6c5729e` — **fix(login): the "Check your email" panel after a password reset now says to
   check the Junk or Spam folder.** A squad manager's reset mail sat in Hotmail's
   Junk folder and she reported it as never having arrived; the diagnosis found
   the mail path was fine and the mail was in Junk. The sign-up panel already

@@ -1215,11 +1215,22 @@ proves you wrong.**
   is refused. `deletePlayer` surfaces both as a permissions-shaped message and
   the staff member gives up. ⚠️ **AND WHEN IT DOES SUCCEED IT IS WORSE:** the
   parent's membership survives with a blank player link, still `active`, still on
-  the squad — roster, chat and pushes for a squad their child has left. The
-  designed remedy for "the child quit" is
-  `claude/specs/2026-09-02-player-leavers-design.md`; Delete itself still needs
-  its cascades decided (parent membership: delete the row; invites: cascade) and
-  a harness that first REPRODUCES both refusals.
+  the squad — roster, chat and pushes for a squad their child has left.
+  ✅ **THE DESIGNED REMEDY FOR "THE CHILD QUIT" HAS SHIPPED, 2 Sep 2026** —
+  `claude/specs/2026-09-02-player-leavers-design.md`, `mark_player_left`/
+  `restore_player`. **Delete itself is UNTOUCHED and still broken** for
+  exactly the reasons above; it still needs its cascades decided (parent
+  membership: delete the row; invites: cascade) and a harness that first
+  REPRODUCES both refusals.
+- 🟡 **A `staff-photos` OBJECT IS ORPHANED IN PRODUCTION, since 31 Aug 2026 —
+  found 2 Sep 2026 by the whole `db:check` run while shipping player leavers;
+  not caused by it.** `db/tests/photo-orphans.sql`: "staff-photos orphaned
+  (expect 0) -> 1". Measured: one `staff-photos` object created 2026-08-31
+  17:57 UTC with no `profiles` row pointing at it. `RESTORE.md` already
+  records that `staff-photos` is NOT mirrored to R2, so deleting it is
+  irreversible — do not sweep it without checking who it was and whether it
+  is still wanted; use the Storage API, never `storage.allow_delete_query`.
+  Not fixed here.
 - **The whole app is one JavaScript chunk** and every parent downloads all of it.
   ⚠️ Re-measure rather than citing an old figure. Two fixes, biggest first:
   `flag-icons` is imported whole for a phone country picker and is most of the CSS

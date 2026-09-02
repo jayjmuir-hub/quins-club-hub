@@ -2,7 +2,8 @@
 
 **2 Sep 2026.** Jay asked how an age group manager could remove a player from
 their squad when the child quits. This is the design he approved after three
-approaches were laid out. Status: **specified, not built.**
+approaches were laid out. Status: **specified and BUILT — pull request
+pending (branch `claude/graft-build-840faa`), 2 Sep 2026.**
 
 ⚠️ **EVERY NAME BELOW IS INVENTED.** This repo is public and its members are
 mostly children.
@@ -71,13 +72,29 @@ in the same migration, or the harness that guards the pair goes red.
 **Why a status and not a delete of the membership row.** Measured 2 Sep 2026:
 every membership predicate in `db/schema/functions.sql` and `policies.sql`
 tests `status = 'active'` — 122 sites — and none tests `<> 'pending'` or an
-`IN` list. So a `'left'` row grants exactly nothing, the same as no row. What it
+`IN` list. ⚠️ **THAT WAS ALMOST TRUE, NOT TRUE.** The harness (step 12 of
+`db/tests/player-leavers.sql`) found two exceptions:
+`private.is_own_player` and `private.is_attached_to_team` tested neither
+`status` nor `left_at` at all, so a `'left'` membership row — which the
+widened CHECK above now permits to exist — passed both unchanged. A second
+migration, `db/migrations/20260902_player_leavers_left_grants_nothing.sql`,
+added `AND status <> 'left'` to each. ⚠️ **Deliberately `<> 'left'`, not
+`= 'active'`** — a `'pending'` row must still pass these two exactly as
+before; only a leaver is newly excluded. So a `'left'` row grants exactly
+nothing, the same as no row. What it
 buys is (a) a record of who the parents were and (b) a **Restore that works
 without a sign-in or an approval** — see §3. Client side, `isActiveMembership`
 in `src/lib/scope.js` already tests `=== 'active'`; the one place that tests
 `=== 'pending'` (`isPendingOnly`) is unaffected because a `'left'` row is not
 pending either. Audit the screens that LIST a profile's memberships
 (`Accounts.jsx`) so a `'left'` row is labelled, not mistaken for pending.
+
+⚠️ **DEVIATION, found by review the same day.** The `invite_parent` leaver
+guard below is checked AFTER its `may_edit` authorisation raises, not before.
+The first version of this migration checked it first, which let an
+unauthorised caller learn a player's leaver status from the error message
+before being told they cannot invite anyone at all. Fixed same-session,
+commit `9bd5276`.
 
 ### 2. One database function does the whole job
 
@@ -115,14 +132,19 @@ parent signing in again would NOT regain access; they would raise an approval
 request for a child who has left, which the squad's staff would have to notice
 and decline. Noise, not a hole, but wrong.
 
-Three functions gain `AND p.left_at IS NULL` on their `players` join, so a
+Two functions gain `AND p.left_at IS NULL` on their `players` join, so a
 leaver is skipped entirely:
 
 | Function | Why |
 |---|---|
 | `public.claim_roster_access` | no pending request for a departed child |
-| `public.register_my_player` / `private.apply_signup_intent` | a fresh self-registration must not attach to the old row |
 | `public.invite_parent` | staff cannot invite a parent to a leaver |
+
+⚠️ **DEVIATION, decided in plan Task 1.** `public.register_my_player` /
+`private.apply_signup_intent` are **UNCHANGED on purpose.** Their duplicate
+check still sees leavers, so a returning child is refused with "ask the club
+to connect you", which is the cue for Restore. Skipping leavers would create
+a second row.
 
 `private.can_dm`, `private.guard_staff_dm_opt_in` and `private.photo_team` also
 read `players`; they are gated by an active membership upstream, so a `'left'`
