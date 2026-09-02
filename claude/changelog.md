@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(training): THE DIRECTOR'S SESSION IS A SUGGESTION — the screens.**
+- **docs(plan): training plan status — Part 1 shipped; the migration is
+  APPLIED.** `training_suggestions` was applied to production right before
+  `d98b593` merged, the sixteen-step harness passed 16/16 live in a rolled-back
+  transaction, and the served bundle was checked for the new RPC names before
+  this was written. Still to build from the plan: the coaches' push and the
+  director's uptake view.
+- `d98b593` — **feat(training): THE DIRECTOR'S SESSION IS A SUGGESTION — the screens.**
   Part 1 of `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`,
   second pull request, on top of the schema one (#645). The Publish tab now
   calls `suggest_training`: the button reads "Suggest to N squads" and the
