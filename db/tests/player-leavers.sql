@@ -60,6 +60,13 @@ begin
 end $$;
 
 -- ── FIXTURE ──────────────────────────────────────────────────────────────
+-- ⚠️ fx is owned by this connection's role. Any step that impersonates via
+-- pg_temp.act_as(...) must resolve every fx lookup it needs into a plpgsql
+-- variable BEFORE calling act_as — reading fx AFTER switching role fails
+-- 42501 (permission denied for table fx), because the impersonated
+-- 'authenticated' role has no grant on it. Do not grant fx to
+-- authenticated to work around this: that would widen what the
+-- impersonated role can see and make the probe less faithful.
 create temp table fx (k text primary key, v uuid);
 insert into fx select 'team', t.id from public.teams t where t.name='U16B';
 insert into fx select 'club', t.club_id from public.teams t where t.name='U16B';
@@ -190,7 +197,9 @@ end $$;
 -- ── STEP 9 — register_my_player still sees the leaver as a duplicate ──────
 -- DELIBERATE (plan Task 1): a returning child is told to ask the club, which
 -- is the cue for Restore. A second row for the same child is the bug.
-do $$ begin
+do $$ declare v_team uuid; begin
+  -- resolved BEFORE act_as: fx is unreadable once role='authenticated'
+  select v into v_team from fx where k='team';
   perform pg_temp.act_as('stranger');
   begin
     -- p_gender is required: U16B is a single-gender squad, and the gender
@@ -199,7 +208,7 @@ do $$ begin
     -- is actually testing.
     perform public.register_my_player(
       p_full_name => 'Rafiq Delacroix-Obi',
-      p_team_id => (select v from fx where k='team'),
+      p_team_id => v_team,
       p_gender => 'male',
       p_confirm_duplicate => false);
     raise exception 'SELF-TEST FAILED: a leaver''s name re-registered as a NEW row';
@@ -243,19 +252,88 @@ do $$ begin
     raise exception 'restore did not reactivate the parent membership'; end if;
 end $$;
 
--- ── STEP 12 — a 'left' membership grants NOTHING (sanity on the mechanism) ─
--- Mark again, then read players as the parent: they must not see the squad
--- through the left row. Their SIBLING row is still active so they still see
--- U16B — so the assertion is on the DM predicate, which is per membership.
-do $$ declare ok boolean; begin
+-- ── STEP 12a — CONTROL A: while BOTH memberships are still active, the
+--              parent DOES read the squad, its events, and their own
+--              child's contact row. Covers db/migrations/
+--              20260902_player_leavers_left_grants_nothing.sql, which tests
+--              is_own_player and is_attached_to_team for status <> 'left' —
+--              every zero asserted below is meaningful only because this
+--              control is non-zero first. ─────────────────────────────────
+do $$ declare v_team uuid; v_event uuid; n int; begin
+  -- resolved BEFORE act_as: fx is unreadable once role='authenticated'
+  select v into v_team from fx where k='team';
+
+  insert into public.events (club_id, team_id, type, starts_at)
+  select (select v from fx where k='club'), v_team, 'match', now() + interval '7 days'
+  returning id into v_event;
+  insert into fx values ('event', v_event);
+
+  -- the fixture already gave both children a player_contacts row (the
+  -- shared family address, for the claim_roster_access control) — no new
+  -- insert needed, player_id is that table's PRIMARY KEY.
+
+  perform pg_temp.act_as('parent');
+  select count(*) into n from public.players where team_id=v_team;
+  if n < 1 then raise exception 'CONTROL A FAILED: active parent reads 0 players rows for their squad — the probe proves nothing'; end if;
+  select count(*) into n from public.events where team_id=v_team;
+  if n < 1 then raise exception 'CONTROL A FAILED: active parent reads 0 events rows for their squad — the probe proves nothing'; end if;
+  select count(*) into n from public.player_contacts where player_id='00000000-bbbb-0000-0000-000000000002';
+  if n < 1 then raise exception 'CONTROL A FAILED: active parent reads 0 player_contacts rows for their own child — the probe proves nothing'; end if;
+  perform pg_temp.act_as_owner();
+end $$;
+
+-- ── STEP 12b — a 'left' membership grants NOTHING ─────────────────────────
+-- Mark the leaver again (restore in step 11 undid step 5's mark), then set
+-- the SIBLING's membership to 'left' directly too, so BOTH of the parent's
+-- links to the squad are 'left'. Assert every read CONTROL A proved is now
+-- zero, and that an availability insert for the leaver is refused.
+do $$ declare ok boolean; v_team uuid; v_event uuid; n int; begin
   perform pg_temp.act_as('coach');
   perform public.mark_player_left('00000000-bbbb-0000-0000-000000000001');
   perform pg_temp.act_as_owner();
   update public.memberships set status='left' where player_id='00000000-bbbb-0000-0000-000000000002'; -- both rows now 'left'
+  -- resolved BEFORE act_as: fx is unreadable once role='authenticated'
+  select v into v_team  from fx where k='team';
+  select v into v_event from fx where k='event';
+
   perform pg_temp.act_as('parent');
-  select count(*) = 0 into ok from public.players where team_id=(select v from fx where k='team');
-  perform pg_temp.act_as_owner();
+
+  select count(*) = 0 into ok from public.players where team_id=v_team;
   if not ok then raise exception 'a parent whose memberships are all ''left'' can still read the squad'; end if;
+
+  select count(*) = 0 into ok from public.events where team_id=v_team;
+  if not ok then raise exception 'a parent whose memberships are all ''left'' can still read the squad''s events'; end if;
+
+  select count(*) into n from public.player_contacts
+   where player_id in ('00000000-bbbb-0000-0000-000000000001','00000000-bbbb-0000-0000-000000000002');
+  if n <> 0 then raise exception 'a parent whose memberships are all ''left'' can still read % player_contacts row(s)', n; end if;
+
+  begin
+    insert into public.availability (event_id, player_id, status)
+    values (v_event, '00000000-bbbb-0000-0000-000000000001', 'in');
+    raise exception 'SELF-TEST FAILED: a ''left'' parent inserted an availability row for the leaver';
+  exception when others then
+    if sqlerrm like 'SELF-TEST FAILED%' then raise; end if;
+    raise notice '''left'' parent refused an availability insert: %', sqlerrm;
+  end;
+
+  perform pg_temp.act_as_owner();
+end $$;
+
+-- ── STEP 12c — CONTROL B: PENDING must keep working ───────────────────────
+-- Flip the sibling's membership to 'pending' (not 'left'). The parent must
+-- read exactly the sibling's players row, and NOT the leaver's — proving
+-- `<> 'left'` was used, not `= 'active'`, which would have broken this.
+do $$ declare v_team uuid; n_sibling int; n_leaver int; begin
+  update public.memberships set status='pending' where player_id='00000000-bbbb-0000-0000-000000000002';
+  -- resolved BEFORE act_as: fx is unreadable once role='authenticated'
+  select v into v_team from fx where k='team';
+  perform pg_temp.act_as('parent');
+  select count(*) into n_sibling from public.players where id='00000000-bbbb-0000-0000-000000000002';
+  select count(*) into n_leaver  from public.players where id='00000000-bbbb-0000-0000-000000000001';
+  perform pg_temp.act_as_owner();
+  if n_sibling <> 1 then raise exception 'CONTROL FAILED: a PENDING parent no longer reads their own child (got %) — is_own_player must accept pending, only exclude left', n_sibling; end if;
+  if n_leaver <> 0 then raise exception 'a PENDING sibling membership also surfaced the unrelated LEFT child (% rows)', n_leaver; end if;
 end $$;
 
 do $$ begin raise notice 'player-leavers: all steps passed'; end $$;
