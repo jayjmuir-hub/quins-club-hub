@@ -5,6 +5,7 @@ import { signPhotoUrl } from '../data/photos.js'
 // roster, the dashboard and the player hero, and the picker is a large module to
 // drag onto all three for a percentage. See src/lib/photoFocus.js.
 import { focusToObjectPosition } from '../lib/photoFocus.js'
+import { isJerseyNumber } from '../lib/jersey.js'
 
 // A player's head shot, falling back to their initials.
 //
@@ -30,6 +31,13 @@ export default function PlayerAvatar({
   url,
   size = 'md',
   className = '',
+  // ⚠️ SENIOR SQUADS 2a — a jersey number is a per-squad decision
+  // (teams.uses_jersey_numbers), never derived from the row itself, so the
+  // caller states it explicitly rather than this component guessing from
+  // `player.jersey_num` alone (which would show a number on a youth squad
+  // roster the moment one happened to be set). Default false: every existing
+  // caller that does not pass this renders exactly as before.
+  showJersey = false,
 }) {
   const path = player?.photo_path ?? null
   // ⚠️ READ OFF THE PLAYER ROW, NOT TAKEN AS A PROP, because every caller
@@ -111,12 +119,16 @@ export default function PlayerAvatar({
     )
   }
 
+  // The photo branch above is unchanged — a number over a photo is a
+  // different design decision, not made here (task-5-brief.md). Only the
+  // monogram fallback trades initials for the number, and only when the
+  // squad the caller is rendering actually uses them.
   return (
     <div
       className={`${shared} grid place-items-center bg-white/20 font-extrabold tracking-[.5px]`}
       aria-hidden="true"
     >
-      {initials(player?.full_name)}
+      {showJersey && isJerseyNumber(player?.jersey_num) ? player.jersey_num : initials(player?.full_name)}
     </div>
   )
 }
