@@ -218,6 +218,9 @@ describe('App', () => {
 
     expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/')
+    // ...and says why (2 Sep 2026 UX review, pattern 7): a stale deep-link
+    // used to land here silently.
+    expect(screen.getByTestId('missing-page')).toHaveTextContent(/no longer exists/i)
   })
 
   it('renders /accept-invite/:token even for a brand-new invitee with zero memberships', () => {

@@ -405,7 +405,11 @@ describe('the channel thread uses the same bubble language as a DM (25 Aug 2026)
     renderChat()
     const row = await screen.findByTestId('message-row')
     expect(within(row).queryByText('You')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull()
+    // ⚠️ ONE EXCEPTION SINCE 2 Sep 2026 (UX review, High): under announce-only
+    // a parent gets a visible Reply under an unanswered post, because the
+    // locked composer tells them to reply to a thread and the chevron was the
+    // only way. It is the affordance, not the old action-link row.
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBe(screen.getByTestId('reply-affordance'))
     expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Report' })).toBeNull()

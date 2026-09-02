@@ -404,7 +404,10 @@ export default function App() {
               Accounts must exist in exactly one place. */}
           <Route path="/accounts" element={<Navigate to="/admin/accounts" replace />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* ⚠️ WITH A REASON (2 Sep 2026 UX review, pattern 7): a stale push
+              deep-link or a mistyped address used to land on Home with no
+              message. AppShell reads `state.missing` and says so, once. */}
+          <Route path="*" element={<Navigate to="/" replace state={{ missing: true }} />} />
         </Route>
       </Routes>
       </ErrorBoundary>

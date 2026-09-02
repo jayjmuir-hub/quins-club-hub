@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import Spinner from '../components/Spinner.jsx'
 import crest from '../assets/crest.png'
 import { acceptInvite } from '../data/members.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { useAuth } from '../lib/auth.jsx'
 
 // The invitee-facing half of Task 18's invite flow, reached via
 // /accept-invite/:token (see src/App.jsx for why this route sits outside
@@ -38,6 +39,7 @@ export default function AcceptInvite() {
   const { token } = useParams()
   const { reload } = useMemberships()
   const [status, setStatus] = useState('loading')
+  const { signOut } = useAuth()
   const [error, setError] = useState(null)
 
   // Guards against React 18 StrictMode's double-invoke-in-dev (and any
@@ -117,6 +119,26 @@ export default function AcceptInvite() {
             <p role="alert" className="mt-2 text-sm leading-relaxed text-danger-ink">
               {friendlyMessage(error, "We couldn't accept that invite. Try again.")}
             </p>
+            {/* ⚠️ A WAY OUT (2 Sep 2026 UX review, High). This route sits
+                outside the shell — no nav, no crest link, no sign-out — so a
+                parent with a used or wrong-address invite was stranded on
+                this card. AuthConfirm's error state already offers the same
+                two doors. */}
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <Link
+                to="/"
+                className="inline-block rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white"
+              >
+                Go to the app
+              </Link>
+              <button
+                type="button"
+                onClick={() => signOut()}
+                className="inline-block rounded-[11px] border border-line px-4 py-2.5 text-sm font-bold text-ink"
+              >
+                Sign out
+              </button>
+            </div>
           </>
         )}
       </div>

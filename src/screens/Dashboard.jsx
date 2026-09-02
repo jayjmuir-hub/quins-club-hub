@@ -499,6 +499,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [settled, setSettled] = useState(false)
   const [error, setError] = useState(null)
+  // ⚠️ ITS OWN STATE, NOT THE PAGE'S (2 Sep 2026 UX review, High). A refused
+  // DM used to go into `error`, which switches Home into the whole "We
+  // couldn't load your dashboard" card — and, being a string, read as
+  // "Something went wrong" with a Try again that refetched everything. The
+  // staff card is where the tap happened; the refusal belongs beside it.
+  const [chatError, setChatError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
   const [selectedEventId, setSelectedEventId] = useState(null)
   // The fortnight strip's day chooser: { year, month, day } club-day parts for
@@ -1186,7 +1192,13 @@ export default function Dashboard() {
             // return first. That is stable between loads, which matters — a
             // disclosure that opens a different squad each visit is worse than
             // one that opens none.
-            myTeams.map((team, index) => (
+            <>
+            {chatError && (
+              <p role="alert" data-testid="chat-error" className="rounded-[10px] bg-danger-surface px-3 py-2 text-[13px] font-semibold text-danger-ink">
+                {chatError}
+              </p>
+            )}
+            {myTeams.map((team, index) => (
               <SquadStaffCard
                 key={team.id}
                 squadName={team.name}
@@ -1203,11 +1215,12 @@ export default function Dashboard() {
                     const conversationId = await openConversation(member.profileId)
                     navigate(`/chat/dm/${conversationId}`)
                   } catch (err) {
-                    setError(friendlyMessage(err, 'Could not open a chat with them.'))
+                    setChatError(friendlyMessage(err, 'Could not open a chat with them.'))
                   }
                 }}
               />
-            ))
+            ))}
+            </>
           )}
         </div>
       )}

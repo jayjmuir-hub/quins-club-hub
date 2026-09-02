@@ -197,6 +197,30 @@ describe('Chat — announce-only', () => {
     expect(replyToMessageMock).toHaveBeenCalledWith('msg-1', 'Is there a bus?', { mentions: [] })
   })
 
+  it('⚠️ shows a visible Reply under an unanswered post while announce-only is on', async () => {
+    // 2 Sep 2026 UX review, High: the locked composer said "reply to a thread
+    // instead", but a post with no replies yet had no reply control except
+    // the chevron menu. The affordance opens the same reply composer.
+    const user = userEvent.setup()
+    renderAt('/chat/team-a')
+    await screen.findByTestId('message-row')
+
+    const reply = screen.getByTestId('reply-affordance')
+    expect(reply).toHaveTextContent('Reply')
+    expect(reply.className.split(/\s+/)).toContain('min-h-[44px]')
+    await user.click(reply)
+    expect(screen.getByLabelText('Reply')).toBeInTheDocument()
+    // Once open, the affordance has done its job and goes.
+    expect(screen.queryByTestId('reply-affordance')).toBeNull()
+  })
+
+  it('shows no Reply affordance when announce-only is off — the composer is the route', async () => {
+    getChannelSettingsMock.mockResolvedValue({ team_id: 'team-a', announce_only: false })
+    renderAt('/chat/team-a')
+    await screen.findByTestId('message-row')
+    expect(screen.queryByTestId('reply-affordance')).toBeNull()
+  })
+
   it('opens the composer for a parent when the squad has turned announce-only off', async () => {
     getChannelSettingsMock.mockResolvedValue({ team_id: 'team-a', announce_only: false })
     const user = userEvent.setup()

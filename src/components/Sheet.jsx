@@ -122,6 +122,39 @@ export function Sheet({ open, onClose, title, children, dismissible = true }) {
 
     document.addEventListener('keydown', handleKeyDown, true)
 
+    // ⚠️ BACK CLOSES THE SHEET, NOT THE SCREEN (2 Sep 2026 UX review,
+    // pattern 7). On Android the system Back with a sheet open used to leave
+    // the whole screen, form and all. Opening pushes one history entry
+    // tagged with this sheet's id; popping it (Back, or a swipe) closes the
+    // sheet the same way Escape does, and a non-dismissible sheet re-pushes
+    // so Back cannot skip a true gate. Closing by any OTHER route (the X,
+    // Escape, the scrim, a save) pops our own entry back off in the cleanup,
+    // so the history is exactly as long as it was before the sheet opened —
+    // a second Back then leaves the screen, as it always did.
+    const marker = { __sheet: titleId }
+    let poppedByBack = false
+    try {
+      window.history.pushState(marker, '')
+    } catch {
+      // A sandboxed frame or a locked-down browser: the sheet still works,
+      // only the Back shortcut is lost.
+    }
+    function handlePopState() {
+      poppedByBack = true
+      if (dismissibleRef.current) {
+        onCloseRef.current()
+      } else {
+        // Put the entry back: Back must not step past a gate.
+        try {
+          window.history.pushState(marker, '')
+        } catch {
+          // As above.
+        }
+        poppedByBack = false
+      }
+    }
+    window.addEventListener('popstate', handlePopState)
+
     // Prevent background scroll while the sheet is open (matches the
     // prototype's body.style.overflow="hidden" behaviour).
     const previousOverflow = document.body.style.overflow
@@ -129,6 +162,15 @@ export function Sheet({ open, onClose, title, children, dismissible = true }) {
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true)
+      window.removeEventListener('popstate', handlePopState)
+      if (!poppedByBack && window.history.state?.__sheet === titleId) {
+        // Closed by the X, Escape or the scrim: take our entry with us.
+        try {
+          window.history.back()
+        } catch {
+          // As above.
+        }
+      }
       document.body.style.overflow = previousOverflow
       triggerRef.current?.focus?.()
     }
