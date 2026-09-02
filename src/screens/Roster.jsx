@@ -5,7 +5,6 @@ import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
-import Spinner from '../components/Spinner.jsx'
 import RosterTable from '../components/RosterTable.jsx'
 import TeamFilter, { ALL_TEAMS_ID } from '../components/TeamFilter.jsx'
 import { positionGroup, POSITION_GROUP_ORDER } from '../lib/rosterUnit.js'
@@ -28,6 +27,7 @@ import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
 import { useMediaQuery, DESKTOP_QUERY } from '../lib/useMediaQuery.js'
 import { sortByJersey } from '../lib/jersey.js'
+import { ListSkeleton } from '../components/Skeleton.jsx'
 
 // The team filter survives a reload. Without this, choosing club-wide as the
 // desktop default (desktop-spec.md §10 decision 2) would make a coach who
@@ -1050,9 +1050,11 @@ export default function Roster() {
       )}
 
       {isFirstLoad && (
-        <Card className="flex justify-center py-10">
-          <Spinner />
-        </Card>
+        // Eight player rows of the measured 68px, so the list does not lurch
+        // when the roster lands (2 Sep 2026 UX review, item 6).
+        <div role="status" aria-live="polite" aria-label="Loading the roster…">
+          <ListSkeleton rows={8} rowHeight={68} />
+        </div>
       )}
 
       {!isFirstLoad && error && (

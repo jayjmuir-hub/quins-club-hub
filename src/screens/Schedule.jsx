@@ -6,7 +6,6 @@ import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import DaySheet from '../components/DaySheet.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
-import Spinner from '../components/Spinner.jsx'
 import TeamFilter, { ALL_TEAMS_ID, PillButton } from '../components/TeamFilter.jsx'
 import Availability from './Availability.jsx'
 import Register from './Register.jsx'
@@ -37,6 +36,7 @@ import {
   showMoreMonthsLabel,
 } from '../lib/scheduleMonthGroups.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { ListSkeleton } from '../components/Skeleton.jsx'
 
 // Same reasoning as Roster's: the filter has to outlive a reload, or a coach
 // who runs one age group re-filters on every visit. Separate key from the
@@ -816,9 +816,10 @@ export default function Schedule() {
       </div>
 
       {isFirstLoad && (
-        <Card className="flex justify-center py-10">
-          <Spinner />
-        </Card>
+        // Five fixture rows at the measured 104px (2 Sep 2026 UX review, item 6).
+        <div role="status" aria-live="polite" aria-label="Loading the schedule…">
+          <ListSkeleton rows={5} rowHeight={104} lead="square" />
+        </div>
       )}
 
       {!isFirstLoad && error && (

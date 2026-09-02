@@ -5,7 +5,6 @@ import { Empty } from '../components/Empty.jsx'
 import NewChatPicker, { Avatar } from '../components/NewChatPicker.jsx'
 import NewGroupPicker from '../components/NewGroupPicker.jsx'
 import PresenceDot from '../components/PresenceDot.jsx'
-import Spinner from '../components/Spinner.jsx'
 import { attachmentPreviewLabel } from '../data/chatMedia.js'
 import { listMyChatPrefs, setChatPref } from '../data/chatPrefs.js'
 import {
@@ -23,6 +22,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { postedLabel } from '../lib/notices.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { ListSkeleton } from '../components/Skeleton.jsx'
 
 // The Chats list — 24 Aug 2026. claude/plans/2026-08-24-chat-list.md.
 //
@@ -391,8 +391,10 @@ export default function ChatList() {
       )}
 
       {rows === null && !error && (
-        <div className="py-8">
-          <Spinner />
+        // Held at the height of six chat rows, not a spinner in a void:
+        // 2 Sep 2026 UX review, item 6 (see ListSkeleton's note on heights).
+        <div role="status" aria-live="polite" aria-label="Loading chats…">
+          <ListSkeleton rows={6} rowHeight={68} />
         </div>
       )}
       {rows?.length === 0 && <Empty message="No chats yet. Your squad's channel appears here once you are on a squad." />}

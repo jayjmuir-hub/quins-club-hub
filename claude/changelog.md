@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **docs(schema): captures for the three 2 Sep migrations.** Also
+- **fix(ui): the five busiest lists hold their height while loading.** Item 6
+  of the 2 Sep 2026 UX review. Chats, Roster, Schedule, Documents and
+  Accounts swapped in a spinner with no reserved height, so the page collapsed
+  and lurched when the data landed — the exact jump `Skeleton.jsx`'s header
+  was written to stop — and Documents showed a blank page (its loading state
+  was a screen-reader-only sentence). New `ListSkeleton` in
+  `src/components/Skeleton.jsx` takes rows and a row height per screen:
+  roster 68 (measured), fixture 104 (measured 15 Aug), chat 68, document 64,
+  approval card 88 (derived from their classes — re-measure if a screen starts
+  jumping). Each loading region keeps `role="status"` and an `aria-label`, as
+  the Spinner had. `tests/list-skeleton.test.jsx`.
+- `524bdf7` — **docs(schema): captures for the three 2 Sep migrations.** Also
   `public.training_suggestions` (table, its "suggestion read" policy) and
   `public.suggest_training` / `public.decide_training_suggestion`, captured
   from live after Training Sessions applied 20260902_training_suggestions.
