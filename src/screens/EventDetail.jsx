@@ -27,6 +27,7 @@ import {
   eventPitchLabel,
   homeAwayLabel,
 } from '../lib/eventFormat.js'
+import { DEFAULT_FORMAT, formatLabel, formatOf } from '../lib/fixtureFormat.js'
 
 // The compact share tag (¼/⅓/½) ONLY when a booking takes part of a pitch. A
 // full or unset pitch is the whole thing — nobody is sharing it — so it returns
@@ -647,6 +648,10 @@ export default function EventDetail({
                 ? `League${event.round != null ? ` · Round ${event.round}` : ''}`
                 : event.competition || 'Tournament'}
           </KeyValue>
+        )}
+        {/* Only when it is not 15s — see ScheduleTable for the reasoning. */}
+        {event.type === 'match' && formatOf(event) !== DEFAULT_FORMAT && (
+          <KeyValue label="Format">{formatLabel(formatOf(event))}</KeyValue>
         )}
       </div>
 

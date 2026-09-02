@@ -153,6 +153,35 @@ describe('AddGameForm', () => {
     expect(onSaved).toHaveBeenCalled()
   })
 
+  // Format on the fixture (claude/plans/2026-09-02-fixture-format.md): a
+  // tournament container holds the day's format and a game underneath it
+  // inherits it, rather than asking again per game.
+  it('a game inherits the format of a 7s tournament', async () => {
+    const user = userEvent.setup()
+    render(<AddGameForm tournament={{ ...TOURNAMENT, format: 7 }} onSaved={() => {}} onClose={() => {}} />)
+
+    await user.type(screen.getByLabelText('Opponent'), 'Exiles')
+    await user.type(screen.getByLabelText('Kick-off'), '10:20')
+    await user.click(screen.getByRole('button', { name: /add game/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ format: 7 })
+  })
+
+  // CONTROL: a container with no stated format yields a game with no stated
+  // format either — otherwise "inherits" above is not really tested.
+  it('CONTROL: a game under a container with no format is written with format null', async () => {
+    const user = userEvent.setup()
+    render(<AddGameForm tournament={{ ...TOURNAMENT, format: null }} onSaved={() => {}} onClose={() => {}} />)
+
+    await user.type(screen.getByLabelText('Opponent'), 'Exiles')
+    await user.type(screen.getByLabelText('Kick-off'), '10:20')
+    await user.click(screen.getByRole('button', { name: /add game/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    expect(upsertEventMock.mock.calls[0][0].format).toBeNull()
+  })
+
   it('refuses a half score — both or neither', async () => {
     const user = userEvent.setup()
     render(<AddGameForm tournament={TOURNAMENT} onSaved={() => {}} onClose={() => {}} />)

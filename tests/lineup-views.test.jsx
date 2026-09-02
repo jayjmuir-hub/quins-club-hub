@@ -129,8 +129,13 @@ describe('the slots view', () => {
   })
 
   it('asks for a format before drawing shirts', async () => {
+    // ⚠️ A NEW LINEUP NOW OPENS AT THE FIXTURE'S FORMAT (Task 7, 2 Sep 2026),
+    // so this guard is no longer reachable merely by leaving the field alone —
+    // it fires when the coach clears the select back to "Not set", which is
+    // still a real, reachable state (src/screens/Lineup.jsx).
     const user = renderScreen()
     await loaded()
+    await user.selectOptions(screen.getByLabelText(/players per side/i), '')
     await user.click(screen.getByRole('tab', { name: 'Slots' }))
     expect(screen.getByText(/choose players per side above/i)).toBeInTheDocument()
   })
@@ -204,8 +209,12 @@ describe('the pitch view', () => {
 
 describe('the sheet style (phase 2)', () => {
   it('offers the toggle only when a format is chosen', async () => {
+    // ⚠️ SAME ADJUSTMENT AS ABOVE: a new lineup now opens already at a format
+    // (Task 7), so "no format chosen" has to be reached by clearing the
+    // select rather than by simply not touching it.
     const user = renderScreen()
     await loaded()
+    await user.selectOptions(screen.getByLabelText(/players per side/i), '')
     expect(screen.queryByRole('group', { name: 'Sheet style' })).toBeNull()
     await chooseSevens(user)
     expect(screen.getByRole('group', { name: 'Sheet style' })).toBeInTheDocument()

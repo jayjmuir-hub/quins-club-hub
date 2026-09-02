@@ -13,6 +13,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam } from '../lib/scope.js'
 import { TIER_OK, tierEligibility } from '../lib/tierEligibility.js'
 import { rosterFormat, slotLabel } from '../lib/rosterFormats.js'
+import { formatOf } from '../lib/fixtureFormat.js'
 import { useDragReorder } from '../lib/useDragReorder.js'
 import PitchDiagram from '../components/PitchDiagram.jsx'
 import {
@@ -292,6 +293,12 @@ export default function Lineup() {
           }
           setSlotted(nextSlots)
           setReps(nextReps)
+        } else {
+          // ⚠️ A NEW LINEUP OPENS AT THE FIXTURE'S FORMAT (2 Sep 2026) — 7 for
+          // a 7s tournament, 15 for a league match or an unstated one. Still a
+          // GUIDE, NOT A GATE: the coach can change it, and an existing lineup
+          // above keeps whatever it was saved with. src/lib/fixtureFormat.js.
+          setPerSide(formatOf(eventRow))
         }
       })
       .catch((failure) => {

@@ -2697,6 +2697,13 @@ alter table public.players
 -- rename-cannot-change-behaviour shape as teams.is_senior /
 -- self_registration_allowed / requires_contact above: a column, never
 -- parsed from a name.
+-- ⚠️ NULL IS NOT BACKFILLED: every pre-existing fixture reads as 15 through
+-- src/lib/fixtureFormat.js; the migration deliberately wrote nothing. A
+-- league match is always 15s — the form never asks, events_league_is_fifteen
+-- is the boundary against a hand-rolled write. default_format is only what a
+-- NEW tournament or friendly pre-selects, admin-edited on the Club tab beside
+-- scoring, never read for a league match. Reasoning:
+-- db/migrations/20260902_fixture_format.sql.
 alter table public.teams
   add column default_format smallint;
 

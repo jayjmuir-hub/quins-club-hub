@@ -10,11 +10,13 @@ import {
   upsertLeagueTeam,
 } from '../data/leagueTeams.js'
 import { listContactsForPlayers, listPlayers, restorePlayer } from '../data/players.js'
-import { setTeamScoringKinds, setTeamRequiresContact } from '../data/teams.js'
+import { setTeamScoringKinds, setTeamRequiresContact, setTeamDefaultFormat } from '../data/teams.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { SCORE_KINDS, SCORE_LABELS, scoringForBand, scoringForTeam } from '../lib/scoring.js'
 import { ageBandFromTeamName } from '../lib/ageGroup.js'
 import { formatLeftDate, isLeaver } from '../lib/leavers.js'
+import { FORMATS, formatLabel } from '../lib/fixtureFormat.js'
+import { isMinisTeam } from '../lib/minis.js'
 import InviteForm from './InviteForm.jsx'
 import StorageCard from '../components/StorageCard.jsx'
 
@@ -417,6 +419,21 @@ export default function AdminClub() {
     }
   }
 
+  /** Same shape as saveRequiresContact: the select shows what the reload brings back. */
+  async function saveDefaultFormat(next) {
+    const id = scoringTeamId
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await setTeamDefaultFormat(id, next === '' ? null : Number(next))
+      await reloadTeams()
+    } catch (failure) {
+      setSaveError(failure)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function toggleKind(kind) {
     setDraftKinds((current) =>
       current.includes(kind)
@@ -696,6 +713,30 @@ export default function AdminClub() {
               {scoringTeam.requires_contact === true ? 'Contact' : 'Tag'}
             </button>
           </div>
+
+          {/* ⚠️ A DEFAULT, NOT A RULE. What a NEW tournament or friendly for
+              this squad pre-selects; every fixture still asks. A league match
+              is always 15 and never reads this. Minis squads have their own
+              formats and no sheet, so the control is hidden for them.
+              claude/plans/2026-09-02-fixture-format.md. */}
+          {!isMinisTeam(scoringTeam.name) && (
+            <label className="mt-3 block">
+              <span className="text-[13px] font-bold text-ink">Usual tournament format</span>
+              <select
+                value={scoringTeam.default_format == null ? '' : String(scoringTeam.default_format)}
+                disabled={saving}
+                onChange={(domEvent) => saveDefaultFormat(domEvent.target.value)}
+                className="mt-1 w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-2.5 text-[16px] text-ink outline-none focus:border-brand"
+              >
+                <option value="">15s (default)</option>
+                {FORMATS.filter((format) => format !== 15).map((format) => (
+                  <option key={format} value={String(format)}>
+                    {formatLabel(format)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <div className="mt-3 flex flex-wrap gap-2.5">
             {/* ⚠️ REFUSED WHEN NOTHING IS TICKED, rather than silently saved as

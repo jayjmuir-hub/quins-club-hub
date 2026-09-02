@@ -14,6 +14,7 @@ import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '
 import { listAvailability } from '../data/availability.js'
 import { SCORE_KINDS, hasNoComponents } from '../lib/scoring.js'
 import { isMinisTeam, recordsScores } from '../lib/minis.js'
+import { DEFAULT_FORMAT, FORMATS, formatLabel, isFormat } from '../lib/fixtureFormat.js'
 
 // The pitch picker's escape hatch. A sentinel rather than '' so "Something
 // else…" stays distinguishable from "No pitch" — they are different answers,
@@ -280,6 +281,9 @@ const CLUB_WIDE = '__club__'
 function initialValues(event, editableTeams, initialDate = null, duplicating = false, initialKind = null) {
   const teamIds = editableTeams.map((team) => team.id)
   const fallbackTeamId = teamIds[0] ?? ''
+  // Looked up once and reused by both the pitch portion and format defaults
+  // below, rather than re-running the same `.find` for each.
+  const fallbackTeam = editableTeams.find((team) => team.id === fallbackTeamId)
 
   if (!event) {
     const today = clubToday()
@@ -333,10 +337,7 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       // quarter, U9–U11 a half, U12+ full; training leans smaller). A
       // suggestion, never a rule — the picker below can change it, and an
       // effect keeps it in step with the squad and type until it is overridden.
-      pitchPortion: defaultPitchPortion(
-        editableTeams.find((team) => team.id === fallbackTeamId)?.name ?? null,
-        { type },
-      ),
+      pitchPortion: defaultPitchPortion(fallbackTeam?.name ?? null, { type }),
       competition: '',
       // ⚠️ '' MEANS "NOT A LEAGUE MATCH", and that is the default for every new
       // fixture. Null league_team_id is what makes a fixture not a league one;
@@ -347,6 +348,11 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       // '' = neither: a friendly. A tournament pick presets this to 'tournament'
       // so the container saves as one; see the block by COMPETITION_LEAGUE.
       competitionType: isTournamentKind ? COMPETITION_TOURNAMENT : '',
+      // ⚠️ THE SQUAD'S USUAL FORMAT, OR 15. Read once when the sheet opens —
+      // the team can change below and the effect after the form re-seeds it.
+      format: String(
+        isFormat(fallbackTeam?.default_format) ? fallbackTeam.default_format : DEFAULT_FORMAT,
+      ),
       notes: '',
       resultUs: '',
       resultThem: '',
@@ -459,6 +465,10 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     // so nothing in the database can be mistaken for an answer somebody gave.
     competitionType:
       event.competition_type ?? (event.competition ? COMPETITION_TOURNAMENT : ''),
+    // ⚠️ THE ROW'S OWN FORMAT, never the squad default — a reopened 10s
+    // fixture must show 10s. Null reads as 15, the same fallback every reader
+    // applies.
+    format: String(isFormat(event.format) ? event.format : DEFAULT_FORMAT),
     // ⚠️ CARRIED ON A DUPLICATE, unlike the round below. A league team belongs
     // to the SQUAD, and the squad carries over — so ADHQ2's next fixture is
     // still ADHQ2's. Clearing it would make the commonest duplicate (same
@@ -894,6 +904,54 @@ export default function EventForm({
     String(values.resultUs ?? '') !== '' ||
     String(values.resultThem ?? '') !== ''
 
+  // ⚠️ FORMAT IS ASKED FOR A TOURNAMENT OR A FRIENDLY ON A U11+ SQUAD, AND
+  // NEVER FOR A LEAGUE MATCH — the league is 15s at every age (Jay, 2 Sep
+  // 2026) and the database refuses anything else (events_league_is_fifteen).
+  // Minis have their own formats and no match sheet, so nothing is offered.
+  // ⚠️ A TOURNAMENT CONTAINER (tournamentMode) ASKS TOO — it holds the day's
+  // format for every game AddGameForm adds underneath it (see the `format`
+  // field in the payload below). Only league and minis are excluded.
+  // claude/plans/2026-09-02-fixture-format.md.
+  const showFormat =
+    isMatch && !minisSquad && values.competitionType !== COMPETITION_LEAGUE
+
+  // When the squad changes on a NEW fixture, follow that squad's usual format.
+  // Editing keeps the row's own answer: a coach correcting the kick-off time
+  // must not have the format silently swapped under them.
+  //
+  // ⚠️ A DUPLICATE IS NOT EDITING (see the `editing` flag above), so without a
+  // further guard this effect fires on MOUNT for a duplicate too and stamps
+  // the squad's default straight over the format initialValues deliberately
+  // carried from the original row — a 7s tournament fixture duplicated onto a
+  // 15s squad would silently reopen as 15s.
+  //
+  // openedWithTeam records the team the form OPENED with and is never
+  // mutated afterwards — this must be an identity comparison, not a
+  // one-shot "eat the first call" flag. React 18 StrictMode (main.jsx wraps
+  // the app in it) double-invokes a cleanup-less effect synchronously at
+  // mount — mount, cleanup, remount, all before first paint — so a
+  // consumed-on-first-run flag (the earlier `skipFirstReseed` ref) sees
+  // itself already spent on the SECOND invocation and reseeds anyway,
+  // reproducing the exact bug in `npm run dev`. Comparing `teamId` against
+  // a value that is set once and never changed is naturally idempotent:
+  // both StrictMode calls see the same `teamId` on the still-fresh
+  // duplicate and both skip, however many times the effect body runs. A
+  // real team change later moves `teamId` away from `openedWithTeam.current`
+  // and the effect reseeds from the new squad's default — same as on a
+  // plain new fixture. The alternative (skip reseeding for the whole life
+  // of a duplicate) would leave a duplicate that has had its squad changed
+  // carrying the WRONG squad's format with nothing to correct it.
+  const openedWithTeam = useRef(teamId)
+  useEffect(() => {
+    if (editing) return
+    if (duplicate && teamId === openedWithTeam.current) return
+    const team = editableTeams.find((candidate) => candidate.id === teamId)
+    setValues((current) => ({
+      ...current,
+      format: String(isFormat(team?.default_format) ? team.default_format : DEFAULT_FORMAT),
+    }))
+  }, [editing, duplicate, teamId, editableTeams])
+
   // Extras AND a repeat is refused outright (see the row-count guard in
   // handleSubmit). Naming it here so the SUBMIT BUTTON can tell the truth:
   // before this existed the label read "Add 14 events" — the series count —
@@ -1233,6 +1291,17 @@ export default function EventForm({
       // tournament for all of them. Which of our teams played it, and in which
       // round, are facts about the SQUAD, so those stay on the primary payload.
       competition_type: isMatch ? values.competitionType || null : null,
+      // ⚠️ 15 FOR A LEAGUE MATCH, NULL FOR A NON-MATCH OR A MINIS SQUAD, THE
+      // PICK OTHERWISE. Written as a NUMBER — the radio holds a string. A
+      // tournament CONTAINER (tournamentMode) writes the picked format like
+      // any other non-league match: it is the day's format, and AddGameForm
+      // has every game underneath it inherit it — see the `format` field it
+      // adds to `common` there.
+      format: !isMatch || minisSquad
+        ? null
+        : values.competitionType === COMPETITION_LEAGUE
+          ? DEFAULT_FORMAT
+          : Number(values.format),
       // ⚠️ IN `common`, so a multi-squad fan-out and a whole repeating term all
       // carry it: what tier a fixture is played at is a fact about the FIXTURE,
       // true of every squad joining it.
@@ -2324,6 +2393,16 @@ export default function EventForm({
                 </p>
               )}
             </div>
+            )}
+
+            {showFormat && (
+              <Segmented
+                legend="Format"
+                name="event-format"
+                options={FORMATS.map((format) => ({ value: String(format), label: formatLabel(format) }))}
+                value={values.format}
+                onChange={(next) => setValues((current) => ({ ...current, format: next }))}
+              />
             )}
 
             {/* ⚠️ ROUND BELONGS TO THE LEAGUE, so it appears with it and only
