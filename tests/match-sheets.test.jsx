@@ -434,7 +434,7 @@ describe('MatchSheet — the form', () => {
     // group — which the governing body receives as a wrong team sheet.
     mount(<MatchSheet />)
     await screen.findByRole('heading', { name: /official match result sheet/i })
-    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['t-u14b'] })
+    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['t-u14b'], includeLeft: true })
   })
 
   it('links a typed name back to the roster when it matches exactly', async () => {

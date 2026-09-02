@@ -349,6 +349,57 @@ describe('AppShell', () => {
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
 
+  // Task 8: a 'left' membership grants nothing server-side, so a profile
+  // whose only rows are 'left' must land on the same roll-call as somebody
+  // with no memberships at all — never a blank routed screen.
+  it('treats a leaver (only "left" memberships) the same as zero memberships', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [{ id: 'm-left', status: 'left', role: 'parent', team_id: 't-1', player_id: 'p-1' }],
+        teams: [{ id: 't-u13', name: 'U13', sort_order: 3 }],
+      }),
+    )
+
+    renderShell()
+
+    await answerRollCall(user)
+
+    expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
+    expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+  })
+
+  // ⚠️ ADDED 2 Sep 2026 by the leavers review, and it is the state BETWEEN the
+  // two the test above and the pending-banner tests cover. One child has quit
+  // ('left') and a second has just been registered ('pending'). Server-side
+  // that person has exactly the access of somebody purely pending. But
+  // isPendingOnly was `every`, so the 'left' row made it false and they got
+  // the routed app with no waiting banner — no explanation for a squad list
+  // that shows nothing. Now the 'left' row is ignored and they get the same
+  // banner as anybody else waiting for approval.
+  it('shows the waiting banner to somebody with one left and one pending membership', async () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [
+          { id: 'm-left', status: 'left', role: 'parent', team_id: 't-1', player_id: 'p-gone' },
+          { id: 'm-pending', status: 'pending', role: 'parent', team_id: 't-2', player_id: 'p-new' },
+        ],
+        teams: [{ id: 't-2', name: 'U13', sort_order: 3 }],
+      }),
+    )
+
+    renderShell()
+
+    expect(await screen.findByTestId('pending-approval')).toHaveTextContent(
+      /waiting to be approved/i,
+    )
+    // ⚠️ The banner sits ABOVE the app, it does not replace it — same contract
+    // as the purely-pending case. And this is NOT the roll-call branch: the
+    // 'left' row is ignored, not treated as the whole picture.
+    expect(screen.getByText('Routed content')).toBeInTheDocument()
+  })
+
   // ❌ THE FORK IS GONE. This test used to click "I'm not adding a player" and
   // then "Add a player instead" — the two halves of a branch that made the
   // routes mutually exclusive, which is the bug the account-creation plan opens

@@ -400,6 +400,31 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   exposed or destroyed. Pre-existing from the 24 Aug pin work, not introduced
   by any 30 Aug surface. Backlog fix if wanted: freeze `pinned` for non-staff
   in `touch_message`, or drop `pinned` from the column grant.
+- **`public.clubs` `"club read"` is status-blind — recorded 2 Sep 2026, NOT
+  fixed.** Its USING is, in full,
+  `EXISTS (SELECT 1 FROM memberships m WHERE m.profile_id = auth.uid() AND m.club_id = clubs.id)`
+  — no `status` test, so a `'left'` or a never-approved `'pending'` membership
+  reads the club row just as an active one does. Benign: `clubs` holds the
+  club's own name and settings, which are on the sign-in screen anyway, and
+  every table that hangs off it is separately gated. Tightening it would also
+  need care — a pending parent seeing "no club at all" is the failure mode
+  `private.is_own_player` exists to avoid (see
+  `db/migrations/20260902_player_leavers_left_grants_nothing.sql`). Recorded so
+  the next person who counts status-blind predicates finds it already counted
+  rather than thinking it is new.
+- **⚠️ THE STATUS-BLIND SWEEP MUST COVER INLINE JOINS, NOT ONLY `private.*`
+  HELPERS — and this is the process finding, not the bullet above.** The
+  leavers work counted membership predicates twice and both counts were wrong
+  in the same way: they searched the bodies of `private.*` helper functions.
+  The second migration caught `is_own_player` and `is_attached_to_team` that
+  way; the third caught `public.calendar_events_for_token`, which is an
+  **inline `join public.memberships` inside a `security definer` function** and
+  therefore invisible to a search shaped around helper names. A family who had
+  left kept receiving the squad's fixtures in their phone calendar — 54 events
+  in the injected-fault run — because of it. **A membership predicate is any
+  place a `memberships` row is read to decide access, wherever it is written.**
+  Next sweep: `grep` the live catalogue for `from memberships` / `join
+  memberships` across `pg_proc` and `pg_policy` bodies, not for helper names.
 
 ## Needs Jay (account creations — Claude does not do these)
 
@@ -1205,6 +1230,32 @@ proves you wrong.**
   ⚠️ **AND IT STARTS AT 17 Aug 2026.** There is no history before that date and
   none can be reconstructed, so an empty log is not evidence that nothing
   happened. The screen says so in its empty state.
+- 🟡 **DELETING A PLAYER FAILS FOR MOST REAL PLAYERS — found 2 Sep 2026 while
+  designing "mark as left", NOT fixed by it.** Read from `db/schema/tables.sql`,
+  not yet reproduced live. Two independent causes: (1) `memberships.player_id` is
+  `ON DELETE SET NULL` but `memberships_family_role_needs_player` requires a
+  parent/player row to carry a `player_id`, so the delete violates the CHECK for
+  any child with a linked parent; (2) `invites.player_id` and
+  `invite_targets.player_id` have no `ON DELETE` rule, so any child ever invited
+  is refused. `deletePlayer` surfaces both as a permissions-shaped message and
+  the staff member gives up. ⚠️ **AND WHEN IT DOES SUCCEED IT IS WORSE:** the
+  parent's membership survives with a blank player link, still `active`, still on
+  the squad — roster, chat and pushes for a squad their child has left.
+  ✅ **THE DESIGNED REMEDY FOR "THE CHILD QUIT" HAS BEEN BUILT — both migrations applied to live 2 Sep 2026, pull request pending** —
+  `claude/specs/2026-09-02-player-leavers-design.md`, `mark_player_left`/
+  `restore_player`. **Delete itself is UNTOUCHED and still broken** for
+  exactly the reasons above; it still needs its cascades decided (parent
+  membership: delete the row; invites: cascade) and a harness that first
+  REPRODUCES both refusals.
+- 🟡 **A `staff-photos` OBJECT IS ORPHANED IN PRODUCTION, since 31 Aug 2026 —
+  found 2 Sep 2026 by the whole `db:check` run while shipping player leavers;
+  not caused by it.** `db/tests/photo-orphans.sql`: "staff-photos orphaned
+  (expect 0) -> 1". Measured: one `staff-photos` object created 2026-08-31
+  17:57 UTC with no `profiles` row pointing at it. `RESTORE.md` already
+  records that `staff-photos` is NOT mirrored to R2, so deleting it is
+  irreversible — do not sweep it without checking who it was and whether it
+  is still wanted; use the Storage API, never `storage.allow_delete_query`.
+  Not fixed here.
 - **The whole app is one JavaScript chunk** and every parent downloads all of it.
   ⚠️ Re-measure rather than citing an old figure. Two fixes, biggest first:
   `flag-icons` is imported whole for a phone country picker and is most of the CSS

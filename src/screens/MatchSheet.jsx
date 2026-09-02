@@ -15,6 +15,7 @@ import {
   saveMatchSheetSlots,
   setMatchSheetStatus,
 } from '../data/matchSheets.js'
+import { isLeaver, leaverName } from '../lib/leavers.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import { canEditTeam } from '../lib/scope.js'
@@ -162,14 +163,24 @@ function Cell({ value }) {
   )
 }
 
-/** One numbered squad row on the finished form: number, name, FR tick. */
-function SlotCells({ slots, index }) {
+/**
+ * One numbered squad row on the finished form: number, name, FR tick.
+ *
+ * ⚠️ THE NAME IS RESOLVED AGAINST `squad` BY `player_id`, NOT BY STRING
+ * MATCH ON `row.full_name`. A historic sheet must still name a player who has
+ * since left, tagged — `row.full_name` is the fallback for a row whose typed
+ * text never linked to a roster player (or whose player has aged out of the
+ * squad list entirely), never the leaver signal itself.
+ */
+function SlotCells({ slots, squad, index }) {
   const row = slots[index]
+  const player = row.player_id ? squad.find((candidate) => candidate.id === row.player_id) : null
+  const displayName = player ? leaverName(player) : row.full_name
   return (
     <>
       <td className={`${CELL} text-center font-bold`}>{row.slot}</td>
       <td className={CELL}>
-        <Cell value={row.full_name} />
+        <Cell value={displayName} />
       </td>
       <td className={`${CELL} text-center`}>
         {/* ⚠️ The FR column is a SAFETY declaration — it tells the referee which
@@ -265,6 +276,30 @@ function slotsFromLineup(picks) {
   return base
 }
 
+/**
+ * A discipline card's name, resolved through the SLOT it was issued against —
+ * never by matching `card.full_name` as a string.
+ *
+ * ⚠️ `match_sheet_cards` carries no `player_id` of its own (see
+ * saveMatchSheetCards), but `card.slot` is the sheet's own numbered row, and
+ * `slots[slot - 1].player_id` is the same authoritative link SlotCells uses
+ * for that row. Going through the slot means a leaver who was carded is
+ * tagged from the SAME id that tags their squad row, and two children who
+ * happen to share a name are never confused — matching by name text is
+ * exactly what the spec forbids.
+ *
+ * ⚠️ FALLS BACK TO THE STORED TEXT whenever the slot doesn't resolve: no
+ * number typed yet, a slot outside 1..SLOT_COUNT, a slot whose player_id is
+ * null, or a player_id that no longer appears in `squad`. A card mid-entry
+ * must still show what was typed, not disappear.
+ */
+function cardDisplayName(card, slots, squad) {
+  const slotNumber = Number(card.slot)
+  const row = Number.isFinite(slotNumber) ? slots.find((candidate) => candidate.slot === slotNumber) : null
+  const player = row?.player_id ? squad.find((candidate) => candidate.id === row.player_id) : null
+  return player ? leaverName(player) : card.full_name
+}
+
 function emptyCards() {
   return Array.from({ length: CARD_ROWS }, () => ({
     half: '',
@@ -347,8 +382,10 @@ export default function MatchSheet() {
         // sheet is the governing body's document and must open with an empty 22
         // rather than an error — the same `.catch(() => [])` the squad read has
         // carried since this screen was written.
+        // includeLeft: a saved sheet / a past appearance must still name the
+        // child who has since left. Spec §4.
         const [players, existing, fixtureLineups] = await Promise.all([
-          listPlayers({ teamIds: [row.team_id] }).catch(() => []),
+          listPlayers({ teamIds: [row.team_id], includeLeft: true }).catch(() => []),
           getMatchSheet(eventId),
           listLineups(eventId).catch(() => []),
         ])
@@ -459,9 +496,15 @@ export default function MatchSheet() {
     setSlots(slotsFromLineup(namesFromLineup(lineup, squad)))
   }
 
-  /** Links a typed name back to a roster player when it matches one exactly. */
+  /**
+   * Links a typed name back to a roster player when it matches one exactly.
+   *
+   * ⚠️ NEVER MATCHES A LEAVER. A leaver already on the sheet keeps showing
+   * (see SlotCells), but typing their name into a fresh box must not link it
+   * back to them — that would be newly selecting somebody who has left.
+   */
   function nameChanged(index, value) {
-    const match = squad.find((player) => player.full_name === value)
+    const match = squad.filter((player) => !isLeaver(player)).find((player) => player.full_name === value)
     setSlot(index, { full_name: value, player_id: match ? match.id : null })
   }
 
@@ -1001,10 +1044,15 @@ export default function MatchSheet() {
             to walk a list of every player in the squad to render a form that
             cannot use it. A <datalist> draws nothing either way; this is about
             the id living next to the inputs that name it. */}
+        {/* ⚠️ A LEAVER NEVER APPEARS HERE. This is the pick list for a fresh
+            box — a leaver already on the sheet keeps showing (SlotCells
+            below) but must never be newly selectable into another slot. */}
         <datalist id="squad-players">
-          {squad.map((player) => (
-            <option key={player.id} value={player.full_name} />
-          ))}
+          {squad
+            .filter((player) => !isLeaver(player))
+            .map((player) => (
+              <option key={player.id} value={player.full_name} />
+            ))}
         </datalist>
         <MatchSheetEntry
           slots={slots}
@@ -1158,9 +1206,9 @@ export default function MatchSheet() {
                 const right = left + LEFT_COLUMN.length
                 return (
                   <tr key={left}>
-                    <SlotCells slots={slots} index={left - 1} />
+                    <SlotCells slots={slots} squad={squad} index={left - 1} />
                     {right <= SLOT_COUNT ? (
-                      <SlotCells slots={slots} index={right - 1} />
+                      <SlotCells slots={slots} squad={squad} index={right - 1} />
                     ) : (
                       <>
                         <td className={CELL} />
@@ -1221,7 +1269,15 @@ export default function MatchSheet() {
                     <Cell value={card.slot} />
                   </td>
                   <td className={CELL}>
-                    <Cell value={card.full_name} />
+                    {/* ⚠️ RESOLVED THROUGH THE SLOT, NOT BY NAME STRING. See
+                        cardDisplayName above — `match_sheet_cards` carries no
+                        player_id of its own, but `card.slot` names one of the
+                        22 numbered rows above, and that row's player_id is the
+                        sheet's authoritative link. Matching `card.full_name`
+                        against a player's name would be wrong for the same
+                        reason the squad rows never do it: two children can
+                        share a name. */}
+                    <Cell value={cardDisplayName(card, slots, squad)} />
                   </td>
                   <td className={CELL}>
                     <Cell value={card.reason} />

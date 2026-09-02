@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
-import { deletePlayer, getPlayerContact, getPlayerDob } from '../data/players.js'
+import { deletePlayer, getPlayerContact, getPlayerDob, markPlayerLeft, restorePlayer } from '../data/players.js'
+import { formatLeftDate, isLeaver } from '../lib/leavers.js'
 import { listParents } from '../data/parents.js'
 import useOwnContactGate from '../lib/useOwnContactGate.js'
 // The club's own age function, so the number shown here cannot drift from the
@@ -406,16 +407,26 @@ function ContactBlock({ playerId }) {
 // here would leave `rounded-[11px]` racing `rounded-btn` on equal specificity.
 const FOOTER_BUTTON = 'flex-1'
 
-function FooterActions({ player, canEdit, canEditOwn, onEdit, onEditOwn, onDeleted }) {
-  const [confirming, setConfirming] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+// Footer actions (design-system.md §5.7). Since 2 Sep 2026 the staff pair is
+// Edit + MARK AS LEFT, and Delete is ADMIN-ONLY (canDelete = canWriteChild):
+// "the child quit" is a leaving, never a deletion — attendance and selection
+// history stay, the parents' access to this squad ends, the photo goes.
+// Spec: claude/specs/2026-09-02-player-leavers-design.md §5. Delete is kept
+// for a duplicate registration, which is an admin's job. A LEAVER gets one
+// action, Restore, and no Edit — the row is history until somebody brings it
+// back. RLS and the two RPCs enforce all of this; getting it wrong here can
+// only hide a control, never authorise a write.
+function FooterActions({ player, canEdit, canEditOwn, canDelete, onEdit, onEditOwn, onDeleted, onLeft, onRestored }) {
+  const [confirming, setConfirming] = useState(null) // null | 'left' | 'delete'
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
-  // A parent or the player themselves gets ONE action, not the coach's pair:
+  // A parent or the player themselves gets ONE action, not the staff pair:
   // they can update the photo, contact details and parent rows, and they
-  // cannot delete a player. Wording avoids "Edit" so it doesn't read as the
-  // same power a coach has.
-  if (!canEdit && canEditOwn) {
+  // cannot mark a player as left or delete one. Wording avoids "Edit" so it
+  // doesn't read as the same power staff have. A leaver's own family gets
+  // nothing here either — the row is history, not something to update.
+  if (!canEdit && canEditOwn && !isLeaver(player)) {
     return (
       <div className="mt-5 border-t border-line pt-4">
         <Button full onClick={() => onEditOwn?.(player)} className={FOOTER_BUTTON}>
@@ -431,67 +442,75 @@ function FooterActions({ player, canEdit, canEditOwn, onEdit, onEditOwn, onDelet
   // exception worth interrupting for.
   if (!canEdit) return null
 
-  function handleDelete() {
-    setDeleting(true)
+  function run(action, after) {
+    setBusy(true)
     setError(null)
-    // Only the player row is deleted; player_contacts cascades server-side
-    // (see deletePlayer), so there is no second call to fail halfway.
-    deletePlayer(player.id)
-      .then(() => onDeleted?.(player))
+    action(player.id)
+      .then(() => after?.(player))
       .catch((err) => {
         setError(err)
-        setDeleting(false)
-        setConfirming(false)
+        setBusy(false)
+        setConfirming(null)
       })
   }
 
+  const alert = error && (
+    <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink">
+      {error.message || "We couldn't change that player. Try again."}
+    </p>
+  )
+
+  if (isLeaver(player)) {
+    return (
+      <div className="mt-5 border-t border-line pt-4">
+        {alert}
+        <Button full disabled={busy} onClick={() => run(restorePlayer, onRestored)} className={FOOTER_BUTTON}>
+          {busy ? 'Restoring…' : 'Restore'}
+        </Button>
+      </div>
+    )
+  }
+
+  const firstName = player.first_name || player.full_name
   return (
     <div className="mt-5 border-t border-line pt-4">
-      {error && (
-        <p
-          role="alert"
-          className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
-        >
-          {error.message || "We couldn't remove that player. Try again."}
-        </p>
-      )}
-
-      {confirming ? (
+      {alert}
+      {confirming === 'left' && (
         <div>
           <p className="mb-3 text-sm font-semibold text-ink">
-            Remove this player? Their contact details go too, and this can&apos;t be undone.
+            Mark {firstName} as left? They come off the squad list and selection, their parents&apos;
+            access to this squad ends, and their photo is removed. Attendance and match history
+            are kept. You or an admin can undo this from the roster.
           </p>
           <div className="flex gap-2.5">
-            <Button
-              variant="secondary"
-              onClick={() => setConfirming(false)}
-              disabled={deleting}
-              className={FOOTER_BUTTON}
-            >
-              Keep them
-            </Button>
-            <Button
-              variant="danger"
-              onClick={handleDelete}
-              disabled={deleting}
-              className={FOOTER_BUTTON}
-            >
-              {deleting ? 'Deleting…' : 'Yes, delete'}
+            <Button variant="secondary" onClick={() => setConfirming(null)} disabled={busy} className={FOOTER_BUTTON}>Keep them</Button>
+            <Button variant="danger" onClick={() => run(markPlayerLeft, onLeft)} disabled={busy} className={FOOTER_BUTTON}>
+              {busy ? 'Marking…' : 'Yes, mark as left'}
             </Button>
           </div>
         </div>
-      ) : (
+      )}
+      {confirming === 'delete' && (
+        <div>
+          <p className="mb-3 text-sm font-semibold text-ink">
+            Delete this player? Their contact details go too, and this can&apos;t be undone. If they
+            have simply left the club, use Mark as left instead.
+          </p>
+          <div className="flex gap-2.5">
+            <Button variant="secondary" onClick={() => setConfirming(null)} disabled={busy} className={FOOTER_BUTTON}>Keep them</Button>
+            <Button variant="danger" onClick={() => run(deletePlayer, onDeleted)} disabled={busy} className={FOOTER_BUTTON}>
+              {busy ? 'Deleting…' : 'Yes, delete'}
+            </Button>
+          </div>
+        </div>
+      )}
+      {confirming === null && (
         <div className="flex gap-2.5">
-          <Button onClick={() => onEdit?.(player)} className={FOOTER_BUTTON}>
-            Edit
-          </Button>
-          <Button
-            variant="dangerQuiet"
-            onClick={() => setConfirming(true)}
-            className={FOOTER_BUTTON}
-          >
-            Delete
-          </Button>
+          <Button onClick={() => onEdit?.(player)} className={FOOTER_BUTTON}>Edit</Button>
+          <Button variant="dangerQuiet" onClick={() => setConfirming('left')} className={FOOTER_BUTTON}>Mark as left</Button>
+          {canDelete && (
+            <Button variant="dangerQuiet" onClick={() => setConfirming('delete')} className={FOOTER_BUTTON}>Delete</Button>
+          )}
         </div>
       )}
     </div>
@@ -504,9 +523,12 @@ export default function PlayerDetail({
   onClose,
   canEdit = false,
   canEditOwn = false,
+  canDelete = false,
   onEdit,
   onEditOwn,
   onDeleted,
+  onLeft,
+  onRestored,
 }) {
   const teamName = team?.name ?? 'Not set'
   const position = player.position || 'Not set'
@@ -541,6 +563,15 @@ export default function PlayerDetail({
               this sheet already carries; staff still get "Not set". */}
           {canEdit && <p className="mt-1 text-sm font-semibold text-white/[.85]">{position}</p>}
           <p className="text-sm font-semibold text-white/[.85]">{teamName}</p>
+          {isLeaver(player) && (
+            <p className="mt-1 text-sm font-semibold text-white/[.85]">
+              {/* ⚠️ formatLeftDate, NOT toLocaleDateString. AdminClub shows the
+                  same fact, and until 2 Sep 2026 the two disagreed in September
+                  only — ICU's en-GB short month is 'Sept'. One formatter, in
+                  src/lib/leavers.js. */}
+              Left {formatLeftDate(player.left_at)}
+            </p>
+          )}
           {/* Captaincy used to live in a "Role" key/value row below, because
               the prototype's "©" suffix is announced as "copyright" and means
               nothing on its own. The row went with Position and Age group
@@ -592,9 +623,12 @@ export default function PlayerDetail({
         player={player}
         canEdit={canEdit}
         canEditOwn={canEditOwn}
+        canDelete={canDelete}
         onEdit={onEdit}
         onEditOwn={onEditOwn}
         onDeleted={onDeleted}
+        onLeft={onLeft}
+        onRestored={onRestored}
       />
     </Sheet>
   )

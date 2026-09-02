@@ -8,6 +8,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import useAutoHideOnScroll from '../lib/useAutoHideOnScroll.js'
 import useSlowLoad from '../lib/useSlowLoad.js'
 import { highestRole, isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
+import { isLeftOnly } from '../lib/leavers.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
 import RollCall from './RollCall.jsx'
@@ -265,7 +266,12 @@ export default function AppShell({ children }) {
       /^\/squad\/[^/]+\/chat$/.test(location.pathname) ||
       (/^\/chat\/[^/]+$/.test(location.pathname) &&
         !['dm', 'starred'].includes(location.pathname.split('/')[2])))
-  const ready = !loading && !error && memberships.length > 0
+  // Task 8: a profile whose only rows are 'left' is not ready either — it
+  // must see the same no-access screen as zero memberships, not the routed
+  // app underneath it. Without this, ready stayed true for a left-only
+  // profile (memberships.length > 0) while the branch below ALSO switched to
+  // the no-access screen, and the two rendered at once.
+  const ready = !loading && !error && memberships.length > 0 && !isLeftOnly(memberships)
   // After a few seconds the load gate admits it is slow and offers a retry —
   // claude/plans/2026-08-28-provider-resilience.md §3.
   const slowLoading = useSlowLoad(loading)
@@ -758,7 +764,12 @@ export default function AppShell({ children }) {
             <SignOutControl signOut={signOut} className="mt-5" />
           </ErrorState>
         )}
-        {!loading && !error && memberships.length === 0 && (
+        {/* Task 8: a profile whose ONLY memberships are 'left' has no squad and
+            is not waiting for approval either — server-side no status other
+            than 'active' grants anything, so this must show the same
+            "tell the club who you are" screen as zero memberships, not a
+            blank routed app. isLeftOnly mirrors isPendingOnly in scope.js. */}
+        {!loading && !error && (memberships.length === 0 || isLeftOnly(memberships)) && (
           <RollCall
             teams={teams}
             userId={user?.id}

@@ -85,4 +85,22 @@ describe('Game time', () => {
     renderScreen({ memberships: PARENT })
     expect(await screen.findByRole('alert')).toHaveTextContent(/don't have a squad you can pick/i)
   })
+
+  it('loads and tags a leaver, but never tags a current player', async () => {
+    // A past appearance must still name the child who has since left. Spec §4.
+    useMembershipsMock.mockReturnValue({ memberships: COACH, teams: [TEAM], loading: false, error: null })
+    listPlayersMock.mockResolvedValue([
+      ...PLAYERS,
+      { id: 'p-4', full_name: 'Delphine Okonkwo-Reyes', team_id: TEAM.id, left_at: '2026-09-02T08:00:00Z' },
+    ])
+    listAppearancesMock.mockResolvedValue(new Map([['p-4', { starts: 2, bench: 0, total: 2 }]]))
+    render(<GameTime />)
+
+    expect(listPlayersMock).toHaveBeenCalledWith(
+      expect.objectContaining({ teamIds: [TEAM.id], includeLeft: true }),
+    )
+    expect(await screen.findByText('Delphine Okonkwo-Reyes · Left')).toBeInTheDocument()
+    expect(screen.getByText('Aled Fenwicke')).toBeInTheDocument()
+    expect(screen.queryByText('Aled Fenwicke · Left')).not.toBeInTheDocument()
+  })
 })

@@ -246,14 +246,14 @@ describe('Roster — scoping the query', () => {
     setup()
 
     await screen.findByText('Tom Fletcher')
-    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u12'] })
+    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u12'], includeLeft: true })
   })
 
   it('passes every visible team, in display order, for an admin', async () => {
     setup()
 
     await screen.findByText('Tom Fletcher')
-    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u12', 'team-1xv'] })
+    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: ['team-u12', 'team-1xv'], includeLeft: true })
   })
 
   // The deliberate zero-teams decision: an empty teamIds array means "no
@@ -268,7 +268,7 @@ describe('Roster — scoping the query', () => {
     setup()
 
     expect(await screen.findByText(/no players yet/i)).toBeInTheDocument()
-    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: [] })
+    expect(listPlayersMock).toHaveBeenCalledWith({ teamIds: [], includeLeft: false })
   })
 })
 

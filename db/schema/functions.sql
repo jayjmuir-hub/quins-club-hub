@@ -318,6 +318,23 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 -- ⚠️ THAT MIRROR IS NOW BROKEN, DELIBERATELY. private.can_see_team gained
 -- `m.status = 'active'` on 8 Aug (membership_pending_status) and this
 -- function did NOT. See the note on can_see_team below.
+--
+-- ⚠️ CHANGED 2026-09-01 (20260901_calendar_token_fn_all_day.sql), and this was
+-- NOT CAPTURED until this 2 Sep re-capture -- functions.sql had been carrying
+-- the 12 Aug body for three weeks. `join public.teams t` became `left join`,
+-- and the visibility predicate was widened from `(m.role = 'admin' and
+-- m.club_id = t.club_id) or m.team_id = e.team_id` to also match
+-- `(e.team_id is null and m.club_id = e.club_id)` -- a club-wide event
+-- (team_id null) is now visible to any club admin via the club_id match, not
+-- only via the admin-role clause reading through the (now-optional) team.
+--
+-- ⚠️ CHANGED 2026-09-02 (20260902_player_leavers_pending_and_feed.sql): ONE
+-- line added, `and m.status <> 'left'` on the memberships join. A 'left'
+-- family's calendar token previously kept receiving the squad's fixtures
+-- indefinitely -- the join carried no status test of any kind before this.
+-- Deliberately `<> 'left'`, not `= 'active'`: a PENDING parent's feed is a
+-- separate question, it works today, and narrowing it here would be an
+-- unrelated behaviour change smuggled in under a leavers fix.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.calendar_events_for_token(_token uuid)
  RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text, league_team_name text, league_division text, round smallint, time_tbd boolean, competition_type text, info_only boolean, all_day boolean)
@@ -330,16 +347,18 @@ AS $function$
          lt.rcm_name as league_team_name, lt.division as league_division, e.round,
          e.time_tbd, e.competition_type, e.info_only, e.all_day
   from public.events e
-  join public.teams t on t.id = e.team_id
+  left join public.teams t on t.id = e.team_id
   left join public.league_teams lt on lt.id = e.league_team_id
   where exists (
     select 1
     from public.calendar_tokens ct
     join public.memberships m on m.profile_id = ct.profile_id
     where ct.token = _token
+      and m.status <> 'left'
       and (
-        (m.role = 'admin' and m.club_id = t.club_id)
+        (m.role = 'admin' and m.club_id = e.club_id)
         or m.team_id = e.team_id
+        or (e.team_id is null and m.club_id = e.club_id)
       )
   )
   and e.starts_at > now() - interval '6 months'
@@ -955,6 +974,12 @@ GRANT EXECUTE ON FUNCTION private.is_own_invite(uuid) TO authenticated;
 -- private.is_own_player(uuid)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
 -- ---------------------------------------------------------------------
+-- ⚠️ EDITED 2 Sep 2026 (20260902_player_leavers_left_grants_nothing.sql). The
+-- leavers harness (step 12) found this was the only membership predicate on
+-- OWN-PLAYER access with no status test at all -- a 'left' membership row
+-- (now possible since memberships_status_check widened) passed it just the
+-- same as an active one. `and m.status <> 'left'` added -- NOT `= 'active'`,
+-- so a pending row still passes, unchanged.
 CREATE OR REPLACE FUNCTION private.is_own_player(_player uuid)
  RETURNS boolean
  LANGUAGE sql
@@ -963,7 +988,8 @@ CREATE OR REPLACE FUNCTION private.is_own_player(_player uuid)
 AS $function$
   select exists (select 1 from memberships m
     where m.profile_id = auth.uid() and m.player_id = _player
-      and m.role in ('parent','player'));
+      and m.role in ('parent','player')
+      and m.status <> 'left');
 $function$
 ;
 
@@ -1333,6 +1359,13 @@ begin
   join public.players p on p.id = c.player_id
   join public.teams   t on t.id = p.team_id
   where lower(btrim(c.email)) = lower(btrim(caller_email))
+    -- ⚠️ ADDED 2 Sep 2026 (20260902_player_leavers.sql). A leaver's own row
+    -- must not raise a pending approval request for a squad the child no
+    -- longer belongs to — see claude/specs/2026-09-02-player-leavers-design.md
+    -- §3. This is the re-match being SKIPPED for a leaver, and is not the
+    -- same thing as Restore: restore_player is what gives the family their
+    -- access back; this only stops a NEW, unwanted request being raised.
+    and p.left_at is null
   on conflict do nothing
   returning *;
 end;
@@ -1544,6 +1577,11 @@ $function$
 -- policy expression is evaluated AS THE QUERYING USER; SECURITY DEFINER
 -- governs what a function may do once it runs, not who may run it.
 -- ---------------------------------------------------------------------
+-- ⚠️ EDITED 2 Sep 2026 (20260902_player_leavers_left_grants_nothing.sql),
+-- the same finding as private.is_own_player above: this was the other of
+-- the two membership predicates with no status test at all. `and m.status
+-- <> 'left'` added -- a pending row is still let through, only a leaver
+-- is excluded.
 CREATE OR REPLACE FUNCTION private.is_attached_to_team(_team uuid)
  RETURNS boolean
  LANGUAGE sql
@@ -1552,6 +1590,7 @@ CREATE OR REPLACE FUNCTION private.is_attached_to_team(_team uuid)
 AS $function$
   select exists (select 1 from memberships m
     where m.profile_id = auth.uid()
+      and m.status <> 'left'
       and ((m.role = 'admin' and m.club_id = (select club_id from teams where id = _team))
            or m.team_id = _team));
 $function$
@@ -2049,6 +2088,18 @@ GRANT EXECUTE ON FUNCTION public.register_my_player(text, uuid, text, boolean) T
 -- The migration carries a guard asserting `memb manage` is still exactly
 -- `private.is_admin(club_id)` — this RPC is pointless the moment coaches can
 -- UPDATE the table directly.
+--
+-- ⚠️ CHANGED 2026-09-02 (20260902_player_leavers_pending_and_feed.sql): one
+-- guard added, after private.can_approve_team so the message cannot leak
+-- anything about the child to a caller not entitled to approve for this
+-- squad at all. mark_player_left deliberately leaves a pending request
+-- pending rather than flipping it to 'left', which closes the promotion
+-- route through restore_player but leaves the request itself sitting in the
+-- approvals queue for a child who has quit — approving it would hand the
+-- family full squad access. Refused with errcode 22023 while players.left_at
+-- is not null for target.player_id; restoring the player clears left_at and
+-- the request becomes approvable again. A membership with a null player_id
+-- (staff, admins) is unaffected — the exists() cannot match.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.approve_membership(p_membership_id uuid)
  RETURNS memberships
@@ -2062,26 +2113,29 @@ begin
   if auth.uid() is null then
     raise exception 'You must be signed in.' using errcode = '42501';
   end if;
-
   select * into target from public.memberships where id = p_membership_id;
   if target.id is null then
     raise exception 'That registration no longer exists.' using errcode = '42704';
   end if;
-
   if not private.can_approve_team(target.team_id) then
     raise exception 'You can only approve players for your own age groups.'
       using errcode = '42501';
   end if;
-
+  if exists (
+    select 1 from public.players p
+     where p.id = target.player_id
+       and p.left_at is not null
+  ) then
+    raise exception 'That player has left the squad. Restore them first if they are back.'
+      using errcode = '22023';
+  end if;
   if target.status = 'active' then
     return target;
   end if;
-
   update public.memberships
      set status = 'active'
    where id = p_membership_id
   returning * into target;
-
   return target;
 end;
 $function$
@@ -6436,6 +6490,12 @@ AS $function$
 $function$
 
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ⚠️ EDITED 2 Sep 2026 (20260902_player_leavers.sql, then corrected same day
+-- by 9bd5276). The leaver guard (`ply.left_at is not null`) was placed
+-- BEFORE the may_edit authorisation check in the first version of this
+-- migration -- an unauthorised caller could learn a player's leaver status
+-- from the error message before being told they cannot invite anyone at
+-- all. Moved to directly AFTER may_edit raises, below.
 CREATE OR REPLACE FUNCTION public.invite_parent(p_parent_row uuid)
  RETURNS invites
  LANGUAGE plpgsql
@@ -6465,10 +6525,15 @@ begin
     raise exception 'That contact is not attached to a player.' using errcode = '22023';
   end if;
 
+  -- AUTHORISATION BEFORE ANYTHING ELSE IS READ BACK TO THE CALLER.
   may_edit := private.is_own_player(row_p.player_id)
               or private.can_edit_team(ply.team_id);
   if not may_edit then
     raise exception 'You cannot invite that person.' using errcode = '42501';
+  end if;
+
+  if ply.left_at is not null then
+    raise exception 'That player has left the squad, so nobody can be invited to them.' using errcode = '22023';
   end if;
 
   clean := lower(nullif(btrim(row_p.email), ''));
@@ -7496,3 +7561,202 @@ $function$
 REVOKE ALL ON FUNCTION public.document_push_subscriptions(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.document_push_subscriptions(uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.document_push_subscriptions(uuid) FROM authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════
+--  Player leavers, 2 Sep 2026 (20260902_player_leavers.sql, then
+--  20260902_player_leavers_left_grants_nothing.sql). Both applied to live
+--  2 Sep 2026, Jay's go-ahead. claude/specs/2026-09-02-player-leavers-design.md.
+--  proacl on both: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ═══════════════════════════════════════════════════════════════════════
+
+-- ---------------------------------------------------------------------
+-- public.mark_player_left(uuid)
+--
+-- Same authorisation predicate as the "player edit" policy: private.can_write_child()
+-- OR private.is_team_staff(that player's team_id) -- the screen never decides
+-- who may do this. Sets left_at/left_by and, in the SAME statement, clears
+-- the photo columns on the row -- the storage OBJECT itself is removed by the
+-- app afterwards via the Storage API (RESTORE.md: SQL cannot delete a storage
+-- object). Every membership row for that player with role in
+-- ('parent','player') moves from 'active' to 'left'. Refuses if already left.
+--
+-- ⚠️ CHANGED 2026-09-02 (20260902_player_leavers_pending_and_feed.sql), four
+-- ways, reversible body quoted in full in that migration:
+--   (a) `for update` on the players read, closing a race between two
+--       concurrent calls.
+--   (b) the "no longer exists" branch is now GATED behind
+--       private.can_write_child() -- a caller with no write access at all
+--       gets the generic 42501 instead of an oracle for whether the uuid
+--       names a real player.
+--   (c) the memberships update is now `and m.status = 'active'`, NOT
+--       `in ('active','pending')` -- a pending row is never flipped to
+--       'left', so restore_player's blanket 'left' → 'active' can no longer
+--       promote a request that was never approved.
+--   (d) that player's FUTURE availability and lineup_players rows (joined
+--       through lineups) are deleted; past rows are history and stay.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.mark_player_left(p_player_id uuid)
+ RETURNS TABLE(id uuid, photo_path text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  ply public.players%rowtype;
+begin
+  select * into ply from public.players p where p.id = p_player_id for update;
+  if ply.id is null then
+    if private.can_write_child() then
+      raise exception 'That player no longer exists.' using errcode = '22023';
+    end if;
+    raise exception 'You are not allowed to change this player.' using errcode = '42501';
+  end if;
+  if not (private.can_write_child() or private.is_team_staff(ply.team_id)) then
+    raise exception 'You are not allowed to change this player.' using errcode = '42501';
+  end if;
+  if ply.left_at is not null then
+    raise exception 'This player has already been marked as left.' using errcode = '22023';
+  end if;
+  update public.players p
+     set left_at = now(), left_by = auth.uid(),
+         photo_path = null, photo_focus_x = null, photo_focus_y = null
+   where p.id = p_player_id;
+  update public.memberships m
+     set status = 'left'
+   where m.player_id = p_player_id
+     and m.role in ('parent','player')
+     and m.status = 'active';
+  delete from public.availability a
+   using public.events e
+   where e.id = a.event_id
+     and a.player_id = p_player_id
+     and e.starts_at > now();
+  delete from public.lineup_players lp
+   using public.lineups l, public.events e
+   where l.id = lp.lineup_id
+     and e.id = l.event_id
+     and lp.player_id = p_player_id
+     and e.starts_at > now();
+  return query select ply.id, ply.photo_path;
+end $function$
+;
+
+REVOKE ALL ON FUNCTION public.mark_player_left(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.mark_player_left(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- public.restore_player(uuid)
+--
+-- Same authorisation predicate and grant as mark_player_left. Clears
+-- left_at/left_by and flips that child's 'left' memberships back to
+-- 'active' -- the family has its squad access back the moment this
+-- returns. Refuses if the player is not currently a leaver.
+--
+-- ⚠️ CHANGED 2026-09-02 (20260902_player_leavers_pending_and_feed.sql): the
+-- same two edits as mark_player_left's (a) and (b) above -- `for update` on
+-- the players read, and the "no longer exists" branch gated behind
+-- private.can_write_child(). The memberships update is UNCHANGED and stays a
+-- blanket 'left' → 'active'; that is correct only because mark_player_left no
+-- longer produces a 'left' row from a 'pending' one, so the two edits belong
+-- together across both functions.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.restore_player(p_player_id uuid)
+ RETURNS players
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  ply public.players%rowtype;
+begin
+  select * into ply from public.players p where p.id = p_player_id for update;
+  if ply.id is null then
+    if private.can_write_child() then
+      raise exception 'That player no longer exists.' using errcode = '22023';
+    end if;
+    raise exception 'You are not allowed to change this player.' using errcode = '42501';
+  end if;
+  if not (private.can_write_child() or private.is_team_staff(ply.team_id)) then
+    raise exception 'You are not allowed to change this player.' using errcode = '42501';
+  end if;
+  if ply.left_at is null then
+    raise exception 'This player has not been marked as left.' using errcode = '22023';
+  end if;
+  update public.players p set left_at = null, left_by = null where p.id = p_player_id;
+  update public.memberships m set status = 'active'
+   where m.player_id = p_player_id and m.role in ('parent','player') and m.status = 'left';
+  select * into ply from public.players p where p.id = p_player_id;
+  return ply;
+end $function$
+;
+
+REVOKE ALL ON FUNCTION public.restore_player(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.restore_player(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.is_team_staff(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+--
+-- ⚠️ CAPTURED FROM LIVE 2 Sep 2026, and it had been MISSING from this file
+-- since it was created on 28 Aug (20260828_child_contacts_allowlist.sql).
+-- That gap is why it is worth a note rather than a silent addition: this
+-- function is the squad-staff arm of the "player edit" policy, of the
+-- player_contacts / player_parents / player_private allowlists, of the
+-- player-photo storage policy, and of both leavers RPCs — and a reader
+-- auditing membership predicates from this file alone would not have seen it.
+--
+-- The non-admin arm of can_edit_team, split out on 28 Aug so a coach keeps
+-- their own squad's contacts and DOB when the admin arm narrows. Note it
+-- requires status = 'active': an unapproved coach is a REQUEST to be staff,
+-- not staff. (Harness step 4a of db/tests/player-leavers.sql pins that.)
+-- Live body on 2 Sep 2026 is equivalent to the creating migration's, so the
+-- 2 Sep leavers work deliberately did not restate it.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.is_team_staff(_team uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from memberships m
+     where m.profile_id=auth.uid() and m.status='active'
+       and m.role in ('coach','manager','medic') and m.team_id=_team); $function$
+;
+
+REVOKE ALL ON FUNCTION private.is_team_staff(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION private.is_team_staff(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.can_write_child()
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+--
+-- ⚠️ CAPTURED FROM LIVE 2 Sep 2026, missing from this file since 28 Aug
+-- (20260828_child_write_allowlist.sql) for the same reason as is_team_staff
+-- above, and it matters more: this is the ADMIN arm of every write gate on a
+-- child. It is deliberately NOT `is_admin` — a club admin with no relevant
+-- job cannot write a child's row. Only a super admin, or one holding
+-- clubadmin / youth / media.
+--
+-- ⚠️ It is also the ONE predicate that can be evaluated with no player row in
+-- hand, which is why the leavers RPCs use it to decide whether a caller is
+-- entitled to be told a player does not exist
+-- (db/migrations/20260902_player_leavers_pending_and_feed.sql).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_write_child()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from memberships m
+     where m.profile_id = auth.uid() and m.role = 'admin' and m.status = 'active'
+       and (m.is_super or m.admin_rights && array['clubadmin','youth','media']));
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.can_write_child() FROM public, anon;
+GRANT EXECUTE ON FUNCTION private.can_write_child() TO authenticated;

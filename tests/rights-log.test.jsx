@@ -123,6 +123,30 @@ describe('auditFormat — saying what happened, not that something did', () => {
     expect(auditDetails(entry())).toEqual(['Approved'])
   })
 
+  // ⚠️ ADDED 2 Sep 2026 by the leavers review. 'left' is a THIRD status and
+  // this formatter knew about two, so the one transition a reader of this log
+  // most needs to understand — a family losing their squad — came out as
+  // "Status: active → left", the database's way of saying somebody was
+  // removed. Same argument the 'Approved' line above already makes, applied to
+  // the other end of the membership's life.
+  it('names leaving and being restored, in words', () => {
+    const left = entry({ old_status: 'active', new_status: 'left' })
+    expect(auditDetails(left)).toEqual(['Left the squad'])
+
+    const back = entry({ old_status: 'left', new_status: 'active' })
+    expect(auditDetails(back)).toEqual(['Restored to the squad'])
+  })
+
+  it('⚠️ does not call a pending row that went left a departure from anything', () => {
+    // A pending request is not access, so a pending row reaching 'left' is not
+    // somebody leaving the squad — and after the third leavers migration
+    // mark_player_left cannot produce this at all. If it ever appears again,
+    // the raw statuses are the honest answer and the wording must not invent a
+    // departure that did not happen.
+    const row = entry({ old_status: 'pending', new_status: 'left' })
+    expect(auditDetails(row)).toEqual(['Status: pending → left'])
+  })
+
   it('says a super admin was made, in words', () => {
     const row = entry({ old_is_super: false, new_is_super: true, old_status: 'active' })
     expect(auditDetails(row)).toContain('Made a super admin')

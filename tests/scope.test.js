@@ -15,6 +15,7 @@ import {
   canApproveAnything,
   canApproveTeam,
   isActiveMembership,
+  isPendingOnly,
   isSuperAdmin,
   adminRights,
 } from '../src/lib/scope.js'
@@ -139,6 +140,85 @@ describe('visibleTeams', () => {
 
     // teamWithoutOrder falls back to sort_order 0, before U6 (1) and U12 (7).
     expect(result.map((t) => t.id)).toEqual([teamWithoutOrder.id, U6.id, U12.id])
+  })
+
+  // ⚠️ ADDED 2 Sep 2026 by the leavers review. 'left' is a THIRD status, and
+  // this function only ever knew about two — it mapped team_id off every row
+  // it was given. So the moment a child was marked as left, their parent kept
+  // the squad in the nav, in the squad switcher and in every screen that asks
+  // "which squads am I in", for a squad the database would then hand them
+  // nothing from: a named, tappable, permanently empty age group.
+  it('drops a team whose only membership is left', () => {
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1', status: 'left' }),
+    ]
+
+    expect(visibleTeams(memberships, ALL_TEAMS)).toEqual([])
+  })
+
+  it('keeps the squads a left member is still active or pending on', () => {
+    // The discriminating case: one family, two children, one has quit. The
+    // squad they left goes; the squad the sibling is still in stays. A blanket
+    // "any left row means hide everything" would fail this, and so would the
+    // old behaviour of ignoring status entirely.
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-gone', status: 'left' }),
+      membership({ role: 'parent', team_id: U12.id, player_id: 'player-still-here', status: 'active' }),
+    ]
+
+    expect(visibleTeams(memberships, ALL_TEAMS).map((t) => t.id)).toEqual([U12.id])
+  })
+
+  it('still shows a PENDING squad, which is deliberate', () => {
+    // Anchor against over-correcting: D6, 30 Aug 2026 — a pending membership
+    // still attaches the person to the squad and its fixtures. Only 'left' is
+    // newly excluded.
+    const memberships = [
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-child-1', status: 'pending' }),
+    ]
+
+    expect(visibleTeams(memberships, ALL_TEAMS).map((t) => t.id)).toEqual([U8.id])
+  })
+
+  it('shows every team for an admin even if some other row of theirs is left', () => {
+    const memberships = [
+      membership({ role: 'admin', status: 'active', team_id: null }),
+      membership({ role: 'parent', team_id: U8.id, player_id: 'player-gone', status: 'left' }),
+    ]
+
+    expect(visibleTeams(memberships, ALL_TEAMS).map((t) => t.id)).toEqual([
+      U6.id, U8.id, U12.id, U16.id, SENIOR_1XV.id,
+    ])
+  })
+})
+
+// ⚠️ ADDED 2 Sep 2026 by the leavers review, and the bug it pins is a SCREEN
+// somebody gets stuck on rather than a wrong label. isPendingOnly is `every`,
+// so one 'left' row alongside a genuinely pending one made the answer false:
+// the parent whose first child has quit and whose second is waiting for
+// approval saw the routed app with no waiting banner and no explanation, while
+// the database gave them nothing. A 'left' row is not a counter-example to
+// "everything I have is pending" — it is not an access grant at all.
+describe('isPendingOnly — a left row is not a counter-example', () => {
+  const row = (status, extra = {}) => ({ id: `m-${status}`, role: 'parent', team_id: 't-1', status, ...extra })
+
+  it('is true for one left row plus one pending row', () => {
+    expect(isPendingOnly([row('left', { id: 'm-a' }), row('pending', { id: 'm-b' })])).toBe(true)
+  })
+
+  it('is false when every row is left — isLeftOnly is that state, and it has its own screen', () => {
+    expect(isPendingOnly([row('left', { id: 'm-a' }), row('left', { id: 'm-b' })])).toBe(false)
+  })
+
+  it('is still false when an ACTIVE row is present alongside a left one', () => {
+    expect(isPendingOnly([row('left'), row('pending'), row('active')])).toBe(false)
+  })
+
+  it('is unchanged for the cases that have nothing to do with leavers', () => {
+    expect(isPendingOnly([row('pending')])).toBe(true)
+    expect(isPendingOnly([row('active')])).toBe(false)
+    expect(isPendingOnly([])).toBe(false)
+    expect(isPendingOnly(null)).toBe(false)
   })
 })
 

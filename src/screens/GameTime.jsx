@@ -3,6 +3,7 @@ import Card from '../components/Card.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listPlayers } from '../data/players.js'
 import { listAppearances } from '../data/appearances.js'
+import { leaverName } from '../lib/leavers.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 
@@ -56,7 +57,12 @@ export default function GameTime() {
     let mounted = true
     setLoading(true)
     setError(null)
-    Promise.all([listPlayers({ teamIds: [chosen] }), listAppearances({ teamId: chosen })])
+    // includeLeft: a past appearance must still name the child who has since
+    // left. Spec §4.
+    Promise.all([
+      listPlayers({ teamIds: [chosen], includeLeft: true }),
+      listAppearances({ teamId: chosen }),
+    ])
       .then(([playerRows, appearances]) => {
         if (!mounted) return
         setPlayers(playerRows)
@@ -172,7 +178,7 @@ export default function GameTime() {
                   className="flex items-center gap-3 border-b border-line px-[14px] py-2.5 last:border-b-0"
                 >
                   <span className="min-w-0 flex-1 truncate text-[14.5px] font-bold text-ink">
-                    {row.player.full_name}
+                    {leaverName(row.player)}
                   </span>
                   {/* Starts and bench separately, because "always a replacement"
                       is a different problem from "never picked" and the total

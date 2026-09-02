@@ -279,7 +279,7 @@ describe('AdminClub — the Club tab', () => {
     renderAdmin('/admin/club')
 
     await screen.findByTestId('team-row-team-u10')
-    expect(listPlayersMock).toHaveBeenCalledWith()
+    expect(listPlayersMock).toHaveBeenCalledWith({ includeLeft: true })
     expect(listContactsForPlayersMock).toHaveBeenCalledWith([
       'player-zara',
       'player-tom',

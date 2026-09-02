@@ -149,6 +149,17 @@ export async function deletePlayer(id) {
   window.__writes.push({ op: 'delete', table: 'players', id })
 }
 
+export async function markPlayerLeft(id) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'rpc', fn: 'mark_player_left', id })
+}
+
+export async function restorePlayer(id) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'rpc', fn: 'restore_player', id })
+  return { id, left_at: null, left_by: null }
+}
+
 // The parent self-service gender write (7 Aug 2026). Recorded as an `rpc` op,
 // not an `update` on players, because that distinction IS the thing worth
 // checking in the browser: a parent saving MyPlayerForm must never produce an

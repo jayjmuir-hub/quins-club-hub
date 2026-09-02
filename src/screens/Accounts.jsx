@@ -1067,11 +1067,11 @@ export default function Accounts() {
   // before it was moved; the gate is now below the last hook, next to the
   // render. tests/accounts.test.jsx — "hook order across a View-as switch".
 
-  // Split by ROW, not by person — see THE THIRD CATEGORY above. `status` is
-  // compared against 'pending' rather than 'active' so a row from before the
-  // column existed, or one that somehow came back without it, is treated as
-  // real access rather than being quietly hidden from the main list.
-  const activeMembers = members.filter((member) => member.status !== 'pending')
+  // ⚠️ 'left' IS A THIRD STATUS SINCE 2 Sep 2026 and it is neither. Testing
+  // `!== 'pending'` would list a family whose child has left as ACTIVE members
+  // of the squad. Leavers are found on AdminClub's "Left this season" list and
+  // the squad roster's "Left the squad" group, not here.
+  const activeMembers = members.filter((member) => member.status === 'active')
   const pendingMembers = members.filter((member) => member.status === 'pending')
 
   // ⚠️ A PARTITION, NOT A FILTER — 17 Aug 2026, and the difference is the whole

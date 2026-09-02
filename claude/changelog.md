@@ -10,7 +10,36 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(login): the "Check your email" panel after a password reset now says to
+- **feat(roster): MARKING A PLAYER AS LEFT — BUILT, both migrations applied to live 2 Sep 2026, pull request pending.**
+  `claude/specs/2026-09-02-player-leavers-design.md`,
+  `claude/plans/2026-09-02-player-leavers-implementation.md`. Two migrations
+  applied to live 2 Sep 2026 (Jay's go-ahead): `db/migrations/20260902_player_leavers.sql`
+  (`players.left_at`/`left_by`, membership status `'left'`, `mark_player_left`/
+  `restore_player`) and `db/migrations/20260902_player_leavers_left_grants_nothing.sql`
+  (the harness found `private.is_own_player` and `private.is_attached_to_team`
+  were the only membership predicates untouched by any status test, so a
+  `'left'` row passed both — both now add `status <> 'left'`, correcting the
+  spec's claim that every predicate already tested `status = 'active'`).
+  Harness `db/tests/player-leavers.sql` green against live. Deviations:
+  `register_my_player`/`apply_signup_intent` are unchanged on purpose, so a
+  returning leaver is refused as a duplicate rather than silently re-attached
+  — the cue for Restore; and the `invite_parent` leaver guard sits after its
+  `may_edit` authorisation check, not before, so an unauthorised caller cannot
+  learn a player's leaver status from the refusal. `Mark as left` replaces
+  `Delete` for squad staff (Delete stays admin-only, still broken for most
+  players — `claude/open-items.md`); a staff-only "Left the squad" roster
+  group and an admin "Left this season" list both offer Restore. A final
+  whole-branch review then produced a THIRD migration,
+  `db/migrations/20260902_player_leavers_pending_and_feed.sql` — **written but
+  NOT applied, pending Jay's go-ahead** — which stops a mark-and-restore
+  promoting a `'pending'` membership to `'active'` (and stops a leaver's stale
+  request being approved instead), adds the missing `status <> 'left'` test to
+  `public.calendar_events_for_token`, whose memberships join had none at all so
+  a family who had left kept receiving the squad's fixtures in their phone
+  calendar, removes the leaver's FUTURE availability and lineup rows while
+  keeping past ones, stops both RPCs revealing whether a player exists to a
+  caller who may not write players, and locks the players row it reads.
+- `6c5729e` — **fix(login): the "Check your email" panel after a password reset now says to
   check the Junk or Spam folder.** A squad manager's reset mail sat in Hotmail's
   Junk folder and she reported it as never having arrived; the diagnosis found
   the mail path was fine and the mail was in Junk. The sign-up panel already
@@ -31,6 +60,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `/admin`. ⚠️ **Edge function `push-send` must be REDEPLOYED with
   `--no-verify-jwt`** for this to reach a phone — merging alone changes
   nothing.
+- **docs(spec): MARKING A PLAYER AS LEFT — specified, not built.** Jay asked how
+  an age group manager removes a child who quits; today that is a hard Delete
+  which erases attendance and selection history, leaves the parent's squad
+  access alive, strands the photo, and — read from the schema — is refused
+  outright for any child with a linked parent or a past invite. Jay ruled
+  **keep the history**. `claude/specs/2026-09-02-player-leavers-design.md`:
+  `players.left_at`/`left_by`, a `'left'` membership status that every
+  `status = 'active'` predicate already treats as no access, one
+  `mark_player_left` RPC with a `restore_player` twin, `listPlayers` hiding
+  leavers by default, a staff-only "Left the squad" roster group and an admin
+  "Left this season" list. The Delete refusals are a new entry in
+  `claude/open-items.md`, not fixed here. No code, no deploy.
 
 ## 1 Sep 2026
 

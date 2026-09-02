@@ -503,6 +503,48 @@ harmless, available if a senior side ever wants it) but nothing in the UI reads 
 and the PlayerDetail hero show initials instead, via `src/lib/playerFormat.js`. Never add a
 jersey field to the event/player forms.
 
+**A player who has quit is marked LEFT, never deleted.** `players.left_at` non-null is a
+leaver; `left_at IS NULL` means current. `mark_player_left`/`restore_player`
+(`db/migrations/20260902_player_leavers.sql`,
+`claude/specs/2026-09-02-player-leavers-design.md`) are the only way in or out of that state —
+same `security definer` authorisation as `"player edit"`. Marking also moves that child's
+`parent`/`player` memberships to a third status, `'left'`, which grants nothing anywhere:
+every membership predicate in `functions.sql`/`policies.sql` tests `status = 'active'` except
+two, `private.is_own_player` and `private.is_attached_to_team`, which tested no status at all
+until a second migration the same day
+(`db/migrations/20260902_player_leavers_left_grants_nothing.sql`) added `AND status <> 'left'`
+to both — deliberately not `= 'active'`, so a `'pending'` row is untouched.
+⚠️ **"GRANTS NOTHING" WAS SAID TWICE AND WAS WRONG BOTH TIMES, AND THE THIRD PREDICATE WAS NOT A
+`private.*` HELPER AT ALL.** A whole-branch review on 2 Sep 2026 found
+`public.calendar_events_for_token` joining `memberships` with **no status test of any kind**,
+so a family who had left kept every fixture of the squad arriving in their phone calendar for
+as long as their ICS token existed — and nothing about ending access anywhere revokes a token.
+`db/migrations/20260902_player_leavers_pending_and_feed.sql` adds `and m.status <> 'left'`
+there. The audit that found the first two searched `private.*` helper bodies; this one is an
+**inline join inside a function**, which is why it survived. Recorded in
+`claude/open-items.md`: the status-blind sweep has to cover inline joins too.
+⚠️ **AND A `'pending'` MEMBERSHIP IS NEVER TOUCHED BY MARKING, WHICH IS A RULE AND NOT A
+DETAIL.** `mark_player_left` moves `'active'` rows only. It used to move `'pending'` ones as
+well, and because `restore_player` flips **every** `'left'` row to `'active'`, a mark followed
+by a restore **approved a parent nobody had ever approved** — a way past the approvals queue
+that needed no sign-in and no admin. A pending row grants nothing already, so leaving has
+nothing to take from it; leaving it alone is what makes the blanket restore safe. The stale
+request it leaves behind cannot be approved while the child is a leaver either
+(`public.approve_membership` refuses with *"That player has left the squad. Restore them first
+if they are back."*), so **Restore is the only route back in, by both doors.**
+⚠️ **Marking also removes the child's FUTURE `availability` and `lineup_players` rows** — past
+ones stay. History is kept; a Saturday selection made on Thursday is not history.
+⚠️ **Neither RPC tells an unauthorised caller whether a player exists**: a null row raises
+`42501`, not the `22023` "no longer exists", unless the caller holds `private.can_write_child()`.
+⚠️ **Hiding a leaver
+is a query default, not an RLS change.** `listPlayers({ includeLeft })` in `src/data/players.js`
+filters `left_at IS NULL` by default across its twelve call sites; the `"player read"` policy
+itself is unchanged, because `MatchSheet.jsx` and `GameTime.jsx` legitimately pass
+`includeLeft: true` to keep a historic team sheet or appearance readable. **Delete is
+admin-only and still broken for most real players** — see `claude/open-items.md` — because
+this design deliberately did not touch it: keeping history was the whole point, and fixing
+Delete's cascades is separate work.
+
 **"Upcoming" and "not yet scored" are two different questions that happen to look similar.**
 Schedule's Upcoming *tab* deliberately shows unscored events regardless of date — a match still
 needing a score stays visible until someone scores it. That's correct and must not change.

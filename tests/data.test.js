@@ -61,6 +61,8 @@ import {
   deletePlayer,
   upsertContact,
   listContactsForPlayers,
+  markPlayerLeft,
+  restorePlayer,
 } from '../src/data/players.js'
 import {
   listAvailability,
@@ -919,6 +921,29 @@ describe('listPlayers', () => {
   })
 })
 
+// ⚠️ LEAVERS ARE HIDDEN AT THE QUERY, NOT BY EACH CALLER. Twelve screens call
+// listPlayers; hiding at the query means none of them can forget to filter.
+// Spec: claude/specs/2026-09-02-player-leavers-design.md §4.
+describe('listPlayers and leavers', () => {
+  it('hides leavers by default', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await listPlayers({ teamIds: ['t-1'] })
+
+    expect(calls.is).toEqual([['left_at', null]])
+  })
+
+  it('includes leavers when asked', async () => {
+    const { builder, calls } = createQueryBuilder({ data: [] })
+    supabase.from.mockReturnValue(builder)
+
+    await listPlayers({ teamIds: ['t-1'], includeLeft: true })
+
+    expect(calls.is).toEqual([])
+  })
+})
+
 // --- getPlayerContact -------------------------------------------------
 
 describe('getPlayerContact', () => {
@@ -1122,6 +1147,50 @@ describe('deletePlayer', () => {
 
     await expect(deletePlayer('p-1')).rejects.toThrow()
     expect(deletePlayerPhotoMock).not.toHaveBeenCalled()
+  })
+})
+
+// --- markPlayerLeft --------------------------------------------------------
+
+// ⚠️ NEVER A DELETE. The database (mark_player_left) decides who may do this,
+// and hands back the OLD photo path so the storage object can be removed
+// best-effort — same ROW FIRST, OBJECT SECOND ordering as deletePlayer.
+describe('markPlayerLeft', () => {
+  beforeEach(() => deletePlayerPhotoMock.mockClear())
+
+  it('calls the RPC and then removes the returned photo object', async () => {
+    supabase.rpc.mockResolvedValue({ data: [{ id: 'p-1', photo_path: 'p-1/1.jpg' }], error: null })
+
+    await markPlayerLeft('p-1')
+
+    expect(supabase.rpc).toHaveBeenCalledWith('mark_player_left', { p_player_id: 'p-1' })
+    expect(deletePlayerPhotoMock).toHaveBeenCalledWith('p-1/1.jpg')
+  })
+
+  it('does not touch storage when there was no photo', async () => {
+    supabase.rpc.mockResolvedValue({ data: [{ id: 'p-1', photo_path: null }], error: null })
+
+    await markPlayerLeft('p-1')
+
+    expect(deletePlayerPhotoMock).not.toHaveBeenCalled()
+  })
+
+  it('throws the RPC error and never touches storage', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: new Error('You are not allowed to change this player.') })
+
+    await expect(markPlayerLeft('p-1')).rejects.toThrow(/not allowed/)
+    expect(deletePlayerPhotoMock).not.toHaveBeenCalled()
+  })
+})
+
+// --- restorePlayer -----------------------------------------------------
+
+describe('restorePlayer', () => {
+  it('calls the RPC and returns the row', async () => {
+    supabase.rpc.mockResolvedValue({ data: { id: 'p-1', left_at: null }, error: null })
+
+    await expect(restorePlayer('p-1')).resolves.toEqual({ id: 'p-1', left_at: null })
+    expect(supabase.rpc).toHaveBeenCalledWith('restore_player', { p_player_id: 'p-1' })
   })
 })
 
