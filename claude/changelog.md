@@ -19,7 +19,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   Button `sm` goes from `py-2` to `py-2.5`, and the approval vouch chips from
   `py-0.5` to `min-h-[36px]`. `tests/tap-targets.test.js` pins each class with
   a control, and the built CSS was checked for the `before:` utilities.
-- `2e387ee` — - **feat(seniors): senior squads, jersey numbers, players in more than one
+- `2e387ee` — **feat(seniors): senior squads, jersey numbers, players in more than one
   squad, adult sign-up.** Piece 2a of `claude/plans/2026-09-02-senior-squads.md`
   — squads 2, 3 and 4 of "Order of work"
   (`claude/plans/2026-09-02-senior-squads-2a-implementation.md`). An admin can
