@@ -131,9 +131,14 @@ function PlayerRow({
   age = null,
   showPosition = false,
   showJersey = false,
-  // Staff only (canEditAnything upstream) — a parent must never learn that a
-  // team-mate is on loan from another squad. See the "from {squad}" span
-  // below.
+  // ⚠️ STAFF ONLY, BUT AS A CONVENIENCE — NOT A PRIVACY BOUNDARY. The home
+  // squad this mark names is already visible to EVERY viewer, parents
+  // included, in the subtitle a few lines down (`{teamName}`, unconditional)
+  // and searchable there too. Hiding the "from {squad}" mark from a parent
+  // does not hide who is on loan from where; it only saves staff a label
+  // they specifically asked for and spares a parent a piece of shorthand
+  // that reads as an insider note about a team-mate. See the "from {squad}"
+  // span below.
   showGuestMark = false,
   onSelect,
 }) {
@@ -169,11 +174,17 @@ function PlayerRow({
             {player.full_name}
           </span>
           {player.is_captain && <Badge tone="captain">Capt</Badge>}
-          {/* ⚠️ STAFF ONLY, AND ONLY ON A GUEST ROW. `guest_of` is set for a
-              player whose home squad is elsewhere and who holds an active
-              membership in the squad being rendered (src/data/players.js) —
-              the name printed is the HOME squad's, from `teamsById`, via
-              `player.team_id` which stays the home team even on a guest row. */}
+          {/* ⚠️ STAFF ONLY, AND ONLY ON A GUEST ROW — A CONVENIENCE, NOT A
+              PRIVACY BOUNDARY (see showGuestMark's own comment above). The
+              home squad this names is already printed for every viewer, in
+              this row's subtitle (`{teamName}` a few lines down) and
+              matched by search there too; hiding this mark from a parent
+              does not hide which squad a team-mate calls home. `guest_of` is
+              set for a player whose home squad is elsewhere and who holds an
+              active membership in the squad being rendered
+              (src/data/players.js) — the name printed is the HOME squad's,
+              from `teamsById`, via `player.team_id` which stays the home
+              team even on a guest row. */}
           {showGuestMark && player.guest_of && (
             <span className="text-[12px] font-semibold text-ink-faint">from {teamName}</span>
           )}
@@ -816,7 +827,16 @@ export default function Roster() {
   // pitches-only admin gets no dead Edit button. RLS is what actually
   // enforces this; getting it wrong here can only hide a control, never
   // authorise a write.
-  const canEditSelected = selectedPlayer ? canWritePlayer(memberships, selectedPlayer.team_id) : false
+  //
+  // ⚠️ AND guest_of MAKES IT FALSE OUTRIGHT — same guard, same reasoning, as
+  // RosterTable.jsx's per-row `editable` (finding 2, whole-branch review,
+  // 2 Sep 2026). A coach who staffs both the guest's home squad and the
+  // squad being viewed would otherwise pass canWritePlayer here too; this
+  // sheet is reached by tapping a row on THIS squad's roster, and a page
+  // showing someone as a guest must never offer to edit their real record.
+  const canEditSelected = selectedPlayer
+    ? canWritePlayer(memberships, selectedPlayer.team_id) && !selectedPlayer.guest_of
+    : false
   // A parent/player of THIS player, who is not already a coach of the squad.
   // Gates only whether the self-service form is offered; RLS and
   // set_own_player_photo() are what permit the writes.

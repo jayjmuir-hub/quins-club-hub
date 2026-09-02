@@ -53,7 +53,7 @@ vi.mock('../src/lib/supabase', () => ({
   },
 }))
 
-import { listPlayers, listPlayerSquads } from '../src/data/players.js'
+import { listPlayers } from '../src/data/players.js'
 
 beforeEach(() => {
   fromMock.mockClear()
@@ -124,29 +124,8 @@ describe('listPlayers({ teamIds }) — home or active membership', () => {
   })
 })
 
-describe('listPlayerSquads', () => {
-  it('returns active membership team ids per player, excluding the home team', async () => {
-    playersRows = [
-      { id: 'p-1', team_id: 'A' },
-      { id: 'p-2', team_id: 'A' },
-    ]
-    membershipsRows = [
-      // p-1's own home squad, redundant — must not appear in the result.
-      { player_id: 'p-1', team_id: 'A', status: 'active' },
-      { player_id: 'p-1', team_id: 'B', status: 'active' },
-      { player_id: 'p-2', team_id: 'C', status: 'left' },
-    ]
-
-    const result = await listPlayerSquads(['p-1', 'p-2'])
-
-    expect(result.get('p-1')).toEqual(['B'])
-    expect(result.has('p-2')).toBe(false)
-  })
-
-  it('returns an empty Map without querying when given no ids', async () => {
-    const result = await listPlayerSquads([])
-
-    expect(result).toEqual(new Map())
-    expect(fromMock).not.toHaveBeenCalled()
-  })
-})
+// ⚠️ listPlayerSquads' TESTS WERE HERE — deleted 2 Sep 2026, whole-branch
+// review finding 6, alongside the export itself (src/data/players.js) and
+// its harness stub, all for the same reason: zero production callers. The
+// guest mark this function was built to feed ships from `listPlayers`'s own
+// `guest_of` field instead (tested above).

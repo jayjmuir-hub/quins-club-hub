@@ -182,7 +182,25 @@ begin
   if not private.can_see_player(ply) then
     raise exception 'STEP 5 FAILED: B coach cannot see the A player after a B membership';
   end if;
-  raise notice 'STEP 5 ok: visible only through the membership';
+  -- ⚠️ THE SUBJECT SIDE, NOT JUST THE CALLER SIDE. Everything above proves the
+  -- CALLER'S membership (the B coach) grants the view; this proves the
+  -- PLAYER'S guest membership has to be ACTIVE too — a leaver's guest row
+  -- must grant nothing, matching private.can_see_player's own status='active'
+  -- guard on the caller side. memberships_status_check admits 'left' (the
+  -- 2 Sep 2026 leavers migration), so this is a real value, not a fault the
+  -- constraint would refuse before it reaches can_see_player at all.
+  update public.memberships set status = 'left' where player_id = ply and team_id = t.b;
+  if private.can_see_player(ply) then
+    raise exception 'STEP 5 FAILED: a leaver''s guest membership still grants visibility';
+  end if;
+  -- CONTROL: restoring the same row to active restores the view — proves the
+  -- refusal above is really about status, not that the membership row itself
+  -- was destroyed or the coach's own access broke.
+  update public.memberships set status = 'active' where player_id = ply and team_id = t.b;
+  if not private.can_see_player(ply) then
+    raise exception 'STEP 5 CONTROL FAILED: restoring the B membership to active did not restore visibility';
+  end if;
+  raise notice 'STEP 5 ok: visible only through the membership, and only while it is active';
 end $$;
 
 -- ── STEP 6 — create_team refuses a non-admin, accepts an admin ────────────

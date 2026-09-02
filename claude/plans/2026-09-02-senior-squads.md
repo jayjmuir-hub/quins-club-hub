@@ -116,6 +116,9 @@ harness `jerseyAnywhere` probes prove it.
 A player in two squads appears on both rosters. On the non-home roster the
 row carries a small "from U18B" mark for staff; parents see nothing extra.
 
+Unique per squad is a fact about the data (home squad); a mixed roster with a
+guest can show two 9s.
+
 ### Availability, chat, notices, documents, push
 
 All of these decide their audience from `memberships` already

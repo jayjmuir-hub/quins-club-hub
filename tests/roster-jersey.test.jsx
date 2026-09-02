@@ -411,3 +411,52 @@ describe('RosterTable — inline jersey number edit', () => {
     expect(names()).toEqual(['Ben Okafor', 'Zaid Karim'])
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════
+//  GUEST ROWS ARE READ-ONLY — finding 2 of the whole-branch review. The
+//  "player edit" RLS policy is keyed on the row's HOME team_id
+//  (private.is_team_staff(team_id) OR private.can_write_child()), so a
+//  coach who is staff only on the squad a guest is VISITING, not on their
+//  home squad, can never actually write that row — an editor RLS will
+//  always refuse. This proves the desktop table never renders one for a
+//  guest row, with the coach's own squad's numbered player as the CONTROL
+//  that editors still exist where they should.
+// ═══════════════════════════════════════════════════════════════════════
+describe('RosterTable — guest rows are read-only', () => {
+  // ⚠️ COACH_BOTH_SQUADS, NOT A SINGLE-SQUAD COACH — a coach of team-1xv
+  // ONLY already gets no editor on this row, because canWritePlayer checks
+  // is_team_staff against the row's HOME team (team-u18b for GUEST), which
+  // that coach doesn't hold. That case doesn't discriminate: it passes
+  // whether or not guest rows get their own guard. The row that actually
+  // exercises the guard is this one — a coach who genuinely IS active staff
+  // on team-u18b too, so canWritePlayer(team-u18b) is true and RLS itself
+  // would allow the write. The product decision (finding 2) is that a
+  // roster page showing a player as a GUEST must never offer to edit their
+  // real record regardless of what the viewer could do from the player's
+  // own squad's page.
+  it('a coach of BOTH squads still gets no editor on a guest row viewed from the other squad', async () => {
+    setDesktop(true)
+    useMembershipsMock.mockReturnValue(memberships(COACH_BOTH_SQUADS, [TEAM_1XV, TEAM_U18B]))
+    listPlayersMock.mockResolvedValue([NUMBERED, GUEST])
+
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    // The guest row: no editor of any kind, just static text/dashes.
+    // (Gender is not asserted here — with both fixtures carrying no gender
+    // the column is hidden entirely by constantColumns, unrelated to guest
+    // status, so it would prove nothing either way.)
+    expect(screen.queryByLabelText('Jersey number for Sami Rahman')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Position for Sami Rahman')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Age group for Sami Rahman')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Captain: Sami Rahman')).not.toBeInTheDocument()
+
+    // CONTROL: the coach's own squad's numbered player still gets every
+    // editor — proves the guest row's lack of controls is about guest_of,
+    // not a general breakage of editability on this render.
+    expect(screen.getByLabelText('Jersey number for Ben Okafor')).toBeInTheDocument()
+    expect(screen.getByLabelText('Position for Ben Okafor')).toBeInTheDocument()
+    expect(screen.getByLabelText('Age group for Ben Okafor')).toBeInTheDocument()
+    expect(screen.getByLabelText('Captain: Ben Okafor')).toBeInTheDocument()
+  })
+})

@@ -68,7 +68,21 @@ const YOUTH_U16 = {
   is_senior: false,
   self_registration_allowed: true,
 }
+// Invite-only senior squad — a first team whose players don't add
+// themselves. Finding 1 of the whole-branch review: the form used to force
+// selfRegister:true onto a row like this anyway, purely from is_senior,
+// which register_my_player then either rejected or silently downgraded —
+// a dead end either way. sort_order deliberately between the other two
+// seniors, same reason as the rest of this fixture list.
+const SENIOR_INVITE_ONLY = {
+  id: 't-sr-invite',
+  name: 'Harness Senior Invite-Only',
+  sort_order: 10.5,
+  is_senior: true,
+  self_registration_allowed: false,
+}
 const TEAMS = [SENIOR_A, YOUTH_U16, SENIOR_B, YOUTH_U14]
+const TEAMS_WITH_INVITE_ONLY = [...TEAMS, SENIOR_INVITE_ONLY]
 
 function squadOptionNames() {
   const options = within(screen.getByLabelText(/age group/i)).getAllByRole('option')
@@ -157,6 +171,55 @@ describe('PlayerRegistrationForm — senior squads first for a self-registering 
     expect(screen.getByRole('radio', { name: /i'm the player/i })).toBeInTheDocument()
     expect(
       screen.queryByText(/senior squads are for players registering themselves/i),
+    ).not.toBeInTheDocument()
+  })
+
+  // Finding 1: an invite-only senior squad (self_registration_allowed:false)
+  // must not force the row into self-registering — it is a dead end,
+  // because register_my_player refuses p_self_register for a squad like this
+  // (0A000). The row shows an invite-only note instead and collects with
+  // selfRegister:false.
+  it('shows an invite-only note, not the self statement, for a senior squad with self-registration off', async () => {
+    const user = userEvent.setup()
+    const onCollect = vi.fn()
+    render(<PlayerRegistrationForm teams={TEAMS_WITH_INVITE_ONLY} collectOnly onCollect={onCollect} />)
+
+    await user.type(screen.getByLabelText(/player's first name/i), 'Amara')
+    await user.type(screen.getByLabelText(/player's family name/i), 'Bello')
+    await pickDate(user, '1995-05-01', /date of birth/i)
+    await user.selectOptions(screen.getByLabelText(/age group/i), SENIOR_INVITE_ONLY.id)
+
+    expect(screen.queryByRole('radio', { name: /i'm the player/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /my child/i })).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/senior squads are for players registering themselves/i),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/this squad is invite-only\. ask its coach or the club to add you/i),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+    expect(onCollect).toHaveBeenCalledWith([
+      expect.objectContaining({ teamId: SENIOR_INVITE_ONLY.id, selfRegister: false }),
+    ])
+  })
+
+  // CONTROL for the assertion above: the self-registering senior squad from
+  // the earlier test still shows the self statement and forces selfRegister
+  // true — proves the invite-only note is really conditional on the column,
+  // not a blanket change to every senior squad.
+  it('CONTROL: the self-registering senior squad still shows the self statement', async () => {
+    const user = userEvent.setup()
+    render(<PlayerRegistrationForm teams={TEAMS_WITH_INVITE_ONLY} collectOnly onCollect={vi.fn()} />)
+
+    await user.selectOptions(screen.getByLabelText(/age group/i), SENIOR_A.id)
+
+    expect(
+      screen.getByText(/senior squads are for players registering themselves/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(/this squad is invite-only/i),
     ).not.toBeInTheDocument()
   })
 })

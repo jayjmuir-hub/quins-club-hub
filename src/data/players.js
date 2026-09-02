@@ -142,47 +142,12 @@ export async function listPlayers({ teamIds, includeLeft = false } = {}) {
   })
 }
 
-/**
- * Which squads (beyond a player's home squad) each player is an ACTIVE
- * member of — the "from U18B" mark on a guest row.
- *
- * Returns a Map<playerId, teamId[]>, excluding the player's home `team_id`:
- * a redundant membership row in a player's own squad is not a second squad
- * to show. `[]` input returns an empty Map without querying, matching the
- * convention `listPlayers({teamIds})`/`listContactsForPlayers` already use.
- */
-export async function listPlayerSquads(playerIds) {
-  const ids = [...new Set((playerIds ?? []).filter(Boolean))]
-  if (ids.length === 0) return new Map()
-
-  const [players, memberships] = await Promise.all([
-    fetchByIds(ids, async (chunk) => {
-      const { data, error } = await supabase.from('players').select('id, team_id').in('id', chunk)
-      if (error) throw error
-      return data ?? []
-    }),
-    fetchByIds(ids, async (chunk) => {
-      const { data, error } = await supabase
-        .from('memberships')
-        .select('player_id, team_id')
-        .in('player_id', chunk)
-        .eq('status', 'active')
-      if (error) throw error
-      return data ?? []
-    }),
-  ])
-
-  const homeByPlayer = new Map(players.map((row) => [row.id, row.team_id]))
-  const map = new Map()
-  for (const row of memberships) {
-    if (!row.player_id || !row.team_id) continue
-    if (homeByPlayer.get(row.player_id) === row.team_id) continue
-    if (!map.has(row.player_id)) map.set(row.player_id, [])
-    const list = map.get(row.player_id)
-    if (!list.includes(row.team_id)) list.push(row.team_id)
-  }
-  return map
-}
+// ⚠️ listPlayerSquads WAS HERE — deleted 2 Sep 2026, whole-branch review
+// finding 6, zero production callers. It computed the same "which squad(s)
+// beyond home is this player active in" fact that the guest mark actually
+// ships with, but `listPlayers`'s own `guest_of` field (built from `team_id`
+// + an active-memberships lookup, see its header above) is what every real
+// caller reads.
 
 /**
  * Writes one player's season jersey number, or clears it with null.
@@ -221,10 +186,18 @@ export async function setPlayerJerseyNumber(playerId, number) {
     // ⚠️ NAME THE HOLDER. A constraint name is not a sentence a coach can
     // act on.
     const { data: me } = await supabase.from('players').select('team_id').eq('id', playerId).maybeSingle()
+    // ⚠️ NO team_id, NO SECOND QUERY. `.eq('team_id', undefined)` would send a
+    // PostgREST filter with no value — not "match nothing", which is what we
+    // want here, but a malformed request. A lookup with no team to search
+    // within can never name the holder anyway, so bail straight to the
+    // generic clash message.
+    if (!me?.team_id) {
+      throw new Error(jerseyClashMessage(number, 'another player'))
+    }
     const { data: holder } = await supabase
       .from('players')
       .select('full_name')
-      .eq('team_id', me?.team_id)
+      .eq('team_id', me.team_id)
       .eq('jersey_num', number)
       .maybeSingle()
     throw new Error(jerseyClashMessage(number, holder?.full_name ?? 'another player'))

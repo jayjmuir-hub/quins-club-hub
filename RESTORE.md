@@ -509,8 +509,8 @@ not use jersey numbers: `players.jersey_num` stays null for them and the roster 
 PlayerDetail hero still show initials, via `src/lib/playerFormat.js`. Never add a jersey field
 to a youth squad's event/player forms. But a squad with `teams.uses_jersey_numbers = true` does
 use them — `jersey_num` there is the player's SEASON number in their HOME squad (unique 1–99
-per squad, two squads may both have a 9), shown on the roster tile in place of initials, and
-sortable, searchable and staff-editable there. `claude/plans/2026-09-02-senior-squads.md` is the
+per squad, two squads may both have a 9), shown on the roster tile in place of initials when
+there is no photo, and sortable, searchable and staff-editable there. `claude/plans/2026-09-02-senior-squads.md` is the
 tombstone over the original ruling and `claude/plans/2026-09-02-senior-squads-2a-implementation.md`
 is what built the narrower one.
 

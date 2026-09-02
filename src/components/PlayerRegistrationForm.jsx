@@ -464,13 +464,17 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
           // ⚠️ AND A SENIOR SQUAD FORCES IT ON, THE SAME WAY the block above
           // forces it off — a senior squad's roster is players registering
           // themselves; there is no "my child" answer for it to ask about.
+          // ⚠️ BUT ONLY WHEN THE SQUAD ACTUALLY ALLOWS SELF-REGISTRATION.
+          // register_my_player refuses p_self_register when
+          // teams.self_registration_allowed is false (0A000) — an invite-only
+          // senior squad (a first team, say) has real players but they don't
+          // add themselves. Forcing the flag on for one of those was a dead
+          // end: the row would be told it was self-registering and then be
+          // sent in as self_register:false anyway, or fail outright.
+          const nextSelfAllowed = next?.self_registration_allowed === true
           onChange({
             teamId: nextId,
-            selfRegister: nextIsSenior
-              ? true
-              : next?.self_registration_allowed === true
-                ? row.selfRegister
-                : false,
+            selfRegister: nextSelfAllowed ? (nextIsSenior ? true : row.selfRegister) : false,
           })
         }}
         className={FIELD}
@@ -535,11 +539,25 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
           ⚠️ A SENIOR SQUAD REPLACES THE QUESTION WITH A STATEMENT — it is not
           shown alongside the control, and not shown at all once isSeniorTeam
           is true, whatever canSelfRegister says. A control with exactly one
-          legal answer is not a question. */}
+          legal answer is not a question.
+
+          ⚠️ AND THE STATEMENT ITSELF DEPENDS ON canSelfRegister, not just
+          isSeniorTeam — a senior squad with self-registration OFF (an
+          invite-only first team) is not "players registering themselves",
+          it is nobody self-registering at all. Saying so anyway was the dead
+          end this replaces: the row above is never forced to self:true for
+          this squad (see the onChange), so there is no self answer left to
+          submit. */}
       {isSeniorTeam ? (
-        <p className="mt-4 rounded-[11px] bg-surface px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-muted">
-          Senior squads are for players registering themselves.
-        </p>
+        canSelfRegister ? (
+          <p className="mt-4 rounded-[11px] bg-surface px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-muted">
+            Senior squads are for players registering themselves.
+          </p>
+        ) : (
+          <p className="mt-4 rounded-[11px] bg-surface px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-muted">
+            This squad is invite-only. Ask its coach or the club to add you.
+          </p>
+        )
       ) : (
         canSelfRegister && (
           <Segmented

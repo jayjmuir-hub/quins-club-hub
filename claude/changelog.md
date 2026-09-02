@@ -10,7 +10,45 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **docs(plan): training plan status — Part 2 shipped as `7db98ca`, Part 1 still
+- **feat(seniors): senior squads, jersey numbers, players in more than one
+  squad, adult sign-up.** Piece 2a of `claude/plans/2026-09-02-senior-squads.md`
+  — squads 2, 3 and 4 of "Order of work"
+  (`claude/plans/2026-09-02-senior-squads-2a-implementation.md`). An admin can
+  create a senior squad from the Club tab (`create_team`) and switch a
+  "Jersey numbers" flag on it (`uses_jersey_numbers`). Where that flag is on,
+  the roster shows the number on the avatar tile instead of initials, sorts
+  and searches by it, and lets staff edit it inline — a clash names the
+  player already holding the number rather than just refusing the save. A
+  player who holds a membership in a second squad now shows up on that
+  squad's roster too, marked as a guest of their home squad; this is
+  `listPlayers` reading home-squad-OR-membership instead of home-squad-only,
+  which is what makes the guest appear in Squad Hub, Availability and Lineup
+  as well as the roster, since all three call it. Adult self-registration
+  orders senior squads first and drops "your child" wording on that path.
+  ⚠️ **The read-side RLS policy `"player read"` is now strictly WIDER** —
+  `private.can_see_player` — so a player is visible to anyone who runs a
+  squad the player has an ACTIVE membership in, not only their home squad.
+  Edit policies (positions, private data) are unchanged: a guest's private
+  data stays with their home squad's staff. Migration
+  `db/migrations/20260903_senior_squads_2a.sql` — dated 20260903 for
+  ordering among that day's migrations, but actually applied to live
+  2 Sep 2026 — with Jay's yes, harness (`db/tests/senior-squads-2a.sql`) green first,
+  whole `npm run db:check` after. Its STEP 5 control proves the widening
+  does not leak too far: a B-squad coach cannot see an A-squad player until
+  a B membership row exists for that player, and can once it does. Youth
+  squads are unaffected — every harness fixture for `jerseyAnywhere` is a
+  youth squad and those probes are unchanged. NOT in this piece: shirt
+  numbers on the lineup/sheet, publish-to-chat, call-ups, the Senior Section
+  overview, season stats, union registration numbers — 2b–2d.
+  Also folded in while this branch was open: `db/tests/notice-push.sql`'s
+  `v_two` (second-subscriber) pick could land back on the poster with no
+  `distinct` excluded and no order by; it now excludes the poster
+  (`<> v_poster`) and orders by `profile_id` for a deterministic pick —
+  proven red before the fix, green after. And the two error-handling lines
+  this branch added (`src/data/players.js`, `src/screens/AdminClub.jsx`) go
+  through `friendlyMessage`, as the merged error sweep below requires —
+  they were the reason those two files were allowlisted out of that sweep.
+- `09dd81d` — **docs(plan): training plan status — Part 2 shipped as `7db98ca`, Part 1 still
   spec only.** Verified live from the served bundle: the new guidance
   sentences are in it and "Show all ages" is not.
 - `7db98ca` — **feat(training): AGE BAND IS GUIDANCE, NOT A GATE — contact stays the

@@ -423,7 +423,19 @@ export default function RosterTable({
               }
 
               const player = row.player
-              const editable = canEditTeam(player.team_id)
+              // ⚠️ GUEST ROWS ARE READ-ONLY HERE, WHATEVER canEditTeam SAYS.
+              // Finding 2 of the whole-branch review (2 Sep 2026): the
+              // "player edit" RLS policy is keyed on the row's HOME
+              // team_id, so a coach who staffs only the squad being
+              // VIEWED (not the guest's home) already gets false out of
+              // canEditTeam(player.team_id) — player.team_id stays the
+              // home team on a guest row (src/data/players.js). But a
+              // coach who genuinely staffs BOTH squads passes that check,
+              // and RLS would in fact allow the write — this guard exists
+              // anyway, on product grounds: a roster page showing someone
+              // as a GUEST must never offer to edit their real record: that
+              // edit belongs on the player's own squad's roster, not here.
+              const editable = canEditTeam(player.team_id) && !player.guest_of
               const busy = saving[player.id]
               const error = errors[player.id]
 
@@ -466,8 +478,15 @@ export default function RosterTable({
                       </span>
                     </button>
                     {/* ⚠️ STAFF ONLY, AND ONLY ON A GUEST ROW — the same rule
-                        PlayerRow's mobile mark follows. `player.team_id` is
-                        still the HOME squad on a guest row (src/data/players.js). */}
+                        PlayerRow's mobile mark follows, and it is a
+                        CONVENIENCE rather than a privacy boundary: this
+                        table is desktop-only staff chrome (see the header
+                        note), but even so, the home squad this names is not
+                        secret — it is printed for a parent too, on the
+                        mobile row's subtitle, and searchable there. Hiding
+                        it here just keeps the table free of a label that is
+                        only useful to staff. `player.team_id` is still the
+                        HOME squad on a guest row (src/data/players.js). */}
                     {showGuestMark && player.guest_of && (
                       <span className="mt-0.5 block text-[12px] font-semibold text-ink-faint">
                         from {teamsById.get(player.team_id)?.name ?? 'another squad'}
