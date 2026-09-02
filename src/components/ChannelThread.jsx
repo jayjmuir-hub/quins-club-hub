@@ -139,6 +139,7 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           mentionables={mentionables}
           forceOpen={openThreadId === m.id}
           onReply={thread.onReply}
+          announceOnly={Boolean(announceOnly && !mayPost)}
           onRemove={thread.onRemove}
           onEdit={thread.onEdit}
           onPin={thread.onPin}

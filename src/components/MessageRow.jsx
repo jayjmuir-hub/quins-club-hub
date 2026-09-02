@@ -133,6 +133,13 @@ export default function MessageRow({
   // optional; the screen supplies them only where a DM makes sense.
   onReplyPrivately,
   onAuthor,
+  // 2 Sep 2026 (UX review, High): in an announce-only channel the locked
+  // composer says "reply to a thread instead", but a post with no replies
+  // yet showed no reply control at all — only the 20px chevron menu. When
+  // this is set, an unopened post with no replies gets a visible Reply
+  // button under the bubble. Off for ordinary channels, where the composer
+  // at the foot is the obvious route and a button on every post is noise.
+  announceOnly = false,
 }) {
   const iconFor = useProfileIcons()
   const [open, setOpen] = useState(forceOpen)
@@ -255,6 +262,17 @@ export default function MessageRow({
                 aria-expanded={open}
               >
                 {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+              </button>
+            )}
+            {announceOnly && onReply && replies.length === 0 && !open && !message.deleted_at && (
+              <button
+                type="button"
+                data-testid="reply-affordance"
+                onClick={() => setOpen(true)}
+                className={`mt-0.5 block min-h-[44px] text-[12px] font-semibold ${mine ? 'text-white/80' : 'text-brand-ink'}`}
+                aria-expanded={open}
+              >
+                Reply
               </button>
             )}
           </>

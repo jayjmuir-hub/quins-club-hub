@@ -21,6 +21,14 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+// The error state offers "Sign out" (2 Sep 2026 UX review, High: an invite
+// that fails was a dead end). The screen sits outside AuthProvider in these
+// tests, so the hook is mocked.
+const signOutMock = vi.fn()
+vi.mock('../src/lib/auth.jsx', () => ({
+  useAuth: () => ({ signOut: signOutMock }),
+}))
+
 // Imported after vi.mock so this binds to the mocked modules.
 import AcceptInvite from '../src/screens/AcceptInvite.jsx'
 
@@ -150,5 +158,17 @@ describe('AcceptInvite', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('This invite has already been used.')
     expect(acceptInviteMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('AcceptInvite — a way out on failure', () => {
+  it('offers "Go to the app" and "Sign out" under the alert, and nothing while loading', async () => {
+    acceptInviteMock.mockRejectedValue(new Error('This invite has already been used.'))
+    renderScreen()
+    expect(screen.queryByRole('link', { name: /go to the app/i })).toBeNull()
+    await screen.findByRole('alert')
+    expect(screen.getByRole('link', { name: /go to the app/i })).toHaveAttribute('href', '/')
+    screen.getByRole('button', { name: /sign out/i }).click()
+    expect(signOutMock).toHaveBeenCalledTimes(1)
   })
 })

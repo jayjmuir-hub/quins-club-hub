@@ -756,6 +756,15 @@ export default function AppShell({ children }) {
             `ready` branch they would never see it. It renders nothing at all
             unless there is an install route to offer — see InstallPrompt. */}
         <InstallPrompt />
+        {location.state?.missing && (
+          <p
+            role="status"
+            data-testid="missing-page"
+            className="mb-3 rounded-[10px] bg-surface-sunk px-3 py-2 text-[13px] font-semibold text-ink-muted"
+          >
+            That page no longer exists, so you&apos;re back at Home.
+          </p>
+        )}
         {loading && <LoadingState slow={slowLoading} reload={reload} />}
         {!loading && error && (
           <ErrorState error={error} reload={reload}>

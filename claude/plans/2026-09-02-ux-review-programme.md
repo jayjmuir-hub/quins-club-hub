@@ -1,7 +1,7 @@
 # UX review programme — the eight items, in order
 
-**Status: IN PROGRESS, 2 Sep 2026.** Items 1-7 shipped; item 8 on
-`claude/ux-8-desktop-width`. Each row below says where it
+**Status: THE EIGHT ITEMS SHIPPED, 2 Sep 2026.** Phase 2 — the remaining
+findings from the full report — is tracked in the section at the end. Each row below says where it
 stands. Update the row, not the header, when one lands.
 
 The 2 Sep 2026 frontend usability review (five parallel read-throughs of the
@@ -21,7 +21,7 @@ invented fixture data and belongs with the plans only as this summary.
 | 5 | Pitch-side tap targets to 44px: availability In/Maybe/Out, lineup Bench/Remove, chat message chevron, Sheet close | **SHIPPED** `5b38132` (#638) | — |
 | 6 | One measured list skeleton for the five busiest lists; Documents shows nothing while loading today | **SHIPPED** `559f8eb` (#643) | `src/components/Skeleton.jsx` |
 | 7 | A screen-title hook: `document.title`, focus the new screen, reset scroll | **SHIPPED** `2483fdc` (#650) | `src/lib/screenTitle.js`, `src/lib/useScreenChrome.js` |
-| 8 | A readable default width on desktop; 38 of 55 screens stretch edge to edge beside the sidebar | building | `src/lib/screenWidth.js` |
+| 8 | A readable default width on desktop; 38 of 55 screens stretch edge to edge beside the sidebar | **SHIPPED** `ad1963c` (#651) | `src/lib/screenWidth.js` |
 
 ## Follow-ups the shipped items left behind, on purpose
 
@@ -70,3 +70,20 @@ the first invalid control; registration form focuses its alert),
 red before wiring). `MyPlayerForm` takes the identical effect and alert
 markup and is covered by the helper test; a dedicated harness for it was not
 worth building for one assertion.
+
+## Phase 2 — the rest of the report, 2 Sep 2026
+
+The full report (`.claude/handoffs/club-hub-ux-review.html`, not committed —
+it names real screens with invented data and lives with the session that
+wrote it) lists about thirty-five findings beyond the eight items. Worked in
+severity order, one pull request per cluster, each a live deploy.
+
+| Cluster | Findings | Status |
+|---|---|---|
+| High + pattern 7 leftovers | Home blanked by a refused DM; invite dead end; announce-only Reply; Back closes a sheet; unknown path says so | building, `claude/ux-high-cluster` |
+| Follow-ups from items 1 and 2 | team-sheet draft; sweep allowlist to the helper alone | `claude/ux-followups`, waiting to open |
+| Coach/manager Medium | Lineup save bar; match sheet "Mark ready to send" + draft before share; Accounts prose; Availability names wrap; admin panels scroll into view; squad screens Try again; DatePicker/TimePicker in AddGameForm and TrainingPublish; Schedule status after multi-add | not started |
+| Parent Medium | availability tap-to-clear + own child first; sign-up copy; offline banner; Maps link; wizard draft; avatar caption | not started |
+| Pattern leftovers | RequireAuth slow-load reload; Home first-load gate includes notices; photo aspect-ratio; PlayerDetail reserved space; Documents `window.confirm`; per-field error helpers | not started |
+| Desktop | event-form sheet width and fieldsets; ChatPhoto Escape and focus trap; starred message scroll-to | not started |
+| Low | the two "Smaller items" lists and the extra findings | not started |

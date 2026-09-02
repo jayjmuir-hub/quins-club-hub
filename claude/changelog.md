@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(ui): a readable default width on desktop; tables, grids and
+- **fix(ux): the three High findings outside the eight items, and two
+  pattern-7 leftovers.** From the full UX review (2 Sep 2026). (1) A refused
+  DM from a squad contact no longer blanks Home: `Dashboard.jsx` keeps a
+  `chatError` beside the staff cards instead of switching the whole screen
+  into the error card. (2) An invite that fails offers "Go to the app" and
+  "Sign out" (`AcceptInvite.jsx`), as the confirm screen already did. (3) In
+  an announce-only channel an unanswered post shows a visible 44px Reply
+  under it (`MessageRow.jsx`, threaded from `ChannelThread.jsx`) — the
+  locked composer said "reply to a thread instead" while the only route was
+  the chevron menu. (4) Android Back closes a sheet instead of leaving the
+  screen: `Sheet.jsx` pushes one tagged history entry on open, closes on
+  popstate, re-pushes when non-dismissible, and pops its own entry when
+  closed any other way. (5) An unknown path lands on Home with "That page no
+  longer exists" (`App.jsx` state, rendered by `AppShell.jsx`).
+- `ad1963c` — **feat(ui): a readable default width on desktop; tables, grids and
   threads keep the whole width.** Item 8 of the 2 Sep 2026 UX review: 38 of
   55 screens stretched edge to edge beside the sidebar, and a settings page
   or a notice at 1,600px is a line the eye loses on the way back. The

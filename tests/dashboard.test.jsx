@@ -65,6 +65,13 @@ vi.mock('../src/data/players.js', () => ({
 // tests/squad-staff-home.test.jsx. Defaults to an empty Map — every existing
 // test in this file predates the block and must keep passing without knowing
 // about it.
+// A refused DM from a squad contact (2 Sep 2026 UX review, High).
+const openConversationMock = vi.fn()
+vi.mock('../src/data/messages.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  openConversation: (...a) => openConversationMock(...a),
+}))
+
 vi.mock('../src/data/staff.js', () => ({
   listMySquadStaff: (...args) => listMySquadStaffMock(...args),
 }))
@@ -1113,5 +1120,26 @@ describe('Dashboard — how your season works', () => {
     await screen.findByTestId('upcoming-list')
 
     expect(screen.queryByTestId('squad-format-block')).not.toBeInTheDocument()
+  })
+})
+
+describe('Dashboard — a refused DM from a squad contact', () => {
+  it('⚠️ stays on Home and says so beside the card, instead of blanking the whole screen', async () => {
+    useMembershipsMock.mockReturnValue(membershipValue(PARENT))
+    listMySquadStaffMock.mockResolvedValue(new Map([[
+      'team-u10',
+      [{ membershipId: 'ms-1', profileId: 'p-rosa', role: 'coach', title: 'Head Coach', name: 'Rosa Ferreira', email: null, phone: null, photoPath: null, photoUrl: null }],
+    ]]))
+    openConversationMock.mockRejectedValue(new Error('not allowed to message this person'))
+    renderDashboard()
+
+    const chat = await screen.findByRole('button', { name: /chat with/i })
+    chat.click()
+
+    const note = await screen.findByTestId('chat-error')
+    expect(note).toHaveTextContent(/./)
+    // The page did NOT switch into the load-failure card.
+    expect(screen.queryByText(/couldn.t load your dashboard/i)).toBeNull()
+    expect(screen.getByRole('button', { name: /chat with/i })).toBeInTheDocument()
   })
 })
