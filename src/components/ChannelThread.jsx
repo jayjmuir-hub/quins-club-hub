@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import Button from './Button.jsx'
 import AttachmentTray from './AttachmentTray.jsx'
 import ChatDropZone from './ChatDropZone.jsx'
@@ -55,6 +55,19 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
     mentionables,
     background,
   } = thread
+
+  // A #msg-<id> in the address (a starred message, a shared link) scrolls to
+  // that post once it is on screen — once, so a later refresh does not yank
+  // the reader back. DmThread carries the same anchors on its rows.
+  const [jumpedTo, setJumpedTo] = useState(null)
+  useEffect(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash : ''
+    if (!hash.startsWith('#msg-') || jumpedTo === hash) return
+    const node = document.getElementById(hash.slice(1))
+    if (!node) return
+    node.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+    setJumpedTo(hash)
+  }, [messages, jumpedTo])
 
   // Poll create sheet, and the "View votes" sheet (which poll's votes to show).
   const [pollOpen, setPollOpen] = useState(false)

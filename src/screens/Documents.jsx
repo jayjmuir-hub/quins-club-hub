@@ -133,6 +133,40 @@ function categoryLabel(document) {
   return DOCUMENT_CATEGORIES.find((c) => c.key === document.category)?.label ?? document.category
 }
 
+/** Remove, then "Remove <title>?" with a named yes and a cancel. */
+function RemoveControl({ document, confirming, onRemove, onCancel }) {
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={onRemove}
+        className="min-h-[44px] px-2 text-[12.5px] font-bold text-danger-ink"
+      >
+        Remove
+      </button>
+    )
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-1.5" role="group" aria-label={`Remove ${document.title}?`}>
+      <span className="text-[12.5px] font-semibold text-ink-muted">Remove?</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="min-h-[44px] rounded-[9px] bg-danger px-2.5 text-[12.5px] font-bold text-white"
+      >
+        Yes, remove
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="min-h-[44px] px-2 text-[12.5px] font-bold text-ink"
+      >
+        Cancel
+      </button>
+    </span>
+  )
+}
+
 export default function Documents() {
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
@@ -207,9 +241,17 @@ export default function Documents() {
     }
   }
 
+  // ⚠️ THE APP'S OWN TWO-STEP, NOT window.confirm (2 Sep 2026 UX review,
+  // pattern 3). This was the one place the written "never a native
+  // confirm()" rule was broken. First press arms the row; the second, named
+  // press deletes; anything else disarms. Same shape as NoticeRow.
+  const [confirmingId, setConfirmingId] = useState(null)
   async function handleDelete(document) {
-    // eslint-disable-next-line no-alert -- confirm-before-delete, same as Notices.
-    if (!window.confirm(`Remove "${document.title}"? This cannot be undone.`)) return
+    if (confirmingId !== document.id) {
+      setConfirmingId(document.id)
+      return
+    }
+    setConfirmingId(null)
     try {
       await deleteDocument({ id: document.id, storageKey: document.storage_key })
       await load()
@@ -329,13 +371,12 @@ export default function Documents() {
                 <div className="flex items-start justify-between gap-2">
                   <FileTypeIcon document={document} shape="square" />
                   {canDelete && (
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(document)}
-                      className="text-[12.5px] font-bold text-danger-ink"
-                    >
-                      Remove
-                    </button>
+                    <RemoveControl
+                      document={document}
+                      confirming={confirmingId === document.id}
+                      onRemove={() => handleDelete(document)}
+                      onCancel={() => setConfirmingId(null)}
+                    />
                   )}
                 </div>
                 <button
@@ -417,13 +458,12 @@ export default function Documents() {
                   </button>
                   <div className="flex shrink-0 items-center gap-2">
                     {canDelete && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(document)}
-                        className="text-[12.5px] font-bold text-danger-ink"
-                      >
-                        Remove
-                      </button>
+                      <RemoveControl
+                        document={document}
+                        confirming={confirmingId === document.id}
+                        onRemove={() => handleDelete(document)}
+                        onCancel={() => setConfirmingId(null)}
+                      />
                     )}
                     <RowChevron className="h-4 w-4 shrink-0 text-ink-faint" />
                   </div>
