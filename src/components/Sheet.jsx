@@ -55,7 +55,12 @@ const FOCUSABLE_SELECTOR = [
 // Used by NamePrompt, the sign-in name gate. Do not reach for it to make an
 // ordinary form feel important; a modal a user cannot leave is a trap unless
 // completing it is genuinely the only way forward.
-export function Sheet({ open, onClose, title, children, dismissible = true }) {
+// `size`: 'default' is the 520px dialog every form has had; 'wide' is
+// min(760px, 94vw) on desktop — 2 Sep 2026 UX review (managers on desktop,
+// Medium): the event form is about twenty fields in one column inside a
+// 520px keyhole, a long internal scroll with only the sticky title. On a
+// phone both sizes are the full-width sheet they always were.
+export function Sheet({ open, onClose, title, children, dismissible = true, size = 'default' }) {
   const titleId = useId()
   const panelRef = useRef(null)
   const triggerRef = useRef(null)
@@ -193,7 +198,8 @@ export function Sheet({ open, onClose, title, children, dismissible = true }) {
         aria-labelledby={titleId}
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
-        className="glass-panel max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] shadow-card animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] desktop:w-[min(520px,94vw)] desktop:animate-sheet-scale-in desktop:rounded-[20px]"
+        data-size={size}
+        className={`glass-panel max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] shadow-card animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] ${size === 'wide' ? 'desktop:w-[min(760px,94vw)]' : 'desktop:w-[min(520px,94vw)]'} desktop:animate-sheet-scale-in desktop:rounded-[20px]`}
       >
         {/* Drag-handle bar (design-system.md §4.16 .sheet-grip): mobile
             only, visual affordance only — there is no swipe-to-dismiss

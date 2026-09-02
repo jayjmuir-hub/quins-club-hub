@@ -1067,7 +1067,7 @@ export default function EventForm({
   // apologises.
   if (editableTeams.length === 0) {
     return (
-      <Sheet open onClose={requestClose} title={sheetTitle}>
+      <Sheet open onClose={requestClose} title={sheetTitle} size="wide">
         <p role="alert" className="rounded-[11px] bg-warn-bg px-4 py-3 text-sm text-ink">
           You don&apos;t have a squad you can add or change fixtures for. Ask a club admin if that
           looks wrong.
@@ -1556,7 +1556,7 @@ export default function EventForm({
   }
 
   return (
-    <Sheet open onClose={requestClose} title={sheetTitle}>
+    <Sheet open onClose={requestClose} title={sheetTitle} size="wide">
       {/* noValidate: this form does its own validation and reports it in a
           role="alert" region, which a screen reader announces — the native
           bubble is neither announced reliably nor visible to the browser
