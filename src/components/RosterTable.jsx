@@ -155,11 +155,14 @@ export default function RosterTable({
       : { key, dir: 'asc' }))
   }
 
+  // `value` is the whole ordered positions list when field is 'position'
+  // (first = main), and a scalar for everything else.
   async function save(player, field, value) {
     // No write when nothing changed. Blurring a select the user only opened
     // and closed should cost nothing, and an UPDATE that sets a column to its
-    // current value still bumps the row and still has to clear RLS.
-    if (player[field] === value) return
+    // current value still bumps the row and still has to clear RLS. Position
+    // callers below only call with a genuinely different list.
+    if (field !== 'position' && player[field] === value) return
 
     const previous = player[field]
     setErrors((e) => ({ ...e, [player.id]: null }))
@@ -176,13 +179,9 @@ export default function RosterTable({
       if (field === 'unit') {
         await onSaveUnit?.(player.id, value)
       } else if (field === 'position') {
-        // The picked position becomes the primary; the player's other
-        // positions keep their order behind it. players.position is nulled
+        // The whole ordered list, first = main. players.position is nulled
         // and staff-only — player_positions is the only store now.
-        const others = (positionsByPlayer?.get(player.id) ?? []).filter(
-          (name) => name !== previous && name !== value,
-        )
-        await onSavePositions?.(player.id, value ? [value, ...others] : others)
+        await onSavePositions?.(player.id, value)
       } else {
         await upsertPlayer({ id: player.id, [field]: value })
       }
@@ -214,8 +213,25 @@ export default function RosterTable({
   // optional Tier column, and the Open column.
   const span = columns.length + (tierByPlayer ? 1 : 0) + 1
 
-  const otherPositions = (player) =>
-    (positionsByPlayer?.get(player.id) ?? []).filter((name) => name !== player.position)
+  // Every position, in order — the first is the main one. ⚠️ ALL OF THEM
+  // RENDER AS EQUAL CHIPS since 2 Sep 2026 (Jay: "when selecting multiple
+  // positions, they should all show the same rank"), with the main one marked
+  // rather than promoted into a select with the rest as an afterthought
+  // underneath. Clicking a chip makes it the main; the × removes it; the
+  // "+ Add" select appends one. Same store, same order rule as before.
+  const positionsOf = (player) => positionsByPlayer?.get(player.id) ?? []
+  // The add-select offers the player's own unit's positions when the unit is
+  // set — a "back" is not offered Prop, the same rule PlayerForm applies —
+  // and both groups when it is not.
+  const addable = (player) => {
+    const have = new Set(positionsOf(player))
+    const offer = (list) => list.filter((p) => p !== 'Utility' && !have.has(p))
+    return {
+      forward: !player.unit || player.unit === 'forward' ? offer(POSITIONS_BY_UNIT.forward) : [],
+      back: !player.unit || player.unit === 'back' ? offer(POSITIONS_BY_UNIT.back) : [],
+      utility: !have.has('Utility'),
+    }
+  }
 
   // ⚠️ FLATTENED TO A SINGLE LIST OF ROWS, each either a heading or a player, so
   // the tbody keeps ONE map instead of three nested ones. Group headings and
@@ -393,53 +409,86 @@ export default function RosterTable({
 
                   {show('position') && (
                   <td className={BODY_CELL}>
-                    {editable ? (
-                      <select
-                        className={INLINE_CONTROL}
-                        aria-label={`Position for ${player.full_name}`}
-                        value={player.position ?? ''}
-                        disabled={busy === 'position'}
-                        onChange={(event) => save(player, 'position', event.target.value || null)}
-                      >
-                        <option value="">Not set</option>
-                        {/* Grouped the way the form now asks the question:
-                            forward or back first, the position under it. */}
-                        <optgroup label="Forwards">
-                          {POSITIONS_BY_UNIT.forward.filter((p) => p !== 'Utility').map((p) => (
-                            <option key={p} value={p}>{p}</option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Backs">
-                          {POSITIONS_BY_UNIT.back.filter((p) => p !== 'Utility').map((p) => (
-                            <option key={p} value={p}>{p}</option>
-                          ))}
-                        </optgroup>
-                        {/* Utility sits under both units, so it groups under
-                            neither here. */}
-                        <option value="Utility">Utility</option>
-                      </select>
-                    ) : (
-                      <span className="px-2 text-ink-muted">{player.position || 'Not set'}</span>
-                    )}
-                    {/* ⚠️ THE OTHER positions, not all of them. The select above
-                        edits players.position — the primary — and repeating it
-                        as a chip directly beneath itself would read as a
-                        duplicate. Jay added a second position to a player and
-                        saw no sign of it here at all, which is what these are
-                        for. */}
-                    {otherPositions(player).length > 0 && (
-                      <span className="mt-0.5 flex flex-wrap gap-1 px-2">
-                        {otherPositions(player).map((name) => (
+                    <div className="flex flex-wrap items-center gap-1 px-2">
+                      {positionsOf(player).map((name, index) => {
+                        const main = index === 0
+                        const list = positionsOf(player)
+                        return (
                           <span
                             key={name}
-                            data-testid="other-position"
-                            className="rounded-[100px] bg-surface-sunk px-1.5 py-px text-[11px] font-bold text-ink-muted"
+                            data-testid="position-chip"
+                            data-main={main ? 'true' : 'false'}
+                            className={[
+                              'inline-flex items-center rounded-[100px] border px-2 py-px text-[12px] font-bold',
+                              main
+                                ? 'border-brand bg-surface-mute text-danger-ink'
+                                : 'border-line bg-surface-sunk text-ink-muted',
+                            ].join(' ')}
                           >
-                            {name}
+                            {editable ? (
+                              <button
+                                type="button"
+                                aria-pressed={main}
+                                aria-label={main
+                                  ? `${name}, main position for ${player.full_name}`
+                                  : `Make ${name} the main position for ${player.full_name}`}
+                                title={main ? 'Main position' : 'Make this the main position'}
+                                disabled={busy === 'position'}
+                                onClick={() => {
+                                  if (main) return
+                                  save(player, 'position', [name, ...list.filter((p) => p !== name)])
+                                }}
+                                className="rounded-[100px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+                              >
+                                {main && <span aria-hidden="true">★ </span>}{name}
+                              </button>
+                            ) : (
+                              <span>{main && <span aria-hidden="true">★ </span>}{name}</span>
+                            )}
+                            {editable && (
+                              <button
+                                type="button"
+                                aria-label={`Remove ${name} from ${player.full_name}`}
+                                disabled={busy === 'position'}
+                                onClick={() => save(player, 'position', list.filter((p) => p !== name))}
+                                className="ml-1 rounded-[100px] px-0.5 leading-none text-ink-faint hover:text-danger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60"
+                              >
+                                <span aria-hidden="true">×</span>
+                              </button>
+                            )}
                           </span>
-                        ))}
-                      </span>
-                    )}
+                        )
+                      })}
+                      {editable ? (
+                        <select
+                          className={`${INLINE_CONTROL} w-auto`}
+                          aria-label={`Add a position for ${player.full_name}`}
+                          value=""
+                          disabled={busy === 'position'}
+                          onChange={(event) => {
+                            const name = event.target.value
+                            if (name) save(player, 'position', [...positionsOf(player), name])
+                          }}
+                        >
+                          <option value="">{positionsOf(player).length ? '+ Add' : 'Not set'}</option>
+                          {addable(player).forward.length > 0 && (
+                            <optgroup label="Forwards">
+                              {addable(player).forward.map((p) => <option key={p} value={p}>{p}</option>)}
+                            </optgroup>
+                          )}
+                          {addable(player).back.length > 0 && (
+                            <optgroup label="Backs">
+                              {addable(player).back.map((p) => <option key={p} value={p}>{p}</option>)}
+                            </optgroup>
+                          )}
+                          {/* Utility sits under both units, so it groups under
+                              neither here. */}
+                          {addable(player).utility && <option value="Utility">Utility</option>}
+                        </select>
+                      ) : (
+                        positionsOf(player).length === 0 && <span className="text-ink-muted">Not set</span>
+                      )}
+                    </div>
                   </td>
                   )}
 

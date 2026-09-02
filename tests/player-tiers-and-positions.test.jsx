@@ -114,14 +114,38 @@ describe('multiple positions', () => {
     await user.click(screen.getByRole('button', { name: /add player/i }))
 
     await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalled())
-    // ⚠️ ORDERED BY THE POSITIONS LIST, NOT BY WHICH WAS TICKED FIRST. A
-    // checkbox group has no memory of press order, so deriving the primary from
-    // it would make it depend on invisible state.
+    // Ticked in that order, saved in that order — the first is the main. (Until
+    // 2 Sep 2026 the list was re-sorted by POSITIONS on every tick, which is
+    // why a coach could never choose the main; see the next test.)
     expect(savePlayerPositionsMock).toHaveBeenCalledWith('p-new', ['Hooker', 'Flanker'])
     expect(setPlayerUnitMock).toHaveBeenCalledWith('p-new', 'forward')
     // The squad-readable players row must carry neither fact.
     expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('position')
     expect(upsertPlayerMock.mock.calls[0][0]).not.toHaveProperty('unit')
+  })
+
+  it('⚠️ the coach chooses the MAIN position; it is not decided by list order', async () => {
+    // Jay, 2 Sep 2026: "maybe we need a primary position marker". Flanker is
+    // ticked first here, then Hooker — which comes BEFORE Flanker in the
+    // POSITIONS list, so the old sort-by-list rule would have silently made
+    // Hooker the main. The radio row is the explicit choice.
+    const user = renderForm()
+    await user.type(screen.getByLabelText('First name', { selector: '#player-first-name' }), 'Idris')
+    await user.type(screen.getByLabelText('Family name', { selector: '#player-last-name' }), 'Vanterpool')
+    await user.selectOptions(screen.getByLabelText(/forward or back/i), 'forward')
+    // One position: no choice to make, no radio row.
+    await user.click(screen.getByRole('checkbox', { name: 'Flanker' }))
+    expect(screen.queryByRole('radio', { name: 'Flanker' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: 'Hooker' }))
+    // Two: the first ticked stays the main until told otherwise.
+    expect(screen.getByRole('radio', { name: 'Flanker' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Hooker' })).not.toBeChecked()
+
+    await user.click(screen.getByRole('radio', { name: 'Hooker' }))
+    expect(screen.getByRole('radio', { name: 'Hooker' })).toBeChecked()
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+
+    await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p-new', ['Hooker', 'Flanker']))
   })
 
   it('switching unit drops the positions the new one does not offer', async () => {
