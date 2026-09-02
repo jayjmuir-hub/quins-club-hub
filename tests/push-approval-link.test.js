@@ -32,15 +32,19 @@ const EMAIL = readFileSync(resolve(root, 'supabase/functions/notify-approval/ind
 const APP = readFileSync(resolve(root, 'src/App.jsx'), 'utf8')
 
 /** Just the approval branch, so a hit elsewhere in push-send cannot satisfy an assertion. */
+// ⚠️ ENDS AT THE ACCESS-REQUEST BRANCH, which sits between approval and
+// message since 2 Sep 2026 — it links under /admin on purpose (its audience
+// is super admins only), and slicing to the message branch swept it into
+// this one and turned the /admin negative red.
 const APPROVAL_BRANCH = PUSH.slice(
   PUSH.indexOf('} else if (approvalMembershipId) {'),
-  PUSH.indexOf('} else if (messageId) {'),
+  PUSH.indexOf('} else if (accessRequestId) {'),
 )
 
 describe('approval push deep link (rot detector)', () => {
   it('CONTROL: the slice is the approval branch and the matcher can see known strings', () => {
     expect(PUSH).toContain('} else if (approvalMembershipId) {')
-    expect(PUSH).toContain('} else if (messageId) {')
+    expect(PUSH).toContain('} else if (accessRequestId) {')
     expect(APPROVAL_BRANCH.length).toBeGreaterThan(200)
     expect(APPROVAL_BRANCH).toContain("title: 'Waiting to be approved'")
     expect(APPROVAL_BRANCH).toContain('approvalTargets(approvalMembershipId)')
