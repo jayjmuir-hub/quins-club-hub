@@ -5,6 +5,7 @@ import DatePicker from '../components/DatePicker.jsx'
 import TimePicker from '../components/TimePicker.jsx'
 import RepeatUntilField from '../components/RepeatUntilField.jsx'
 import useUnsavedChanges from '../lib/useUnsavedChanges.js'
+import { revealProblem } from '../lib/revealProblem.js'
 import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
 import { PITCH_PORTIONS, defaultPitchPortion } from '../lib/pitchPortion.js'
@@ -573,6 +574,14 @@ export default function EventForm({
   )
   const [invalid, setInvalid] = useState({})
   const [error, setError] = useState(null)
+  // "Fill in the highlighted fields" sat at the foot of twenty fields while
+  // the highlighted one was fifteen fields up (2 Sep 2026 UX review, item
+  // 3). Once the error has rendered, scroll to and focus the first invalid
+  // control, or the banner itself for a save failure.
+  const formRef = useRef(null)
+  useEffect(() => {
+    if (error) revealProblem(formRef.current)
+  }, [error])
   const [saving, setSaving] = useState(false)
 
   // --- Repeats (create-time only) ------------------------------------
@@ -1548,7 +1557,7 @@ export default function EventForm({
           role="alert" region, which a screen reader announces — the native
           bubble is neither announced reliably nor visible to the browser
           check. */}
-      <form onSubmit={handleSubmit} noValidate>
+      <form onSubmit={handleSubmit} noValidate ref={formRef}>
         {confirmingDiscard && (
           <div
             role="alertdialog"
@@ -2667,6 +2676,8 @@ export default function EventForm({
         {error && (
           <p
             role="alert"
+            data-reveal="problem"
+            tabIndex={-1}
             className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
           >
             {friendlyMessage(error, "We couldn't save that. Try again.")}

@@ -10,6 +10,7 @@ import {
   upsertPlayer,
 } from '../data/players.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import { revealProblem } from '../lib/revealProblem.js'
 import { canWritePlayer, visibleTeams } from '../lib/scope.js'
 import { POSITIONS, POSITIONS_BY_UNIT } from '../lib/positions.js'
 import { isMinisTeam } from '../lib/minis.js'
@@ -200,6 +201,14 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   const [values, setValues] = useState(() => initialValues(player, editableTeams))
   const [invalid, setInvalid] = useState({})
   const [error, setError] = useState(null)
+  // The banner sits beside Save at the foot of a fifteen-field sheet while
+  // the blank box is two screens up (2 Sep 2026 UX review, item 3). Once the
+  // error has rendered, scroll to and focus the first invalid control, or
+  // the banner itself for a save failure.
+  const formRef = useRef(null)
+  useEffect(() => {
+    if (error) revealProblem(formRef.current)
+  }, [error])
   // Which of the two writes failed. The distinction is the point: a contact
   // failure means the player IS saved, and saying otherwise would send a
   // coach back to re-enter a player who already exists.
@@ -765,7 +774,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           role="alert" region, which a screen reader announces — the native
           bubble is neither announced reliably nor visible to the browser
           check. */}
-      <form onSubmit={handleSubmit} noValidate>
+      <form onSubmit={handleSubmit} noValidate ref={formRef}>
         {/* ⚠️ TWO BOXES, NOT ONE. A single box gets a single word — that is how
             a child reached the live roster with a first name and nothing else,
             and it is the whole reason players.first_name / last_name exist.
@@ -1146,6 +1155,8 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         {error && (
           <p
             role="alert"
+            data-reveal="problem"
+            tabIndex={-1}
             className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
           >
             {errorStage === 'contact' && (
