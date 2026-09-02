@@ -10,7 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(positions): every position is a chip of the same rank, the main
+- **feat(training): AGE BAND IS GUIDANCE, NOT A GATE — contact stays the
+  gate.** Part 2 of `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`;
+  a coach, via Jay 2 Sep 2026: drills and templates "should not be age group
+  locked". `squadFitsTemplate` and `drillFitsTemplate` now refuse on contact
+  ONLY and report an age mismatch as `guidance` — every caller that read `ok`
+  keeps working. Session Plan and shelf pickers list in-band rows first and
+  the rest after with the band in the label (`shelfRowsForSquad` orders, it
+  no longer filters; the browser's "Show all ages" toggle is gone because all
+  ages is the list). A focus chip outside the band is enabled with the band
+  said beside it in the muted colour, and when no pack is in band the chip is
+  the widest the squad may run. On Publish an out-of-band squad is tickable
+  with the band in its accessible name and one sentence counting the ticked
+  ones; the template builder offers an out-of-band drill with its band rather
+  than disabling it. ⚠️ **A squad whose name carries no band ("Senior Men")
+  is no longer refused by anything that sets an age** — the null-band
+  refusal was the thing that gave senior coaches a thinner library than
+  juniors. ⚠️ **Supersedes the 27 Aug 2026 ruling** that U18 must not see
+  U9 copies; both are recorded in the plan. The twelve-year-old-girls'
+  contact case that ruling protected is the CONTACT half, untouched:
+  `publish_training`'s server check, the tag-squad refusals and their
+  wording are all unchanged, and the tests pin that in as many words.
+  `claude/specs/2026-08-27-training-shelf.md` updated in place.
+- `062254c` — **feat(positions): every position is a chip of the same rank, the main
   one starred — and the coach chooses which is main.** Jay, 2 Sep 2026:
   *"when selecting multiple positions, they should all show the same rank,
   but maybe we need a primary position marker"*. The roster table's Position
