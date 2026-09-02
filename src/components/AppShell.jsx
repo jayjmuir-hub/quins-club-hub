@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { mainWidthClass } from '../lib/screenWidth.js'
+import useOnline from '../lib/useOnline.js'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import FloatingChatDock from './FloatingChatDock.jsx'
@@ -289,6 +290,7 @@ export default function AppShell({ children }) {
   // The dock's status dots — see src/lib/useDockBadges.js. Off until the
   // membership set is known, so a pending parent is never shown a dot for a
   // chat they cannot open.
+  const online = useOnline()
   const dockBadges = useDockBadges({ userId: user?.id ?? null, admin: isAdmin(memberships), enabled: ready })
   const currentRoleLabel = roleLabel(memberships)
   // The KEY, for the Badge tone — the same design-system role tag the
@@ -756,6 +758,17 @@ export default function AppShell({ children }) {
             `ready` branch they would never see it. It renders nothing at all
             unless there is an install route to offer — see InstallPrompt. */}
         <InstallPrompt />
+        {/* 2 Sep 2026 UX review (parents, Medium): the service worker serves
+            what it last loaded, and nothing said so. src/lib/useOnline.js. */}
+        {!online && (
+          <p
+            role="status"
+            data-testid="offline-banner"
+            className="mb-3 rounded-[10px] bg-warn-bg px-3 py-2 text-[13px] font-semibold text-warn-ink"
+          >
+            You&apos;re offline — showing what was last loaded.
+          </p>
+        )}
         {location.state?.missing && (
           <p
             role="status"

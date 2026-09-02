@@ -43,19 +43,56 @@ function PasswordChecklist({ password }) {
   )
 }
 
+// ── The draft ───────────────────────────────────────────────────────────────
+//
+// Everything typed into the wizard survives a tab switch, a back-swipe or a
+// reload as a sessionStorage draft — 2 Sep 2026 UX review (parents, Medium):
+// iOS kills background tabs freely, so a parent who switched to Photos for a
+// picture came back to an empty form. ⚠️ NEVER THE PASSWORD. sessionStorage
+// is per tab and dies with the browser; the password is the one field worth
+// retyping. Cleared the moment the account submit succeeds.
+const DRAFT_KEY = 'signup-draft'
+function readDraft() {
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+function writeDraft(draft) {
+  try {
+    window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  } catch {
+    // Private mode or a full store: the wizard still works, only the draft is lost.
+  }
+}
+export function clearSignupDraft() {
+  try {
+    window.sessionStorage.removeItem(DRAFT_KEY)
+  } catch {
+    // Nothing to clear, or nothing we can do about it.
+  }
+}
+
 export default function SignupWizard({ busy, error, onError, onSubmitAccount }) {
-  const [step, setStep] = useState('who') // 'who' | 'players' | 'account'
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [answers, setAnswers] = useState({})
-  const [squadIds, setSquadIds] = useState([])
-  const [staffRole, setStaffRole] = useState('')
-  const [staffTeamId, setStaffTeamId] = useState('')
-  const [players, setPlayers] = useState([])
+  const draft = readDraft() ?? {}
+  const [step, setStep] = useState(draft.step === 'account' || draft.step === 'players' ? draft.step : 'who') // 'who' | 'players' | 'account'
+  const [firstName, setFirstName] = useState(typeof draft.firstName === 'string' ? draft.firstName : '')
+  const [lastName, setLastName] = useState(typeof draft.lastName === 'string' ? draft.lastName : '')
+  const [answers, setAnswers] = useState(draft.answers && typeof draft.answers === 'object' ? draft.answers : {})
+  const [squadIds, setSquadIds] = useState(Array.isArray(draft.squadIds) ? draft.squadIds : [])
+  const [staffRole, setStaffRole] = useState(typeof draft.staffRole === 'string' ? draft.staffRole : '')
+  const [staffTeamId, setStaffTeamId] = useState(typeof draft.staffTeamId === 'string' ? draft.staffTeamId : '')
+  const [players, setPlayers] = useState(Array.isArray(draft.players) ? draft.players : [])
   const [teams, setTeams] = useState([])
   const [teamsFailed, setTeamsFailed] = useState(false)
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(typeof draft.email === 'string' ? draft.email : '')
   const [password, setPassword] = useState('')
+
+  useEffect(() => {
+    writeDraft({ step, firstName, lastName, answers, squadIds, staffRole, staffTeamId, players, email })
+  }, [step, firstName, lastName, answers, squadIds, staffRole, staffTeamId, players, email])
   const [showPassword, setShowPassword] = useState(false)
   // The squads are loading while none have arrived and nothing has failed; after
   // a few seconds say so honestly — claude/plans/2026-08-28-provider-resilience.md §3.
@@ -145,6 +182,8 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
       return
     }
     await onSubmitAccount({ email: trimmed, password, intent })
+    // Resolved without throwing: the account exists, the draft has done its job.
+    clearSignupDraft()
   }
 
   const passwordOk = checkPassword(password).valid
@@ -184,7 +223,7 @@ export default function SignupWizard({ busy, error, onError, onSubmitAccount }) 
     return (
       <form className="mt-4" onSubmit={handleAccount} noValidate>
         <p className="mb-3 text-sm leading-relaxed text-ink-faint">
-          Last step: a login. We'll email this address so the club knows it's really you.
+          Last step: choose a login. You'll go straight in.
         </p>
         {error && (
           <p role="alert" className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">

@@ -65,7 +65,7 @@ const STATUS_OFF = 'border-line bg-surface-card text-ink-muted hover:bg-surface-
 
 function StatusButtons({ status, disabled, onSet, onClear }) {
   return (
-    <div className="flex shrink-0 gap-1.5" role="group" aria-label="Set availability">
+    <div className="flex shrink-0 flex-wrap items-center gap-1.5" role="group" aria-label="Set availability">
       {STATUSES.map((option) => {
         const pressed = status === option.value
         return (
@@ -74,7 +74,11 @@ function StatusButtons({ status, disabled, onSet, onClear }) {
             type="button"
             disabled={disabled}
             aria-pressed={pressed}
-            onClick={() => (pressed ? onClear() : onSet(option.value))}
+            // ⚠️ TAPPING THE ANSWER YOU ALREADY GAVE DOES NOTHING (2 Sep 2026 UX
+            // review, parents, Medium). It used to CLEAR it: a nervous
+            // double-tap on "In" became "No response" with no sign. Clearing
+            // is the explicit control after the three.
+            onClick={() => (pressed ? undefined : onSet(option.value))}
             className={[
               // Task 22 fix: these three toggle buttons had no focus-visible
               // ring at all — a real gap the brief's "focus rings are already
@@ -87,6 +91,17 @@ function StatusButtons({ status, disabled, onSet, onClear }) {
           </button>
         )
       })}
+      {status && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onClear}
+          aria-label="Clear answer"
+          className="min-h-[44px] px-2 text-[12.5px] font-semibold text-ink-muted underline-offset-2 hover:underline disabled:opacity-60"
+        >
+          Clear
+        </button>
+      )}
     </div>
   )
 }
@@ -355,9 +370,23 @@ export default function Availability({ event, team, onClose }) {
             <span>{counts.none} no response</span>
           </div>
 
+          {/* ⚠️ YOUR PLAYER FIRST (2 Sep 2026 UX review, parents, Medium). All
+              players were sorted by name, so a parent of a child late in the
+              alphabet scrolled past twenty-five read-only rows to reach the
+              one they can answer for. Staff have no "own" rows and see the
+              one list as before. */}
+          {myPlayerIds.size > 0 && players.some((p) => myPlayerIds.has(p.id)) && (
+            <h3 className="mb-1 text-[11px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+              Your player{players.filter((p) => myPlayerIds.has(p.id)).length === 1 ? '' : 's'}
+            </h3>
+          )}
           <ul>
             {[...players]
-              .sort((a, b) => a.full_name.localeCompare(b.full_name))
+              .sort((a, b) => {
+                const mineA = myPlayerIds.has(a.id) ? 0 : 1
+                const mineB = myPlayerIds.has(b.id) ? 0 : 1
+                return mineA - mineB || a.full_name.localeCompare(b.full_name)
+              })
               .map((player) => (
                 <PlayerRow
                   key={player.id}

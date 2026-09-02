@@ -339,7 +339,23 @@ describe('Availability — realtime', () => {
 })
 
 describe('Availability — clear and lock', () => {
-  it('clears a status when its already-selected button is clicked again', async () => {
+  it('⚠️ tapping the answer already given does NOTHING — clearing is its own control', async () => {
+    // 2 Sep 2026 UX review (parents, Medium): a nervous double-tap on "In"
+    // used to become "No response" with no sign.
+    useMembershipsMock.mockReturnValue(memberships(COACH))
+    listAvailabilityMock.mockResolvedValue([
+      { id: 'a1', event_id: 'e-1', player_id: 'p-ana', status: 'in' },
+    ])
+    const { user } = setup()
+    await screen.findByText('Ana Silva')
+    const row = screen.getByText('Ana Silva').closest('li')
+    await user.click(within(row).getByRole('button', { name: /^in$/i }))
+    expect(clearAvailabilityMock).not.toHaveBeenCalled()
+    expect(setAvailabilityMock).not.toHaveBeenCalled()
+    expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('clears a status through the explicit Clear control', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH))
     listAvailabilityMock.mockResolvedValue([
       { id: 'a1', event_id: 'e-1', player_id: 'p-ana', status: 'in' },
@@ -351,7 +367,7 @@ describe('Availability — clear and lock', () => {
     const row = screen.getByText('Ana Silva').closest('li')
     expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'true')
 
-    await user.click(within(row).getByRole('button', { name: /^in$/i }))
+    await user.click(within(row).getByRole('button', { name: /clear answer/i }))
 
     expect(clearAvailabilityMock).toHaveBeenCalledWith('e-1', 'p-ana')
     expect(within(row).getByRole('button', { name: /^in$/i })).toHaveAttribute('aria-pressed', 'false')
@@ -369,7 +385,7 @@ describe('Availability — clear and lock', () => {
     const row = screen.getByText('Ana Silva').closest('li')
     const before = listAvailabilityMock.mock.calls.length
 
-    await user.click(within(row).getByRole('button', { name: /^in$/i }))
+    await user.click(within(row).getByRole('button', { name: /clear answer/i }))
 
     await waitFor(() => expect(listAvailabilityMock.mock.calls.length).toBeGreaterThan(before))
   })

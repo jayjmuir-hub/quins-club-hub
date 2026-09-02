@@ -57,3 +57,42 @@ describe('SignupWizard — Back from the account step', () => {
     expect(seenInitialRows).toHaveBeenLastCalledWith([{ key: 'row-1', firstName: 'Teodora' }])
   })
 })
+
+// The draft (2 Sep 2026 UX review, parents, Medium): a tab switch or a
+// reload used to empty the wizard; iOS kills background tabs freely.
+describe('SignupWizard — the draft', () => {
+  beforeEach(() => window.sessionStorage.clear())
+
+  it('restores the names on a fresh mount, and never stores the password', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<SignupWizard busy={false} error={null} onError={vi.fn()} onSubmitAccount={vi.fn()} />)
+    await user.type(screen.getByLabelText(/your first name/i), 'Sam')
+    await user.type(screen.getByLabelText(/your family name/i), 'Okonkwo-Reyes')
+    unmount()
+
+    const raw = window.sessionStorage.getItem('signup-draft')
+    expect(raw).not.toBeNull()
+    expect(Object.keys(JSON.parse(raw))).not.toContain('password')
+
+    render(<SignupWizard busy={false} error={null} onError={vi.fn()} onSubmitAccount={vi.fn()} />)
+    expect(screen.getByLabelText(/your first name/i)).toHaveValue('Sam')
+    expect(screen.getByLabelText(/your family name/i)).toHaveValue('Okonkwo-Reyes')
+  })
+
+  it('clears the draft once the account submit resolves', async () => {
+    const user = userEvent.setup()
+    const onSubmitAccount = vi.fn().mockResolvedValue(undefined)
+    render(<SignupWizard busy={false} error={null} onError={vi.fn()} onSubmitAccount={onSubmitAccount} />)
+    await user.type(screen.getByLabelText(/your first name/i), 'Sam')
+    await user.type(screen.getByLabelText(/your family name/i), 'Okonkwo-Reyes')
+    await user.click(screen.getByRole('checkbox', { name: /i have a child playing here/i }))
+    await user.click(await screen.findByRole('checkbox', { name: /u10 mixed/i }))
+    await user.click(screen.getByRole('button', { name: /^continue$/i }))
+    await user.click(screen.getByRole('button', { name: /^continue$/i }))
+    await user.type(await screen.findByLabelText(/email/i), 'sam@example.invalid')
+    await user.type(screen.getByLabelText(/^password$/i), 'Long-enough-passphrase-9')
+    await user.click(screen.getByRole('button', { name: /send my details/i }))
+    await vi.waitFor(() => expect(onSubmitAccount).toHaveBeenCalled())
+    await vi.waitFor(() => expect(window.sessionStorage.getItem('signup-draft')).toBeNull())
+  })
+})

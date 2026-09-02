@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ux): the two follow-ups the UX programme left open.** (1) The
+- **fix(ux): the parent Medium findings from the full review.** (1)
+  Availability: tapping the answer you already gave no longer clears it — a
+  nervous double-tap on "In" became "No response" with no sign; clearing is
+  an explicit Clear after the three buttons, and a parent's own player rows
+  come first under a "Your player" heading instead of twenty-five read-only
+  rows away (`Availability.jsx`). (2) Sign-up copy stops promising an email
+  that has not been sent since 25 August: "Last step: choose a login. You'll
+  go straight in." (3) The notifications toggle describes what it actually
+  sends — notices, chat, fixture changes, replies — rather than "replies to
+  a report you sent". (4) An offline banner in the shell, "You're offline —
+  showing what was last loaded" (`src/lib/useOnline.js`), because the
+  service worker serves stale data silently. (5) The venue on a fixture is a
+  Maps link with the pitch appended (`EventDetail.jsx`). (6) The sign-up
+  wizard keeps a `sessionStorage` draft — everything but the password — so
+  a tab switch or reload no longer empties it; cleared when the account
+  submit resolves (`SignupWizard.jsx`). ⚠️ **Deferred:** a visible caption
+  on the account avatar — the masthead row is already over-full between 820
+  and 1,280px (see the wordmark note in `AppShell.jsx`), so a caption needs
+  its own layout pass.
+- `9473a80` — **fix(ux): the two follow-ups the UX programme left open.** (1) The
   team sheet keeps a `sessionStorage` draft per fixture (`Lineup.jsx`), so
   leaving by the dock or the sidebar — plain links, no route blocker — no
   longer discards fifteen placed shirts; restored only when the server has no
