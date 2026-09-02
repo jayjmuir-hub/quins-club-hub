@@ -25,14 +25,15 @@ invented fixture data and belongs with the plans only as this summary.
 
 ## Follow-ups the shipped items left behind, on purpose
 
-- **Item 1:** leaving the team sheet via the dock or sidebar still discards.
-  The lineup row is created on first Save so "did anyone pick a team?" stays
-  answerable, and the app is on `BrowserRouter` with no route blocker. A
-  `sessionStorage` draft like the match sheet's is the fix if coaches hit it.
-- **Item 2:** `AdminClub.jsx`, `Roster.jsx` and `RosterTable.jsx` are
-  allowlisted in the sweep test because the senior-squads-2a session had
-  uncommitted edits on those exact lines. Convert them and shrink the list
-  once that branch lands. The allowlist comment says the same.
+- **Item 1:** ~~leaving the team sheet via the dock or sidebar still
+  discards~~ **CLOSED 2 Sep 2026**: `Lineup.jsx` keeps a `sessionStorage`
+  draft per fixture, restored only when the server has no lineup, cleared on
+  save — the match sheet's shape. The lineup row is still created on first
+  Save, so "did anyone pick a team?" stays answerable.
+- **Item 2:** ~~`AdminClub.jsx`, `Roster.jsx` and `RosterTable.jsx` are
+  allowlisted in the sweep test~~ **CLOSED 2 Sep 2026**: senior squads
+  (#640) landed, the five remaining raw renders were converted, and the
+  allowlist is the helper alone.
 
 ## Item 3 — form errors land where the thumb is
 
@@ -81,8 +82,8 @@ severity order, one pull request per cluster, each a live deploy.
 | Cluster | Findings | Status |
 |---|---|---|
 | High + pattern 7 leftovers | Home blanked by a refused DM; invite dead end; announce-only Reply; Back closes a sheet; unknown path says so | **SHIPPED** `cc550dc` (#652) |
-| Follow-ups from items 1 and 2 | team-sheet draft; sweep allowlist to the helper alone | `claude/ux-followups`, waiting to open |
-| Coach/manager Medium | Lineup save chip; match sheet "Mark ready to send" + draft before share; Accounts prose folded; Availability names wrap; admin panels scroll into view; squad screens Try again; Schedule status after multi-add | building, `claude/ux-coach-cluster`. **Deferred:** DatePicker/TimePicker in AddGameForm and TrainingPublish (tests drive the native inputs) |
+| Follow-ups from items 1 and 2 | team-sheet draft; sweep allowlist to the helper alone | building, `claude/ux-followups` |
+| Coach/manager Medium | Lineup save chip; match sheet "Mark ready to send" + draft before share; Accounts prose folded; Availability names wrap; admin panels scroll into view; squad screens Try again; Schedule status after multi-add | **SHIPPED** `4093935` (#653). **Deferred:** DatePicker/TimePicker in AddGameForm and TrainingPublish (tests drive the native inputs) |
 | Parent Medium | availability tap-to-clear + own child first; sign-up copy; offline banner; Maps link; wizard draft; avatar caption | not started |
 | Pattern leftovers | RequireAuth slow-load reload; Home first-load gate includes notices; photo aspect-ratio; PlayerDetail reserved space; Documents `window.confirm`; per-field error helpers | not started |
 | Desktop | event-form sheet width and fieldsets; ChatPhoto Escape and focus trap; starred message scroll-to | not started |

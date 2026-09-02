@@ -172,6 +172,47 @@ function PickedRow({ player, status, fixtureTier, grade, onRemove, onToggleRole 
   )
 }
 
+// ── The draft ───────────────────────────────────────────────────────────────
+//
+// Shirts placed survive leaving by the dock or the sidebar, a back-swipe or a
+// reload, as a sessionStorage draft per fixture — the follow-up item 1 of the
+// 2 Sep 2026 UX review left open ("leaving the team sheet via the dock or
+// sidebar still discards"). The Back button and beforeunload already ask;
+// the dock and sidebar are plain links on BrowserRouter with no route
+// blocker, so a draft is the only guard that covers every route out. The
+// same shape as MatchSheet's, for the same reasons.
+//
+// ⚠️ A LINEUP THE SERVER HAS ALWAYS WINS. The draft is restored only when
+// listLineups returned nothing; otherwise it is discarded on load. This keeps
+// the 2 Sep ruling intact: the lineup ROW is still created on first Save, so
+// "did anyone pick a team?" stays answerable — a draft is a browser's memory,
+// not a record.
+//
+// sessionStorage, not localStorage: per tab, dies with the browser.
+const draftKey = (eventId) => `lineup-draft:${eventId}`
+function readDraft(eventId) {
+  try {
+    const raw = window.sessionStorage.getItem(draftKey(eventId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+function writeDraft(eventId, draft) {
+  try {
+    window.sessionStorage.setItem(draftKey(eventId), JSON.stringify(draft))
+  } catch {
+    // Private mode or a full store: the sheet still works, only the draft is lost.
+  }
+}
+function clearDraft(eventId) {
+  try {
+    window.sessionStorage.removeItem(draftKey(eventId))
+  } catch {
+    // Nothing to clear, or nothing we can do about it.
+  }
+}
+
 export default function Lineup() {
   const { eventId } = useParams()
   const navigate = useNavigate()
@@ -245,6 +286,12 @@ export default function Lineup() {
     setSaved(false)
     setDirty(true)
   }
+  // Every edit is already marked dirty; the draft follows the state, so no
+  // edit site has to remember to write it.
+  useEffect(() => {
+    if (!dirty || loading) return
+    writeDraft(eventId, { slotted, reps, perSide, squadSize, notes, savedAt: Date.now() })
+  }, [dirty, loading, eventId, slotted, reps, perSide, squadSize, notes])
   const shareRef = useRef(null)
 
   useEffect(() => {
@@ -320,7 +367,19 @@ export default function Lineup() {
           // GUIDE, NOT A GATE: the coach can change it, and an existing lineup
           // above keeps whatever it was saved with. src/lib/fixtureFormat.js.
           setPerSide(formatOf(eventRow))
+          // ...unless this tab holds unsaved shirts for this fixture. See the
+          // draft note above the component: only when the server has nothing.
+          const draft = readDraft(eventId)
+          if (draft && Array.isArray(draft.slotted)) {
+            setSlotted(draft.slotted)
+            setReps(Array.isArray(draft.reps) ? draft.reps : [])
+            if (draft.perSide != null) setPerSide(draft.perSide)
+            if (draft.squadSize != null) setSquadSize(draft.squadSize)
+            if (typeof draft.notes === 'string') setNotes(draft.notes)
+            setDirty(true)
+          }
         }
+        if (existing) clearDraft(eventId)
       })
       .catch((failure) => {
         if (mounted) setError(failure)
@@ -554,6 +613,7 @@ export default function Lineup() {
         })
       })
       await saveLineupPlayers(id, rows)
+      clearDraft(eventId)
       setSaved(true)
       setDirty(false)
     } catch (failure) {
