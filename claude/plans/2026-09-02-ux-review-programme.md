@@ -80,9 +80,9 @@ severity order, one pull request per cluster, each a live deploy.
 
 | Cluster | Findings | Status |
 |---|---|---|
-| High + pattern 7 leftovers | Home blanked by a refused DM; invite dead end; announce-only Reply; Back closes a sheet; unknown path says so | building, `claude/ux-high-cluster` |
+| High + pattern 7 leftovers | Home blanked by a refused DM; invite dead end; announce-only Reply; Back closes a sheet; unknown path says so | **SHIPPED** `cc550dc` (#652) |
 | Follow-ups from items 1 and 2 | team-sheet draft; sweep allowlist to the helper alone | `claude/ux-followups`, waiting to open |
-| Coach/manager Medium | Lineup save bar; match sheet "Mark ready to send" + draft before share; Accounts prose; Availability names wrap; admin panels scroll into view; squad screens Try again; DatePicker/TimePicker in AddGameForm and TrainingPublish; Schedule status after multi-add | not started |
+| Coach/manager Medium | Lineup save chip; match sheet "Mark ready to send" + draft before share; Accounts prose folded; Availability names wrap; admin panels scroll into view; squad screens Try again; Schedule status after multi-add | building, `claude/ux-coach-cluster`. **Deferred:** DatePicker/TimePicker in AddGameForm and TrainingPublish (tests drive the native inputs) |
 | Parent Medium | availability tap-to-clear + own child first; sign-up copy; offline banner; Maps link; wizard draft; avatar caption | not started |
 | Pattern leftovers | RequireAuth slow-load reload; Home first-load gate includes notices; photo aspect-ratio; PlayerDetail reserved space; Documents `window.confirm`; per-field error helpers | not started |
 | Desktop | event-form sheet width and fieldsets; ChatPhoto Escape and focus trap; starred message scroll-to | not started |

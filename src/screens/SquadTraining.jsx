@@ -112,8 +112,15 @@ export default function SquadTraining() {
       </div>
 
       {error && (
-        <p role="alert" className="mb-3 text-[13px] font-semibold text-danger-ink">
-          Something went wrong loading the sessions. Try again shortly.
+        <p role="alert" className="mb-3 flex flex-wrap items-center gap-2 text-[13px] font-semibold text-danger-ink">
+          <span>Something went wrong loading the sessions.</span>
+          <button
+            type="button"
+            onClick={() => setPlanReload((n) => n + 1)}
+            className="min-h-[44px] rounded-[9px] border border-line bg-surface-card px-3 text-[13px] font-bold text-ink"
+          >
+            Try again
+          </button>
         </p>
       )}
       {loading && <Spinner label="Loading sessions…" />}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useRevealOnOpen from '../lib/useRevealOnOpen.js'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Chip from '../components/Chip.jsx'
@@ -263,6 +264,7 @@ function TemplatesBody() {
 
   // The template being edited, or 'new'. null means the builder is closed.
   const [editing, setEditing] = useState(null)
+  const panelRef = useRevealOnOpen(editing === 'new' ? 'new' : editing?.id ?? null)
   const [draft, setDraft] = useState(BLANK)
   const [blocks, setBlocks] = useState([])
   const [picked, setPicked] = useState('')
@@ -623,7 +625,7 @@ function TemplatesBody() {
       )}
 
       {editing && (
-        <Card className="mt-3.5 p-3.5" data-testid="template-panel">
+        <Card ref={panelRef} className="mt-3.5 p-3.5" data-testid="template-panel">
           <h3 className="mb-2.5 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
             {editing === 'new' ? 'Add a template' : `Edit ${editing.name}`}
           </h3>

@@ -802,6 +802,12 @@ export default function MatchSheet() {
     setSharing(true)
     setSaveError(null)
     try {
+      // ⚠️ SAVED BEFORE IT IS PHOTOGRAPHED (2 Sep 2026 UX review, Medium).
+      // Share used to picture the form without persisting it, so a correct
+      // image could go to RCM whose record was never saved and was then
+      // lost on the next back-swipe. persist(null) is "Save draft": it keeps
+      // whatever status the sheet already has.
+      await persist(null)
       await shareElementAsImage(printRef.current, {
         filename: `match-sheet-${eventId}.png`,
         title: 'RCM match sheet',
@@ -917,13 +923,20 @@ export default function MatchSheet() {
                 gate existed must still be fixable, and refusing to reopen it
                 would be the app defending its own rule against the person
                 trying to obey it. */}
+            {/* ⚠️ "Mark ready to send", NOT "Submit" (2 Sep 2026 UX review,
+                Medium). "Submit" read as "sent to RCM"; a coach could press
+                it, close the app and believe the sheet had gone in. The app
+                cannot send anything — the label now says exactly what the
+                state below says. Once marked, Share becomes the primary
+                action because sharing is the step that is still to do. */}
             <Button
+              variant={complete ? 'secondary' : undefined}
               disabled={saving || (missingLeagueTeam && !complete)}
               onClick={() => persist(complete ? 'draft' : 'complete').catch(() => {})}
             >
-              {complete ? 'Reopen' : 'Submit'}
+              {complete ? 'Reopen' : 'Mark ready to send'}
             </Button>
-            <Button variant="secondary" disabled={sharing} onClick={share}>
+            <Button variant={complete ? undefined : 'secondary'} disabled={sharing || saving} onClick={share}>
               {sharing ? 'Preparing…' : 'Share'}
             </Button>
           </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useRevealOnOpen from '../lib/useRevealOnOpen.js'
 import { Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
 import { friendlyMessage } from '../lib/friendlyError.js'
@@ -236,6 +237,8 @@ export default function AdminClub() {
   // the squad's current state and flip it in place. Deriving the row from
   // `teams` by id costs a find() per render and makes a reload redraw the panel.
   const [scoringTeamId, setScoringTeamId] = useState(null)
+  const scoringPanelRef = useRevealOnOpen(scoringTeamId)
+  const leagueTeamPanelRef = useRevealOnOpen(editing?.id ?? null)
   const scoringTeam = teams.find((team) => team.id === scoringTeamId) ?? null
   const [draftKinds, setDraftKinds] = useState([])
 
@@ -649,7 +652,7 @@ export default function AdminClub() {
       )}
 
       {(editing || adding) && (
-        <Card className="mt-3.5 p-3.5">
+        <Card ref={leagueTeamPanelRef} className="mt-3.5 p-3.5">
           <h3 className="mb-2.5 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
             {editing ? `Edit ${editing.rcm_name}` : `Add a league team to ${adding.name}`}
           </h3>
@@ -737,7 +740,7 @@ export default function AdminClub() {
       )}
 
       {scoringTeam && (
-        <Card className="mt-3.5 p-3.5" data-testid="scoring-panel">
+        <Card className="mt-3.5 p-3.5" data-testid="scoring-panel" ref={scoringPanelRef}>
           <h3 className="mb-2.5 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
             Scoring for {scoringTeam.name}
           </h3>

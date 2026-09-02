@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import useRevealOnOpen from '../lib/useRevealOnOpen.js'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -89,6 +90,8 @@ export default function Pitches() {
   const [editing, setEditing] = useState(null)
   const [draftName, setDraftName] = useState('')
   const [adding, setAdding] = useState(null)
+  // After BOTH states it reads: `adding` is declared below `editing`.
+  const panelRef = useRevealOnOpen(editing?.id ?? (adding !== null ? 'new' : null))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
@@ -245,7 +248,7 @@ export default function Pitches() {
       )}
 
       {(editing || adding !== null) && (
-        <Card className="mt-3.5 p-3.5">
+        <Card ref={panelRef} className="mt-3.5 p-3.5">
           <h3 className="mb-2.5 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
             {editing ? `Edit ${editing.name}` : 'Add a pitch'}
           </h3>

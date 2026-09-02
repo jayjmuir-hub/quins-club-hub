@@ -1,3 +1,4 @@
+import { forwardRef } from 'react'
 // Base card container (design-system.md §4.5 / §3): white background, the
 // design system's large radius (--radius, 16px) and elevation (--shadow), a
 // hairline border. No default padding — the prototype uses .card both as a
@@ -9,7 +10,11 @@
 // <section>) without duplicating the base styling — not used yet, but cheap
 // and matches how Nav/AppShell already accept a few such escape hatches.
 
-export function Card({ as: Tag = 'div', className = '', children, ...rest }) {
+// ⚠️ forwardRef SINCE 2 Sep 2026: editor panels scroll themselves into view
+// when they open (src/lib/useRevealOnOpen.js), and a function component on
+// React 18 drops a `ref` on the floor with a console warning. The ref lands
+// on the rendered element; nothing else changed.
+export const Card = forwardRef(function Card({ as: Tag = 'div', className = '', children, ...rest }, ref) {
   const classes = [
     'rounded-card',
     'border',
@@ -30,10 +35,10 @@ export function Card({ as: Tag = 'div', className = '', children, ...rest }) {
     .join(' ')
 
   return (
-    <Tag className={classes} {...rest}>
+    <Tag ref={ref} className={classes} {...rest}>
       {children}
     </Tag>
   )
-}
+})
 
 export default Card

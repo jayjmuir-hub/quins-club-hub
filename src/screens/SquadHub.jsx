@@ -409,8 +409,17 @@ export default function SquadHub() {
       </div>
 
       {error && (
-        <p role="alert" className="mb-3 text-[13px] font-semibold text-danger-ink">
-          Something went wrong loading this squad. Pull to refresh or try again shortly.
+        <p role="alert" className="mb-3 flex flex-wrap items-center gap-2 text-[13px] font-semibold text-danger-ink">
+          {/* ⚠️ A BUTTON, NOT "pull to refresh" — this PWA has no pull-to-refresh
+              (2 Sep 2026 UX review, Medium). Same shape as the roster's. */}
+          <span>Something went wrong loading this squad.</span>
+          <button
+            type="button"
+            onClick={() => setReloadToken((token) => token + 1)}
+            className="min-h-[44px] rounded-[9px] border border-line bg-surface-card px-3 text-[13px] font-bold text-ink"
+          >
+            Try again
+          </button>
         </p>
       )}
       {loading && (
