@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(format): FORMAT ON THE FIXTURE — 7s, 10s, 12s or 15s.** Piece 1 of the
+- **docs(plan): SENIOR SQUADS — the two remaining specs, nothing built.** Jay,
+  2 Sep 2026: add the senior teams (about four men's squads plus women's
+  sides), jersey numbers for seniors only, U18 players called up at 17 or over
+  with parental consent and the U18 staff informed with no veto, full
+  membership in every squad a player is in (option C, chosen over a
+  home-squad-plus-guests model), a Senior Section overview shared by the club
+  captain and one or two others, season stats and union registration numbers
+  for seniors. Money is out entirely.
+  `claude/plans/2026-09-02-senior-squads.md` is pieces 2 and 3;
+  `claude/plans/2026-09-02-standings-and-results.md` is piece 4 — league
+  tables for every division that plays league, juniors included, from three
+  routes (type, share-and-confirm via a reader, fetch) into one results table;
+  Jay: "option 1 and 2 ... option to use either". Piece 1 shipped as `3f9d462`
+  below. Both specs carry tombstones for the August "no jersey numbers" ruling
+  (narrowed to youth squads, not deleted) and for the declined options.
+- `3f9d462` — **feat(format): FORMAT ON THE FIXTURE — 7s, 10s, 12s or 15s.** Piece 1 of the
   senior-squads work, `claude/plans/2026-09-02-fixture-format.md`. A league match
   is always 15 and is not asked; a tournament or friendly on a U11+ squad asks,
   pre-selecting the squad's usual format (`teams.default_format`, set on the
