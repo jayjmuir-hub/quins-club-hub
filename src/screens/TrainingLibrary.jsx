@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useRevealOnOpen from '../lib/useRevealOnOpen.js'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Chip from '../components/Chip.jsx'
@@ -154,6 +155,7 @@ function LibraryBody() {
 
   // The drill being edited, or 'new'. null means the panel is closed.
   const [editing, setEditing] = useState(null)
+  const panelRef = useRevealOnOpen(editing === 'new' ? 'new' : editing?.id ?? null)
   const [draft, setDraft] = useState(BLANK)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -428,7 +430,7 @@ function LibraryBody() {
       )}
 
       {editing && (
-        <Card className="mt-3.5 p-3.5" data-testid="drill-panel">
+        <Card ref={panelRef} className="mt-3.5 p-3.5" data-testid="drill-panel">
           <h3 className="mb-2.5 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
             {editing === 'new' ? 'Add a drill' : `Edit ${editing.title}`}
           </h3>

@@ -1539,7 +1539,11 @@ export default function EventForm({
 
     write
       .then((saved) => {
-        onSaved?.(saved)
+        // The second argument is NEW (2 Sep 2026 UX review, Medium) and every
+        // existing caller ignores it: how many rows this save wrote, so the
+        // schedule can say "Added 14 events" — training publish already
+        // reports its count; this form closed silently.
+        onSaved?.(saved, { count: rows ? rows.length : 1 })
         onClose?.()
       })
       .catch((err) => {

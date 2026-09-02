@@ -765,8 +765,24 @@ export default function Lineup() {
       <div className="mb-3.5 mt-1 flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Team sheet</h2>
         <div className="flex items-center gap-3">
+          {/* ⚠️ THE STATE AND THE SAVE ARE IN THE HEADER (2 Sep 2026 UX review,
+              coaches, Medium): Save used to exist only at the foot of the
+              whole squad list, so after picking a team the coach scrolled
+              past every unpicked player, the notes and the sheet toggle to
+              find it, and "Saved" only appeared down there. The chip says
+              how many are picked and whether that is saved; the button is
+              the same save() as the one at the foot. "Save changes", not
+              "Save", so the two never share an accessible name. */}
+          <span
+            data-testid="picked-chip"
+            className={`rounded-[100px] px-2.5 py-1 text-[12.5px] font-semibold ${dirty ? 'bg-warn-bg text-warn-ink' : 'bg-surface-sunk text-ink-muted'}`}
+          >
+            {picked.length} picked{dirty ? ' · unsaved changes' : saved ? ' · saved' : ''}
+          </span>
           {dirty && (
-            <span className="text-[12.5px] font-semibold text-warn-ink">Unsaved changes</span>
+            <Button size="sm" onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </Button>
           )}
           {/* 44px tall: the UX review measured the old bare text link at ~16px. */}
           <button

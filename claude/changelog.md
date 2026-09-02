@@ -10,7 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ux): the three High findings outside the eight items, and two
+- **fix(ux): the coach and manager Medium findings from the full review.**
+  (1) Team sheet: a "N picked · unsaved changes" chip and a Save changes
+  button in the header (`Lineup.jsx`) — Save lived only at the foot of the
+  whole squad list. (2) Match sheet: "Submit" is now "Mark ready to send",
+  which is what it does; Share saves the draft before it photographs the
+  form, and becomes the primary action once the sheet is marked
+  (`MatchSheet.jsx`). (3) Accounts: the explanation folds behind "How
+  accounts work" so the queue is nearer the top. (4) Availability: a player's
+  name wraps to two lines instead of truncating to "Charlie Nguyen…". (5)
+  Admin editor panels scroll into view when they open (`useRevealOnOpen`,
+  used by club settings, pitches, drills and templates); `Card` now forwards
+  a ref. (6) Squad Hub, squad training and the match-roster picker get a
+  Try again button — "pull to refresh" named a gesture this PWA does not
+  have. (7) Schedule says "Added N events." for five seconds after a
+  multi-row add (`EventForm` passes the count as a second argument every
+  other caller ignores). ⚠️ **Deferred:** swapping the native date and time
+  inputs in AddGameForm and TrainingPublish for `DatePicker`/`TimePicker` —
+  their tests drive the native inputs and need rewriting first.
+- `cc550dc` — **fix(ux): the three High findings outside the eight items, and two
   pattern-7 leftovers.** From the full UX review (2 Sep 2026). (1) A refused
   DM from a squad contact no longer blanks Home: `Dashboard.jsx` keeps a
   `chatError` beside the staff cards instead of switching the whole screen

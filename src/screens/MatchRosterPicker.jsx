@@ -43,6 +43,7 @@ export default function MatchRosterPicker() {
   const [lineupCounts, setLineupCounts] = useState(() => new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   const team = teams?.find((candidate) => candidate.id === teamId)
   const mayView = canEditTeam(memberships, teamId)
@@ -94,7 +95,7 @@ export default function MatchRosterPicker() {
     return () => {
       mounted = false
     }
-  }, [teamId, mayView])
+  }, [teamId, mayView, reloadToken])
 
   if (membershipsLoading) return <Spinner label="Loading…" />
   if (!mayView) {
@@ -115,8 +116,15 @@ export default function MatchRosterPicker() {
       </div>
 
       {error && (
-        <p role="alert" className="mb-3 text-[13px] font-semibold text-danger-ink">
-          Something went wrong loading the fixtures. Try again shortly.
+        <p role="alert" className="mb-3 flex flex-wrap items-center gap-2 text-[13px] font-semibold text-danger-ink">
+          <span>Something went wrong loading the fixtures.</span>
+          <button
+            type="button"
+            onClick={() => setReloadToken((token) => token + 1)}
+            className="min-h-[44px] rounded-[9px] border border-line bg-surface-card px-3 text-[13px] font-bold text-ink"
+          >
+            Try again
+          </button>
         </p>
       )}
       {loading && <Spinner label="Loading fixtures…" />}

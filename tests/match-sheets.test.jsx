@@ -476,7 +476,7 @@ describe('MatchSheet — the form', () => {
   it('submits by marking the sheet complete', async () => {
     const { user } = mount(<MatchSheet />)
     await screen.findByRole('heading', { name: /official match result sheet/i })
-    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    await user.click(screen.getByRole('button', { name: /^mark ready to send$/i }))
     await waitFor(() => expect(setStatusMock).toHaveBeenCalledWith('ms-1', 'complete'))
   })
 
@@ -517,7 +517,7 @@ describe('MatchSheet — the form', () => {
       mount(<MatchSheet />)
       await screen.findByRole('heading', { name: /official match result sheet/i })
 
-      expect(screen.getByRole('button', { name: /^submit$/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /^mark ready to send$/i })).toBeDisabled()
       expect(screen.getByTestId('match-sheet-no-league-team')).toBeInTheDocument()
     })
 
@@ -537,7 +537,7 @@ describe('MatchSheet — the form', () => {
       await screen.findByRole('heading', { name: /official match result sheet/i })
 
       expect(screen.getByTestId('match-sheet-facsimile')).toHaveTextContent(/ADHQ2/)
-      expect(screen.getByRole('button', { name: /^submit$/i })).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: /^mark ready to send$/i })).not.toBeDisabled()
       expect(screen.queryByTestId('match-sheet-no-league-team')).not.toBeInTheDocument()
     })
 
@@ -959,7 +959,7 @@ describe('MatchSheet — filling it in when the paper does not fit', () => {
 
     // A short squad is normal and must still be submittable — the count says so
     // and nothing acts on it.
-    expect(screen.getByRole('button', { name: /^submit$/i })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /^mark ready to send$/i })).not.toBeDisabled()
   })
 
   it('⚠️ the card TIME box writes `minute`, the column that actually exists', async () => {

@@ -101,7 +101,11 @@ function PlayerRow({ player, status, editable, locked, saving, onSet, onClear })
         >
           {initials(player.full_name)}
         </span>
-        <span className="truncate text-[14.5px] font-bold text-ink">{player.full_name}</span>
+        {/* ⚠️ WRAPS, NEVER TRUNCATES (2 Sep 2026 UX review, Medium). At 375px
+            the three answer buttons took the width and surnames became
+            "Charlie Nguyen…" — with two players sharing a first name a coach
+            could not tell them apart. Two lines is the ceiling. */}
+        <span className="line-clamp-2 break-words text-[14.5px] font-bold leading-snug text-ink">{player.full_name}</span>
       </div>
 
       {editable ? (

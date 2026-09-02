@@ -1956,11 +1956,17 @@ export default function Accounts() {
       </div>
 
       {/* Stated once, near the top, instead of a "reset password" button that
-          could not work from the browser. */}
-      <p className={`mb-3.5 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
-        Email addresses come from each person&apos;s login and can&apos;t be changed here.
-        Passwords are self-serve — members reset their own from the sign-in screen.
-      </p>
+          could not work from the browser. ⚠️ FOLDED (2 Sep 2026 UX review,
+          Medium): on a phone this and the counts above sat between the
+          heading and the first person waiting, and a manager approving from
+          the touchline scrolled past it every time. */}
+      <details className={`mb-3.5 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
+        <summary className="cursor-pointer font-semibold">How accounts work</summary>
+        <p className="mt-1">
+          Email addresses come from each person&apos;s login and can&apos;t be changed here.
+          Passwords are self-serve — members reset their own from the sign-in screen.
+        </p>
+      </details>
 
       {isFirstLoad && (
         <div role="status" aria-live="polite" aria-label="Loading accounts…">
