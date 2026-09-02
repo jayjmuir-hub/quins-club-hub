@@ -221,6 +221,22 @@ function joinName(row) {
  * the family, and a single-gender squad in row 2 must not make row 1 ask.
  */
 /**
+ * ⚠️ SENIOR SQUADS FIRST FOR A SELF-REGISTERING ROW — Task 6 of
+ * claude/plans/2026-09-02-senior-squads-2a-implementation.md. `row.selfRegister`
+ * already carries `defaultSelfRegister` for the first row (blankRow's initial
+ * state), so partitioning on the row's own flag covers both without a second
+ * prop threaded down here.
+ *
+ * A STABLE partition, not a re-sort: within each half the list keeps the
+ * sort_order/name ordering `sortedTeams` already produced. Swapping the two
+ * halves is the entire operation.
+ */
+function partitionTeamsForRow(teams, seniorFirst) {
+  const senior = teams.filter((team) => team.is_senior === true)
+  const youth = teams.filter((team) => team.is_senior !== true)
+  return seniorFirst ? [...senior, ...youth] : [...youth, ...senior]
+}
+/**
  * `askingOwnName` is the "About you" fieldset's presence, and it exists here for
  * exactly one reason.
  *
@@ -239,6 +255,15 @@ function joinName(row) {
  */
 function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange, onRemove }) {
   const selfNamed = row.selfRegister && !askingOwnName
+  // ⚠️ THE ROW'S OWN COPY OF "WHO", used wherever the field would otherwise
+  // say "your child" — never `selfNamed`, which also depends on
+  // `askingOwnName` and answers a different question (whose NAME field is
+  // this, not whose PLAYER is this).
+  const who = row.selfRegister ? 'you' : 'your child'
+  // ⚠️ PARTITIONED, NOT THE PLAIN sortedTeams LIST — senior squads first when
+  // this row is registering an adult, youth squads first otherwise. See
+  // partitionTeamsForRow's header.
+  const rowTeams = partitionTeamsForRow(teams, row.selfRegister === true)
   const selectedTeam = teams.find((team) => team.id === row.teamId)
   const genderRequired = squadRequiresGender(selectedTeam?.name)
   // ⚠️ THE SQUAD DECIDES, AND IT COMES FROM A COLUMN —
@@ -248,6 +273,12 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
   // here would do exactly that. The database refuses it independently; this
   // only decides whether to ASK.
   const canSelfRegister = selectedTeam?.self_registration_allowed === true
+  // ⚠️ A SENIOR SQUAD CAN ONLY EVER BE SELF — teams.is_senior, the same kind
+  // of column-not-name rule as canSelfRegister above. Forces the row's
+  // selfRegister true (in the <select>'s onChange below) and replaces the
+  // self/child control with a one-line note, rather than asking a question
+  // that has exactly one legal answer.
+  const isSeniorTeam = selectedTeam?.is_senior === true
 
   // Silent until BOTH answers are on screen, so nobody is questioned about a
   // squad they have not picked yet.
@@ -268,6 +299,14 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
 
   return (
     <li data-testid="player-row" className={index === 0 ? '' : 'mt-5 border-t border-line pt-4'}>
+      {/* ⚠️ THE ONLY PLACE THIS ROW SAYS "your child" — or doesn't. Nothing
+          else in the row names who the fields are about (the labels below say
+          "Player's…" or "Your…", never "child"), so the copy the CONTROL in
+          tests/signup-adult-path.test.jsx is looking for lives here, and
+          nowhere else needs to change. */}
+      <p className="mb-2 text-[12.5px] leading-relaxed text-ink-muted">
+        {`Tell us about ${who}.`}
+      </p>
       <div className="mb-1.5 flex items-baseline justify-between gap-3">
         <label htmlFor={firstId} className={`${LABEL} mb-0`}>
           {/* Follows the answer below: a 16-year-old filling in "Player's first
@@ -406,14 +445,23 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
         onChange={(event) => {
           const nextId = event.target.value
           const next = teams.find((team) => team.id === nextId)
+          const nextIsSenior = next?.is_senior === true
           // ⚠️ CLEAR THE ANSWER WHEN THE QUESTION DISAPPEARS. Tick "this is me"
           // on U18B, then change your mind to U10 Mixed, and without this the
           // flag survives on a squad that never showed the control. The database
           // would refuse it, but the person would be reading an error about a
           // question they can no longer see.
+          //
+          // ⚠️ AND A SENIOR SQUAD FORCES IT ON, THE SAME WAY the block above
+          // forces it off — a senior squad's roster is players registering
+          // themselves; there is no "my child" answer for it to ask about.
           onChange({
             teamId: nextId,
-            selfRegister: next?.self_registration_allowed === true ? row.selfRegister : false,
+            selfRegister: nextIsSenior
+              ? true
+              : next?.self_registration_allowed === true
+                ? row.selfRegister
+                : false,
           })
         }}
         className={FIELD}
@@ -422,7 +470,7 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
             happens to be right for one family is wrong for every other one, and
             a wrong age group is a row an admin has to notice and fix. */}
         <option value="">Choose an age group…</option>
-        {teams.map((team) => (
+        {rowTeams.map((team) => (
           <option key={team.id} value={team.id}>
             {team.name}
           </option>
@@ -473,17 +521,28 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
       {/* ⚠️ CONDITIONAL on the SQUAD's column, and it appears ABOVE the gender
           field on purpose: "who is this?" changes the meaning of every question
           under it, so being asked it after naming the player reads as an
-          afterthought. Squads below U13 never see it. */}
-      {canSelfRegister && (
-        <Segmented
-          legend="Who are you registering?"
-          name={`register-who-${row.key}`}
-          options={WHO_OPTIONS}
-          value={row.selfRegister ? 'self' : 'child'}
-          onChange={(next) => onChange({ selfRegister: next === 'self' })}
-          disabled={disabled}
-          className="mt-4"
-        />
+          afterthought. Squads below U13 never see it.
+
+          ⚠️ A SENIOR SQUAD REPLACES THE QUESTION WITH A STATEMENT — it is not
+          shown alongside the control, and not shown at all once isSeniorTeam
+          is true, whatever canSelfRegister says. A control with exactly one
+          legal answer is not a question. */}
+      {isSeniorTeam ? (
+        <p className="mt-4 rounded-[11px] bg-surface px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-muted">
+          Senior squads are for players registering themselves.
+        </p>
+      ) : (
+        canSelfRegister && (
+          <Segmented
+            legend="Who are you registering?"
+            name={`register-who-${row.key}`}
+            options={WHO_OPTIONS}
+            value={row.selfRegister ? 'self' : 'child'}
+            onChange={(next) => onChange({ selfRegister: next === 'self' })}
+            disabled={disabled}
+            className="mt-4"
+          />
+        )
       )}
 
       {/* ⚠️ CONDITIONAL, not always-on. Asking every parent in the club for
