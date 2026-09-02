@@ -1,6 +1,6 @@
 # Senior Squads 2a Implementation Plan — squads, jersey numbers, players in several squads, adult sign-up
 
-**Status: NOT SHIPPED — implementation plan for steps 2–4 of `claude/plans/2026-09-02-senior-squads.md`, not yet executed.** Dated 2026-09-02.
+**Status: EXECUTED 2 Sep 2026 — pull request pending.** Dated 2026-09-02.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

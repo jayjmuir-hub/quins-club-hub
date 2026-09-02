@@ -324,6 +324,8 @@ division. The season-record view above stays as the seniors' own record.
 
 ## Order of work
 
+⚠️ Steps 2–4 BUILT as 2a on 2 Sep 2026 — claude/plans/2026-09-02-senior-squads-2a-implementation.md.
+
 1. Piece 1 (format on the fixture) — separate plan, ships first.
 2. `uses_jersey_numbers`, the unique index, roster number display and edit.
 3. `listPlayers` by membership; availability, Squad Hub and Lineup follow.
