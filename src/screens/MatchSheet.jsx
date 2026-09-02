@@ -276,6 +276,30 @@ function slotsFromLineup(picks) {
   return base
 }
 
+/**
+ * A discipline card's name, resolved through the SLOT it was issued against —
+ * never by matching `card.full_name` as a string.
+ *
+ * ⚠️ `match_sheet_cards` carries no `player_id` of its own (see
+ * saveMatchSheetCards), but `card.slot` is the sheet's own numbered row, and
+ * `slots[slot - 1].player_id` is the same authoritative link SlotCells uses
+ * for that row. Going through the slot means a leaver who was carded is
+ * tagged from the SAME id that tags their squad row, and two children who
+ * happen to share a name are never confused — matching by name text is
+ * exactly what the spec forbids.
+ *
+ * ⚠️ FALLS BACK TO THE STORED TEXT whenever the slot doesn't resolve: no
+ * number typed yet, a slot outside 1..SLOT_COUNT, a slot whose player_id is
+ * null, or a player_id that no longer appears in `squad`. A card mid-entry
+ * must still show what was typed, not disappear.
+ */
+function cardDisplayName(card, slots, squad) {
+  const slotNumber = Number(card.slot)
+  const row = Number.isFinite(slotNumber) ? slots.find((candidate) => candidate.slot === slotNumber) : null
+  const player = row?.player_id ? squad.find((candidate) => candidate.id === row.player_id) : null
+  return player ? leaverName(player) : card.full_name
+}
+
 function emptyCards() {
   return Array.from({ length: CARD_ROWS }, () => ({
     half: '',
@@ -1245,13 +1269,15 @@ export default function MatchSheet() {
                     <Cell value={card.slot} />
                   </td>
                   <td className={CELL}>
-                    {/* ⚠️ NOT TAGGED. `match_sheet_cards` carries no player_id
-                        (see saveMatchSheetCards) — this is free-typed text, and
-                        resolving it to a leaver would mean matching by NAME
-                        STRING, which the spec forbids: two different children
-                        can share a name. Untagged here is deliberately correct,
-                        not an oversight. */}
-                    <Cell value={card.full_name} />
+                    {/* ⚠️ RESOLVED THROUGH THE SLOT, NOT BY NAME STRING. See
+                        cardDisplayName above — `match_sheet_cards` carries no
+                        player_id of its own, but `card.slot` names one of the
+                        22 numbered rows above, and that row's player_id is the
+                        sheet's authoritative link. Matching `card.full_name`
+                        against a player's name would be wrong for the same
+                        reason the squad rows never do it: two children can
+                        share a name. */}
+                    <Cell value={cardDisplayName(card, slots, squad)} />
                   </td>
                   <td className={CELL}>
                     <Cell value={card.reason} />

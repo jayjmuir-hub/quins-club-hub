@@ -161,6 +161,69 @@ describe('MatchSheet — leavers', () => {
     expect(facsimile.queryByText('Tomasz Delacroix-Obi · Left')).not.toBeInTheDocument()
   })
 
+  // ⚠️ DISCRIMINATING against name-string matching, not just id-matching. The
+  // slot's STORED full_name text ('R. Delacroix-Obi') deliberately differs
+  // from the resolved player's real name — a name-string implementation would
+  // never produce 'Rafiq Delacroix-Obi · Left' here, because that string never
+  // appears anywhere in the stored sheet. Only resolving through
+  // slots[player_id] can reach it.
+  it('tags a slot by its player_id even when the stored text is a different string', async () => {
+    listPlayersMock.mockResolvedValue([
+      { id: 'p-1', team_id: 't-u14b', full_name: 'Tomasz Delacroix-Obi', left_at: null },
+      { id: 'p-2', team_id: 't-u14b', full_name: 'Rafiq Delacroix-Obi', left_at: '2026-09-02T08:00:00Z' },
+    ])
+    getMatchSheetMock.mockResolvedValue({
+      id: 'ms-1',
+      status: 'draft',
+      league_team: { id: 'lt-2', rcm_name: 'ADHQ2', division: 'B' },
+      slots: [
+        { slot: 1, player_id: 'p-1', full_name: 'Tomasz Delacroix-Obi', front_row: false },
+        // Stored text is an abbreviation, not the squad row's full_name.
+        { slot: 2, player_id: 'p-2', full_name: 'R. Delacroix-Obi', front_row: false },
+      ],
+      cards: [],
+    })
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    const facsimile = within(screen.getByTestId('match-sheet-facsimile'))
+    expect(await facsimile.findByText('Rafiq Delacroix-Obi · Left')).toBeInTheDocument()
+    expect(facsimile.queryByText('R. Delacroix-Obi')).not.toBeInTheDocument()
+  })
+
+  it('resolves a discipline card through its slot, and only tags the leaver carded', async () => {
+    listPlayersMock.mockResolvedValue([
+      { id: 'p-1', team_id: 't-u14b', full_name: 'Tomasz Delacroix-Obi', left_at: null },
+      { id: 'p-2', team_id: 't-u14b', full_name: 'Rafiq Delacroix-Obi', left_at: '2026-09-02T08:00:00Z' },
+    ])
+    getMatchSheetMock.mockResolvedValue({
+      id: 'ms-1',
+      status: 'draft',
+      league_team: { id: 'lt-2', rcm_name: 'ADHQ2', division: 'B' },
+      slots: [
+        { slot: 1, player_id: 'p-1', full_name: 'Tomasz Delacroix-Obi', front_row: false },
+        { slot: 2, player_id: 'p-2', full_name: 'R. Delacroix-Obi', front_row: false },
+      ],
+      cards: [
+        // Carded on the leaver's slot — must resolve and tag through it.
+        { half: 1, minute: 10, colour: 'yellow', slot: 2, full_name: 'R. Delacroix-Obi', reason: 'Foul play' },
+        // Carded on the current player's slot — never tagged.
+        { half: 2, minute: 55, colour: 'red', slot: 1, full_name: 'Tomasz Delacroix-Obi', reason: 'Dissent' },
+      ],
+    })
+    mount(<MatchSheet />)
+    await screen.findByTestId('match-sheet-facsimile')
+
+    const facsimile = within(screen.getByTestId('match-sheet-facsimile'))
+    // The tagged leaver's name appears twice: once in the squad row (slot 2)
+    // and once in the discipline card resolved through that same slot.
+    expect(await facsimile.findAllByText('Rafiq Delacroix-Obi · Left')).toHaveLength(2)
+    // The current player's name appears twice too (squad row + card row) and
+    // is never tagged either time.
+    expect(facsimile.getAllByText('Tomasz Delacroix-Obi')).toHaveLength(2)
+    expect(facsimile.queryByText('Tomasz Delacroix-Obi · Left')).not.toBeInTheDocument()
+  })
+
   it('never offers a leaver in the squad picker for a new slot', async () => {
     listPlayersMock.mockResolvedValue([
       { id: 'p-1', team_id: 't-u14b', full_name: 'Tomasz Delacroix-Obi', left_at: null },
