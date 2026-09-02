@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ui): the five busiest lists hold their height while loading.** Item 6
+- **feat(ui): every navigation changes the tab title, moves focus to the
+  new screen and scrolls to the top.** Item 7 of the 2 Sep 2026 UX review.
+  The tab read "Abu Dhabi Harlequins" on every screen, focus stayed on the
+  nav link just used, and the previous screen's scroll carried over. New
+  `src/lib/screenTitle.js` names every route from one table, in the nav's
+  own words — `tests/screen-title.test.js` fails when a route in `App.jsx`
+  has no name; `src/lib/useScreenChrome.js` runs on pathname change only
+  (a `?open=` sheet moves nothing), never on first render (the login field
+  keeps focus), and leaves the scroll alone on conversations, which are
+  pinned to the bottom. Mounted once in `App.jsx`. No name from data ever
+  reaches the title: a squad chat is "Squad chat", a team sheet "Team sheet".
+- `559f8eb` — **fix(ui): the five busiest lists hold their height while loading.** Item 6
   of the 2 Sep 2026 UX review. Chats, Roster, Schedule, Documents and
   Accounts swapped in a spinner with no reserved height, so the page collapsed
   and lurched when the data landed — the exact jump `Skeleton.jsx`'s header
