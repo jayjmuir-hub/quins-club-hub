@@ -243,3 +243,54 @@ export function SquadHubSkeleton() {
 }
 
 export default Skeleton
+
+/**
+ * A generic list placeholder: a card of `rows` rows, each `rowHeight` tall,
+ * with a leading block (avatar or date tile) and two text lines.
+ *
+ * Item 6 of the 2 Sep 2026 UX review. The busiest lists — chats, roster,
+ * schedule, documents, accounts — all spun with no reserved height, so the
+ * page collapsed and lurched exactly as this file's header describes. One
+ * measured shape per screen beats five bespoke skeletons that rot separately.
+ *
+ * ⚠️ `rowHeight` IS THE WHOLE POINT, and it is per call site: roster player
+ * row 68 (measured in the harness at phone width, 2 Sep 2026), fixture row
+ * 104 (measured 15 Aug, see DashboardSkeleton), chat row 68 (44px avatar +
+ * py-3, from the classes), document card 64 and pending-approval card 88
+ * (from their padding and line counts — derived, not measured; re-measure if
+ * either screen starts jumping). Inline style, not a Tailwind class, because
+ * the value is a prop.
+ *
+ * aria-hidden like everything else here: the caller wraps it in role="status"
+ * with one sr-only sentence.
+ */
+export function ListSkeleton({ rows = 5, rowHeight = 68, lead = 'circle', className = '' }) {
+  const leadClass =
+    lead === 'square'
+      ? 'h-11 w-11 shrink-0 rounded-[11px]'
+      : lead === 'none'
+        ? 'hidden'
+        : 'h-11 w-11 shrink-0 rounded-full'
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="list-skeleton"
+      className={`overflow-hidden rounded-card border border-line bg-surface-card ${className}`}
+    >
+      {Array.from({ length: rows }, (_, row) => (
+        <div
+          key={row}
+          data-testid="list-skeleton-row"
+          style={{ height: rowHeight }}
+          className="flex items-center gap-3 border-b border-line px-3.5 last:border-b-0"
+        >
+          <Skeleton className={leadClass} />
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-[15px] w-[46%]" />
+            <Skeleton className="mt-1.5 h-[11px] w-[28%]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}

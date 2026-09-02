@@ -20,6 +20,7 @@ import {
 } from '../lib/documents.js'
 import { DESKTOP_QUERY, useMediaQuery } from '../lib/useMediaQuery.js'
 import { visibleTeams } from '../lib/scope.js'
+import { ListSkeleton } from '../components/Skeleton.jsx'
 
 // The documents repo — /documents. Task 6 of
 // claude/plans/2026-08-31-documents-repo.md.
@@ -300,8 +301,11 @@ export default function Documents() {
       )}
 
       {!documents && !error && (
-        <div role="status" aria-live="polite">
-          <span className="sr-only">Loading documents…</span>
+        // This used to be the sr-only sentence and nothing else: a sighted
+        // person saw a blank page under the filters (2 Sep 2026 UX review,
+        // item 6).
+        <div role="status" aria-live="polite" aria-label="Loading documents…">
+          <ListSkeleton rows={4} rowHeight={64} lead="square" />
         </div>
       )}
 

@@ -19,7 +19,6 @@ import {
 import { openConversation } from '../data/messages.js'
 import { useNavigate } from 'react-router-dom'
 import Sheet from '../components/Sheet.jsx'
-import Spinner from '../components/Spinner.jsx'
 import {
   approveMembership,
   deleteMembership,
@@ -45,6 +44,7 @@ import { ADMIN_RIGHTS, adminRightLabel, canApproveAnything, isAdmin, isSuperAdmi
 import { initials } from '../lib/playerFormat.js'
 import { joinPhone, splitPhone, whatsappUrl } from '../lib/phone.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { ListSkeleton } from '../components/Skeleton.jsx'
 
 // Admin Accounts screen (design spec 2026-08-03 §2): view and edit who has
 // access to the club — display name, role, age group, and revoking access.
@@ -1864,9 +1864,9 @@ export default function Accounts() {
         </div>
 
         {isFirstLoad && (
-          <Card className="flex justify-center py-10">
-            <Spinner label="Loading approvals…" />
-          </Card>
+          <div role="status" aria-live="polite" aria-label="Loading approvals…">
+            <ListSkeleton rows={3} rowHeight={88} lead="square" />
+          </div>
         )}
 
         {!isFirstLoad && error && (
@@ -1963,9 +1963,9 @@ export default function Accounts() {
       </p>
 
       {isFirstLoad && (
-        <Card className="flex justify-center py-10">
-          <Spinner label="Loading accounts…" />
-        </Card>
+        <div role="status" aria-live="polite" aria-label="Loading accounts…">
+          <ListSkeleton rows={6} rowHeight={88} lead="square" />
+        </div>
       )}
 
       {/* The third category — see THE THIRD CATEGORY at the top of this file.
