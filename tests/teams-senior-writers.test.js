@@ -160,12 +160,20 @@ describe('setPlayerJerseyNumber', () => {
 
   // CONTROL: a DIFFERENT error code rethrows ITS OWN message rather than the
   // clash sentence, and never runs the two holder-lookup queries at all.
-  it('rethrows any other error with its own message, without looking up a holder', async () => {
+  it('maps an unrecognised database error to the plain fallback, without looking up a holder', async () => {
+    // friendlyMessage: a code outside its trusted list is raw database text and
+    // must not reach the screen (UX review item 2, 2 Sep 2026).
     playersQueue = [{ data: null, error: { code: '55000', message: 'some other failure' } }]
 
-    await expect(setPlayerJerseyNumber('p1', 9)).rejects.toThrow('some other failure')
+    await expect(setPlayerJerseyNumber('p1', 9)).rejects.toThrow('We could not save that number.')
     // Only the update itself — no holder lookups for a non-clash error.
     expect(playersFromCallCount).toBe(1)
+  })
+
+  it('CONTROL: a message written for a person (trusted code) passes through unchanged', async () => {
+    playersQueue = [{ data: null, error: { code: 'P0001', message: 'Only squad staff may set numbers.' } }]
+
+    await expect(setPlayerJerseyNumber('p1', 9)).rejects.toThrow('Only squad staff may set numbers.')
   })
 
   it('treats data === null && error === null as an RLS refusal', async () => {

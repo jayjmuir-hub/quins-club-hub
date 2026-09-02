@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Button from '../components/Button.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
@@ -1052,7 +1053,7 @@ export default function AdminClub() {
 
           {addSquadError && (
             <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
-              {addSquadError.message || "That didn't save. Try again."}
+              {friendlyMessage(addSquadError, "That didn't save. Try again.")}
             </p>
           )}
         </Sheet>

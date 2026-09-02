@@ -3,6 +3,7 @@ import { upsertById } from './upsertById.js'
 import { fetchAllPages, fetchByIds } from './limits.js'
 import { deletePlayerPhoto } from './photos.js'
 import { jerseyClashMessage, isJerseyNumber } from '../lib/jersey.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Data access for the players and player_contacts tables. RLS already
 // restricts rows to what the calling user's memberships allow. player_contacts
@@ -228,7 +229,7 @@ export async function setPlayerJerseyNumber(playerId, number) {
       .maybeSingle()
     throw new Error(jerseyClashMessage(number, holder?.full_name ?? 'another player'))
   }
-  if (error) throw new Error(error.message || 'We could not save that number.')
+  if (error) throw new Error(friendlyMessage(error, 'We could not save that number.'))
   if (!data) throw new Error("We couldn't save that. Only squad staff can change a jersey number.")
   return data
 }
