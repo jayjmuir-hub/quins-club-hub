@@ -21,7 +21,7 @@ import { listPlayers, listPlayerPrivate } from '../data/players.js'
 // one that decides which squad a child belongs in.
 import { ageAt } from '../lib/ageGrade.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canWritePlayer, isActiveMembership, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
+import { canWriteChild, canWritePlayer, isActiveMembership, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
 import { GENDERS, genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
@@ -976,9 +976,18 @@ export default function Roster() {
           onClose={() => setSelectedPlayerId(null)}
           canEdit={canEditSelected}
           canEditOwn={canEditOwnSelected}
+          canDelete={canWriteChild(memberships)}
           onEdit={(player) => setFormState({ player })}
           onEditOwn={(player) => setFormState({ player, own: true })}
           onDeleted={() => {
+            setSelectedPlayerId(null)
+            refresh()
+          }}
+          onLeft={() => {
+            setSelectedPlayerId(null)
+            refresh()
+          }}
+          onRestored={() => {
             setSelectedPlayerId(null)
             refresh()
           }}

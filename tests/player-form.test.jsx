@@ -22,6 +22,8 @@ const listPlayersMock = vi.fn()
 const getPlayerContactMock = vi.fn()
 const upsertPlayerMock = vi.fn()
 const deletePlayerMock = vi.fn()
+const markPlayerLeftMock = vi.fn()
+const restorePlayerMock = vi.fn()
 const upsertContactMock = vi.fn()
 const getPlayerDobMock = vi.fn(() => Promise.resolve(null))
 const setPlayerDobMock = vi.fn()
@@ -72,6 +74,8 @@ vi.mock('../src/data/players.js', () => ({
   getPlayerContact: (...args) => getPlayerContactMock(...args),
   upsertPlayer: (...args) => upsertPlayerMock(...args),
   deletePlayer: (...args) => deletePlayerMock(...args),
+  markPlayerLeft: (...args) => markPlayerLeftMock(...args),
+  restorePlayer: (...args) => restorePlayerMock(...args),
   upsertContact: (...args) => upsertContactMock(...args),
   // ⚠️ BOTH WRITERS, so a test can assert WHICH one the form reached. They are
   // not interchangeable: setPlayerDob also writes `plays_up_confirmed_at`,
@@ -180,11 +184,15 @@ beforeEach(() => {
   getPlayerContactMock.mockReset()
   upsertPlayerMock.mockReset()
   deletePlayerMock.mockReset()
+  markPlayerLeftMock.mockReset()
+  restorePlayerMock.mockReset()
   upsertContactMock.mockReset()
   listPlayersMock.mockResolvedValue([])
   getPlayerContactMock.mockResolvedValue(null)
   upsertPlayerMock.mockImplementation(async (player) => ({ id: player?.id ?? 'p-new', ...player }))
   deletePlayerMock.mockResolvedValue(undefined)
+  markPlayerLeftMock.mockResolvedValue(undefined)
+  restorePlayerMock.mockResolvedValue({})
   upsertContactMock.mockImplementation(async (contact) => ({ ...contact }))
   listParentsMock.mockReset()
   saveParentsMock.mockReset()
@@ -901,11 +909,12 @@ describe('PlayerDetail wiring', () => {
     return user
   }
 
-  it('offers Edit and Delete to a coach of that squad', async () => {
+  it('offers Edit and Mark as left to a coach of that squad, but not Delete', async () => {
     await openDetail(COACH_U14)
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Mark as left' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Delete' })).toBeNull()
   })
 
   it('puts the name, position and age group beside a large photo, not under it', async () => {
@@ -1066,40 +1075,62 @@ describe('PlayerDetail wiring', () => {
     expect(lastNameBox()).toHaveValue('Ramachandran')
   })
 
-  it('asks for confirmation before deleting, and does nothing if cancelled', async () => {
+  // Since 2 Sep 2026: squad staff no longer delete a player who has simply
+  // left the club — they mark them as left, which keeps attendance and match
+  // history and only ends the parents' access and removes the photo. Delete
+  // stays, but only for an admin with child-write rights (below), for the
+  // duplicate-registration case. Spec: claude/specs/2026-09-02-player-leavers-design.md §5.
+  it('asks for confirmation before marking as left, and does nothing if cancelled', async () => {
     const user = await openDetail(COACH_U14)
-
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
-    expect(deletePlayerMock).not.toHaveBeenCalled()
-    expect(screen.getByText(/remove this player\?|delete this player\?/i)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: /keep them|keep it/i }))
-    expect(deletePlayerMock).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: 'Delete' })).toBeNull()
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Mark as left' }))
+    expect(markPlayerLeftMock).not.toHaveBeenCalled()
+    expect(screen.getByText(/mark dhruv as left\?/i)).toBeInTheDocument()
+    expect(screen.getByText(/attendance and match history are kept/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /keep them/i }))
+    expect(markPlayerLeftMock).not.toHaveBeenCalled()
   })
 
-  it('deletes on confirmation and closes back to the roster', async () => {
+  it('marks as left on confirmation and closes back to the roster', async () => {
     const user = await openDetail(COACH_U14)
-
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
-    await user.click(screen.getByRole('button', { name: /yes, delete/i }))
-
-    await waitFor(() => expect(deletePlayerMock).toHaveBeenCalledWith('p-1'))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Mark as left' }))
+    await user.click(screen.getByRole('button', { name: /yes, mark as left/i }))
+    await waitFor(() => expect(markPlayerLeftMock).toHaveBeenCalledWith('p-1'))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('surfaces a delete failure and leaves the player on screen', async () => {
-    deletePlayerMock.mockRejectedValue(new Error('permission denied for table players'))
+  it('surfaces a refusal and leaves the player on screen', async () => {
+    markPlayerLeftMock.mockRejectedValue(new Error('You are not allowed to change this player.'))
     const user = await openDetail(COACH_U14)
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Mark as left' }))
+    await user.click(screen.getByRole('button', { name: /yes, mark as left/i }))
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(/not allowed/)
+    expect(deletePlayerMock).not.toHaveBeenCalled()
+  })
 
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
-    await user.click(screen.getByRole('button', { name: /yes, delete/i }))
-
+  it('an admin with child-write rights still gets Delete, and it still deletes', async () => {
+    const user = await openDetail(ADMIN)
     const dialog = screen.getByRole('dialog')
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'permission denied for table players',
-    )
-    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Mark as left' })).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: /yes, delete/i }))
+    await waitFor(() => expect(deletePlayerMock).toHaveBeenCalledWith('p-1'))
+  })
+
+  it('a leaver is read-only with a Left line and a Restore button', async () => {
+    listPlayersMock.mockResolvedValue([
+      { ...EXISTING_PLAYER, left_at: '2026-09-02T08:00:00Z', left_by: 'pr-coach' },
+    ])
+    const user = await openDetail(COACH_U14)
+    const dialog = screen.getByRole('dialog')
+    // Node's ICU renders en-GB's short September as "Sept", not "Sep" — same
+    // toLocaleDateString call as Accounts.jsx / InviteParentButton.jsx, so
+    // this is the existing house format, not a bug in this screen.
+    expect(within(dialog).getByText(/left 2 sept? 2026/i)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Edit' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: 'Mark as left' })).toBeNull()
+    await user.click(within(dialog).getByRole('button', { name: 'Restore' }))
+    await waitFor(() => expect(restorePlayerMock).toHaveBeenCalledWith('p-1'))
   })
 })
 
