@@ -10,7 +10,26 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(push): a push when somebody with no membership asks to join.** Jay,
+- **db(training): TRAINING SUGGESTIONS — the schema and the two RPCs, proven
+  and NOT YET APPLIED.** Part 1 of
+  `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`, first
+  of two pull requests. `db/migrations/20260902_training_suggestions.sql`: a
+  `training_suggestions` row per event beside the session (never inside it),
+  `suggest_training` with the same signature and preview switch as
+  `publish_training` but writing suggestions only, and
+  `decide_training_suggestion` for the squad's staff — accept copies the
+  template's blocks into the session and stamps `coach_edited_at`, decline
+  keeps an optional note. Same template never nags; a different one asks
+  again. `publish_training` stays until the app stops calling it.
+  `db/tests/training-suggestions.sql` is sixteen steps; run together with the
+  migration inside one rolled-back transaction against production via the
+  MCP, 16/16, then re-run with the function made to write a session and the
+  key step went red (`sessions=1`). Nothing leaked: table, functions, users
+  and squad all absent afterwards with `training_sessions` as the control.
+  Reasoning in `claude/schema-history.md`. Grants documented. Screens are the
+  next pull request; the migration is applied to production when that one is
+  ready to merge, and the changelog will say so.
+- `93356aa` — **feat(push): a push when somebody with no membership asks to join.** Jay,
   2 Sep 2026: *"add a push for plain access requests"*. A plain access
   request (an account with no squad and no child yet) only EMAILED the super
   admins; the pending-membership case has buzzed phones since 19 Aug.
