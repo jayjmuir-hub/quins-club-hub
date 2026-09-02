@@ -162,6 +162,7 @@ const JAY_ADMIN = {
   profile_id: SELF_ID,
   role: 'admin',
   team_id: null,
+  status: 'active',
   created_at: '2026-01-05T09:00:00Z',
   profiles: { full_name: 'Jay Muir', email: 'jay@example.com' },
   teams: null,
@@ -171,6 +172,7 @@ const SARA_COACH = {
   profile_id: 'profile-sara',
   role: 'coach',
   team_id: 'team-u10',
+  status: 'active',
   created_at: '2026-02-01T09:00:00Z',
   profiles: { full_name: 'Sara Coach', email: 'sara@example.com' },
   teams: { name: 'U10' },
@@ -180,6 +182,7 @@ const SARA_PARENT = {
   profile_id: 'profile-sara',
   role: 'parent',
   team_id: 'team-u12',
+  status: 'active',
   created_at: '2026-02-02T09:00:00Z',
   profiles: { full_name: 'Sara Coach', email: 'sara@example.com' },
   teams: { name: 'U12 Boys' },
@@ -194,6 +197,7 @@ const ALI_PARENT = {
   role: 'parent',
   team_id: 'team-u12',
   player_id: 'player-omar',
+  status: 'active',
   created_at: '2026-03-01T09:00:00Z',
   profiles: { full_name: 'Ali Parent', email: 'ali@example.com' },
   teams: { name: 'U12 Boys' },
@@ -334,6 +338,7 @@ beforeEach(() => {
       role: row.role,
       team_id: row.role === 'admin' ? null : row.teamId,
       player_id: row.playerId ?? null,
+      status: 'active',
       created_at: '2026-08-03T12:00:00Z',
     })),
   )
@@ -681,6 +686,26 @@ describe('Accounts — list', () => {
     await user.click(within(alert).getByRole('button', { name: /try again/i }))
 
     expect(await screen.findByText('Sara Coach')).toBeInTheDocument()
+  })
+
+  // Task 8: 'left' is a third status since 2 Sep 2026, and it is neither
+  // active nor pending. A row testing `!== 'pending'` would have listed a
+  // family whose child has left as an active member of the squad.
+  it("a 'left' membership appears in neither the active list nor the pending list", async () => {
+    listClubMembersMock.mockResolvedValue([
+      ALI_PARENT,
+      {
+        ...ALI_PARENT,
+        id: 'm-left',
+        profile_id: 'profile-left',
+        status: 'left',
+        profiles: { full_name: 'Nadia Delacroix-Obi', email: 'nadia@example.com' },
+      },
+    ])
+    setup()
+
+    await screen.findByText('Ali Parent')
+    expect(screen.queryByText('Nadia Delacroix-Obi')).toBeNull()
   })
 })
 

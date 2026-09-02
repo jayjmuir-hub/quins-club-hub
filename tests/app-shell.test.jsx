@@ -349,6 +349,27 @@ describe('AppShell', () => {
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
 
+  // Task 8: a 'left' membership grants nothing server-side, so a profile
+  // whose only rows are 'left' must land on the same roll-call as somebody
+  // with no memberships at all — never a blank routed screen.
+  it('treats a leaver (only "left" memberships) the same as zero memberships', async () => {
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [{ id: 'm-left', status: 'left', role: 'parent', team_id: 't-1', player_id: 'p-1' }],
+        teams: [{ id: 't-u13', name: 'U13', sort_order: 3 }],
+      }),
+    )
+
+    renderShell()
+
+    await answerRollCall(user)
+
+    expect(await screen.findByRole('button', { name: /add my player/i })).toBeInTheDocument()
+    expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+  })
+
   // ❌ THE FORK IS GONE. This test used to click "I'm not adding a player" and
   // then "Add a player instead" — the two halves of a branch that made the
   // routes mutually exclusive, which is the bug the account-creation plan opens
