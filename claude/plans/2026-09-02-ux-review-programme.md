@@ -1,7 +1,7 @@
 # UX review programme — the eight items, in order
 
-**Status: IN PROGRESS, 2 Sep 2026.** Items 1 and 2 shipped; item 3 on
-`claude/ux-3-form-errors`; 4-8 not started. Each row below says where it
+**Status: IN PROGRESS, 2 Sep 2026.** Items 1-6 shipped; item 7 on
+`claude/ux-7-screen-title`; item 8 not started. Each row below says where it
 stands. Update the row, not the header, when one lands.
 
 The 2 Sep 2026 frontend usability review (five parallel read-throughs of the
@@ -16,11 +16,11 @@ invented fixture data and belongs with the plans only as this summary.
 |---|---|---|---|
 | 1 | Stop losing unsaved work: team sheet, match sheet, event form, sign-up wizard | **SHIPPED** `2d227af` (#631) | `claude/plans/2026-09-02-ux-unsaved-work.md` |
 | 2 | Every error a person can read goes through `friendlyMessage`, with a sweep test | **SHIPPED** `6fa8f14` (#633) | `tests/friendly-error-sweep.test.js` |
-| 3 | Form errors land where the thumb is: focus the first invalid field, else the alert | building | below |
-| 4 | Confirm the three one-tap writes: role/squad select in Accounts, Remove on a focus period, Approve as Coach | not started | — |
-| 5 | Pitch-side tap targets to 44px: availability In/Maybe/Out, lineup Bench/Remove, chat message chevron, Sheet close | not started | — |
-| 6 | One measured list skeleton for the five busiest lists; Documents shows nothing while loading today | not started | — |
-| 7 | A screen-title hook: `document.title`, focus the new screen, reset scroll | not started | — |
+| 3 | Form errors land where the thumb is: focus the first invalid field, else the alert | **SHIPPED** `95cf9c1` (#634) | below |
+| 4 | Confirm the three one-tap writes: role/squad select in Accounts, Remove on a focus period, Approve as Coach | **SHIPPED** `8b48808` (#636) | — |
+| 5 | Pitch-side tap targets to 44px: availability In/Maybe/Out, lineup Bench/Remove, chat message chevron, Sheet close | **SHIPPED** `5b38132` (#638) | — |
+| 6 | One measured list skeleton for the five busiest lists; Documents shows nothing while loading today | **SHIPPED** `559f8eb` (#643) | `src/components/Skeleton.jsx` |
+| 7 | A screen-title hook: `document.title`, focus the new screen, reset scroll | building | `src/lib/screenTitle.js`, `src/lib/useScreenChrome.js` |
 | 8 | A readable default width on desktop; 38 of 55 screens stretch edge to edge beside the sidebar | not started | — |
 
 ## Follow-ups the shipped items left behind, on purpose

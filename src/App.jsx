@@ -3,6 +3,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import { MembershipProvider } from './lib/memberships.jsx'
 import { useNotificationRouting } from './lib/notificationRouting.js'
+import useScreenChrome from './lib/useScreenChrome.js'
 import AppShell from './components/AppShell.jsx'
 import Dashboard from './screens/Dashboard.jsx'
 import Schedule from './screens/Schedule.jsx'
@@ -130,6 +131,26 @@ function NotificationRouting() {
   return null
 }
 
+// Conversation screens are pinned to the BOTTOM by useStayPinnedToBottom and
+// must not be scrolled to the top on arrival. The same three shapes AppShell
+// treats as chrome-free; kept here as paths only, because this runs above
+// the shell and cannot see view-as state.
+function pinnedToBottom(pathname) {
+  return (
+    /^\/chat\/dm\/./.test(pathname) ||
+    /^\/squad\/[^/]+\/chat$/.test(pathname) ||
+    (/^\/chat\/[^/]+$/.test(pathname) && !/^\/chat\/(starred|dm)$/.test(pathname))
+  )
+}
+
+// UX review item 7 (2 Sep 2026): tab title, focus and scroll on every
+// navigation — src/lib/useScreenChrome.js. Renders nothing; inside
+// BrowserRouter because it reads useLocation.
+function ScreenChrome() {
+  useScreenChrome({ pinnedToBottom })
+  return null
+}
+
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -137,6 +158,7 @@ export default function App() {
           itself — see src/lib/notificationRouting.js. Renders nothing; it has
           to live INSIDE BrowserRouter because it uses useNavigate. */}
       <NotificationRouting />
+      <ScreenChrome />
       <ErrorBoundary>
       <Routes>
         {/* PUBLIC — no session required, and no MembershipProvider either.
