@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { setAppBadge } from './appBadge.js'
 import { countUnreadMessages, subscribeMessages } from '../data/messages.js'
-import { countAdminWaiting } from '../data/members.js'
+import useAdminWaiting from './useAdminWaiting.js'
 
 // The dock's status dots (23 Aug 2026, the motion pass): a red dot with a
 // glow halo on Chat when there are unread posts, and on More — the phone's
@@ -19,8 +19,10 @@ import { countAdminWaiting } from '../data/members.js'
 //   - chat: realtime on `messages` (already the screen's own subscription
 //     shape), plus a recount when LEAVING /chat — that is where reads get
 //     recorded, so the count taken before the visit is the one that is wrong.
-//   - admin: a recount when leaving Accounts/approvals, the same rule the
-//     sidebar badge follows and for the same reason.
+//   - admin: src/lib/useAdminWaiting.js, shared with the sidebar — realtime on
+//     memberships and access_requests, a recount when the tab comes back, and
+//     the recount when leaving Accounts/approvals that was the whole policy
+//     until 2 Sep 2026.
 // Both fail to "no dot": a count that cannot be read must never paint a
 // dot the screen cannot clear.
 
@@ -38,7 +40,6 @@ function onAny(pathname, paths) {
 export default function useDockBadges({ userId, admin, enabled = true }) {
   const { pathname } = useLocation()
   const [chat, setChat] = useState(false)
-  const [more, setMore] = useState(false)
   const [chatTick, setChatTick] = useState(0)
   const [adminTick, setAdminTick] = useState(0)
 
@@ -83,19 +84,7 @@ export default function useDockBadges({ userId, admin, enabled = true }) {
     }
   }, [enabled, userId, chatTick])
 
-  useEffect(() => {
-    if (!enabled || !admin) {
-      setMore(false)
-      return undefined
-    }
-    let mounted = true
-    countAdminWaiting(userId)
-      .then((n) => mounted && setMore(n > 0))
-      .catch(() => mounted && setMore(false))
-    return () => {
-      mounted = false
-    }
-  }, [enabled, admin, userId, adminTick])
+  const more = useAdminWaiting({ userId, enabled: Boolean(enabled && admin), tick: adminTick }) > 0
 
   // While you are ON the screen the dot points at, it is noise — Chat is
   // clearing itself as you read.

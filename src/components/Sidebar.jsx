@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { countAdminWaiting } from '../data/members.js'
+import useAdminWaiting from '../lib/useAdminWaiting.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isPortalOpen, portalHome, portalLabel, PORTALS } from '../lib/portals.js'
@@ -96,7 +96,11 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
   // count taken before the visit is exactly the number that is now wrong —
   // and re-counting on every route change would be a query per click to
   // answer a question whose answer only changes there.
-  const [adminWaiting, setAdminWaiting] = useState(0)
+  // ⚠️ AND LIVE, SINCE 2 Sep 2026 — realtime on the two tables that are the
+  // count, plus a recount when the tab comes back. Jay: "the little number
+  // icon on admin doesn't increment unless I open admin again or refresh".
+  // The leave-Accounts tick below still applies; src/lib/useAdminWaiting.js
+  // carries the whole policy and the phone dock reads the same hook.
   const [recount, setRecount] = useState(0)
   const onAccounts = ACCOUNTS_PATHS.some((path) => location.pathname.startsWith(path))
   const wasOnAccounts = useRef(onAccounts)
@@ -104,18 +108,7 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
     if (wasOnAccounts.current && !onAccounts) setRecount((n) => n + 1)
     wasOnAccounts.current = onAccounts
   }, [onAccounts])
-  useEffect(() => {
-    if (!showAdmin) return undefined
-    let mounted = true
-    countAdminWaiting(user?.id)
-      .then((count) => {
-        if (mounted) setAdminWaiting(count)
-      })
-      .catch(() => {})
-    return () => {
-      mounted = false
-    }
-  }, [showAdmin, user?.id, recount])
+  const adminWaiting = useAdminWaiting({ userId: user?.id, enabled: showAdmin, tick: recount })
 
   // Sub-menus (22 Aug 2026, Jay). Only the ACTIVE section expands — a
   // coach-admin's sidebar with every section open would be a wall — and every
