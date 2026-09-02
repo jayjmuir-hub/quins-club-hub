@@ -411,6 +411,11 @@ function roleSelect(label) {
   return screen.getByLabelText(`Role for ${label}`)
 }
 
+// The selects STAGE a change (2 Sep 2026 UX review, item 4); this commits it.
+async function saveChange(user, label) {
+  return user.click(screen.getByRole('button', { name: `Save change for ${label}` }))
+}
+
 // Access-builder helpers. Several builders can be on screen at once (one per
 // waiting person, one per person whose "Add access" is open), so everything is
 // scoped to the builder whose role select carries this person's label.
@@ -716,6 +721,7 @@ describe('Accounts — changing access', () => {
     await screen.findByText('Sara Coach')
     await openPerson(user, 'Ali Parent')
     await user.selectOptions(roleSelect('Ali Parent (U12 Boys)'), 'coach')
+    await saveChange(user, 'Ali Parent (U12 Boys)')
 
     expect(updateMembershipRoleMock).toHaveBeenCalledWith({
       membershipId: 'mem-ali',
@@ -730,6 +736,7 @@ describe('Accounts — changing access', () => {
     await screen.findByText('Sara Coach')
     await openPerson(user, 'Ali Parent')
     await user.selectOptions(screen.getByLabelText('Age group for Ali Parent (U12 Boys)'), 'team-u10')
+    await saveChange(user, 'Ali Parent (U12 Boys)')
 
     expect(updateMembershipRoleMock).toHaveBeenCalledWith({
       membershipId: 'mem-ali',
@@ -744,6 +751,7 @@ describe('Accounts — changing access', () => {
     await screen.findByText('Sara Coach')
     await openPerson(user, 'Ali Parent')
     await user.selectOptions(roleSelect('Ali Parent (U12 Boys)'), 'admin')
+    await saveChange(user, 'Ali Parent (U12 Boys)')
 
     expect(updateMembershipRoleMock).toHaveBeenCalledWith({
       membershipId: 'mem-ali',
@@ -765,6 +773,7 @@ describe('Accounts — changing access', () => {
     await screen.findByText('Sara Coach')
     await openPerson(user, 'Ali Parent')
     await user.selectOptions(roleSelect('Ali Parent (U12 Boys)'), 'coach')
+    await saveChange(user, 'Ali Parent (U12 Boys)')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/choose an age group/i)
   })
@@ -913,6 +922,7 @@ describe('Accounts — last-admin guard', () => {
     await screen.findByText('Sara Coach')
     await openPerson(user, 'Jay Muir')
     await user.selectOptions(roleSelect('Jay Muir (club-wide)'), 'coach')
+    await saveChange(user, 'Jay Muir (club-wide)')
 
     expect(updateMembershipRoleMock).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent(/locked out/i)
@@ -933,6 +943,11 @@ describe('Accounts — last-admin guard', () => {
     expect(jayRows).toHaveLength(2)
 
     await user.selectOptions(jayRows[1], 'coach')
+    await user.click(
+      within(jayRows[1].closest('[data-testid="account-membership"]')).getByRole('button', {
+        name: /save change/i,
+      }),
+    )
 
     expect(updateMembershipRoleMock).toHaveBeenCalledWith({
       membershipId: 'mem-jay-dup',
@@ -2625,6 +2640,27 @@ describe('Accounts — staff asking for access', () => {
     ).toBeInTheDocument()
   })
 
+  // ⚠️ 2 Sep 2026 UX review, item 4. One tap here handed a stranger every
+  // family's contact details for an age group. Now the first tap only arms.
+  it('⚠️ approving staff takes two taps, the second naming person, role and squad', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, STAFF_REQUEST])
+    const { user } = setup()
+
+    const staff = await screen.findByTestId('pending-staff')
+    await user.click(within(staff).getByRole('button', { name: /approve marek osgoode as coach/i }))
+
+    expect(within(staff).getByText(/give marek osgoode coach access to u10\?/i)).toBeInTheDocument()
+    expect(
+      within(staff).getByRole('button', { name: /yes, approve marek osgoode as coach/i }),
+    ).toBeEnabled()
+
+    await user.click(within(staff).getByRole('button', { name: /^cancel$/i }))
+    expect(within(staff).queryByRole('button', { name: /yes, approve/i })).toBeNull()
+    expect(
+      within(staff).getByRole('button', { name: /approve marek osgoode as coach/i }),
+    ).toBeInTheDocument()
+  })
+
   // ⚠️ THE CONTROL, AND IT IS NOT PADDING. Without it, a "fix" that routed
   // EVERY pending row into the staff section would pass every test above while
   // breaking the queue the club actually uses each day.
@@ -2923,5 +2959,36 @@ describe('last active on the Accounts screen', () => {
 
     const sheet = await openPerson(user, 'Sara Coach')
     expect(within(sheet).getByTestId('last-active')).toHaveTextContent('Never signed in')
+  })
+})
+
+// ⚠️ 2 Sep 2026 UX review, item 4: the role and squad selects in the edit sheet
+// wrote on onChange, so a mis-scroll on a phone picker turned a parent into an
+// admin the instant the wheel stopped. Both cases below were run red against
+// that code.
+describe('Accounts — the selects stage, Save commits', () => {
+  it('⚠️ moving the role select alone saves nothing', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+    await openPerson(user, 'Ali Parent')
+
+    await user.selectOptions(roleSelect('Ali Parent (U12 Boys)'), 'coach')
+
+    expect(updateMembershipRoleMock).not.toHaveBeenCalled()
+    expect(roleSelect('Ali Parent (U12 Boys)')).toHaveValue('coach')
+    expect(screen.getByRole('button', { name: 'Save change for Ali Parent (U12 Boys)' })).toBeEnabled()
+  })
+
+  it('Cancel puts the select back and offers no Save', async () => {
+    const { user } = setup()
+    await screen.findByText('Sara Coach')
+    await openPerson(user, 'Ali Parent')
+
+    await user.selectOptions(roleSelect('Ali Parent (U12 Boys)'), 'coach')
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+
+    expect(updateMembershipRoleMock).not.toHaveBeenCalled()
+    expect(roleSelect('Ali Parent (U12 Boys)')).toHaveValue('parent')
+    expect(screen.queryByRole('button', { name: /save change for/i })).toBeNull()
   })
 })

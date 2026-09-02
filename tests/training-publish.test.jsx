@@ -438,7 +438,25 @@ describe('TrainingPublish', () => {
     await screen.findByText('Breakdown block')
 
     await user.click(screen.getByRole('button', { name: 'Remove Breakdown block' }))
+    await user.click(screen.getByRole('button', { name: 'Yes, remove Breakdown block' }))
 
     expect(await screen.findByText('That change was refused.')).toBeInTheDocument()
+  })
+
+  // ⚠️ 2 Sep 2026 UX review, item 4. Remove was a dangerQuiet button that
+  // deleted on the FIRST press, against Button.jsx's own contract. Run red
+  // against that code.
+  it('⚠️ does not delete a focus period on the first tap; Keep backs out', async () => {
+    const { user } = renderPublish()
+    await screen.findByText('Breakdown block')
+
+    await user.click(screen.getByRole('button', { name: 'Remove Breakdown block' }))
+    expect(deleteFocusMock).not.toHaveBeenCalled()
+    expect(screen.getByText(/remove breakdown block\?/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^keep$/i }))
+    expect(deleteFocusMock).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Yes, remove Breakdown block' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Remove Breakdown block' })).toBeInTheDocument()
   })
 })
