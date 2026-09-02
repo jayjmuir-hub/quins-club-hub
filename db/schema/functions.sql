@@ -7817,3 +7817,236 @@ $function$
 
 REVOKE ALL ON FUNCTION private.can_write_child() FROM public, anon;
 GRANT EXECUTE ON FUNCTION private.can_write_child() TO authenticated;
+
+-- =====================================================================
+-- CAPTURED 2026-09-02 from pg_get_functiondef after applying
+-- 20260902_access_request_push and 20260902_profile_read_named_author.
+-- proacl noted per entry, read from pg_proc — not assumed from the migration.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- private.access_request_audience(uuid)
+-- proacl: {postgres=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.access_request_audience(_requester uuid)
+ RETURNS SETOF uuid
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select distinct m.profile_id
+    from memberships m
+   where m.status = 'active'
+     and m.is_super
+     and m.profile_id is distinct from _requester;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.access_request_push_subscriptions(uuid)
+-- proacl: {postgres=X/postgres,service_role=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.access_request_push_subscriptions(_request uuid)
+ RETURNS TABLE(id uuid, endpoint text, p256dh text, auth text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select s.id, s.endpoint, s.p256dh, s.auth
+    from access_requests req
+    cross join lateral
+      private.access_request_audience(req.profile_id) as aud(profile_id)
+    join push_subscriptions s on s.profile_id = aud.profile_id
+   where req.id = _request
+     and req.status = 'pending'
+     and not exists (
+       select 1 from notification_opt_outs o
+        where o.profile_id = aud.profile_id
+          and o.category = 'approval');
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.notify_access_request_push()
+-- proacl: {postgres=X/postgres}
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.notify_access_request_push()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  endpoint text;
+  secret   text;
+begin
+  select decrypted_secret into endpoint
+    from vault.decrypted_secrets where name = 'push_notify_url';
+  select decrypted_secret into secret
+    from vault.decrypted_secrets where name = 'approval_notify_secret';
+
+  if endpoint is null or secret is null then
+    raise warning 'notify_access_request_push: vault secrets missing, no push sent for request %', new.id;
+    return new;
+  end if;
+
+  perform net.http_post(
+    url     := endpoint,
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'x-approval-secret', secret),
+    body    := jsonb_build_object('access_request_id', new.id)
+  );
+
+  return new;
+exception when others then
+  raise warning 'notify_access_request_push: % (request %)', sqlerrm, new.id;
+  return new;
+end;
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- private.can_read_profile_name(uuid)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- ⚠️ SECURITY INVOKER (no SECURITY DEFINER clause) — that is the whole
+-- point of it; see db/migrations/20260902_profile_read_named_author.sql.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_read_profile_name(_profile uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  select
+    _profile = (select auth.uid())
+    or exists (select 1 from messages m where m.author_id = _profile)
+    or exists (select 1 from announcements a where a.author_id = _profile)
+    or exists (select 1 from poll_votes v where v.voter_id = _profile)
+    or exists (select 1 from club_officers o where o.profile_id = _profile);
+$function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.suggest_training(uuid, uuid[], date, date, boolean)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- Captured 2026-09-02 from pg_get_functiondef after 20260902_training_suggestions.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.suggest_training(_template uuid, _teams uuid[], _from date, _to date, _preview boolean DEFAULT true)
+ RETURNS TABLE(team_id uuid, will_suggest integer, unchanged integer, no_events integer)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  _club uuid;
+  _team uuid;
+  _ev record;
+  _me uuid := auth.uid();
+begin
+  select club_id into _club from session_templates where id = _template and is_active;
+  if _club is null then
+    raise exception 'template not found or retired' using errcode = 'P0002';
+  end if;
+  if not private.is_admin(_club) then
+    raise exception 'not an active admin of this club' using errcode = '42501';
+  end if;
+  if _to < _from then
+    raise exception 'date range is backwards' using errcode = '22007';
+  end if;
+  foreach _team in array _teams loop
+    team_id := _team; will_suggest := 0; unchanged := 0; no_events := 0;
+    perform 1 from teams t, session_templates tpl
+     where t.id = _team and tpl.id = _template
+       and t.club_id = _club
+       and (not tpl.requires_contact or t.requires_contact);
+    if not found then
+      raise exception 'squad % is not in this club or does not fit this template', _team using errcode = '42501';
+    end if;
+    for _ev in
+      select e.id, s.id as suggestion_id, s.template_id as current_template
+        from events e
+        left join training_suggestions s on s.event_id = e.id
+       where e.team_id = _team
+         and e.type = 'training'
+         and (e.starts_at at time zone 'Asia/Dubai')::date between _from and _to
+    loop
+      if _ev.suggestion_id is not null and _ev.current_template = _template then
+        unchanged := unchanged + 1;
+        continue;
+      end if;
+      will_suggest := will_suggest + 1;
+      if _preview then continue; end if;
+      if _ev.suggestion_id is null then
+        insert into training_suggestions (event_id, template_id, suggested_by)
+        values (_ev.id, _template, _me);
+      else
+        update training_suggestions
+           set template_id = _template, suggested_by = _me, suggested_at = now(),
+               status = 'pending', decided_by = null, decided_at = null, decline_note = null
+         where id = _ev.suggestion_id;
+      end if;
+    end loop;
+    if will_suggest = 0 and unchanged = 0 then no_events := 1; end if;
+    return next;
+  end loop;
+end $function$
+;
+
+-- ---------------------------------------------------------------------
+-- public.decide_training_suggestion(uuid, boolean, text)
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+-- Captured 2026-09-02 from pg_get_functiondef after 20260902_training_suggestions.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.decide_training_suggestion(_suggestion uuid, _accept boolean, _note text DEFAULT NULL::text)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  _s record;
+  _session uuid;
+  _me uuid := auth.uid();
+begin
+  select s.id, s.event_id, s.template_id, s.status, e.team_id
+    into _s
+    from training_suggestions s
+    join events e on e.id = s.event_id
+   where s.id = _suggestion;
+  if _s.id is null then
+    raise exception 'suggestion not found' using errcode = 'P0002';
+  end if;
+  if not private.can_edit_team(_s.team_id) then
+    raise exception 'not staff of this squad' using errcode = '42501';
+  end if;
+  if _s.status <> 'pending' then
+    raise exception 'this suggestion has already been answered' using errcode = '22023';
+  end if;
+  if _accept then
+    select id into _session from training_sessions where event_id = _s.event_id;
+    if _session is null then
+      insert into training_sessions (event_id, template_id, coach_edited_at, visibility, created_by)
+      values (_s.event_id, _s.template_id, now(), 'staff', _me)
+      returning id into _session;
+    else
+      update training_sessions
+         set template_id = _s.template_id, coach_edited_at = now()
+       where id = _session;
+      delete from training_session_blocks where session_id = _session;
+    end if;
+    insert into training_session_blocks (session_id, position, drill_id, minutes, coach_note)
+    select _session, b.position, b.drill_id, b.minutes, b.coach_note
+      from session_template_blocks b where b.template_id = _s.template_id;
+    update training_suggestions
+       set status = 'accepted', decided_by = _me, decided_at = now(), decline_note = null
+     where id = _s.id;
+    return _session;
+  end if;
+  update training_suggestions
+     set status = 'declined', decided_by = _me, decided_at = now(),
+         decline_note = nullif(btrim(coalesce(_note, '')), '')
+   where id = _s.id;
+  return null;
+end $function$
+;

@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **docs(plan): training plan status — Part 1 shipped; the migration is
+- **docs(schema): captures for the three 2 Sep migrations.** Also
+  `public.training_suggestions` (table, its "suggestion read" policy) and
+  `public.suggest_training` / `public.decide_training_suggestion`, captured
+  from live after Training Sessions applied 20260902_training_suggestions.
+  `db/schema/functions.sql` gains `private.access_request_audience`,
+  `public.access_request_push_subscriptions`,
+  `private.notify_access_request_push` and `private.can_read_profile_name`,
+  each verbatim from `pg_get_functiondef` with its `proacl` read from
+  `pg_proc` after applying; `db/schema/policies.sql` gains "profile read
+  named author"; `db/schema/triggers.sql` gains `access_request_push`. Both
+  migrations are applied to production and push-send v16 is deployed: a
+  post with an unknown `access_request_id` answered `404 not found` from the
+  new branch (the old code answered `400 bad request`).
+- `6cd17a5` — **docs(plan): training plan status — Part 1 shipped; the migration is
   APPLIED.** `training_suggestions` was applied to production right before
   `d98b593` merged, the sixteen-step harness passed 16/16 live in a rolled-back
   transaction, and the served bundle was checked for the new RPC names before

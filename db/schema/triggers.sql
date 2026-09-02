@@ -435,6 +435,12 @@ CREATE TRIGGER audit_membership AFTER INSERT OR DELETE OR UPDATE ON public.membe
 
 CREATE TRIGGER pending_membership_push AFTER INSERT ON public.memberships FOR EACH ROW WHEN ((new.status = 'pending'::text)) EXECUTE FUNCTION private.notify_pending_membership_push();
 
+-- Added 2 Sep 2026 (20260902_access_request_push): the push counterpart to
+-- notify_access_request_asked (the email) on the same event. Two triggers,
+-- deliberately — a push that throws must not stop an email that works.
+-- Captured from pg_get_triggerdef after applying.
+CREATE TRIGGER access_request_push AFTER INSERT ON public.access_requests FOR EACH ROW WHEN ((new.status = 'pending'::text)) EXECUTE FUNCTION private.notify_access_request_push();
+
 -- Added 30 Aug 2026 (20260830_last_admin_guard, Grok item 8): the club's last
 -- ACTIVE admin can be neither demoted nor deleted — raises P0001. The client
 -- LAST_ADMIN_REFUSAL banner is the friendly first line; this is the real one.

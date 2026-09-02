@@ -2739,3 +2739,33 @@ alter table public.players
 
 create unique index players_team_jersey_unique
   on public.players (team_id, jersey_num) where jersey_num is not null;
+
+-- ---------------------------------------------------------------------
+-- training_suggestions (2 Sep 2026 — 20260902_training_suggestions.sql)
+-- Captured from information_schema / pg_constraint after applying, in the
+-- same pass as the 2 Sep push and profiles captures. One row per training
+-- event; the two SECURITY DEFINER RPCs below are its only writers.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.training_suggestions (
+  id           uuid        NOT NULL DEFAULT gen_random_uuid(),
+  event_id     uuid        NOT NULL,
+  template_id  uuid        NOT NULL,
+  suggested_by uuid        NOT NULL,
+  suggested_at timestamptz NOT NULL DEFAULT now(),
+  status       text        NOT NULL DEFAULT 'pending',
+  decided_by   uuid,
+  decided_at   timestamptz,
+  decline_note text,
+  CONSTRAINT training_suggestions_pkey PRIMARY KEY (id),
+  CONSTRAINT training_suggestions_event_id_key UNIQUE (event_id),
+  CONSTRAINT training_suggestions_event_id_fkey FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  CONSTRAINT training_suggestions_template_id_fkey FOREIGN KEY (template_id) REFERENCES session_templates(id) ON DELETE CASCADE,
+  CONSTRAINT training_suggestions_suggested_by_fkey FOREIGN KEY (suggested_by) REFERENCES profiles(id),
+  CONSTRAINT training_suggestions_decided_by_fkey FOREIGN KEY (decided_by) REFERENCES profiles(id),
+  CONSTRAINT training_suggestions_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text]))),
+  CONSTRAINT training_suggestions_decision_shape CHECK ((((status = 'pending'::text) AND (decided_by IS NULL) AND (decided_at IS NULL) AND (decline_note IS NULL)) OR ((status <> 'pending'::text) AND (decided_by IS NOT NULL) AND (decided_at IS NOT NULL))))
+);
+ALTER TABLE public.training_suggestions ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.training_suggestions IS
+  'The director''s suggested session for one training event. One row per event; a re-publish with a different template resets it to pending. Never written by the app directly — suggest_training and decide_training_suggestion are the only writers. Blocks are not copied here: accept copies them from the template into training_sessions.';
