@@ -303,10 +303,19 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
           else in the row names who the fields are about (the labels below say
           "Player's…" or "Your…", never "child"), so the copy the CONTROL in
           tests/signup-adult-path.test.jsx is looking for lives here, and
-          nowhere else needs to change. */}
-      <p className="mb-2 text-[12.5px] leading-relaxed text-ink-muted">
-        {`Tell us about ${who}.`}
-      </p>
+          nowhere else needs to change.
+
+          ⚠️ SUPPRESSED WHEN `askingOwnName` (review finding, Task 6). The
+          "About you" fieldset directly above already says who this row is
+          for in that case, so "Tell us about you." underneath it is a
+          redundant echo — not a wrong one, just a wasted line. Still shown
+          for every other row, including later rows once the fieldset above
+          is gone, which is why this checks `askingOwnName` and not `who`. */}
+      {!askingOwnName && (
+        <p className="mb-2 text-[12.5px] leading-relaxed text-ink-muted">
+          {`Tell us about ${who}.`}
+        </p>
+      )}
       <div className="mb-1.5 flex items-baseline justify-between gap-3">
         <label htmlFor={firstId} className={`${LABEL} mb-0`}>
           {/* Follows the answer below: a 16-year-old filling in "Player's first
@@ -960,9 +969,17 @@ export default function PlayerRegistrationForm({
           <legend className="px-1 text-xs font-bold uppercase tracking-wide text-ink-faint">
             About you
           </legend>
+          {/* ⚠️ BRANCHED ON WHETHER ANY ROW IS SELF-REGISTER (review finding,
+              Task 6). This fieldset is reachable outside the wizard's
+              collectOnly path — AddYourPlayer renders the same form with
+              defaultSelfRegister set from the roll-call's "I play here
+              myself" tick — and an adult confirming their OWN name on that
+              path must never be told this is "not your child's", because for
+              them there is no child anywhere in the form. */}
           <p className="text-[12.5px] leading-relaxed text-ink-muted">
-            The coach approving this needs to know who asked. This is your name, not
-            your child&apos;s.
+            {rows.some((row) => row.selfRegister)
+              ? 'The coach approving this needs to know who asked. This is your own name, as the club should show it.'
+              : "The coach approving this needs to know who asked. This is your name, not your child's."}
           </p>
 
           <label htmlFor="register-your-first-name" className={`${LABEL} mt-3`}>

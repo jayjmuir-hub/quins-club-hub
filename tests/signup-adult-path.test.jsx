@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { pickDate } from './helpers/pickDate.js'
@@ -20,8 +20,14 @@ import { pickDate } from './helpers/pickDate.js'
 //     first, and the control (child ticked) reaches youth first with "your
 //     child" copy.
 
+// ⚠️ MUTABLE, not a fixed `{ profile: null }` — the review-finding test below
+// (needsName / "About you" fieldset) needs a profile with `id` set and
+// `name_confirmed_at: null` to make `needsName` true, while every other test
+// in this file wants the ordinary signed-out/no-profile case. Reset in
+// afterEach so one test's profile never leaks into the next.
+let mockProfile = { profile: null }
 vi.mock('../src/lib/useMyProfile.js', () => ({
-  default: () => ({ profile: null }),
+  default: () => mockProfile,
   primeMyProfileCache: vi.fn(),
 }))
 vi.mock('../src/data/members.js', () => ({
@@ -209,5 +215,44 @@ describe('SignupWizard — an adult reaches senior squads first', () => {
     ])
     const row = screen.getByTestId('player-row')
     expect(row.textContent).toMatch(/your child/i)
+  })
+})
+
+// ── Review finding: the "About you" fieldset on a self-register path ───────
+//
+// AddYourPlayer.jsx renders PlayerRegistrationForm WITHOUT collectOnly and
+// passes defaultSelfRegister from the roll-call's "I play here myself" tick.
+// A signed-in adult on that path whose name is not yet confirmed
+// (name_confirmed_at: null) sees the "About you" fieldset — needsName is
+// true — and until this fix it always said "This is your name, not your
+// child's", which is wrong for someone who has no child in the form at all.
+
+describe('PlayerRegistrationForm — the "About you" fieldset on a self-register path', () => {
+  afterEach(() => {
+    mockProfile = { profile: null }
+  })
+
+  it('says the self sentence, and never "child", when the row defaults to self-register', () => {
+    mockProfile = { profile: { id: 'user-1', name_confirmed_at: null } }
+
+    render(
+      <PlayerRegistrationForm teams={TEAMS} collectOnly={false} defaultSelfRegister onDone={vi.fn()} />,
+    )
+
+    const fieldset = screen.getByText('About you').closest('fieldset')
+    expect(fieldset.textContent).toMatch(/this is your own name, as the club should show it/i)
+    expect(fieldset.textContent).not.toMatch(/child/i)
+  })
+
+  // CONTROL for the assertion above: the ordinary (non-self) path through the
+  // same fieldset still says "not your child's" — proves the branch is
+  // really about defaultSelfRegister, not that the sentence vanished.
+  it('CONTROL: says "not your child\'s" when the row is not self-register', () => {
+    mockProfile = { profile: { id: 'user-1', name_confirmed_at: null } }
+
+    render(<PlayerRegistrationForm teams={TEAMS} collectOnly={false} onDone={vi.fn()} />)
+
+    const fieldset = screen.getByText('About you').closest('fieldset')
+    expect(fieldset.textContent).toMatch(/not your child's/i)
   })
 })
