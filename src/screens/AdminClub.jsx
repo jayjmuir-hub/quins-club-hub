@@ -9,11 +9,12 @@ import {
   setLeagueTeamActive,
   upsertLeagueTeam,
 } from '../data/leagueTeams.js'
-import { listContactsForPlayers, listPlayers } from '../data/players.js'
+import { listContactsForPlayers, listPlayers, restorePlayer } from '../data/players.js'
 import { setTeamScoringKinds, setTeamRequiresContact } from '../data/teams.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { SCORE_KINDS, SCORE_LABELS, scoringForBand, scoringForTeam } from '../lib/scoring.js'
 import { ageBandFromTeamName } from '../lib/ageGroup.js'
+import { isLeaver } from '../lib/leavers.js'
 import InviteForm from './InviteForm.jsx'
 import StorageCard from '../components/StorageCard.jsx'
 
@@ -33,6 +34,20 @@ import StorageCard from '../components/StorageCard.jsx'
 // are club-wide (listPlayers() with no teamIds): an admin sees every squad,
 // and passing an empty array would mean "no teams" and return nothing (see
 // src/data/players.js). RLS is what actually decides what comes back.
+
+// ⚠️ NOT toLocaleDateString('en-GB', { month: 'short' }) — Node's ICU data
+// renders September as "Sept" (four letters) rather than the three-letter
+// "Sep" every other short month uses, so a locale-driven format is not
+// stable across environments. Fixed table instead.
+const SHORT_MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
+
+function formatLeftDate(iso) {
+  const d = new Date(iso)
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`
+}
 
 function SectionTitle({ children }) {
   return (
@@ -168,6 +183,12 @@ export default function AdminClub() {
   const { teams, reload: reloadTeams } = useMemberships()
 
   const [players, setPlayers] = useState([])
+  // Players with a non-null left_at — kept out of `players` so every existing
+  // count on this screen (squad sizes, missing-contact counts) stays a count
+  // of the CURRENT roster, not a mix of current and departed.
+  const [leavers, setLeavers] = useState([])
+  const [restoring, setRestoring] = useState(null)
+  const [restoreError, setRestoreError] = useState(null)
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [settled, setSettled] = useState(false)
@@ -208,10 +229,11 @@ export default function AdminClub() {
     setLoading(true)
     setError(null)
 
-    listPlayers()
+    listPlayers({ includeLeft: true })
       .then((playerRows) => {
         if (!mounted) return null
-        setPlayers(playerRows)
+        setPlayers(playerRows.filter((p) => !isLeaver(p)))
+        setLeavers(playerRows.filter(isLeaver))
         // Same bulk contact-presence query Overview.jsx used, moved here
         // with it (src/data/players.js listContactsForPlayers) — one query
         // for the whole club rather than one per player.
@@ -237,6 +259,7 @@ export default function AdminClub() {
         if (!mounted) return
         setError(err)
         setPlayers([])
+        setLeavers([])
         setContacts([])
         setLeagueTeams([])
       })
@@ -722,6 +745,46 @@ export default function AdminClub() {
           {saveError && (
             <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
               {saveError.message || "That didn't save. Try again."}
+            </p>
+          )}
+        </Card>
+      )}
+
+      {leavers.length > 0 && (
+        <Card as="section" aria-label="Left this season" className="mt-3.5 p-3.5">
+          <h3 className="mb-2.5 text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+            Left this season
+          </h3>
+          <ul className="divide-y divide-line">
+            {leavers.map((player) => (
+              <li key={player.id} className="flex items-center gap-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-ink">{player.full_name}</p>
+                  <p className="text-[12.5px] text-ink-muted">
+                    {teams.find((team) => team.id === player.team_id)?.name ?? 'Unknown squad'} · left{' '}
+                    {formatLeftDate(player.left_at)}
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  disabled={restoring === player.id}
+                  onClick={() => {
+                    setRestoring(player.id)
+                    setRestoreError(null)
+                    restorePlayer(player.id)
+                      .then(() => setReloadToken((token) => token + 1))
+                      .catch((err) => setRestoreError(err))
+                      .finally(() => setRestoring(null))
+                  }}
+                >
+                  {restoring === player.id ? 'Restoring…' : 'Restore'}
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {restoreError && (
+            <p role="alert" className="mt-2 text-sm font-semibold text-danger-ink">
+              {restoreError.message || "We couldn't restore that player. Try again."}
             </p>
           )}
         </Card>
