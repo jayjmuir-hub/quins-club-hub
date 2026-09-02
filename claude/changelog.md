@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ux): the coach and manager Medium findings from the full review.**
+- **fix(ux): the two follow-ups the UX programme left open.** (1) The
+  team sheet keeps a `sessionStorage` draft per fixture (`Lineup.jsx`), so
+  leaving by the dock or the sidebar — plain links, no route blocker — no
+  longer discards fifteen placed shirts; restored only when the server has no
+  lineup, cleared on save, the match sheet's shape. The lineup row is still
+  created on first Save. `tests/lineup-unsaved.test.jsx`. (2) The
+  friendly-error sweep's allowlist is the helper alone: the five remaining
+  `error.message ||` renders in `AdminClub.jsx`, `Roster.jsx` and
+  `RosterTable.jsx` go through `friendlyMessage`.
+- `4093935` — **fix(ux): the coach and manager Medium findings from the full review.**
   (1) Team sheet: a "N picked · unsaved changes" chip and a Save changes
   button in the header (`Lineup.jsx`) — Save lived only at the foot of the
   whole squad list. (2) Match sheet: "Submit" is now "Mark ready to send",

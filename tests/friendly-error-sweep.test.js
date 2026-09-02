@@ -36,11 +36,12 @@ const BARE_RENDER = /(?<!\$)\{\s*[\w$?.]*[eE]rror[\w$?.]*\.message\s*\}/
 // in these files, so the sweep left them alone to avoid a conflict on merge.
 // Remove them from this list in the follow-up that converts them; each one
 // deleted here must come with the conversion, or the sweep starts lying.
+// ⚠️ THE THREE ROSTER/ADMIN FILES CAME OFF THIS LIST ON 2 Sep 2026, the
+// follow-up the UX programme recorded: senior squads (#640) landed, the two
+// remaining `error.message ||` renders were converted, and RosterTable had
+// already gone through friendlyMessage. Only the helper itself is exempt now.
 const ALLOW = new Set([
   'lib/friendlyError.js',
-  'screens/AdminClub.jsx',
-  'screens/Roster.jsx',
-  'components/RosterTable.jsx',
 ])
 
 function walk(dir, out = []) {

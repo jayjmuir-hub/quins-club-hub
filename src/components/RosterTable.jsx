@@ -273,7 +273,7 @@ export default function RosterTable({
       if (!decorated) onPatch(player.id, { [field]: previous })
       setErrors((e) => ({
         ...e,
-        [player.id]: err?.message || "We couldn't save that change.",
+        [player.id]: friendlyMessage(err, "We couldn't save that change."),
       }))
     } finally {
       setSaving((s) => ({ ...s, [player.id]: null }))

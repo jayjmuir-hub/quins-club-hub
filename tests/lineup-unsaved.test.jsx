@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // The team sheet says when it is unsaved and asks before Back — Task 3 of
@@ -117,5 +117,62 @@ describe('Lineup — unsaved changes', () => {
     await user.click(screen.getByRole('button', { name: /^save$/i }))
     await screen.findByText('Saved')
     expect(screen.queryByText(/unsaved changes/i)).toBeNull()
+  })
+})
+
+// The draft (2 Sep 2026): the follow-up item 1 left open. The dock and the
+// sidebar are plain links with no route blocker, so a coach who tapped one
+// with fifteen shirts placed lost the lot. Same shape as the match sheet's.
+describe('Lineup — the draft', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear()
+  })
+
+  it('a pick is written to sessionStorage, and comes back on a fresh open when the server has nothing', async () => {
+    const user = renderScreen()
+    await screen.findAllByText('Rory Aldenbrook')
+    expect(window.sessionStorage.getItem('lineup-draft:e-1')).toBeNull()
+    await user.click(screen.getAllByRole('button', { name: /^start$/i })[0])
+    const raw = window.sessionStorage.getItem('lineup-draft:e-1')
+    expect(raw).not.toBeNull()
+    expect(JSON.parse(raw).slotted).toContain('p-in')
+
+    // Leave by any route at all — the component simply unmounts — and open
+    // the sheet again from cold.
+    cleanup()
+    renderScreen()
+    await screen.findAllByText('Rory Aldenbrook')
+    expect(await screen.findByText(/unsaved changes/i)).toBeInTheDocument()
+    // The shirt is back where it was: the player is no longer offered as
+    // a bench candidate to start.
+    expect(screen.getAllByRole('button', { name: /^start$/i }).length).toBe(1)
+  })
+
+  it('⚠️ a lineup the server has wins, and the stale draft is thrown away', async () => {
+    window.sessionStorage.setItem('lineup-draft:e-1', JSON.stringify({ slotted: ['p-maybe'], reps: [] }))
+    useMembershipsMock.mockReturnValue({ memberships: COACH, teams: [TEAM], loading: false, error: null })
+    getEventMock.mockResolvedValue(EVENT)
+    listPlayersMock.mockResolvedValue(PLAYERS)
+    listAvailabilityMock.mockResolvedValue([])
+    listLineupsMock.mockResolvedValue([{
+      id: 'l-1', players_per_side: 15, squad_size: null, notes: '',
+      lineup_players: [{ player_id: 'p-in', role: 'starter', position: null, sort_order: 0 }],
+    }])
+    render(<Lineup />)
+    await screen.findAllByText('Rory Aldenbrook')
+    expect(screen.queryByText(/unsaved changes/i)).toBeNull()
+    expect(window.sessionStorage.getItem('lineup-draft:e-1')).toBeNull()
+  })
+
+  it('a save clears the draft', async () => {
+    createLineupMock.mockResolvedValue({ id: 'l-1' })
+    saveLineupPlayersMock.mockResolvedValue([])
+    const user = renderScreen()
+    await screen.findAllByText('Rory Aldenbrook')
+    await user.click(screen.getAllByRole('button', { name: /^start$/i })[0])
+    expect(window.sessionStorage.getItem('lineup-draft:e-1')).not.toBeNull()
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+    await screen.findByText('Saved')
+    expect(window.sessionStorage.getItem('lineup-draft:e-1')).toBeNull()
   })
 })

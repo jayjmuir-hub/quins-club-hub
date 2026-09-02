@@ -28,6 +28,7 @@ import { signPhotoUrls } from '../data/photos.js'
 import { useMediaQuery, DESKTOP_QUERY } from '../lib/useMediaQuery.js'
 import { sortByJersey } from '../lib/jersey.js'
 import { ListSkeleton } from '../components/Skeleton.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The team filter survives a reload. Without this, choosing club-wide as the
 // desktop default (desktop-spec.md §10 decision 2) would make a coach who
@@ -1061,7 +1062,7 @@ export default function Roster() {
         <Card role="alert" className="p-6 text-center">
           <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the roster</h3>
           <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-            {error.message || 'Something went wrong. Try again.'}
+            {friendlyMessage(error, 'Something went wrong. Try again.')}
           </p>
           <Button onClick={() => setReloadToken((token) => token + 1)} className="mt-4">
             Try again
