@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(ui): every navigation changes the tab title, moves focus to the
+- **feat(ui): a readable default width on desktop; tables, grids and
+  threads keep the whole width.** Item 8 of the 2 Sep 2026 UX review: 38 of
+  55 screens stretched edge to edge beside the sidebar, and a settings page
+  or a notice at 1,600px is a line the eye loses on the way back. The
+  shell's `<main>` now caps at 960px on desktop by default, and
+  `src/lib/screenWidth.js` lists the screens that opt out to the full width —
+  the roster and fixture tables, chat and every thread, the team sheet, the
+  pitch calendar and the admin tables. ⚠️ **This does not reverse Jay's
+  26 Aug ruling** ("why can't we have things fill the entire width"): that
+  was about the schedule table, and every table still fills it. Measured in
+  the harness at 1,500px: Settings 960px, Roster 1,229px. Below `desktop`
+  nothing changes. `tests/screen-width.test.js`, with a rot detector on the
+  shell.
+- `2483fdc` — **feat(ui): every navigation changes the tab title, moves focus to the
   new screen and scrolls to the top.** Item 7 of the 2 Sep 2026 UX review.
   The tab read "Abu Dhabi Harlequins" on every screen, focus stayed on the
   nav link just used, and the previous screen's scroll carried over. New
