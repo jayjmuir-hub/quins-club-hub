@@ -183,12 +183,20 @@ export default function TimePicker({
         aria-expanded={open}
         aria-invalid={invalid ? 'true' : undefined}
         aria-describedby={describedBy}
+        // ⚠️ FOCUS DOES NOT OPEN IT (2 Sep 2026 UX review, Low): tabbing from
+        // "Time" to "End time" used to drop ~33 chip buttons into the Tab
+        // order. Click or ArrowDown opens; typing still works closed.
         onFocus={() => {
           focusedRef.current = true
-          setOpen(true)
         }}
         onBlur={handleBlur}
         onClick={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' && !open) {
+            e.preventDefault()
+            setOpen(true)
+          }
+        }}
         onChange={(e) => handleType(e.target.value)}
         className={[FIELD_BASE, invalid ? 'border-danger-ink' : 'border-line'].join(' ')}
       />

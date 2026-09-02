@@ -87,7 +87,7 @@ beforeEach(() => {
 })
 
 async function loaded() {
-  await screen.findByRole('tab', { name: 'Quick' })
+  await within(await screen.findByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Quick' })
 }
 
 async function chooseSevens(user) {
@@ -98,13 +98,13 @@ describe('the view toggle', () => {
   it('starts on Quick — the view with no prerequisites', async () => {
     renderScreen()
     await loaded()
-    expect(screen.getByRole('tab', { name: 'Quick' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Quick' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('remembers the last view for the next visit', async () => {
     const user = renderScreen()
     await loaded()
-    await user.click(screen.getByRole('tab', { name: 'Slots' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Slots' }))
     expect(window.localStorage.getItem('lineup-view')).toBe('slots')
   })
 
@@ -112,7 +112,7 @@ describe('the view toggle', () => {
     window.localStorage.setItem('lineup-view', 'sideways')
     renderScreen()
     await loaded()
-    expect(screen.getByRole('tab', { name: 'Quick' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Quick' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -121,7 +121,7 @@ describe('the slots view', () => {
     const user = renderScreen()
     await loaded()
     await chooseSevens(user)
-    await user.click(screen.getByRole('tab', { name: 'Slots' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Slots' }))
     expect(screen.getByText(/shirts — 0 of 7/i)).toBeInTheDocument()
     // 7s preset: slot 5 is Fly-half. The label is a GUIDE (rosterFormats.js).
     expect(screen.getAllByText(/tap to fill/i)).toHaveLength(7)
@@ -136,7 +136,7 @@ describe('the slots view', () => {
     const user = renderScreen()
     await loaded()
     await user.selectOptions(screen.getByLabelText(/players per side/i), '')
-    await user.click(screen.getByRole('tab', { name: 'Slots' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Slots' }))
     expect(screen.getByText(/choose players per side above/i)).toBeInTheDocument()
   })
 
@@ -144,11 +144,11 @@ describe('the slots view', () => {
     const user = renderScreen()
     await loaded()
     await chooseSevens(user)
-    await user.click(screen.getByRole('tab', { name: 'Slots' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Slots' }))
     // Tap shirt 5 (Fly-half), then a player: they must land at 5, leaving 1–4 empty.
     await user.click(screen.getByRole('button', { name: /tap to fill · fly-half/i }))
     await user.click(screen.getByRole('button', { name: 'Give shirt 5 to Juno Kellaway' }))
-    const handle = screen.getByLabelText('Drag to move Juno Kellaway')
+    const handle = screen.getAllByTestId('drag-handle').find((h) => h.dataset.player === 'Juno Kellaway')
     expect(handle).toBeInTheDocument()
     expect(screen.getAllByText(/tap to fill/i)).toHaveLength(6)
     expect(screen.getByText(/shirts — 1 of 7/i)).toBeInTheDocument()
@@ -158,11 +158,11 @@ describe('the slots view', () => {
     const user = renderScreen()
     await loaded()
     await chooseSevens(user)
-    await user.click(screen.getByRole('tab', { name: 'Slots' }))
-    expect(screen.queryAllByLabelText(/drag to move/i)).toHaveLength(0)
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Slots' }))
+    expect(screen.queryAllByTestId('drag-handle')).toHaveLength(0)
     await user.click(screen.getByRole('button', { name: /tap to fill · scrum-half/i }))
     await user.click(screen.getByRole('button', { name: 'Give shirt 4 to Juno Kellaway' }))
-    expect(screen.getAllByLabelText(/drag to move/i)).toHaveLength(1)
+    expect(screen.getAllByTestId('drag-handle')).toHaveLength(1)
   })
 })
 
@@ -171,7 +171,7 @@ describe('the pitch view', () => {
     const user = renderScreen()
     await loaded()
     await chooseSevens(user)
-    await user.click(screen.getByRole('tab', { name: 'Pitch' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Pitch' }))
     const circles = screen.getAllByRole('button', { name: /^shirt \d+:/i })
     expect(circles).toHaveLength(7)
     expect(screen.getByRole('button', { name: 'Shirt 7: empty' })).toBeInTheDocument()
@@ -181,7 +181,7 @@ describe('the pitch view', () => {
     const user = renderScreen()
     await loaded()
     await chooseSevens(user)
-    await user.click(screen.getByRole('tab', { name: 'Pitch' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Pitch' }))
     await user.click(screen.getByRole('button', { name: 'Shirt 7: empty' }))
     expect(screen.getByText(/shirt 7 — wing: tap a player below/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Give shirt 7 to Juno Kellaway' }))
@@ -194,7 +194,7 @@ describe('the pitch view', () => {
     const user = renderScreen()
     await loaded()
     await chooseSevens(user)
-    await user.click(screen.getByRole('tab', { name: 'Pitch' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Pitch' }))
     await user.click(screen.getByRole('button', { name: 'Shirt 1: empty' }))
     await user.click(screen.getByRole('button', { name: 'Give shirt 1 to Juno Kellaway' }))
     await user.click(screen.getByRole('button', { name: 'Shirt 2: empty' }))
@@ -224,14 +224,15 @@ describe('the sheet style (phase 2)', () => {
     const user = renderScreen()
     await loaded()
     await chooseSevens(user)
-    await user.click(screen.getByRole('tab', { name: 'Slots' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Slots' }))
     await user.click(screen.getByRole('button', { name: /tap to fill · fly-half/i }))
     await user.click(screen.getByRole('button', { name: 'Give shirt 5 to Juno Kellaway' }))
 
     const facsimile = () => document.querySelector('.force-light')
     expect(facsimile().querySelector('svg')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Pitch', pressed: false }))
+    // The sheet-style strip comes after the view strip; both have a "Pitch".
+    await user.click(screen.getAllByRole('button', { name: 'Pitch', pressed: false }).at(-1))
     expect(facsimile().querySelector('svg')).not.toBeNull()
     // ⚠️ THE 14 AUG FULL-NAMES RULING: the pitch graphic abbreviates for
     // space, so the facsimile must STILL carry the full name in its list.
@@ -255,7 +256,7 @@ describe('the slot-shaped save', () => {
     const user = renderScreen()
     await loaded()
     await chooseSevens(user)
-    await user.click(screen.getByRole('tab', { name: 'Slots' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Slots' }))
     // Fill only shirt 5 (Fly-half) and add one replacement.
     await user.click(screen.getByRole('button', { name: /tap to fill · fly-half/i }))
     await user.click(screen.getByRole('button', { name: 'Give shirt 5 to Juno Kellaway' }))
@@ -286,7 +287,7 @@ describe('the slot-shaped save', () => {
       ],
     })
     await loaded()
-    await user.click(screen.getByRole('tab', { name: 'Pitch' }))
+    await user.click(within(screen.getByRole('group', { name: 'Roster view' })).getByRole('button', { name: 'Pitch' }))
     expect(screen.getByRole('button', { name: 'Shirt 5: Juno Kellaway' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Shirt 1: empty' })).toBeInTheDocument()
   })

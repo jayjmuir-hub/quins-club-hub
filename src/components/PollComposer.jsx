@@ -68,7 +68,9 @@ export default function PollComposer({ open, onClose, onSubmit, busy = false }) 
           <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-muted">Options</span>
           {options.map((o, i) => (
             <div key={i} className="flex items-center gap-2">
+              <label className="sr-only" htmlFor={`poll-option-${i}`}>{`Option ${i + 1}`}</label>
               <input
+                id={`poll-option-${i}`}
                 className={field}
                 value={o}
                 onChange={(e) => setOption(i, e.target.value)}

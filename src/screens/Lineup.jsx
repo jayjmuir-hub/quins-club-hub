@@ -953,13 +953,13 @@ export default function Lineup() {
 
       {/* The view toggle. Quick is the whole 14 Aug screen; Slots and Pitch are
           other ways of touching the same roster. */}
-      <div role="tablist" aria-label="Roster view" className="mb-3 flex gap-1.5">
+      {/* Pressed toggles, not a tablist — same reasoning as Login's strip. */}
+      <div role="group" aria-label="Roster view" className="mb-3 flex gap-1.5">
         {VIEWS.map((candidate) => (
           <button
             key={candidate.key}
             type="button"
-            role="tab"
-            aria-selected={view === candidate.key}
+            aria-pressed={view === candidate.key}
             onClick={() => switchView(candidate.key)}
             className={`rounded-[10px] px-3.5 py-1.5 text-[13px] font-bold ${
               view === candidate.key
@@ -1057,7 +1057,14 @@ export default function Lineup() {
                       {player ? (
                         <span
                           {...handleProps(index)}
-                          aria-label={`Drag to move ${player.full_name}`}
+                          // ⚠️ aria-hidden, NOT aria-label: a span is not
+                          // focusable, so a label on it is announced by nothing
+                          // (2 Sep 2026 UX review, Low). The keyboard and
+                          // screen-reader route is the "Give shirt N to…"
+                          // buttons beside it, which always existed.
+                          aria-hidden="true"
+                          data-testid="drag-handle"
+                          data-player={player.full_name}
                           className="shrink-0 cursor-grab select-none px-1 text-[16px] leading-none text-ink-faint"
                         >
                           ⠿

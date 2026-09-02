@@ -210,7 +210,7 @@ export function ViewAsBanner() {
           // themes, and brand-ink brightens to the dark-mode red on dark —
           // which on a white pill is a 3:1 AA fail. brand is the unthemed
           // fill red and is AA on white everywhere.
-          className="shrink-0 rounded-pill bg-white px-3 py-1 text-[13px] font-bold text-brand outline-none transition hover:bg-surface-mute focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-deep"
+          className="min-h-[44px] shrink-0 rounded-pill bg-white px-4 py-1 text-[14px] font-bold text-brand outline-none transition hover:bg-surface-mute focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-deep"
         >
           Exit preview
         </button>

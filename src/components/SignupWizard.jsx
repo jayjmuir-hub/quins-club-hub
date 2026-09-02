@@ -29,7 +29,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 function PasswordChecklist({ password }) {
   const result = checkPassword(password)
   return (
-    <ul className="mt-2 space-y-1 text-[12.5px] text-ink-muted">
+    <ul className="mt-2 space-y-1 text-[12.5px] text-ink-muted" aria-live="polite">
       {result.rules.map((rule) => (
         <li key={rule.id} className="flex items-start gap-2">
           <span aria-hidden="true" className={rule.met ? 'text-brand-ink' : 'text-line'}>

@@ -98,7 +98,7 @@ beforeEach(() => {
 
 /** The tab strip is role="tablist"; switching modes is a real user action. */
 async function switchToSignUp(user) {
-  await user.click(screen.getByRole('tab', { name: /create account/i }))
+  await user.click(screen.getByRole('button', { name: /show create account/i }))
 }
 
 /** Walk the pre-signup wizard as a volunteer so tests can reach email+password.

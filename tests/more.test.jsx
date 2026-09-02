@@ -1208,6 +1208,25 @@ describe('More — the #notifications hash scrolls to the section', () => {
     }
   })
 
+  it('⚠️ stops re-scrolling the moment the person scrolls themselves', () => {
+    // 2 Sep 2026 UX review (Low): the later corrections snapped back somebody
+    // who had started scrolling. The settle-window series above still runs;
+    // a wheel event ends it.
+    vi.useFakeTimers()
+    try {
+      renderMore('/settings#notifications')
+      vi.advanceTimersByTime(50)
+      const before = scrollSpy.mock.instances.filter((el) => el?.id === 'notifications').length
+      expect(before).toBeGreaterThanOrEqual(1)
+      window.dispatchEvent(new Event('wheel'))
+      vi.advanceTimersByTime(2000)
+      const after = scrollSpy.mock.instances.filter((el) => el?.id === 'notifications').length
+      expect(after).toBe(before)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('control: a plain /settings visit never scrolls', async () => {
     renderMore('/settings')
     // Give the (absent) effect the same two frames the real one uses.

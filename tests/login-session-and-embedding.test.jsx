@@ -85,7 +85,7 @@ describe('Login — embedded', () => {
     render(<Login embedded />)
 
     expect(screen.queryByRole('tablist')).toBeNull()
-    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+    expect(screen.queryAllByRole('button', { name: /^show / })).toHaveLength(0)
     expect(screen.queryByRole('button', { name: /create account/i })).toBeNull()
     // ...and therefore no sign-up checklist either.
     expect(screen.queryAllByRole('listitem')).toHaveLength(0)
@@ -98,7 +98,7 @@ describe('Login — embedded', () => {
     expect(screen.getByRole('heading', { level: 1, name: /abu dhabi harlequins/i }))
       .toBeInTheDocument()
     expect(screen.getByAltText(/crest/i)).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /create account/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /show create account/i })).toBeInTheDocument()
   })
 })
 
@@ -107,7 +107,7 @@ describe('Login — session expired', () => {
     markSessionExpired()
     render(<Login />)
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/session expired/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/signed you out to keep things safe/i)
   })
 
   it('says nothing when there is no note — an ordinary sign-out is not a fault', () => {
