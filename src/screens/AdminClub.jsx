@@ -10,7 +10,13 @@ import {
   upsertLeagueTeam,
 } from '../data/leagueTeams.js'
 import { listContactsForPlayers, listPlayers, restorePlayer } from '../data/players.js'
-import { setTeamScoringKinds, setTeamRequiresContact, setTeamDefaultFormat } from '../data/teams.js'
+import {
+  setTeamScoringKinds,
+  setTeamRequiresContact,
+  setTeamDefaultFormat,
+  setTeamUsesJerseyNumbers,
+  createTeam,
+} from '../data/teams.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { SCORE_KINDS, SCORE_LABELS, scoringForBand, scoringForTeam } from '../lib/scoring.js'
 import { ageBandFromTeamName } from '../lib/ageGroup.js'
@@ -18,6 +24,7 @@ import { formatLeftDate, isLeaver } from '../lib/leavers.js'
 import { FORMATS, formatLabel } from '../lib/fixtureFormat.js'
 import { isMinisTeam } from '../lib/minis.js'
 import InviteForm from './InviteForm.jsx'
+import Sheet from '../components/Sheet.jsx'
 import StorageCard from '../components/StorageCard.jsx'
 
 // The Club tab of /admin (admin-dashboard plan, 2026-08-05). Assembled from
@@ -185,6 +192,25 @@ export default function AdminClub() {
   // Whether the invite Sheet is open. A plain boolean: InviteForm has no
   // "edit" mode and no row of its own to carry, only ever the "add" case.
   const [inviteOpen, setInviteOpen] = useState(false)
+
+  // ⚠️ THE FIRST TIME THE APP CREATES A SQUAD. Until 3 Sep 2026 every squad
+  // this club fielded was inserted by a migration — there was no "add a
+  // squad" button anywhere, which is why this is a plain boolean with a
+  // fresh draft each time rather than an "edit" mode like the league-team
+  // panel above: there is no existing row to seed it from.
+  const [addSquadOpen, setAddSquadOpen] = useState(false)
+  const [draftSquadName, setDraftSquadName] = useState('')
+  // ⚠️ "Jersey numbers" is a column, never derived from Senior — a touch
+  // side is senior without numbers (same rule setTeamUsesJerseyNumbers
+  // carries in src/data/teams.js). The three switches are independent on
+  // purpose, and every one defaults OFF — the same fail-safe default
+  // requires_contact already uses (a squad this form creates should never
+  // silently claim a flag nobody asked for).
+  const [draftIsSenior, setDraftIsSenior] = useState(false)
+  const [draftUsesJerseyNumbers, setDraftUsesJerseyNumbers] = useState(false)
+  const [draftSelfRegistration, setDraftSelfRegistration] = useState(false)
+  const [addSquadSaving, setAddSquadSaving] = useState(false)
+  const [addSquadError, setAddSquadError] = useState(null)
 
   // The club's league teams, and the one being edited or added. `editing` is a
   // row; `adding` is the SQUAD a new team is being entered against, so that the
@@ -434,6 +460,76 @@ export default function AdminClub() {
     }
   }
 
+  /**
+   * Flips whether this squad carries season jersey numbers, IN PLACE.
+   *
+   * ⚠️ MIRRORS saveRequiresContact EXACTLY, and for the same reason: this is
+   * a switch, not a task, so it does NOT go through `run` — the panel stays
+   * open and redraws with whatever the reload brings back, on both success
+   * and refusal. See saveRequiresContact above for the full reasoning; it
+   * applies here unchanged.
+   */
+  async function saveUsesJerseyNumbers(next) {
+    const id = scoringTeamId
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await setTeamUsesJerseyNumbers(id, next)
+      await reloadTeams()
+    } catch (failure) {
+      setSaveError(failure)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function openAddSquad() {
+    setAddSquadOpen(true)
+    setDraftSquadName('')
+    setDraftIsSenior(false)
+    setDraftUsesJerseyNumbers(false)
+    setDraftSelfRegistration(false)
+    setAddSquadError(null)
+  }
+
+  function closeAddSquad() {
+    setAddSquadOpen(false)
+    setAddSquadError(null)
+  }
+
+  /**
+   * Creates the squad via the create_team RPC (src/data/teams.js), then
+   * reloads so it appears in the Age groups list below.
+   *
+   * ⚠️ THE BLANK-NAME CHECK IS CLIENT-SIDE TOO, and deliberately duplicates
+   * what create_team itself refuses (errcode 22023): a trip to the server to
+   * be told what an empty input already says is a worse experience, not a
+   * more correct one, and the RPC's own refusal stays as the real boundary.
+   */
+  async function saveNewSquad() {
+    const name = draftSquadName.trim()
+    if (!name) {
+      setAddSquadError(new Error('A squad needs a name.'))
+      return
+    }
+    setAddSquadSaving(true)
+    setAddSquadError(null)
+    try {
+      await createTeam({
+        name,
+        isSenior: draftIsSenior,
+        usesJerseyNumbers: draftUsesJerseyNumbers,
+        selfRegistrationAllowed: draftSelfRegistration,
+      })
+      await reloadTeams()
+      setAddSquadOpen(false)
+    } catch (failure) {
+      setAddSquadError(failure)
+    } finally {
+      setAddSquadSaving(false)
+    }
+  }
+
   function toggleKind(kind) {
     setDraftKinds((current) =>
       current.includes(kind)
@@ -490,7 +586,12 @@ export default function AdminClub() {
         </div>
       </Card>
 
-      <SectionTitle>Age groups ({sortedTeams.length})</SectionTitle>
+      <div className="flex items-center justify-between gap-3">
+        <SectionTitle>Age groups ({sortedTeams.length})</SectionTitle>
+        <Button variant="secondary" onClick={openAddSquad}>
+          Add squad
+        </Button>
+      </div>
       {sortedTeams.length === 0 ? (
         <Card>
           <Empty message="No age groups yet." />
@@ -714,6 +815,35 @@ export default function AdminClub() {
             </button>
           </div>
 
+          {/* ⚠️ "Jersey numbers" IS A COLUMN, NEVER DERIVED FROM SENIOR — a
+              touch side is senior without numbers, exactly as a squad's name
+              says nothing reliable about contact above. Same shape as the
+              Contact rugby switch: saves on the click with no Save button,
+              flips where it stands via saveUsesJerseyNumbers (which mirrors
+              saveRequiresContact and does not go through `run`), and reads
+              straight off the column so a reload is what moves it.
+              claude/plans/2026-09-02-senior-squads-2a-implementation.md. */}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[13px] font-bold text-ink">Jersey numbers</span>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Jersey numbers"
+              aria-checked={scoringTeam.uses_jersey_numbers === true}
+              disabled={saving}
+              onClick={() => saveUsesJerseyNumbers(scoringTeam.uses_jersey_numbers !== true)}
+              className={[
+                CHIP,
+                scoringTeam.uses_jersey_numbers === true
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-line text-ink hover:border-brand hover:text-brand-ink',
+                saving ? 'opacity-60' : '',
+              ].join(' ')}
+            >
+              {scoringTeam.uses_jersey_numbers === true ? 'On' : 'Off'}
+            </button>
+          </div>
+
           {/* ⚠️ A DEFAULT, NOT A RULE. What a NEW tournament or friendly for
               this squad pre-selects; every fixture still asks. A league match
               is always 15 and never reads this. Minis squads have their own
@@ -827,6 +957,106 @@ export default function AdminClub() {
       <StorageCard />
 
       {inviteOpen && <InviteForm onClose={() => setInviteOpen(false)} />}
+
+      {addSquadOpen && (
+        <Sheet open onClose={closeAddSquad} title="Add a squad">
+          <label className="mb-3.5 block">
+            <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
+              Name
+            </span>
+            <input
+              type="text"
+              aria-label="Squad name"
+              value={draftSquadName}
+              disabled={addSquadSaving}
+              autoFocus
+              onChange={(domEvent) => setDraftSquadName(domEvent.target.value)}
+              placeholder="1st XV"
+              className="w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition placeholder:text-ink-faint focus:border-brand"
+            />
+          </label>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[13px] font-bold text-ink">Senior squad</span>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Senior squad"
+              aria-checked={draftIsSenior}
+              disabled={addSquadSaving}
+              onClick={() => setDraftIsSenior((current) => !current)}
+              className={[
+                CHIP,
+                draftIsSenior
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-line text-ink hover:border-brand hover:text-brand-ink',
+                addSquadSaving ? 'opacity-60' : '',
+              ].join(' ')}
+            >
+              {draftIsSenior ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          {/* ⚠️ INDEPENDENT OF Senior squad, ABOVE — never derived from it. A
+              touch side is senior without numbers. */}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[13px] font-bold text-ink">Jersey numbers</span>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Jersey numbers"
+              aria-checked={draftUsesJerseyNumbers}
+              disabled={addSquadSaving}
+              onClick={() => setDraftUsesJerseyNumbers((current) => !current)}
+              className={[
+                CHIP,
+                draftUsesJerseyNumbers
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-line text-ink hover:border-brand hover:text-brand-ink',
+                addSquadSaving ? 'opacity-60' : '',
+              ].join(' ')}
+            >
+              {draftUsesJerseyNumbers ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[13px] font-bold text-ink">Players may register themselves</span>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Players may register themselves"
+              aria-checked={draftSelfRegistration}
+              disabled={addSquadSaving}
+              onClick={() => setDraftSelfRegistration((current) => !current)}
+              className={[
+                CHIP,
+                draftSelfRegistration
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-line text-ink hover:border-brand hover:text-brand-ink',
+                addSquadSaving ? 'opacity-60' : '',
+              ].join(' ')}
+            >
+              {draftSelfRegistration ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          <div className="mt-3.5 flex flex-wrap gap-2.5">
+            <Button disabled={addSquadSaving} onClick={saveNewSquad}>
+              {addSquadSaving ? 'Saving…' : 'Save'}
+            </Button>
+            <Button variant="ghost" disabled={addSquadSaving} onClick={closeAddSquad}>
+              Cancel
+            </Button>
+          </div>
+
+          {addSquadError && (
+            <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
+              {addSquadError.message || "That didn't save. Try again."}
+            </p>
+          )}
+        </Sheet>
+      )}
     </div>
   )
 }
