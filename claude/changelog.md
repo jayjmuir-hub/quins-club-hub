@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(admin): the Admin badge moves the moment a join request arrives —
+- **fix(rls): chat authors are no longer "Someone" for anybody who is not
+  an admin.** Jay, 2 Sep 2026, a team manager's screenshot of the club-wide
+  managers channel: every post, the admin's welcome included, read "Someone".
+  Measured on production as a real manager and a real parent, in a rolled-back
+  transaction: each could read exactly one `profiles` row, their own — the
+  four SELECT policies (own, club admin, two pending arms) never let a member
+  read another member, so the author embed came back null for every post not
+  theirs. ⚠️ **As old as chat itself (23 Aug), not the role channels**, and
+  the same null sat on the notice author and the officers card for a parent.
+  `db/migrations/20260902_profile_read_named_author.sql`: policy "profile read
+  named author", predicate `private.can_read_profile_name` — you may read the
+  name of anyone whose message, notice, poll vote or officer row you can
+  already read, evaluated as SECURITY INVOKER so the messages policies stay in
+  the loop and a parent still cannot list the club. Two indexes for the
+  lookup. `db/tests/profile-names.sql`: control, two missing-name checks, two
+  extra-name checks (another squad's poster; a silent squad-mate), the admin
+  unchanged. ⚠️ **Needs the migration applied.**
+- `5216d85` — **fix(admin): the Admin badge moves the moment a join request arrives —
   no refresh, no reopening Admin.** Jay, 2 Sep 2026, desktop: *"when I have
   the desktop site open and new join approvals come in the little number icon
   on admin doesn't increment unless I open admin again or refresh"*. The
