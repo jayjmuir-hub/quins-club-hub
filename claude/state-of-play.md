@@ -57,9 +57,9 @@ Nothing in this stack is blocked on anyone.
 🏉 **The Rugby Performance Director dashboard (pieces 1–3) is LIVE** — merged
 `d92adb7` (#276) on 21 Aug 2026 and verified end to end on the deployed site.
 Both migrations are applied (`training_plans`, `publish_training_fit_check`),
-plus `training_suggestions` is WRITTEN and proven but NOT applied as of 2 Sep
-2026 — it lands with the screens PR (Part 1 of
-`claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`);
+plus `training_suggestions` — APPLIED 2 Sep 2026 and live with the screens
+(`d98b593`, Part 1 of `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`):
+the director's publish is now a suggestion the coaches accept or decline;
 harness 8/8 against production. The `training` right is held by the club's
 Rugby Performance Director. Ten squads are marked contact and five tag —
 `claude/decisions/2026-08-21-quick-rip-is-tag.md`. Nothing has been published

@@ -1,6 +1,6 @@
 # Training: the director's session becomes a suggestion, and age becomes guidance
 
-**Status: PART 2 SHIPPED as `7db98ca` (#639, 2 Sep 2026); Part 1 NOT SHIPPED — spec only.** Dated 2026-09-02.
+**Status: SHIPPED. Part 2 as `7db98ca` (#639); Part 1 as `226b64f` (#645, schema) and `d98b593` (#647, screens), migration applied 2 Sep 2026. Not yet built from Part 1: the push to the squad's coaches and the director's uptake view.** Dated 2026-09-02.
 
 Two changes to the training builder, both from one coach's feedback relayed
 by Jay on 2 Sep 2026, and both about the same thing: the club's training
