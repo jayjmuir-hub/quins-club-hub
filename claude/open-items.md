@@ -1216,7 +1216,7 @@ proves you wrong.**
   the staff member gives up. ⚠️ **AND WHEN IT DOES SUCCEED IT IS WORSE:** the
   parent's membership survives with a blank player link, still `active`, still on
   the squad — roster, chat and pushes for a squad their child has left.
-  ✅ **THE DESIGNED REMEDY FOR "THE CHILD QUIT" HAS SHIPPED, 2 Sep 2026** —
+  ✅ **THE DESIGNED REMEDY FOR "THE CHILD QUIT" HAS BEEN BUILT — both migrations applied to live 2 Sep 2026, pull request pending** —
   `claude/specs/2026-09-02-player-leavers-design.md`, `mark_player_left`/
   `restore_player`. **Delete itself is UNTOUCHED and still broken** for
   exactly the reasons above; it still needs its cascades decided (parent

@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(roster): MARKING A PLAYER AS LEFT — shipped.**
+- **feat(roster): MARKING A PLAYER AS LEFT — BUILT, both migrations applied to live 2 Sep 2026, pull request pending.**
   `claude/specs/2026-09-02-player-leavers-design.md`,
   `claude/plans/2026-09-02-player-leavers-implementation.md`. Two migrations
   applied to live 2 Sep 2026 (Jay's go-ahead): `db/migrations/20260902_player_leavers.sql`

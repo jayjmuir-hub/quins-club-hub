@@ -2685,7 +2685,7 @@ alter table public.players
 -- predicates in private.sql that tested neither status NOR left_at --
 -- private.is_own_player and private.is_attached_to_team -- so a 'left'
 -- membership row (which the CHECKs above now allow to exist) still passed
--- them. Both gained `AND left_at IS NULL` alongside their existing joins.
+-- them. Both gained `and m.status <> 'left'` to their WHERE clauses.
 -- ⚠️ NOT `status = 'active'`: a pending membership is deliberately still
 -- let through by these two, only a leaver is excluded. See functions.sql.
 
