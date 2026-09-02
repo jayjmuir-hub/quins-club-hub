@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { useState } from 'react'
 import { Sheet } from '../src/components/Sheet.jsx'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 // 2 Sep 2026 UX review, pattern 7: on Android the system Back with a sheet
 // open used to leave the whole screen. Opening a sheet now pushes one history
@@ -82,5 +84,19 @@ describe('Sheet — Back closes the sheet', () => {
     })
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(pushState).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('Sheet — size', () => {
+  it('is the 520px dialog by default and min(760px, 94vw) when wide (2 Sep 2026 UX review, desktop)', () => {
+    render(<Sheet open onClose={() => {}} title="Default"><p>x</p></Sheet>)
+    const panel = screen.getByRole('dialog')
+    expect(panel).toHaveAttribute('data-size', 'default')
+    expect(panel.className).toContain('desktop:w-[min(520px,94vw)]')
+    expect(panel.className).not.toContain('760px')
+  })
+  it('wide: the event form asks for it (rot detector)', () => {
+    const form = readFileSync(resolve(import.meta.dirname, '..', 'src/screens/EventForm.jsx'), 'utf8')
+    expect(form.match(/size="wide"/g)?.length).toBe(2)
   })
 })

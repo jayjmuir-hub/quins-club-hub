@@ -10,7 +10,13 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ux): the pattern leftovers from the full review.** (1) Cold start
+- **feat(ui): the event form gets a wide sheet on desktop.** The last
+  desktop finding of the 2 Sep 2026 UX review: about twenty fields in one
+  column inside a 520px keyhole. `Sheet` takes `size="wide"` —
+  `min(760px, 94vw)` on desktop, unchanged on a phone — and both of the
+  event form's sheets ask for it. The form already groups with `fieldset`
+  and `legend`; two-column rows are left for a later pass.
+- `9929722` — **fix(ux): the pattern leftovers from the full review.** (1) Cold start
   offers Reload after six seconds (`RequireAuth.jsx`, `useSlowLoad`) — the
   recorded 15-second Supabase stalls looked like a dead app. (2) Documents
   uses the app's own two-step Remove instead of `window.confirm`, the one
