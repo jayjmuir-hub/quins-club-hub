@@ -11,8 +11,8 @@ import { upsertPlayer } from '../data/players.js'
 // mobile card list, not alongside it — see src/lib/useMediaQuery.js for why
 // that switch is made in JS rather than with a `desktop:` class.
 //
-// Four columns are editable in place: position, gender, age group and
-// captain. Those are the fields that change during a season; everything else
+// Five columns are editable in place: forward-or-back, position, gender, age
+// group and captain. Those are the fields that change during a season; everything else
 // still goes through PlayerForm, which is where validation, contacts and the
 // two-table save sequence already live. There is deliberately no jersey
 // column — the club does not use squad numbers (src/lib/playerFormat.js).
@@ -43,8 +43,17 @@ const BODY_CELL = 'border-t border-line px-3 py-2 text-[14px] text-ink align-mid
 const INLINE_CONTROL =
   'w-full rounded-[8px] border border-transparent bg-transparent px-2 py-1 text-[14px] text-ink transition hover:border-line hover:bg-surface-card focus:border-brand focus:bg-surface-card focus-visible:outline-none disabled:cursor-not-allowed'
 
+const UNIT_LABEL = { forward: 'Forward', back: 'Back' }
+
 const SORTABLE = [
   { key: 'full_name', label: 'Name' },
+  // Forward-or-back sits BEFORE position because it is the coarser question
+  // and the one a coach can answer for a whole squad in one pass. Jay, 2 Sep
+  // 2026, on a U16 roster where 30 of 37 sat under "Other": "there should be
+  // a column where you can select forward or back in general without opening
+  // each individual player one at a time". The player sheet was the only
+  // write path until then.
+  { key: 'unit', label: 'Forward / Back' },
   { key: 'position', label: 'Position' },
   { key: 'gender', label: 'Gender' },
   { key: 'team', label: 'Age group' },
@@ -109,6 +118,11 @@ export default function RosterTable({
   // optimistic map update. Editing without it is a silent no-op, so pass it
   // whenever rows are editable and positionsByPlayer is set.
   onSavePositions = null,
+  // async (playerId, unit) => void, unit 'forward' | 'back' | null. Same
+  // contract as onSavePositions: player_units is the store, the caller owns
+  // the optimistic unitsByPlayer map, and the column exists only when
+  // positionsByPlayer is set (both are staff-only).
+  onSaveUnit = null,
 }) {
   const [sort, setSort] = useState({ key: 'full_name', dir: 'asc' })
   // Per-row, keyed by player id: the field currently in flight, and the last
@@ -155,10 +169,13 @@ export default function RosterTable({
     // positionsByPlayer map instead (25 Aug 2026): the row's position is
     // decorated from that map, so an onPatch here would be overwritten on
     // the very next render.
-    if (field !== 'position') onPatch(player.id, { [field]: value })
+    const decorated = field === 'position' || field === 'unit'
+    if (!decorated) onPatch(player.id, { [field]: value })
 
     try {
-      if (field === 'position') {
+      if (field === 'unit') {
+        await onSaveUnit?.(player.id, value)
+      } else if (field === 'position') {
         // The picked position becomes the primary; the player's other
         // positions keep their order behind it. players.position is nulled
         // and staff-only — player_positions is the only store now.
@@ -170,7 +187,7 @@ export default function RosterTable({
         await upsertPlayer({ id: player.id, [field]: value })
       }
     } catch (err) {
-      if (field !== 'position') onPatch(player.id, { [field]: previous })
+      if (!decorated) onPatch(player.id, { [field]: previous })
       setErrors((e) => ({
         ...e,
         [player.id]: err?.message || "We couldn't save that change.",
@@ -190,7 +207,8 @@ export default function RosterTable({
   // since 25 Aug 2026). A parent's rows carry no position at all, and a
   // column of "Not set" would state a gap they are not allowed to see filled.
   const show = (key) =>
-    !hiddenColumns?.has(key) && (key !== 'position' || positionsByPlayer != null)
+    !hiddenColumns?.has(key) &&
+    ((key !== 'position' && key !== 'unit') || positionsByPlayer != null)
   const columns = SORTABLE.filter((column) => show(column.key))
   // Every column a heading row has to stretch across: the visible ones, the
   // optional Tier column, and the Open column.
@@ -231,7 +249,7 @@ export default function RosterTable({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse" data-testid="roster-table">
           <caption className="sr-only">
-            Club roster. Position, gender, age group and captain can be changed in place.
+            Club roster. Forward or back, position, gender, age group and captain can be changed in place.
           </caption>
           <thead>
             <tr>
@@ -348,6 +366,30 @@ export default function RosterTable({
                       </span>
                     )}
                   </td>
+
+                  {show('unit') && (
+                  <td className={BODY_CELL}>
+                    {editable ? (
+                      <select
+                        className={INLINE_CONTROL}
+                        aria-label={`Forward or back for ${player.full_name}`}
+                        value={player.unit ?? ''}
+                        disabled={busy === 'unit'}
+                        // '' back to null: setPlayerUnit deletes the row for a
+                        // falsy unit, so "Not set" is the absence of a row.
+                        onChange={(event) => save(player, 'unit', event.target.value || null)}
+                      >
+                        <option value="">Not set</option>
+                        <option value="forward">Forward</option>
+                        <option value="back">Back</option>
+                      </select>
+                    ) : (
+                      <span className="px-2 text-ink-muted">
+                        {UNIT_LABEL[player.unit] ?? 'Not set'}
+                      </span>
+                    )}
+                  </td>
+                  )}
 
                   {show('position') && (
                   <td className={BODY_CELL}>

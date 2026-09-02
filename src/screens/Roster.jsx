@@ -11,7 +11,7 @@ import TeamFilter, { ALL_TEAMS_ID } from '../components/TeamFilter.jsx'
 import { positionGroup, POSITION_GROUP_ORDER } from '../lib/rosterUnit.js'
 import { buildRosterGroups, constantColumns, GROUP_BY } from '../lib/rosterGrouping.js'
 import { isMinisTeam } from '../lib/minis.js'
-import { listPlayerGrades, listPlayerPositions, listPlayerUnits, savePlayerPositions } from '../data/playerTiers.js'
+import { listPlayerGrades, listPlayerPositions, listPlayerUnits, savePlayerPositions, setPlayerUnit } from '../data/playerTiers.js'
 import PlayerDetail from './PlayerDetail.jsx'
 import PlayerForm from './PlayerForm.jsx'
 import MyPlayerForm from './MyPlayerForm.jsx'
@@ -676,6 +676,27 @@ export default function Roster() {
     }
   }
 
+  // The table's forward-or-back write (2 Sep 2026). Same shape as
+  // savePositionsFor: unitsByPlayer decorates player.unit, so the optimism
+  // lives here and the throw lets the table report the refusal in its row.
+  const saveUnitFor = async (playerId, unit) => {
+    const previous = unitsByPlayer.get(playerId) ?? null
+    const stamp = (value) =>
+      setUnitsByPlayer((current) => {
+        const next = new Map(current)
+        if (value) next.set(playerId, value)
+        else next.delete(playerId)
+        return next
+      })
+    stamp(unit)
+    try {
+      await setPlayerUnit(playerId, unit)
+    } catch (err) {
+      stamp(previous)
+      throw err
+    }
+  }
+
   const persistFilter = (next) => {
     setTeamFilter(next)
     try {
@@ -966,6 +987,7 @@ export default function Roster() {
           // not carry the column at all.
           positionsByPlayer={canEditAnything && !minisOnly ? positionsByPlayer : null}
           onSavePositions={savePositionsFor}
+          onSaveUnit={saveUnitFor}
         />
       )}
 

@@ -23,6 +23,7 @@ const listPlayersMock = vi.fn()
 const upsertPlayerMock = vi.fn()
 const savePlayerPositionsMock = vi.fn()
 const listPlayerPositionsMock = vi.fn()
+const setPlayerUnitMock = vi.fn()
 
 // Positions live in staff-only player_positions since 25 Aug 2026; the screen
 // decorates its rows from this map for staff, and the inline editor writes
@@ -32,6 +33,7 @@ vi.mock('../src/data/playerTiers.js', () => ({
   listPlayerUnits: vi.fn(async () => new Map()),
   listPlayerPositions: (...a) => listPlayerPositionsMock(...a),
   savePlayerPositions: (...a) => savePlayerPositionsMock(...a),
+  setPlayerUnit: (...a) => setPlayerUnitMock(...a),
 }))
 
 vi.mock('../src/lib/memberships.jsx', () => ({
@@ -90,6 +92,7 @@ beforeEach(() => {
   listPlayersMock.mockResolvedValue([TOM, AMY, ZAC])
   upsertPlayerMock.mockImplementation(async (p) => ({ ...p }))
   savePlayerPositionsMock.mockResolvedValue([])
+  setPlayerUnitMock.mockResolvedValue(null)
   // Mirrors the inline fixture positions on TOM and AMY above — the fixture
   // fields themselves are ignored for a staff viewer.
   listPlayerPositionsMock.mockResolvedValue(new Map([
@@ -233,6 +236,31 @@ describe('RosterTable — inline editing', () => {
     await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p1', []))
   })
 
+  it('sets forward or back in place, through player_units, without opening the player', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    await user.selectOptions(screen.getByLabelText('Forward or back for Zac Bell'), 'forward')
+    await waitFor(() => expect(setPlayerUnitMock).toHaveBeenCalledWith('p3', 'forward'))
+    expect(screen.getByLabelText('Forward or back for Zac Bell')).toHaveValue('forward')
+    // Its own store: neither the players row nor player_positions is touched.
+    expect(upsertPlayerMock).not.toHaveBeenCalled()
+    expect(savePlayerPositionsMock).not.toHaveBeenCalled()
+  })
+
+  it('clearing forward or back sends null, so the row is deleted rather than blanked', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    const select = screen.getByLabelText('Forward or back for Zac Bell')
+    await user.selectOptions(select, 'back')
+    await waitFor(() => expect(setPlayerUnitMock).toHaveBeenCalledWith('p3', 'back'))
+    await user.selectOptions(select, '')
+    await waitFor(() => expect(setPlayerUnitMock).toHaveBeenCalledWith('p3', null))
+  })
+
   it('moves a player to another age group', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><Roster /></MemoryRouter>)
@@ -287,6 +315,19 @@ describe('RosterTable — refusals', () => {
     expect(alert).toHaveTextContent(/may not have permission/i)
     // Reverted, not left showing a value the database rejected.
     expect(screen.getByLabelText('Position for Zac Bell')).toHaveValue('')
+  })
+
+  it('puts forward or back back to "Not set" and says so in the row when refused', async () => {
+    const user = userEvent.setup()
+    setPlayerUnitMock.mockRejectedValue(new Error("We couldn't save that. Ask a club admin if that looks wrong."))
+
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+    await user.selectOptions(screen.getByLabelText('Forward or back for Zac Bell'), 'forward')
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/couldn't save that/i)
+    expect(screen.getByLabelText('Forward or back for Zac Bell')).toHaveValue('')
   })
 
   it('reports the refusal in the row that caused it, not globally', async () => {
@@ -347,6 +388,7 @@ describe('RosterTable — permissions', () => {
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
     expect(screen.queryByLabelText(/^Position for/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Forward or back for/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Captain:/ })).not.toBeInTheDocument()
   })
 })

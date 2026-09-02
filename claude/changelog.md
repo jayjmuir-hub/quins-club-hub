@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(forms): a refused submit now lands on the problem.** Item 3 of the
+- **feat(roster): forward or back is set in the table, one select per row,
+  without opening the player.** Jay, 2 Sep 2026, on a U16 roster where most
+  of the squad sat under "Other": *"there should be a column where you can
+  select forward or back in general without opening each individual player
+  one at a time"*. The player sheet had been the only write path since the
+  unit field arrived on 14 Aug. `src/components/RosterTable.jsx` gains a
+  "Forward / Back" column ahead of Position, staff-only under the same gate
+  as Position, writing through `setPlayerUnit` with the optimism held in
+  Roster's `unitsByPlayer` map exactly as positions are; a refusal reverts
+  the cell and lands in the row. `tests/rosterTable.test.jsx` covers the
+  write, the clear-to-null, the refusal and the parent's missing column.
+- `95cf9c1` — **feat(forms): a refused submit now lands on the problem.** Item 3 of the
   2 Sep 2026 UX review. On the child form and the sign-up children form the
   alert sat at the top of a long sheet with Save at the bottom, so a parent
   tapped Save and nothing visible happened; the event form and player form

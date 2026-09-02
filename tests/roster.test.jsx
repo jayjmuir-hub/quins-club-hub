@@ -60,6 +60,7 @@ vi.mock('../src/data/players.js', () => ({
 vi.mock('../src/data/playerTiers.js', () => ({
   listPlayerGrades: vi.fn(async () => new Map()),
   listPlayerUnits: vi.fn(async () => new Map()),
+  setPlayerUnit: vi.fn(async () => null),
   savePlayerPositions: vi.fn(async () => []),
   listPlayerPositions: vi.fn(async () => new Map([
     ['p-flanker', ['Flanker']],
