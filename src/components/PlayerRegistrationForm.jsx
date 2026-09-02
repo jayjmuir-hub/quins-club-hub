@@ -546,10 +546,17 @@ export default function PlayerRegistrationForm({
   // true the form validates and hands the rows back instead of writing.
   collectOnly = false,
   onCollect,
+  // Rows to start from, in the shape onCollect hands back. The sign-up wizard
+  // passes what it already collected, so Back from the account step no longer
+  // remounts this form from a blank row and throws three children away
+  // (2 Sep 2026 UX review; claude/plans/2026-09-02-ux-unsaved-work.md Task 5).
+  initialRows = null,
 }) {
-  const [rows, setRows] = useState(() => [
-    { ...blankRow(), selfRegister: Boolean(defaultSelfRegister) },
-  ])
+  const [rows, setRows] = useState(() =>
+    Array.isArray(initialRows) && initialRows.length > 0
+      ? initialRows
+      : [{ ...blankRow(), selfRegister: Boolean(defaultSelfRegister) }],
+  )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   // The registrant's own name — see the header note. `profile` resolves

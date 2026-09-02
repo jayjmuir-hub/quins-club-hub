@@ -4,6 +4,7 @@ import Button from '../components/Button.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import TimePicker from '../components/TimePicker.jsx'
 import RepeatUntilField from '../components/RepeatUntilField.jsx'
+import useUnsavedChanges from '../lib/useUnsavedChanges.js'
 import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPitches, PITCH_TBD } from '../data/pitches.js'
 import { PITCH_PORTIONS, defaultPitchPortion } from '../lib/pitchPortion.js'
@@ -709,6 +710,32 @@ export default function EventForm({
   // event.starts_at.
   const [originalTime] = useState(() => values.time)
 
+  // ── Unsaved work ────────────────────────────────────────────────────────
+  //
+  // ⚠️ DIRTY IS A COMPARISON, NOT A COUNTER. A keystroke that is then undone
+  // leaves the form clean again, which is what somebody expects when they
+  // press Escape on a form they only glanced at. Found by the 2 Sep 2026 UX
+  // review: on desktop this sheet is a 520px modal, and one click on the page
+  // behind it — or an Escape pressed a beat after a picker had already closed
+  // — threw away twenty fields with no warning.
+  // claude/plans/2026-09-02-ux-unsaved-work.md, Task 2.
+  const [initialSnapshot] = useState(() =>
+    JSON.stringify({ values, repeatDays: [], extraTeamIds: [], applyToSeries: false }),
+  )
+  const dirty =
+    JSON.stringify({ values, repeatDays, extraTeamIds, applyToSeries }) !== initialSnapshot
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
+  // Reload, tab close and typed navigation: the browser's own dialog, only
+  // while dirty and not mid-save.
+  useUnsavedChanges(dirty && !saving)
+  // Escape, the backdrop and the X all arrive here via Sheet's onClose. Clean
+  // closes at once; dirty asks first, inline, with the app's own two-step
+  // pattern — never a native confirm().
+  function requestClose() {
+    if (dirty) setConfirmingDiscard(true)
+    else onClose?.()
+  }
+
   // The managed pitch list. Loaded once per open sheet — it is a handful of
   // rows and it must not refetch while somebody is typing.
   //
@@ -1030,7 +1057,7 @@ export default function EventForm({
   // apologises.
   if (editableTeams.length === 0) {
     return (
-      <Sheet open onClose={onClose} title={sheetTitle}>
+      <Sheet open onClose={requestClose} title={sheetTitle}>
         <p role="alert" className="rounded-[11px] bg-warn-bg px-4 py-3 text-sm text-ink">
           You don&apos;t have a squad you can add or change fixtures for. Ask a club admin if that
           looks wrong.
@@ -1515,12 +1542,38 @@ export default function EventForm({
   }
 
   return (
-    <Sheet open onClose={onClose} title={sheetTitle}>
+    <Sheet open onClose={requestClose} title={sheetTitle}>
       {/* noValidate: this form does its own validation and reports it in a
           role="alert" region, which a screen reader announces — the native
           bubble is neither announced reliably nor visible to the browser
           check. */}
       <form onSubmit={handleSubmit} noValidate>
+        {confirmingDiscard && (
+          <div
+            role="alertdialog"
+            aria-labelledby="event-discard-title"
+            aria-describedby="event-discard-body"
+            className="mb-3.5 rounded-[11px] border border-line bg-surface-mute px-3 py-2.5"
+          >
+            <p id="event-discard-title" className="text-sm font-bold text-ink">
+              Discard your changes?
+            </p>
+            <p id="event-discard-body" className="mt-0.5 text-[12.5px] text-ink-muted">
+              Nothing has been saved yet.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {/* `danger` is the CONFIRM of the pair; the arming tap was the
+                  close itself. Button defaults type="button", so neither of
+                  these submits the form they sit inside. */}
+              <Button variant="danger" onClick={() => onClose?.()}>
+                Discard
+              </Button>
+              <Button variant="ghost" onClick={() => setConfirmingDiscard(false)}>
+                Keep editing
+              </Button>
+            </div>
+          </div>
+        )}
         {/* ⚠️ IN TOURNAMENT MODE THE NAME IS THE IDENTITY, so it takes the top
             slot the Type control has for every other kind. The kind was already
             chosen in the "What are you adding?" chooser, so a Type selector here

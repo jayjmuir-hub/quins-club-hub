@@ -10,6 +10,7 @@ import { listAvailability } from '../data/availability.js'
 import { createLineup, listLineups, saveLineupPlayers, updateLineup } from '../data/lineups.js'
 import { listPlayerGrades, listPlayerPositions } from '../data/playerTiers.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import useUnsavedChanges from '../lib/useUnsavedChanges.js'
 import { canEditTeam } from '../lib/scope.js'
 import { TIER_OK, tierEligibility } from '../lib/tierEligibility.js'
 import { rosterFormat, slotLabel } from '../lib/rosterFormats.js'
@@ -224,6 +225,25 @@ export default function Lineup() {
   const [sharing, setSharing] = useState(false)
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(false)
+  // ── Unsaved work ────────────────────────────────────────────────────────
+  //
+  // `saved` says "the last save succeeded"; `dirty` says "something changed
+  // since". They are not each other's opposite: a fresh screen is neither.
+  // Every edit site calls markEdited() — found by the 2 Sep 2026 UX review,
+  // when Save sat at the foot of the whole squad list and Back was a bare
+  // navigate(-1), so a coach who had placed fifteen shirts and swiped back
+  // lost the lot. claude/plans/2026-09-02-ux-unsaved-work.md, Task 3.
+  //
+  // ⚠️ NOT AUTOSAVED, ON PURPOSE: save() creates the lineup row on first Save
+  // so that "did anyone pick a team?" stays answerable. The dock and sidebar
+  // are still an unguarded exit — the plan records that gap.
+  const [dirty, setDirty] = useState(false)
+  const [confirmingLeave, setConfirmingLeave] = useState(false)
+  useUnsavedChanges(dirty && !saving)
+  function markEdited() {
+    setSaved(false)
+    setDirty(true)
+  }
   const shareRef = useRef(null)
 
   useEffect(() => {
@@ -392,7 +412,7 @@ export default function Lineup() {
   }
 
   function add(playerId, role, slotIndex = null) {
-    setSaved(false)
+    markEdited()
     if (role === ROLE_REPLACEMENT) {
       setReps((current) => [...current, playerId])
     } else {
@@ -404,14 +424,14 @@ export default function Lineup() {
   }
 
   function remove(playerId) {
-    setSaved(false)
+    markEdited()
     setSlotted((current) => current.map((id) => (id === playerId ? null : id)))
     setReps((current) => current.filter((id) => id !== playerId))
     setSelectedSlot(null)
   }
 
   function toggleRole(playerId) {
-    setSaved(false)
+    markEdited()
     if (reps.includes(playerId)) {
       setReps((current) => current.filter((id) => id !== playerId))
       setSlotted((current) => placeInSlot(current, firstFreeSlot(current), playerId))
@@ -425,7 +445,7 @@ export default function Lineup() {
   // Drag lands here: splice the full slot array — empty slots move too, which
   // is what "shove everyone down one" means on a team sheet.
   function moveSlot(from, to) {
-    setSaved(false)
+    markEdited()
     setSlotted((current) => {
       const next = [...current]
       while (next.length < slotCount) next.push(null)
@@ -436,7 +456,7 @@ export default function Lineup() {
   }
 
   function swapSlots(a, b) {
-    setSaved(false)
+    markEdited()
     setSlotted((current) => {
       const next = [...current]
       while (next.length <= Math.max(a, b)) next.push(null)
@@ -469,7 +489,7 @@ export default function Lineup() {
   // one moves — the same two outcomes the tap path already has, so drag adds
   // a gesture and no new state transition.
   function movePitchCircle(from, to) {
-    setSaved(false)
+    markEdited()
     setSelectedSlot(null)
     setPendingSlot(null)
     if (slotted[to]) {
@@ -534,6 +554,7 @@ export default function Lineup() {
       })
       await saveLineupPlayers(id, rows)
       setSaved(true)
+      setDirty(false)
     } catch (failure) {
       setError(failure)
     } finally {
@@ -742,14 +763,44 @@ export default function Lineup() {
           screen on its first run. */}
       <div className="mb-3.5 mt-1 flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="font-display text-[24px] font-extrabold tracking-[-0.02em] text-ink desktop:text-[26px]">Team sheet</h2>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="text-[13px] font-bold text-brand-ink"
-        >
-          Back
-        </button>
+        <div className="flex items-center gap-3">
+          {dirty && (
+            <span className="text-[12.5px] font-semibold text-warn-ink">Unsaved changes</span>
+          )}
+          {/* 44px tall: the UX review measured the old bare text link at ~16px. */}
+          <button
+            type="button"
+            onClick={() => (dirty ? setConfirmingLeave(true) : navigate(-1))}
+            className="min-h-[44px] px-3 text-[13px] font-bold text-brand-ink"
+          >
+            Back
+          </button>
+        </div>
       </div>
+
+      {confirmingLeave && (
+        <div
+          role="alertdialog"
+          aria-labelledby="lineup-leave-title"
+          aria-describedby="lineup-leave-body"
+          className="mb-3 rounded-[11px] border border-line bg-surface-mute px-3 py-2.5"
+        >
+          <p id="lineup-leave-title" className="text-sm font-bold text-ink">
+            Leave without saving?
+          </p>
+          <p id="lineup-leave-body" className="mt-0.5 text-[12.5px] text-ink-muted">
+            The team you picked will be lost.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button variant="danger" onClick={() => navigate(-1)}>
+              Leave
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmingLeave(false)}>
+              Stay
+            </Button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p
@@ -773,7 +824,7 @@ export default function Lineup() {
           <select
             value={perSide ?? ''}
             onChange={(domEvent) => {
-              setSaved(false)
+              markEdited()
               setPendingSlot(null)
               setSelectedSlot(null)
               setPerSide(domEvent.target.value === '' ? null : Number(domEvent.target.value))
@@ -809,7 +860,7 @@ export default function Lineup() {
             max="40"
             value={squadSize ?? ''}
             onChange={(domEvent) => {
-              setSaved(false)
+              markEdited()
               const raw = domEvent.target.value
               setSquadSize(raw === '' ? null : Number(raw))
             }}
@@ -1078,7 +1129,7 @@ export default function Lineup() {
           rows={2}
           value={notes}
           onChange={(domEvent) => {
-            setSaved(false)
+            markEdited()
             setNotes(domEvent.target.value)
           }}
           placeholder="Meet 8:15 at the gate. Bring both kits."

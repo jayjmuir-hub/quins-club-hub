@@ -18,6 +18,7 @@ import {
 import { isLeaver, leaverName } from '../lib/leavers.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
+import useUnsavedChanges from '../lib/useUnsavedChanges.js'
 import { formatLabel, formatOf, sheetSlots } from '../lib/fixtureFormat.js'
 import { canEditTeam } from '../lib/scope.js'
 import { CLUB_TIME_ZONE, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
@@ -81,6 +82,47 @@ function leftColumn(count) {
 
 /** The five blank discipline rows the paper form provides. */
 const CARD_ROWS = 5
+
+// ── The draft ───────────────────────────────────────────────────────────────
+//
+// Typing survives a tab switch, a back-swipe or a reload as a sessionStorage
+// draft, per fixture. Found by the 2 Sep 2026 UX review: 22 names and five
+// card rows typed on a phone were gone on one back-swipe, and this screen has
+// no Back button of its own to guard — the dock and sidebar are the exits — so
+// a draft is the only guard that covers every route out.
+// claude/plans/2026-09-02-ux-unsaved-work.md, Task 4.
+//
+// ⚠️ A SHEET THE SERVER HAS ALWAYS WINS. The draft is restored only when
+// getMatchSheet returned nothing; otherwise it is discarded on load. A draft
+// of a sheet that was since saved from another device would otherwise
+// overwrite the saved one on screen while claiming to be "restored".
+//
+// sessionStorage, not localStorage: it is per tab and dies with the browser,
+// which is the right lifetime for a form somebody was in the middle of, and
+// it cannot resurface weeks later on a shared phone.
+const draftKey = (eventId) => `match-sheet-draft:${eventId}`
+function readDraft(eventId) {
+  try {
+    const raw = window.sessionStorage.getItem(draftKey(eventId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+function writeDraft(eventId, draft) {
+  try {
+    window.sessionStorage.setItem(draftKey(eventId), JSON.stringify(draft))
+  } catch {
+    // Private mode or a full store: the form still works, only the draft is lost.
+  }
+}
+function clearDraft(eventId) {
+  try {
+    window.sessionStorage.removeItem(draftKey(eventId))
+  } catch {
+    // Nothing to clear, or nothing we can do about it.
+  }
+}
 
 /** The two sides, in the order the columns are laid out. */
 const SIDES = ['us', 'them']
@@ -372,6 +414,21 @@ export default function MatchSheet() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [saved, setSaved] = useState(false)
+  // `dirty`: something changed since the last save (or since a draft was
+  // restored). `restored`: this visit began from a draft, so say so.
+  const [dirty, setDirty] = useState(false)
+  const [restored, setRestored] = useState(false)
+  useUnsavedChanges(dirty && !saving)
+  function markEdited() {
+    setSaved(false)
+    setDirty(true)
+  }
+  // Write the draft on every change while dirty. Not on a clean form: a coach
+  // who only looked must leave nothing behind.
+  useEffect(() => {
+    if (!dirty) return
+    writeDraft(eventId, { fields, slots, cardRows, score, savedAt: Date.now() })
+  }, [dirty, fields, slots, cardRows, score, eventId])
   const [sharing, setSharing] = useState(false)
   // The id of the lineup whose Refill has been ARMED, or null. Two-step inline
   // confirm — never a native confirm(), which blocks the event loop and is
@@ -452,6 +509,18 @@ export default function MatchSheet() {
             manager_phone: existing.manager_phone ?? '',
             medical_notes: existing.medical_notes ?? '',
           })
+          // A saved sheet makes any draft stale — see the draft note above.
+          clearDraft(eventId)
+        } else {
+          const draft = readDraft(eventId)
+          if (draft) {
+            if (draft.fields) setFields((current) => ({ ...current, ...draft.fields }))
+            if (Array.isArray(draft.slots) && draft.slots.length === rowSlotCount) setSlots(draft.slots)
+            if (Array.isArray(draft.cardRows) && draft.cardRows.length) setCardRows(draft.cardRows)
+            if (draft.score) setScore((current) => ({ ...current, ...draft.score }))
+            setRestored(true)
+            setDirty(true)
+          }
         }
       })
       .catch((err) => {
@@ -508,12 +577,12 @@ export default function MatchSheet() {
   const mayEdit = event ? canEditTeam(memberships, event.team_id) : false
 
   const setField = (key) => (domEvent) => {
-    setSaved(false)
+    markEdited()
     setFields((current) => ({ ...current, [key]: domEvent.target.value }))
   }
 
   function setSlot(index, patch) {
-    setSaved(false)
+    markEdited()
     setSlots((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   }
 
@@ -527,7 +596,7 @@ export default function MatchSheet() {
    * control on this screen that needs a second tap.
    */
   function refillFromLineup(lineup) {
-    setSaved(false)
+    markEdited()
     setConfirmRefill(null)
     setSlots(slotsFromLineup(namesFromLineup(lineup, squad), slotCount))
   }
@@ -545,7 +614,7 @@ export default function MatchSheet() {
   }
 
   const setCard = (index, key) => (domEvent) => {
-    setSaved(false)
+    markEdited()
     const { value } = domEvent.target
     setCardRows((current) => current.map((row, i) => (i === index ? { ...row, [key]: value } : row)))
   }
@@ -590,7 +659,7 @@ export default function MatchSheet() {
   const awayTries = weAreHome ? theirParts.tries : ourParts.tries
 
   const setComponent = (kind, side) => (domEvent) => {
-    setSaved(false)
+    markEdited()
     setScore((current) => ({ ...current, [`${kind}_${side}`]: domEvent.target.value }))
   }
 
@@ -699,6 +768,9 @@ export default function MatchSheet() {
         const fresh = status ? await setMatchSheetStatus(row.id, status) : row
         setSheet((current) => ({ ...current, ...fresh, id: row.id }))
         setSaved(true)
+        setDirty(false)
+        setRestored(false)
+        clearDraft(eventId)
         return fresh
       } catch (failure) {
         setSaveError(failure)
@@ -888,6 +960,11 @@ export default function MatchSheet() {
         )}
         {saved && !saveError && (
           <p className="mt-2.5 text-[12.5px] font-semibold text-ink-muted">Saved.</p>
+        )}
+        {restored && !saved && (
+          <p role="status" className="mt-2.5 text-[12.5px] font-semibold text-ink-muted">
+            Restored what you typed last time. It is not saved yet.
+          </p>
         )}
         {saveError && (
           <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
