@@ -267,11 +267,19 @@ begin
   --
   -- Skipped rather than faked when nobody sits in two squads — a fabricated
   -- membership would test the fixture, not the rule.
+  -- ⚠️ MUST EXCLUDE v_poster — repointed 2 Sep 2026. Without `<> v_poster`,
+  -- the `limit 1` (no ORDER BY) can land back on the person already chosen
+  -- as v_poster above. notice_push_subscriptions excludes the notice's own
+  -- author, so "somebody in BOTH chosen squads" then resolves to 0 rows for
+  -- the poster's own device(s) — a false failure that reads as the function
+  -- dropping `distinct`, and is really the fixture picking the wrong person.
+  -- `order by m.profile_id` makes the pick deterministic across runs.
   select m.profile_id into v_two
     from public.memberships m
     join public.push_subscriptions s on s.profile_id = m.profile_id
-   where m.status = 'active' and m.team_id is not null
+   where m.status = 'active' and m.team_id is not null and m.profile_id <> v_poster
    group by m.profile_id having count(distinct m.team_id) > 1
+   order by m.profile_id
    limit 1;
 
   if v_two is not null then

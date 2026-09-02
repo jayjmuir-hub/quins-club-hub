@@ -128,7 +128,22 @@ begin
   exception when check_violation then null; end;
   insert into public.players (club_id, team_id, full_name, first_name, last_name, jersey_num)
   values (f.club_id, t.a, 'Harness Flank Dunmore', 'Harness', 'Dunmore', null);
-  raise notice 'STEP 4 ok: 0 and 100 refused, null accepted';
+  -- The valid boundary: 1 and 99 are the smallest/largest numbers the check
+  -- allows and must be ACCEPTED, not just implied by 0/100 being refused.
+  -- Names checked against live players/profiles.full_name with an ilike
+  -- '%a%' control before being written down (0 hits on both surnames;
+  -- control 139/137 — 2 Sep 2026).
+  insert into public.players (club_id, team_id, full_name, first_name, last_name, jersey_num)
+  values (f.club_id, t.a, 'Harness Wing Garrowby', 'Harness', 'Garrowby', 1);
+  insert into public.players (club_id, team_id, full_name, first_name, last_name, jersey_num)
+  values (f.club_id, t.a, 'Harness Fullback Hollins', 'Harness', 'Hollins', 99);
+  if not exists (select 1 from public.players where first_name='Harness' and last_name='Garrowby' and jersey_num=1) then
+    raise exception 'STEP 4 FAILED: jersey 1 (lower boundary) was not stored';
+  end if;
+  if not exists (select 1 from public.players where first_name='Harness' and last_name='Hollins' and jersey_num=99) then
+    raise exception 'STEP 4 FAILED: jersey 99 (upper boundary) was not stored';
+  end if;
+  raise notice 'STEP 4 ok: 0 and 100 refused, null accepted, 1 and 99 accepted';
 end $$;
 
 -- ── STEP 5 — can_see_player: a B coach sees an A player only via a B membership
@@ -198,9 +213,24 @@ begin
   update public.memberships set role='admin', team_id=null where profile_id=who;
   select * into made from public.create_team('Harness Senior C', true, true, true);
   if made.is_senior is not true or made.uses_jersey_numbers is not true then
-    raise exception 'STEP 6 FAILED: flags not stored';
+    raise exception 'STEP 6 FAILED: flags not stored (is_senior=%, uses_jersey_numbers=%)',
+      made.is_senior, made.uses_jersey_numbers;
   end if;
-  raise notice 'STEP 6 ok: admin created a senior squad with numbers';
+  if made.name is distinct from 'Harness Senior C' then
+    raise exception 'STEP 6 FAILED: name not stored (got %)', made.name;
+  end if;
+  if made.self_registration_allowed is not true then
+    raise exception 'STEP 6 FAILED: self_registration_allowed not stored (got %)', made.self_registration_allowed;
+  end if;
+  -- CONTROL: a false self_registration_allowed must come back false, not be
+  -- silently coerced to true. Without this, the true-only assertion above
+  -- could pass even if create_team ignored the argument and always stored
+  -- true.
+  select * into made from public.create_team('Harness Senior D', true, true, false);
+  if made.self_registration_allowed is not false then
+    raise exception 'STEP 6 CONTROL FAILED: self_registration_allowed=false was not stored (got %)', made.self_registration_allowed;
+  end if;
+  raise notice 'STEP 6 ok: admin created a senior squad with numbers, all four flags asserted';
 end $$;
 
 rollback;
