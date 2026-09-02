@@ -2640,6 +2640,27 @@ describe('Accounts — staff asking for access', () => {
     ).toBeInTheDocument()
   })
 
+  // ⚠️ 2 Sep 2026 UX review, item 4. One tap here handed a stranger every
+  // family's contact details for an age group. Now the first tap only arms.
+  it('⚠️ approving staff takes two taps, the second naming person, role and squad', async () => {
+    listClubMembersMock.mockResolvedValue([...MEMBER_ROWS, STAFF_REQUEST])
+    const { user } = setup()
+
+    const staff = await screen.findByTestId('pending-staff')
+    await user.click(within(staff).getByRole('button', { name: /approve marek osgoode as coach/i }))
+
+    expect(within(staff).getByText(/give marek osgoode coach access to u10\?/i)).toBeInTheDocument()
+    expect(
+      within(staff).getByRole('button', { name: /yes, approve marek osgoode as coach/i }),
+    ).toBeEnabled()
+
+    await user.click(within(staff).getByRole('button', { name: /^cancel$/i }))
+    expect(within(staff).queryByRole('button', { name: /yes, approve/i })).toBeNull()
+    expect(
+      within(staff).getByRole('button', { name: /approve marek osgoode as coach/i }),
+    ).toBeInTheDocument()
+  })
+
   // ⚠️ THE CONTROL, AND IT IS NOT PADDING. Without it, a "fix" that routed
   // EVERY pending row into the staff section would pass every test above while
   // breaking the queue the club actually uses each day.

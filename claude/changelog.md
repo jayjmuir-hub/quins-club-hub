@@ -10,7 +10,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(roster): forward or back is set in the table, one select per row,
+- **feat(admin): three one-tap writes now ask first.** Item 4 of the 2 Sep
+  2026 UX review. The role and squad selects in the Accounts edit sheet used
+  to write on `onChange`, so a mis-scroll on a phone picker turned a parent
+  into an admin the instant the wheel stopped; they now stage a draft behind
+  "Save change", with Cancel. "Approve as Coach/Manager/Medic" — which hands a
+  stranger every family's contact details for an age group — is now two taps,
+  the second naming the person, role and squad. Remove on a training focus
+  period was a `dangerQuiet` button that deleted on first press, against
+  `Button.jsx`'s own arm-then-confirm contract; it is now two-step. Every
+  first-tap-writes-nothing assertion was run red against the old code.
+- **feat(forms): a refused submit now lands on the problem.** Item 3 of the
+- `35e1593` — **feat(roster): forward or back is set in the table, one select per row,
   without opening the player.** Jay, 2 Sep 2026, on a U16 roster where most
   of the squad sat under "Other": *"there should be a column where you can
   select forward or back in general without opening each individual player
