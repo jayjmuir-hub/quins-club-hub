@@ -10,7 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(admin): three one-tap writes now ask first.** Item 4 of the 2 Sep
+- **feat(positions): every position is a chip of the same rank, the main
+  one starred — and the coach chooses which is main.** Jay, 2 Sep 2026:
+  *"when selecting multiple positions, they should all show the same rank,
+  but maybe we need a primary position marker"*. The roster table's Position
+  cell was a select holding the main with the others as small chips beneath,
+  which ranked them by layout; it is now one row of equal chips, ★ on the
+  main, click a chip to make it main, × to remove, "+ Add" to append (only
+  the player's own unit's positions when the unit is set). The player sheet
+  shows the same chips. `src/screens/PlayerForm.jsx`: a tick now APPENDS
+  instead of re-sorting the list by `POSITIONS` — the rule that made the
+  main whichever ticked position came first in the fixed list, so a
+  Hooker/Flanker was always shown as a Hooker — and two or more ticked
+  positions show a "Main position" radio row. No schema change: the store
+  was already ordered, first = main.
+- `8b48808` — **feat(admin): three one-tap writes now ask first.** Item 4 of the 2 Sep
   2026 UX review. The role and squad selects in the Accounts edit sheet used
   to write on `onChange`, so a mis-scroll on a phone picker turned a parent
   into an admin the instant the wheel stopped; they now stage a draft behind
@@ -20,7 +34,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   period was a `dangerQuiet` button that deleted on first press, against
   `Button.jsx`'s own arm-then-confirm contract; it is now two-step. Every
   first-tap-writes-nothing assertion was run red against the old code.
-- **feat(forms): a refused submit now lands on the problem.** Item 3 of the
 - `35e1593` — **feat(roster): forward or back is set in the table, one select per row,
   without opening the player.** Jay, 2 Sep 2026, on a U16 roster where most
   of the squad sat under "Other": *"there should be a column where you can

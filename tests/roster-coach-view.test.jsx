@@ -150,19 +150,21 @@ describe('tier and the other positions become visible', () => {
     await waitFor(() => expect(within(row).getByText('A')).toBeInTheDocument())
   })
 
-  it('⚠️ shows a player’s OTHER positions, not a duplicate of the primary', async () => {
-    // p1 is Prop (the primary, in the inline select) and also Hooker. Repeating
-    // "Prop" as a chip directly under a select already reading Prop is noise.
+  it('⚠️ shows EVERY position as a chip, the main one first and marked', async () => {
+    // p1 is Prop (the main) and also Hooker. Since 2 Sep 2026 both are chips
+    // of the same rank — Jay: "they should all show the same rank" — with the
+    // main one starred rather than promoted into a select.
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
-    // ⚠️ BY TESTID, NOT BY TEXT. The inline position editor is a <select> whose
-    // options list every position, so a by-text query for "Hooker" matches the
-    // chip AND an off-screen option in the same row.
+    // ⚠️ BY TESTID, NOT BY TEXT. The add-position <select> in the same row
+    // lists positions as options, so a by-text query would match those too.
     const row = (await screen.findByText('Tyrone Bexley')).closest('tr')
     await waitFor(() =>
-      expect(within(row).getAllByTestId('other-position').map((c) => c.textContent))
-        .toEqual(['Hooker']))
+      expect(within(row).getAllByTestId('position-chip').map((c) => c.dataset.main))
+        .toEqual(['true', 'false']))
+    expect(within(row).getByRole('button', { name: 'Prop, main position for Tyrone Bexley' })).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Make Hooker the main position for Tyrone Bexley' })).toBeInTheDocument()
   })
 
   it('⚠️ never asks for grades as a parent, and shows no Tier column', async () => {

@@ -46,7 +46,12 @@ vi.mock('../src/data/parents.js', () => ({
 vi.mock('../src/data/playerTiers.js', () => ({
   TIERS: ['A', 'B', 'C'],
   listPlayerGrades: async () => new Map(),
-  listPlayerPositions: async () => new Map(),
+  // ⚠️ THE EXISTING PLAYER'S POSITION COMES FROM HERE, NOT FROM THE FIXTURE
+  // (2 Sep 2026). The sheet is opened from Roster's DECORATED row, where
+  // player.position is whatever this map says and the fixture's own
+  // `position` field is ignored for staff — exactly as in production, where
+  // the players row carries no position at all.
+  listPlayerPositions: async () => new Map([['p-1', ['Flanker']]]),
   listPlayerUnits: async () => new Map(),
   savePlayerPositions: async () => [],
   setPlayerGrade: async () => null,
@@ -912,10 +917,17 @@ describe('PlayerDetail wiring', () => {
     listPlayersMock.mockResolvedValue([EXISTING_PLAYER])
   })
 
-  async function openDetail(memberships) {
+  // `positioned`: whether this viewer will see the player's position land.
+  // Staff do; a parent never does, and a leaver's row is not decorated.
+  async function openDetail(memberships, { positioned = true } = {}) {
     const user = userEvent.setup()
     useMembershipsMock.mockReturnValue(membershipValue(memberships))
     render(<MemoryRouter><Roster /></MemoryRouter>)
+    // ⚠️ WAIT FOR THE POSITION BEFORE TAKING HOLD OF THE ROW. Positions load
+    // after the players do, and when they land the list regroups the player
+    // from "Other" into "Forwards" — a remount, so a button captured before
+    // that is a detached node and a click on it does nothing (2 Sep 2026).
+    if (positioned) await screen.findAllByText(/Flanker/)
     await user.click(await screen.findByRole('button', { name: /Dhruv Ramachandran/i }))
     await screen.findByRole('dialog')
     return user
@@ -1068,7 +1080,7 @@ describe('PlayerDetail wiring', () => {
   })
 
   it('offers a parent no buttons, and no read-only banner in their place', async () => {
-    await openDetail(PARENT)
+    await openDetail(PARENT, { positioned: false })
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
@@ -1133,7 +1145,7 @@ describe('PlayerDetail wiring', () => {
     listPlayersMock.mockResolvedValue([
       { ...EXISTING_PLAYER, left_at: '2026-09-02T08:00:00Z', left_by: 'pr-coach' },
     ])
-    const user = await openDetail(COACH_U14)
+    const user = await openDetail(COACH_U14, { positioned: false })
     const dialog = screen.getByRole('dialog')
     // ⚠️ THE EXACT STRING, SINCE 2 Sep 2026. This used to be /left 2 sept? 2026/i
     // — a regex that accepted BOTH spellings because the two screens showing

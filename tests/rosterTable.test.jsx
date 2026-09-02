@@ -95,8 +95,10 @@ beforeEach(() => {
   setPlayerUnitMock.mockResolvedValue(null)
   // Mirrors the inline fixture positions on TOM and AMY above — the fixture
   // fields themselves are ignored for a staff viewer.
+  // Tom carries TWO so the main-position chips can be exercised; Flanker is
+  // first and so is his main.
   listPlayerPositionsMock.mockResolvedValue(new Map([
-    ['p1', ['Flanker']],
+    ['p1', ['Flanker', 'Hooker']],
     ['p2', ['Wing']],
   ]))
 })
@@ -205,35 +207,83 @@ describe('RosterTable — sorting', () => {
 })
 
 describe('RosterTable — inline editing', () => {
-  it('writes only the changed field, keyed by id', async () => {
+  it('adds a position through player_positions, keyed by id', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
-    await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
+    await user.selectOptions(screen.getByLabelText('Add a position for Zac Bell'), 'Prop')
     // Through player_positions since 25 Aug 2026 — the players row carries no
     // position any more, so upsertPlayer must not be touched.
     await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p3', ['Prop']))
     expect(upsertPlayerMock).not.toHaveBeenCalled()
   })
 
-  it('does not write when the value is unchanged', async () => {
+  it('⚠️ every position is a chip of the same rank, the main one marked', async () => {
+    // Jay, 2 Sep 2026: "when selecting multiple positions, they should all
+    // show the same rank, but maybe we need a primary position marker". The
+    // select-plus-chips-underneath shape this replaced ranked them by layout.
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    const row = (await screen.findByText('Tom Fletcher')).closest('tr')
+    await waitFor(() => expect(within(row).getAllByTestId('position-chip')).toHaveLength(2))
+    const chips = within(row).getAllByTestId('position-chip')
+    expect(chips.map((c) => c.dataset.main)).toEqual(['true', 'false'])
+    expect(within(row).getByRole('button', { name: 'Flanker, main position for Tom Fletcher' }))
+      .toHaveAttribute('aria-pressed', 'true')
+    expect(within(row).getByRole('button', { name: 'Make Hooker the main position for Tom Fletcher' }))
+      .toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('clicking another chip makes it the main — the list is reordered, not rewritten', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
-    await user.selectOptions(screen.getByLabelText('Position for Tom Fletcher'), 'Flanker')
+    await user.click(await screen.findByRole('button', { name: 'Make Hooker the main position for Tom Fletcher' }))
+    await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p1', ['Hooker', 'Flanker']))
+    // Optimistic: the star has moved before the write resolves.
+    expect(screen.getByRole('button', { name: 'Hooker, main position for Tom Fletcher' })).toBeInTheDocument()
+  })
+
+  it('does not write when the main chip itself is clicked', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    await user.click(await screen.findByRole('button', { name: 'Flanker, main position for Tom Fletcher' }))
     expect(savePlayerPositionsMock).not.toHaveBeenCalled()
     expect(upsertPlayerMock).not.toHaveBeenCalled()
   })
 
-  it('clearing the primary clears the set — an empty list, never an empty string', async () => {
+  it('removing the last position sends an empty list, never an empty string', async () => {
     const user = userEvent.setup()
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
 
-    await user.selectOptions(screen.getByLabelText('Position for Tom Fletcher'), '')
-    await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p1', []))
+    await user.click(await screen.findByRole('button', { name: 'Remove Wing from Amy Rose' }))
+    await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p2', []))
+  })
+
+  it('removing the main promotes the next one', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    await user.click(await screen.findByRole('button', { name: 'Remove Flanker from Tom Fletcher' }))
+    await waitFor(() => expect(savePlayerPositionsMock).toHaveBeenCalledWith('p1', ['Hooker']))
+    expect(screen.getByRole('button', { name: 'Hooker, main position for Tom Fletcher' })).toBeInTheDocument()
+  })
+
+  it('the add select never offers a position the player already has', async () => {
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    const add = await screen.findByLabelText('Add a position for Tom Fletcher')
+    await waitFor(() => expect(within(add).queryByRole('option', { name: 'Flanker' })).not.toBeInTheDocument())
+    expect(within(add).queryByRole('option', { name: 'Hooker' })).not.toBeInTheDocument()
+    expect(within(add).getByRole('option', { name: 'Prop' })).toBeInTheDocument()
   })
 
   it('sets forward or back in place, through player_units, without opening the player', async () => {
@@ -292,10 +342,10 @@ describe('RosterTable — inline editing', () => {
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
-    await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
+    await user.selectOptions(screen.getByLabelText('Add a position for Zac Bell'), 'Prop')
 
     // Still in flight, but the cell already shows the new value.
-    expect(screen.getByLabelText('Position for Zac Bell')).toHaveValue('Prop')
+    expect(screen.getByRole('button', { name: 'Prop, main position for Zac Bell' })).toBeInTheDocument()
     release([])
   })
 })
@@ -309,12 +359,12 @@ describe('RosterTable — refusals', () => {
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
-    await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
+    await user.selectOptions(screen.getByLabelText('Add a position for Zac Bell'), 'Prop')
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/may not have permission/i)
     // Reverted, not left showing a value the database rejected.
-    expect(screen.getByLabelText('Position for Zac Bell')).toHaveValue('')
+    expect(screen.queryByRole('button', { name: 'Prop, main position for Zac Bell' })).not.toBeInTheDocument()
   })
 
   it('puts forward or back back to "Not set" and says so in the row when refused', async () => {
@@ -336,7 +386,7 @@ describe('RosterTable — refusals', () => {
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
-    await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
+    await user.selectOptions(screen.getByLabelText('Add a position for Zac Bell'), 'Prop')
 
     await screen.findByRole('alert')
     const zacRow = rows().find((r) => within(r).queryByText('Zac Bell'))
@@ -349,11 +399,11 @@ describe('RosterTable — refusals', () => {
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
-    await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Prop')
+    await user.selectOptions(screen.getByLabelText('Add a position for Zac Bell'), 'Prop')
     await screen.findByRole('alert')
 
     savePlayerPositionsMock.mockResolvedValue([])
-    await user.selectOptions(screen.getByLabelText('Position for Zac Bell'), 'Lock')
+    await user.selectOptions(screen.getByLabelText('Add a position for Zac Bell'), 'Lock')
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
 })
@@ -372,7 +422,7 @@ describe('RosterTable — permissions', () => {
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
-    await waitFor(() => expect(screen.getByLabelText('Position for Amy Rose')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByLabelText('Add a position for Amy Rose')).toBeInTheDocument())
   })
 
   it('never renders a control the database would refuse', async () => {
@@ -387,7 +437,7 @@ describe('RosterTable — permissions', () => {
 
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
-    expect(screen.queryByLabelText(/^Position for/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Add a position for/)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/^Forward or back for/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Captain:/ })).not.toBeInTheDocument()
   })

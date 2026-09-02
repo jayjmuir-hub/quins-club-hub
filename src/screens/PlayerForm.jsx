@@ -12,7 +12,7 @@ import {
 import { useMemberships } from '../lib/memberships.jsx'
 import { revealProblem } from '../lib/revealProblem.js'
 import { canWritePlayer, visibleTeams } from '../lib/scope.js'
-import { POSITIONS, POSITIONS_BY_UNIT } from '../lib/positions.js'
+import { POSITIONS_BY_UNIT } from '../lib/positions.js'
 import { isMinisTeam } from '../lib/minis.js'
 import { listPlayerGrades, listPlayerPositions, listPlayerUnits, savePlayerPositions, setPlayerGrade, setPlayerUnit, TIERS } from '../data/playerTiers.js'
 import { listParents, saveParents } from '../data/parents.js'
@@ -904,12 +904,13 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
         {/* ⚠️ EVERY POSITION THIS PLAYER CAN COVER (Jay, 14 Aug 2026: "the option
             to add multiple positions in case there are players who play
             different positions sometimes").
-            ⚠️ THE FIRST ONE TICKED BECOMES players.position, which is still the
-            PRIMARY and is what six other screens read — see the player_positions
-            migration. Order is the order of POSITIONS, not the order of ticking,
-            because a checkbox list has no memory of which was pressed first and
-            pretending otherwise would make the primary depend on invisible
-            state. */}
+            ⚠️ THE FIRST IN THE LIST IS THE MAIN POSITION, which is what six
+            other screens read — see the player_positions migration. Until
+            2 Sep 2026 the order was the order of POSITIONS, so the main was
+            whichever ticked position came first in the fixed list and a coach
+            could not choose it — a Hooker/Flanker was always shown as a
+            Hooker. Now a tick APPENDS, an existing order is kept, and the
+            "Main position" radios below reorder the list explicitly. */}
         {/* ⚠️ NESTED UNDER THE UNIT (Jay, 25 Aug 2026: "forward or back
             selectable, then a sub selection for the rugby positions under
             those two main categories"). No unit chosen means no checkboxes —
@@ -936,9 +937,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
                         ...current,
                         positions: on
                           ? current.positions.filter((p) => p !== position)
-                          : POSITIONS.filter(
-                              (p) => p === position || current.positions.includes(p),
-                            ),
+                          : [...current.positions, position],
                       }))
                     }
                     className="peer sr-only"
@@ -958,10 +957,31 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             })}
           </div>
           {values.positions.length > 1 && (
-            <p className="mt-2 text-[12.5px] leading-relaxed text-ink-muted">
-              {values.positions[0]} is their main position — it is the one shown on the
-              roster and in lists.
-            </p>
+            <fieldset className="mt-3">
+              <legend className="text-[12.5px] font-bold text-ink-muted">
+                Main position — the one shown on the roster and in lists
+              </legend>
+              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+                {values.positions.map((position) => (
+                  <label key={position} className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                    <input
+                      type="radio"
+                      name="player-main-position"
+                      value={position}
+                      checked={values.positions[0] === position}
+                      onChange={() =>
+                        setValues((current) => ({
+                          ...current,
+                          positions: [position, ...current.positions.filter((p) => p !== position)],
+                        }))
+                      }
+                      className="accent-brand"
+                    />
+                    {position}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           )}
         </fieldset>
         )}

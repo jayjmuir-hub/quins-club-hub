@@ -532,7 +532,10 @@ export default function PlayerDetail({
   onRestored,
 }) {
   const teamName = team?.name ?? 'Not set'
-  const position = player.position || 'Not set'
+  // Every position as an equal chip, the main one starred (2 Sep 2026 —
+  // Jay: "they should all show the same rank"). `positions` is decorated by
+  // Roster for staff; a row that arrives with only `position` still shows it.
+  const positions = player.positions?.length ? player.positions : (player.position ? [player.position] : [])
   // null when never recorded, and the badge below is then not rendered at
   // all. Deliberately NOT 'Not set' the way position is: position has an
   // editable control everyone expects to find, whereas a "Gender: Not set"
@@ -562,7 +565,24 @@ export default function PlayerDetail({
               — and printing "Not set" for them would suggest an omission they
               are not allowed to see corrected. canEdit is the staff signal
               this sheet already carries; staff still get "Not set". */}
-          {canEdit && <p className="mt-1 text-sm font-semibold text-white/[.85]">{position}</p>}
+          {canEdit && (positions.length === 0 ? (
+            <p className="mt-1 text-sm font-semibold text-white/[.85]">Not set</p>
+          ) : (
+            <p className="mt-1 flex flex-wrap gap-1.5" data-testid="detail-positions">
+              {positions.map((name, index) => (
+                <span
+                  key={name}
+                  className="rounded-[100px] bg-white/[.18] px-2 py-px text-[12.5px] font-semibold text-white"
+                  title={index === 0 ? 'Main position' : undefined}
+                >
+                  {index === 0 && <span aria-hidden="true">★ </span>}
+                  {index === 0 && <span className="sr-only">Main position: </span>}
+                  {/* Own element, so the name is matchable on its own. */}
+                  <span>{name}</span>
+                </span>
+              ))}
+            </p>
+          ))}
           <p className="text-sm font-semibold text-white/[.85]">{teamName}</p>
           {isLeaver(player) && (
             <p className="mt-1 text-sm font-semibold text-white/[.85]">

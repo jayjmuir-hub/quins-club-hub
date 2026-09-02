@@ -485,6 +485,8 @@ export default function Roster() {
     ? players.map((player) => ({
         ...player,
         position: positionsByPlayer.get(player.id)?.[0] ?? null,
+        // The full ordered list, for the detail sheet's chips (2 Sep 2026).
+        positions: positionsByPlayer.get(player.id) ?? [],
         unit: unitsByPlayer.get(player.id) ?? null,
       }))
     : players
@@ -641,8 +643,12 @@ export default function Roster() {
   // Search both lists: a leaver is not in `players` (see the load effect
   // above) but still has to open in the detail sheet, read-only, for a
   // Restore. Task 5/spec §4.
+  // ⚠️ FROM THE DECORATED LIST, not `players` (2 Sep 2026). The sheet shows
+  // positions and forward-or-back, and both are stamped onto the row in
+  // scopedPlayers for staff; the raw row carries neither, so the sheet showed
+  // one chip while the table beside it showed two.
   const selectedPlayer =
-    [...players, ...leavers].find((player) => player.id === selectedPlayerId) ?? null
+    [...scopedPlayers, ...leavers].find((player) => player.id === selectedPlayerId) ?? null
 
   // Applies an inline edit to the loaded list without refetching. Used for
   // both halves of an optimistic write: the table calls it with the new value
