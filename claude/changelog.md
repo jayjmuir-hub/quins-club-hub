@@ -31,6 +31,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `/admin`. ⚠️ **Edge function `push-send` must be REDEPLOYED with
   `--no-verify-jwt`** for this to reach a phone — merging alone changes
   nothing.
+- **docs(spec): MARKING A PLAYER AS LEFT — specified, not built.** Jay asked how
+  an age group manager removes a child who quits; today that is a hard Delete
+  which erases attendance and selection history, leaves the parent's squad
+  access alive, strands the photo, and — read from the schema — is refused
+  outright for any child with a linked parent or a past invite. Jay ruled
+  **keep the history**. `claude/specs/2026-09-02-player-leavers-design.md`:
+  `players.left_at`/`left_by`, a `'left'` membership status that every
+  `status = 'active'` predicate already treats as no access, one
+  `mark_player_left` RPC with a `restore_player` twin, `listPlayers` hiding
+  leavers by default, a staff-only "Left the squad" roster group and an admin
+  "Left this season" list. The Delete refusals are a new entry in
+  `claude/open-items.md`, not fixed here. No code, no deploy.
 
 ## 1 Sep 2026
 

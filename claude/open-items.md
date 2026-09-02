@@ -1205,6 +1205,21 @@ proves you wrong.**
   ⚠️ **AND IT STARTS AT 17 Aug 2026.** There is no history before that date and
   none can be reconstructed, so an empty log is not evidence that nothing
   happened. The screen says so in its empty state.
+- 🟡 **DELETING A PLAYER FAILS FOR MOST REAL PLAYERS — found 2 Sep 2026 while
+  designing "mark as left", NOT fixed by it.** Read from `db/schema/tables.sql`,
+  not yet reproduced live. Two independent causes: (1) `memberships.player_id` is
+  `ON DELETE SET NULL` but `memberships_family_role_needs_player` requires a
+  parent/player row to carry a `player_id`, so the delete violates the CHECK for
+  any child with a linked parent; (2) `invites.player_id` and
+  `invite_targets.player_id` have no `ON DELETE` rule, so any child ever invited
+  is refused. `deletePlayer` surfaces both as a permissions-shaped message and
+  the staff member gives up. ⚠️ **AND WHEN IT DOES SUCCEED IT IS WORSE:** the
+  parent's membership survives with a blank player link, still `active`, still on
+  the squad — roster, chat and pushes for a squad their child has left. The
+  designed remedy for "the child quit" is
+  `claude/specs/2026-09-02-player-leavers-design.md`; Delete itself still needs
+  its cascades decided (parent membership: delete the row; invites: cascade) and
+  a harness that first REPRODUCES both refusals.
 - **The whole app is one JavaScript chunk** and every parent downloads all of it.
   ⚠️ Re-measure rather than citing an old figure. Two fixes, biggest first:
   `flag-icons` is imported whole for a phone country picker and is most of the CSS
