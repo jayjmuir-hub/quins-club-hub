@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **docs(plan): SENIOR SQUADS — the two remaining specs, nothing built.** Jay,
+- **fix(forms): typed work is no longer lost on the team sheet, the match
+  sheet, the event form or the sign-up wizard.** Item 1 of the 2 Sep 2026 UX
+  review (`claude/plans/2026-09-02-ux-unsaved-work.md`). The event form asks
+  "Discard your changes?" when Escape, the backdrop or the X would close it
+  with typing inside; the team sheet shows "Unsaved changes" and asks before
+  its own Back button; the RCM match sheet keeps a `sessionStorage` draft per
+  fixture and restores it, saying so, when the server has no sheet; the
+  sign-up wizard's Back from the account step now hands the collected
+  children back to the form instead of remounting it blank. All four use the
+  browser's own leave-page dialog on reload via the new
+  `src/lib/useUnsavedChanges.js`. ⚠️ **Recorded gap, on purpose:** leaving the
+  team sheet via the dock or sidebar still discards — the lineup row is created
+  on first Save so "did anyone pick a team?" stays answerable, and the app is on
+  `BrowserRouter` with no route blocker. A draft like the match sheet's is the
+  follow-up if coaches hit it. Every assertion was run red first.
+- `7d05629` — **docs(plan): SENIOR SQUADS — the two remaining specs, nothing built.** Jay,
   2 Sep 2026: add the senior teams (about four men's squads plus women's
   sides), jersey numbers for seniors only, U18 players called up at 17 or over
   with parental consent and the U18 staff informed with no veto, full
