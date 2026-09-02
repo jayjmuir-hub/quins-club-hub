@@ -16,9 +16,16 @@
 --   squad      U16B (must exist with a club_id; nothing else about it is read)
 --   children   Rafiq Delacroix-Obi (will leave), Tomasz Delacroix-Obi (stays)
 --   parent     one auth user, two ACTIVE parent memberships, one per child
---   staff      a coach of U16B (may mark), a coach of another squad (may not)
+--   staff      a coach of U16B (may mark), a coach of another squad (may not),
+--              and a coach of U16B whose own membership is still PENDING
 --   stranger   a fresh auth user sharing the family's contact email, for the
 --              claim_roster_access control
+--   pending    a second parent whose memberships are PENDING (one per child),
+--              for the "leaving must not promote a pending row" steps
+--   events     one FUTURE and one PAST event on the squad, each with an
+--              availability row and a lineup naming the leaver, for the
+--              "leaving takes them off future selection" steps
+--   calendar   an ICS token for the active parent, for the feed steps
 
 begin;
 
@@ -82,11 +89,13 @@ insert into fx select 'parent', '00000000-aaaa-0000-0000-000000000001'::uuid;
 insert into fx select 'coach',  '00000000-aaaa-0000-0000-000000000002'::uuid;
 insert into fx select 'other_coach', '00000000-aaaa-0000-0000-000000000003'::uuid;
 insert into fx select 'stranger', '00000000-aaaa-0000-0000-000000000004'::uuid;
+insert into fx select 'pending_coach',  '00000000-aaaa-0000-0000-000000000005'::uuid;
+insert into fx select 'pending_parent', '00000000-aaaa-0000-0000-000000000006'::uuid;
 
 insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
 select v, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
        k || '-leavers@example.invalid', now(), jsonb_build_object('full_name', k), now(), now()
-  from fx where k in ('parent','coach','other_coach','stranger');
+  from fx where k in ('parent','coach','other_coach','stranger','pending_coach','pending_parent');
 
 insert into public.players (id, club_id, team_id, full_name, first_name, last_name, photo_path)
 values ('00000000-bbbb-0000-0000-000000000001', (select v from fx where k='club'), (select v from fx where k='team'),
@@ -103,7 +112,44 @@ insert into public.memberships (profile_id, club_id, team_id, role, player_id, s
   ((select v from fx where k='parent'), (select v from fx where k='club'), (select v from fx where k='team'), 'parent', '00000000-bbbb-0000-0000-000000000001', 'active'),
   ((select v from fx where k='parent'), (select v from fx where k='club'), (select v from fx where k='team'), 'parent', '00000000-bbbb-0000-0000-000000000002', 'active'),
   ((select v from fx where k='coach'),  (select v from fx where k='club'), (select v from fx where k='team'), 'coach', null, 'active'),
-  ((select v from fx where k='other_coach'), (select v from fx where k='club'), (select v from fx where k='other_team'), 'coach', null, 'active');
+  ((select v from fx where k='other_coach'), (select v from fx where k='club'), (select v from fx where k='other_team'), 'coach', null, 'active'),
+  -- A coach of THIS squad whose own membership has not been approved yet.
+  -- is_team_staff requires status='active', so they must be refused.
+  ((select v from fx where k='pending_coach'), (select v from fx where k='club'), (select v from fx where k='team'), 'coach', null, 'pending'),
+  -- A second parent whose two rows are PENDING — one per child. These are the
+  -- rows the "leaving must not promote a pending membership" steps watch.
+  ((select v from fx where k='pending_parent'), (select v from fx where k='club'), (select v from fx where k='team'), 'parent', '00000000-bbbb-0000-0000-000000000001', 'pending'),
+  ((select v from fx where k='pending_parent'), (select v from fx where k='club'), (select v from fx where k='team'), 'parent', '00000000-bbbb-0000-0000-000000000002', 'pending');
+
+-- ── FIXTURE: selection rows the mark must and must not remove ─────────────
+-- One event in the FUTURE and one in the PAST, each with an availability row
+-- and a lineup naming the leaver. mark_player_left must remove the future
+-- pair and keep the past pair: attendance and old team sheets are history, a
+-- Saturday selection made on Thursday is not.
+insert into public.events (id, club_id, team_id, type, starts_at) values
+  ('00000000-cccc-0000-0000-000000000001', (select v from fx where k='club'), (select v from fx where k='team'), 'match', now() + interval '10 days'),
+  ('00000000-cccc-0000-0000-000000000002', (select v from fx where k='club'), (select v from fx where k='team'), 'match', now() - interval '10 days');
+insert into fx values ('fut_event', '00000000-cccc-0000-0000-000000000001'),
+                      ('past_event', '00000000-cccc-0000-0000-000000000002');
+
+insert into public.availability (event_id, player_id, status) values
+  ('00000000-cccc-0000-0000-000000000001', '00000000-bbbb-0000-0000-000000000001', 'in'),
+  ('00000000-cccc-0000-0000-000000000002', '00000000-bbbb-0000-0000-000000000001', 'in');
+
+insert into public.lineups (id, event_id) values
+  ('00000000-dddd-0000-0000-000000000001', '00000000-cccc-0000-0000-000000000001'),
+  ('00000000-dddd-0000-0000-000000000002', '00000000-cccc-0000-0000-000000000002');
+insert into public.lineup_players (lineup_id, player_id, role) values
+  ('00000000-dddd-0000-0000-000000000001', '00000000-bbbb-0000-0000-000000000001', 'starter'),
+  ('00000000-dddd-0000-0000-000000000002', '00000000-bbbb-0000-0000-000000000001', 'starter');
+
+-- An ICS calendar token for the ACTIVE parent, for the feed steps.
+with tok as (
+  insert into public.calendar_tokens (profile_id)
+  values ((select v from fx where k='parent'))
+  returning token
+)
+insert into fx select 'cal_token', token from tok;
 
 create or replace function pg_temp.act_as(who text) returns void language plpgsql as $$
 declare u uuid; begin
@@ -123,6 +169,11 @@ do $$ begin
     raise exception 'SELF-TEST FAILED: a coach of another squad marked the player as left';
   exception when others then
     if sqlerrm like 'SELF-TEST FAILED%' then raise; end if;
+    -- ⚠️ THE CODE, NOT JUST "SOMETHING RAISED". A refusal for the wrong
+    -- reason — a typo'd uuid, a missing grant, a NOT NULL violation — reads
+    -- exactly like the refusal this step is for. 42501 is the authorisation
+    -- gate; anything else means this step proved nothing.
+    if sqlstate <> '42501' then raise exception 'expected 42501 (not allowed), got % %', sqlstate, sqlerrm; end if;
     raise notice 'other-squad coach refused: %', sqlerrm;
   end;
   perform pg_temp.act_as_owner();
@@ -136,7 +187,48 @@ do $$ begin
     raise exception 'SELF-TEST FAILED: a parent marked their own child as left';
   exception when others then
     if sqlerrm like 'SELF-TEST FAILED%' then raise; end if;
+    if sqlstate <> '42501' then raise exception 'expected 42501 (not allowed), got % %', sqlstate, sqlerrm; end if;
     raise notice 'parent refused: %', sqlerrm;
+  end;
+  perform pg_temp.act_as_owner();
+end $$;
+
+-- ── STEP 4a — a coach of THIS squad whose membership is PENDING is refused ─
+-- is_team_staff requires status='active'. An unapproved coach is a request to
+-- be staff, not staff, and must not be able to remove a child from the squad.
+do $$ begin
+  perform pg_temp.act_as('pending_coach');
+  begin
+    perform public.mark_player_left('00000000-bbbb-0000-0000-000000000001');
+    raise exception 'SELF-TEST FAILED: a PENDING coach of the squad marked the player as left';
+  exception when others then
+    if sqlerrm like 'SELF-TEST FAILED%' then raise; end if;
+    if sqlstate <> '42501' then raise exception 'expected 42501 for a pending coach, got % %', sqlstate, sqlerrm; end if;
+    raise notice 'pending coach refused: %', sqlerrm;
+  end;
+  perform pg_temp.act_as_owner();
+end $$;
+
+-- ── STEP 4b — NO EXISTENCE LEAK: an unauthorised caller gets 42501, not the
+--              22023 "no longer exists" that would tell them whether a given
+--              uuid names a real player. ────────────────────────────────────
+-- CONTROL FIRST: the uuid really does match no player, so a "not found" answer
+-- would be the honest one and the step is testing the ORDER of the two
+-- branches, not a lucky miss.
+do $$ begin
+  if exists (select 1 from public.players where id='00000000-eeee-0000-0000-00000000dead') then
+    raise exception 'CONTROL FAILED: the supposedly-absent uuid names a real player; this step proves nothing';
+  end if;
+  perform pg_temp.act_as('other_coach');
+  begin
+    perform public.mark_player_left('00000000-eeee-0000-0000-00000000dead');
+    raise exception 'SELF-TEST FAILED: mark_player_left accepted a uuid that matches no player';
+  exception when others then
+    if sqlerrm like 'SELF-TEST FAILED%' then raise; end if;
+    if sqlstate = '22023' then
+      raise exception 'EXISTENCE LEAK: an unauthorised caller was told the player does not exist (%) — expected 42501', sqlerrm;
+    end if;
+    if sqlstate <> '42501' then raise exception 'expected 42501, got % %', sqlstate, sqlerrm; end if;
   end;
   perform pg_temp.act_as_owner();
 end $$;
@@ -159,11 +251,102 @@ end $$;
 
 -- ── STEP 6 — THE DISCRIMINATING FIXTURE: this child's membership is 'left',
 --            the SIBLING's on the same squad is still 'active' ────────────
+-- ⚠️ BOTH LOOKUPS ARE SCOPED TO THE ACTIVE PARENT'S PROFILE. There is now a
+-- SECOND parent (pending_parent) with a row on each child, so an unscoped
+-- scalar subquery here would fail with "more than one row returned" rather
+-- than assert anything.
 do $$ begin
-  if (select status from public.memberships where player_id='00000000-bbbb-0000-0000-000000000001') <> 'left' then
+  if (select status from public.memberships where player_id='00000000-bbbb-0000-0000-000000000001'
+        and profile_id=(select v from fx where k='parent')) <> 'left' then
     raise exception 'leaver''s parent membership is not ''left'''; end if;
-  if (select status from public.memberships where player_id='00000000-bbbb-0000-0000-000000000002') <> 'active' then
+  if (select status from public.memberships where player_id='00000000-bbbb-0000-0000-000000000002'
+        and profile_id=(select v from fx where k='parent')) <> 'active' then
     raise exception 'SIBLING''s membership was touched — the function is too broad'; end if;
+end $$;
+
+-- ── STEP 6a — CRITICAL: a PENDING membership is UNTOUCHED by the mark ──────
+-- A pending row is a request that was never granted; it already grants
+-- nothing, so leaving has nothing to take away. If the mark flipped it to
+-- 'left', restore_player — which turns every 'left' row back to 'active' —
+-- would APPROVE a parent nobody ever approved. Mark-then-restore must not be
+-- a route past the approvals queue.
+do $$ declare s text; begin
+  select status into s from public.memberships
+   where profile_id=(select v from fx where k='pending_parent')
+     and player_id='00000000-bbbb-0000-0000-000000000001';
+  if s is null then raise exception 'FIXTURE: the pending parent has no row on the leaver — this step proves nothing'; end if;
+  if s <> 'pending' then
+    raise exception 'mark_player_left changed a PENDING membership to ''%'' — a mark-then-restore now promotes it to active', s;
+  end if;
+end $$;
+
+-- ── STEP 6b — leaving takes the child off FUTURE selection, and only future ─
+-- The fixture gave the leaver an availability row and a lineup place on ONE
+-- future event and ONE past event. After the mark the future pair must be
+-- gone and the past pair must remain: history is kept, a Saturday selection
+-- made on Thursday is not history.
+do $$ declare n int; begin
+  select count(*) into n from public.availability
+   where player_id='00000000-bbbb-0000-0000-000000000001'
+     and event_id=(select v from fx where k='fut_event');
+  if n <> 0 then raise exception 'the leaver still has an availability row on a FUTURE event (% rows)', n; end if;
+
+  select count(*) into n from public.lineup_players lp
+    join public.lineups l on l.id = lp.lineup_id
+   where lp.player_id='00000000-bbbb-0000-0000-000000000001'
+     and l.event_id=(select v from fx where k='fut_event');
+  if n <> 0 then raise exception 'the leaver is still named in a lineup for a FUTURE event (% rows)', n; end if;
+
+  -- ⚠️ THE OTHER HALF, AND IT IS THE HALF THAT DISCRIMINATES. A delete with no
+  -- starts_at test would pass both zeroes above and destroy the history this
+  -- whole feature exists to keep.
+  select count(*) into n from public.availability
+   where player_id='00000000-bbbb-0000-0000-000000000001'
+     and event_id=(select v from fx where k='past_event');
+  if n <> 1 then raise exception 'the leaver''s PAST availability row was destroyed (% rows, expected 1)', n; end if;
+
+  select count(*) into n from public.lineup_players lp
+    join public.lineups l on l.id = lp.lineup_id
+   where lp.player_id='00000000-bbbb-0000-0000-000000000001'
+     and l.event_id=(select v from fx where k='past_event');
+  if n <> 1 then raise exception 'the leaver''s PAST lineup place was destroyed (% rows, expected 1)', n; end if;
+end $$;
+
+-- ── STEP 6c — a stale PENDING request for a leaver cannot be approved ──────
+-- Step 6a leaves the pending request sitting in the squad's approvals queue
+-- for a child who has quit. Approving it would hand the family full access to
+-- a squad their child has left, by a completely different route from the one
+-- step 6a closed.
+--
+-- CONTROL FIRST: the SAME caller approving the SAME parent's OTHER row — the
+-- one for the current sibling — succeeds. Without it, a refusal here could be
+-- can_approve_team, a bad membership id, or anything else.
+do $$ declare m_current uuid; m_left uuid; st text; begin
+  select id into m_current from public.memberships
+   where profile_id=(select v from fx where k='pending_parent')
+     and player_id='00000000-bbbb-0000-0000-000000000002';
+  select id into m_left from public.memberships
+   where profile_id=(select v from fx where k='pending_parent')
+     and player_id='00000000-bbbb-0000-0000-000000000001';
+  if m_current is null or m_left is null then
+    raise exception 'FIXTURE: the pending parent is missing a row (current=%, left=%)', m_current, m_left;
+  end if;
+
+  perform pg_temp.act_as('coach');
+  select status into st from public.approve_membership(m_current);
+  if st <> 'active' then
+    raise exception 'CONTROL FAILED: the squad coach could not approve a pending row for a CURRENT child (status %) — the refusal below would prove nothing', st;
+  end if;
+
+  begin
+    perform public.approve_membership(m_left);
+    raise exception 'SELF-TEST FAILED: a pending request for a LEAVER was approved';
+  exception when others then
+    if sqlerrm like 'SELF-TEST FAILED%' then raise; end if;
+    if sqlstate <> '22023' then raise exception 'expected 22023 for a leaver''s pending row, got % %', sqlstate, sqlerrm; end if;
+    if sqlerrm not ilike '%left the squad%' then raise exception 'wrong message on approving a leaver''s request: %', sqlerrm; end if;
+  end;
+  perform pg_temp.act_as_owner();
 end $$;
 
 -- ── STEP 7 — marking twice is refused with a clear message ────────────────
@@ -240,6 +423,41 @@ end $$;
 -- ⚠️ If player_parents has other NOT NULL columns, add them; read with
 --   \d public.player_parents  (or information_schema.columns).
 
+-- ── STEP 10a — RESTORE has the same gate as MARK ──────────────────────────
+-- Steps 3 and 4 prove who may MARK. Restore is the other half of the same
+-- power — it hands a family their squad access back without an approval — and
+-- was never tested at all. A parent must not be able to undo their own child's
+-- departure, and neither must a coach of another squad.
+do $$ begin
+  perform pg_temp.act_as('parent');
+  begin
+    perform public.restore_player('00000000-bbbb-0000-0000-000000000001');
+    raise exception 'SELF-TEST FAILED: a parent restored their own child';
+  exception when others then
+    if sqlerrm like 'SELF-TEST FAILED%' then raise; end if;
+    if sqlstate <> '42501' then raise exception 'expected 42501 for a parent restoring, got % %', sqlstate, sqlerrm; end if;
+  end;
+  perform pg_temp.act_as_owner();
+
+  perform pg_temp.act_as('other_coach');
+  begin
+    perform public.restore_player('00000000-bbbb-0000-0000-000000000001');
+    raise exception 'SELF-TEST FAILED: a coach of another squad restored the player';
+  exception when others then
+    if sqlerrm like 'SELF-TEST FAILED%' then raise; end if;
+    if sqlstate <> '42501' then raise exception 'expected 42501 for an other-squad coach restoring, got % %', sqlstate, sqlerrm; end if;
+  end;
+  perform pg_temp.act_as_owner();
+
+  -- The refusals above are only meaningful because the player IS still a
+  -- leaver at this point: a restore of a player who was never marked is
+  -- refused by a different guard (22023), for a reason that has nothing to do
+  -- with who the caller is.
+  if (select left_at from public.players where id='00000000-bbbb-0000-0000-000000000001') is null then
+    raise exception 'CONTROL FAILED: the player is not a leaver here, so the two refusals above prove nothing';
+  end if;
+end $$;
+
 -- ── STEP 11 — restore: left_at cleared, memberships active again ──────────
 do $$ begin
   perform pg_temp.act_as('coach');
@@ -250,6 +468,21 @@ do $$ begin
   if (select status from public.memberships where player_id='00000000-bbbb-0000-0000-000000000001'
         and profile_id=(select v from fx where k='parent')) <> 'active' then
     raise exception 'restore did not reactivate the parent membership'; end if;
+end $$;
+
+-- ── STEP 11a — CRITICAL, the other end: restore must not APPROVE anybody ───
+-- restore_player flips every 'left' row on this child to 'active'. That is
+-- safe only because the mark never creates a 'left' row from a 'pending' one
+-- (step 6a). This step is the assertion that closes the loop: after a full
+-- mark-and-restore cycle the never-approved parent is exactly where they
+-- started.
+do $$ declare s text; begin
+  select status into s from public.memberships
+   where profile_id=(select v from fx where k='pending_parent')
+     and player_id='00000000-bbbb-0000-0000-000000000001';
+  if s <> 'pending' then
+    raise exception 'restore_player promoted a PENDING membership to ''%'' — a mark-then-restore is a way past the approvals queue', s;
+  end if;
 end $$;
 
 -- ── STEP 12a — CONTROL A: while BOTH memberships are still active, the
@@ -282,6 +515,18 @@ do $$ declare v_team uuid; v_event uuid; n int; begin
   perform pg_temp.act_as_owner();
 end $$;
 
+-- ── STEP 12a-2 — CONTROL: the ICS feed works while the family is active ────
+-- calendar_events_for_token is reached by a TOKEN, not by auth.uid(), so none
+-- of the RLS above touches it — it is its own membership join, and until
+-- 20260902_player_leavers_pending_and_feed.sql that join had no status test of
+-- any kind. This control makes the zero in step 12b-2 mean something.
+do $$ declare n int; begin
+  select count(*) into n from public.calendar_events_for_token((select v from fx where k='cal_token'));
+  if n < 1 then
+    raise exception 'CONTROL FAILED: the ACTIVE parent''s calendar feed returns 0 events — the zero in step 12b-2 would be free';
+  end if;
+end $$;
+
 -- ── STEP 12b — a 'left' membership grants NOTHING ─────────────────────────
 -- Mark the leaver again (restore in step 11 undid step 5's mark), then set
 -- the SIBLING's membership to 'left' directly too, so BOTH of the parent's
@@ -291,7 +536,12 @@ do $$ declare ok boolean; v_team uuid; v_event uuid; n int; begin
   perform pg_temp.act_as('coach');
   perform public.mark_player_left('00000000-bbbb-0000-0000-000000000001');
   perform pg_temp.act_as_owner();
-  update public.memberships set status='left' where player_id='00000000-bbbb-0000-0000-000000000002'; -- both rows now 'left'
+  -- ⚠️ SCOPED TO THIS PARENT. pending_parent also has a row on the sibling and
+  -- it must stay where it is; an unscoped update would quietly change what
+  -- steps 12c and 12b-2 are measuring.
+  update public.memberships set status='left'
+   where player_id='00000000-bbbb-0000-0000-000000000002'
+     and profile_id=(select v from fx where k='parent'); -- both of the parent's rows now 'left'
   -- resolved BEFORE act_as: fx is unreadable once role='authenticated'
   select v into v_team  from fx where k='team';
   select v into v_event from fx where k='event';
@@ -314,10 +564,27 @@ do $$ declare ok boolean; v_team uuid; v_event uuid; n int; begin
     raise exception 'SELF-TEST FAILED: a ''left'' parent inserted an availability row for the leaver';
   exception when others then
     if sqlerrm like 'SELF-TEST FAILED%' then raise; end if;
+    -- ⚠️ THE CODE, NOT JUST "SOMETHING RAISED". Without this the step would
+    -- pass on a UNIQUE violation, a CHECK on status, or a bad event_id — none
+    -- of which say anything about whether RLS refused the write.
+    if sqlstate <> '42501' then raise exception 'expected 42501 (RLS refusal) on the availability insert, got % %', sqlstate, sqlerrm; end if;
     raise notice '''left'' parent refused an availability insert: %', sqlerrm;
   end;
 
   perform pg_temp.act_as_owner();
+end $$;
+
+-- ── STEP 12b-2 — the ICS feed stops too ───────────────────────────────────
+-- Both of the parent's memberships are 'left' now. Step 12a-2 proved the feed
+-- was non-empty a moment ago, so this zero is a measurement and not an
+-- accident of an empty fixture. Until the third migration, a family who had
+-- left kept receiving every fixture of the squad in their phone calendar for
+-- as long as the token existed — and revoking access nowhere revokes a token.
+do $$ declare n int; begin
+  select count(*) into n from public.calendar_events_for_token((select v from fx where k='cal_token'));
+  if n <> 0 then
+    raise exception 'a parent whose memberships are all ''left'' still receives % event(s) in their calendar feed', n;
+  end if;
 end $$;
 
 -- ── STEP 12c — CONTROL B: PENDING must keep working ───────────────────────
@@ -325,7 +592,9 @@ end $$;
 -- read exactly the sibling's players row, and NOT the leaver's — proving
 -- `<> 'left'` was used, not `= 'active'`, which would have broken this.
 do $$ declare v_team uuid; n_sibling int; n_leaver int; begin
-  update public.memberships set status='pending' where player_id='00000000-bbbb-0000-0000-000000000002';
+  update public.memberships set status='pending'
+   where player_id='00000000-bbbb-0000-0000-000000000002'
+     and profile_id=(select v from fx where k='parent');
   -- resolved BEFORE act_as: fx is unreadable once role='authenticated'
   select v into v_team from fx where k='team';
   perform pg_temp.act_as('parent');
