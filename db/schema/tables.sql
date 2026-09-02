@@ -2716,3 +2716,26 @@ alter table public.events
 alter table public.events
   add constraint events_format_check check (format is null or format = any (array[7,10,12,15])),
   add constraint events_league_is_fifteen check (competition_type is distinct from 'league' or format is null or format = 15);
+
+-- ── senior squads 2a, 3 Sep 2026 -- captured from live after Jay's yes,
+-- db/migrations/20260903_senior_squads_2a.sql ───────────────────────────────
+--
+-- teams.uses_jersey_numbers: season jersey numbers on the roster
+-- (players.jersey_num). A column, never derived from is_senior or the name
+-- -- same rename-cannot-change-behaviour shape as is_senior /
+-- self_registration_allowed / requires_contact / default_format above. False
+-- for every youth squad; set by an admin on the Club tab.
+alter table public.teams
+  add column uses_jersey_numbers boolean not null default false;
+
+-- players.jersey_num: unique per squad, 1-99. Two squads may both have a 9.
+-- The CHECK narrows the August "no jersey numbers" ruling rather than
+-- reversing it -- jersey_num has existed unused since Task 12; every youth
+-- squad still keeps uses_jersey_numbers = false and renders exactly as
+-- before. The partial index ignores nulls so a squad with no numbers at all
+-- is unaffected.
+alter table public.players
+  add constraint players_jersey_num_check check (jersey_num is null or (jersey_num between 1 and 99));
+
+create unique index players_team_jersey_unique
+  on public.players (team_id, jersey_num) where jersey_num is not null;

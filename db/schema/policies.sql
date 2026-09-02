@@ -689,9 +689,18 @@ CREATE POLICY "parent delete" ON public.player_parents
 -- restores exactly that one row and nothing else.
 --
 -- Note the argument is `id`, not `team_id`: is_own_player takes a PLAYER id.
+--
+-- CHANGED 2026-09-03 (20260903_senior_squads_2a.sql). Was
+-- `private.can_see_team(team_id) OR private.is_own_player(id)`.
+-- private.can_see_player WIDENS READ ONLY: a coach of squad B could not see
+-- a player whose HOME is squad A even with a B membership; can_see_player
+-- adds "or any active membership in a squad the caller can see". Edit
+-- policies keyed on the home squad (positions, player_private) are
+-- deliberately untouched. Re-captured live via
+-- `pg_get_expr(polqual, polrelid)`.
 CREATE POLICY "player read" ON public.players
   AS PERMISSIVE FOR SELECT TO public
-  USING ((private.can_see_team(team_id) OR private.is_own_player(id)));
+  USING ((private.can_see_player(id) OR private.is_own_player(id)));
 
 -- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 (Grok item 14). The 28 Aug S1 write
 -- allowlist (20260828_child_write_allowlist) replaced can_edit_team with
