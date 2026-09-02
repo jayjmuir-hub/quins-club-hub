@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(errors): raw database and network text no longer reaches the
+- **docs(plan): TRAINING — the director's session becomes a suggestion, and
+  age becomes guidance. Nothing built.** A coach, via Jay 2 Sep 2026: the
+  performance director's published sessions *"should be simply noted as a
+  suggestion and the coach could accept or decline, if accepted then they
+  would still have the ability to adjust that session"*, and drills and
+  templates *"should not be age group locked"*.
+  `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`: a
+  `training_suggestions` row beside the session so publish never writes a
+  coach's plan; accept copies the template's blocks in and opens the editor;
+  decline carries an optional note; nothing is promoted by default and
+  parents never see a suggestion; the director gets uptake per squad instead
+  of a write count. Age band becomes a sorted label with a soft note; the
+  **contact gate stays hard everywhere** and the plan says so in as many
+  words. Null-band squads (Senior Men) stop being refused by anything that
+  sets an age.
+- `6fa8f14` — **fix(errors): raw database and network text no longer reaches the
   screen.** Item 2 of the 2 Sep 2026 UX review. `src/lib/friendlyError.js`
   existed since 30 Aug and was used in nine files while about 150 sites
   bypassed it with `err.message || 'fallback'` — the `||` only fires on an
