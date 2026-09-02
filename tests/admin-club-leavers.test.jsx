@@ -97,6 +97,24 @@ describe('AdminClub — Left this season', () => {
     await waitFor(() => expect(listPlayersMock).toHaveBeenCalledTimes(2))
   })
 
+  // ⚠️ ADDED 2 Sep 2026 by the leavers review. This screen asks for leavers on
+  // purpose (`includeLeft: true`) and then splits the rows into `players` and
+  // `leavers` so that every count stays a count of the CURRENT roster — but
+  // the contacts query was still handed the UNSPLIT list. So a child who had
+  // quit went on being chased for a missing contact number, in the one place
+  // in the app that nags about it, for as long as the row existed.
+  it('asks for contacts on the current roster only, not on leavers', async () => {
+    listPlayersMock.mockResolvedValue([
+      { id: 'p-1', team_id: 't-u14', full_name: 'Tomasz Delacroix-Obi', left_at: null },
+      { id: 'p-2', team_id: 't-u14', full_name: 'Rafiq Delacroix-Obi', left_at: '2026-09-02T08:00:00Z' },
+    ])
+
+    await renderAdminClub()
+
+    await waitFor(() => expect(listContactsForPlayersMock).toHaveBeenCalled())
+    expect(listContactsForPlayersMock).toHaveBeenCalledWith(['p-1'])
+  })
+
   it('shows nothing when nobody has left', async () => {
     listPlayersMock.mockResolvedValue([{ id: 'p-1', team_id: 't-u14', full_name: 'Tomasz Delacroix-Obi', left_at: null }])
     await renderAdminClub()

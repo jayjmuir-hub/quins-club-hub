@@ -514,7 +514,20 @@ export function canWritePlayer(memberships, teamId) {
  */
 export function isPendingOnly(memberships) {
   if (!memberships || memberships.length === 0) return false
-  return memberships.every((m) => m.status === 'pending')
+  // ⚠️ 'left' ROWS ARE IGNORED FIRST, ADDED 2 Sep 2026. A 'left' membership
+  // grants nothing server-side, so it is not a counter-example to "everything
+  // I have is pending" — but `every` treated it as one. The parent whose first
+  // child has quit and whose second is waiting for approval got the routed app
+  // with no waiting banner and no explanation, while the database handed them
+  // nothing: the worst of both screens.
+  //
+  // ⚠️ AND THE ALL-LEFT CASE STILL RETURNS FALSE, which is why the length
+  // check below is not optional. Somebody whose every row is 'left' is not
+  // waiting for anybody — isLeftOnly in src/lib/leavers.js is that state, and
+  // AppShell gives it the roll-call screen, not a banner over an empty app.
+  const live = memberships.filter((m) => m?.status !== 'left')
+  if (live.length === 0) return false
+  return live.every((m) => m.status === 'pending')
 }
 
 /**
@@ -548,7 +561,19 @@ export function visibleTeams(memberships, allTeams) {
     return sorted(allTeams)
   }
 
-  const teamIds = new Set(memberships.map((m) => m.team_id).filter((id) => id != null))
+  // ⚠️ 'left' ROWS ARE DROPPED FIRST, ADDED 2 Sep 2026 by the leavers review.
+  // This function knew about two statuses and there are now three: it mapped
+  // team_id off every row it was handed, so the moment a child was marked as
+  // left their parent kept that squad in the nav, in the switcher and in
+  // every "which squads am I in" list — a named, tappable age group the
+  // database then returns nothing from. The pending note above still stands
+  // and is why the test is `!== 'left'` and not `=== 'active'`.
+  const teamIds = new Set(
+    memberships
+      .filter((m) => m?.status !== 'left')
+      .map((m) => m.team_id)
+      .filter((id) => id != null),
+  )
   return sorted(allTeams.filter((team) => teamIds.has(team.id)))
 }
 

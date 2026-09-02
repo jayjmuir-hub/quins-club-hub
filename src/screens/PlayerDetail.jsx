@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import { deletePlayer, getPlayerContact, getPlayerDob, markPlayerLeft, restorePlayer } from '../data/players.js'
-import { isLeaver } from '../lib/leavers.js'
+import { formatLeftDate, isLeaver } from '../lib/leavers.js'
 import { listParents } from '../data/parents.js'
 import useOwnContactGate from '../lib/useOwnContactGate.js'
 // The club's own age function, so the number shown here cannot drift from the
@@ -565,7 +565,11 @@ export default function PlayerDetail({
           <p className="text-sm font-semibold text-white/[.85]">{teamName}</p>
           {isLeaver(player) && (
             <p className="mt-1 text-sm font-semibold text-white/[.85]">
-              Left {new Date(player.left_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              {/* ⚠️ formatLeftDate, NOT toLocaleDateString. AdminClub shows the
+                  same fact, and until 2 Sep 2026 the two disagreed in September
+                  only — ICU's en-GB short month is 'Sept'. One formatter, in
+                  src/lib/leavers.js. */}
+              Left {formatLeftDate(player.left_at)}
             </p>
           )}
           {/* Captaincy used to live in a "Role" key/value row below, because

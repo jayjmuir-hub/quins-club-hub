@@ -1123,10 +1123,14 @@ describe('PlayerDetail wiring', () => {
     ])
     const user = await openDetail(COACH_U14)
     const dialog = screen.getByRole('dialog')
-    // Node's ICU renders en-GB's short September as "Sept", not "Sep" — same
-    // toLocaleDateString call as Accounts.jsx / InviteParentButton.jsx, so
-    // this is the existing house format, not a bug in this screen.
-    expect(within(dialog).getByText(/left 2 sept? 2026/i)).toBeInTheDocument()
+    // ⚠️ THE EXACT STRING, SINCE 2 Sep 2026. This used to be /left 2 sept? 2026/i
+    // — a regex that accepted BOTH spellings because the two screens showing
+    // this fact formatted it differently: AdminClub had a fixed month table
+    // ('Sep') and this sheet called toLocaleDateString, whose en-GB short
+    // September is 'Sept'. The optional letter made the test pass over the
+    // disagreement instead of failing on it. Both now go through
+    // formatLeftDate in src/lib/leavers.js, so there is one right answer.
+    expect(within(dialog).getByText('Left 2 Sep 2026')).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Edit' })).toBeNull()
     expect(within(dialog).queryByRole('button', { name: 'Mark as left' })).toBeNull()
     await user.click(within(dialog).getByRole('button', { name: 'Restore' }))

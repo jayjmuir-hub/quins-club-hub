@@ -14,7 +14,7 @@ import { setTeamScoringKinds, setTeamRequiresContact } from '../data/teams.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { SCORE_KINDS, SCORE_LABELS, scoringForBand, scoringForTeam } from '../lib/scoring.js'
 import { ageBandFromTeamName } from '../lib/ageGroup.js'
-import { isLeaver } from '../lib/leavers.js'
+import { formatLeftDate, isLeaver } from '../lib/leavers.js'
 import InviteForm from './InviteForm.jsx'
 import StorageCard from '../components/StorageCard.jsx'
 
@@ -34,20 +34,6 @@ import StorageCard from '../components/StorageCard.jsx'
 // are club-wide (listPlayers() with no teamIds): an admin sees every squad,
 // and passing an empty array would mean "no teams" and return nothing (see
 // src/data/players.js). RLS is what actually decides what comes back.
-
-// ⚠️ NOT toLocaleDateString('en-GB', { month: 'short' }) — Node's ICU data
-// renders September as "Sept" (four letters) rather than the three-letter
-// "Sep" every other short month uses, so a locale-driven format is not
-// stable across environments. Fixed table instead.
-const SHORT_MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-]
-
-function formatLeftDate(iso) {
-  const d = new Date(iso)
-  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`
-}
 
 function SectionTitle({ children }) {
   return (
@@ -232,7 +218,8 @@ export default function AdminClub() {
     listPlayers({ includeLeft: true })
       .then((playerRows) => {
         if (!mounted) return null
-        setPlayers(playerRows.filter((p) => !isLeaver(p)))
+        const current = playerRows.filter((p) => !isLeaver(p))
+        setPlayers(current)
         setLeavers(playerRows.filter(isLeaver))
         // Same bulk contact-presence query Overview.jsx used, moved here
         // with it (src/data/players.js listContactsForPlayers) — one query
@@ -245,7 +232,13 @@ export default function AdminClub() {
         // league_teams_team_id_rcm_name_key — which is scoped to the SQUAD, so
         // the collision is always with a team in this same age group.
         return Promise.all([
-          listContactsForPlayers(playerRows.map((player) => player.id)),
+          // ⚠️ `current`, NOT `playerRows`. This is the ONE screen that loads
+          // leavers, and every count on it is deliberately a count of the
+          // current roster (see the useState above). Asking for contacts on
+          // the unsplit list put departed children back into the
+          // missing-contact nag — the only place in the app that chases a
+          // parent for a phone number. Fixed by the leavers review, 2 Sep 2026.
+          listContactsForPlayers(current.map((player) => player.id)),
           listAllLeagueTeams({ includeRetired: true }),
         ])
       })

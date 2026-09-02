@@ -96,6 +96,21 @@ export function auditDetails(row) {
     // way of saying somebody was let in.
     if (row.new_status === 'active' && row.old_status === 'pending') {
       out.push('Approved')
+    } else if (row.new_status === 'left' && row.old_status === 'active') {
+      // ⚠️ THE OTHER END OF THE MEMBERSHIP'S LIFE, and it gets a sentence for
+      // exactly the reason 'Approved' does: "Status: active → left" is the
+      // database's way of saying a family lost their squad, and this log is
+      // read by people checking whether somebody should still have access.
+      // ⚠️ SCOPED TO active → left ON PURPOSE. A pending row is not access, so
+      // its reaching 'left' is not a departure from anything — and since
+      // db/migrations/20260902_player_leavers_pending_and_feed.sql
+      // mark_player_left cannot produce that transition at all. If it turns up
+      // anyway, the raw statuses below are the honest answer.
+      out.push('Left the squad')
+    } else if (row.new_status === 'active' && row.old_status === 'left') {
+      // restore_player. Deliberately NOT 'Approved': nobody approved anything,
+      // the access that was taken away was given back.
+      out.push('Restored to the squad')
     } else {
       out.push(`Status: ${row.old_status} → ${row.new_status}`)
     }

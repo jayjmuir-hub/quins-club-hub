@@ -24,3 +24,27 @@ export function isLeftOnly(memberships) {
   if (!Array.isArray(memberships) || memberships.length === 0) return false
   return memberships.every((m) => m?.status === 'left')
 }
+
+// ⚠️ NOT toLocaleDateString('en-GB', { month: 'short' }) — Node's ICU data
+// renders September as "Sept" (four letters) where every other short month is
+// three, so a locale-driven format is not stable across environments and is
+// not even self-consistent across the year. Fixed table instead.
+const SHORT_MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
+
+/**
+ * The day a player left, as `2 Sep 2026`.
+ *
+ * ⚠️ IT LIVES HERE BECAUSE TWO SCREENS SHOW IT AND THEY DISAGREED. AdminClub
+ * had this table; PlayerDetail called toLocaleDateString. So the club screen
+ * said "2 Sep 2026" and the player sheet said "2 Sept 2026" about the same
+ * player on the same day — and the test that covered it used a `/sept?/`
+ * regex, which accepted the disagreement rather than catching it. One fact,
+ * one formatter (leavers review, 2 Sep 2026).
+ */
+export function formatLeftDate(iso) {
+  const d = new Date(iso)
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`
+}
