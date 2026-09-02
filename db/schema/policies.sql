@@ -758,6 +758,21 @@ CREATE POLICY "profile read squad staff pending" ON public.profiles
   AS PERMISSIVE FOR SELECT TO public
   USING (private.can_squad_staff_see_pending(id));
 
+-- ADDED 2026-09-02 (profile_read_named_author). Until this policy, the four
+-- above were the WHOLE list, and none of them lets an ordinary member read
+-- another member — so every chat author, notice author and officer was a
+-- null embed for anybody who is not an admin (MessageRow printed "Someone").
+-- Measured as a real manager and a real parent before writing it.
+--
+-- ⚠️ THE PREDICATE IS SECURITY INVOKER, and that is the policy. "A message,
+-- notice, poll vote or officer row you can already read" is evaluated under
+-- the caller's own policies on those tables; a definer function would make
+-- every adult who ever posted anywhere readable by uuid. Captured from
+-- pg_policies after applying.
+CREATE POLICY "profile read named author" ON public.profiles
+  AS PERMISSIVE FOR SELECT TO public
+  USING (private.can_read_profile_name(id));
+
 CREATE POLICY "profile insert own" ON public.profiles
   AS PERMISSIVE FOR INSERT TO public
   WITH CHECK ((id = auth.uid()));
@@ -1990,3 +2005,16 @@ CREATE POLICY "document delete" ON storage.objects
 -- (26214400), 10 allowed MIME types — pdf, the six Office types, and
 -- jpeg/png/webp. Reads are signed URLs only, like every bucket here except
 -- training-diagrams.
+
+-- ---------------------------------------------------------------------
+-- training_suggestions (2 Sep 2026 — 20260902_training_suggestions.sql)
+-- SELECT only: the squad's staff and the club's admins. No INSERT, UPDATE or
+-- DELETE policy at all — the two SECURITY DEFINER RPCs are the only writers,
+-- and authenticated holds SELECT alone at the grant level (grants.sql).
+-- Captured from pg_policies after applying.
+-- ---------------------------------------------------------------------
+CREATE POLICY "suggestion read" ON public.training_suggestions
+  AS PERMISSIVE FOR SELECT TO public
+  USING ((EXISTS ( SELECT 1
+   FROM events e
+  WHERE ((e.id = training_suggestions.event_id) AND (private.can_edit_team(e.team_id) OR private.is_admin(e.club_id))))));
