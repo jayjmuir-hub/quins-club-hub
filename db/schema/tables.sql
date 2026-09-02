@@ -166,6 +166,10 @@ CREATE TABLE public.teams (
   -- guard asserts the count at apply time and `select name,
   -- self_registration_allowed from teams` answers it now.
   self_registration_allowed boolean NOT NULL DEFAULT false,
+  -- Added 2026-09-02 (fixture_format). What a NEW tournament or friendly
+  -- pre-selects: 7, 10, 12 or 15. NULL means 15. Never read for a league
+  -- match. Admin-edited on the Club tab beside scoring.
+  default_format  smallint,
 
   -- Added 2026-08-21 (training_plans). Column comment as stored:
   --   "Whether this squad plays contact rugby. Set per squad on /admin/club,
@@ -176,7 +180,8 @@ CREATE TABLE public.teams (
   -- TAG until somebody says otherwise, which is the safe direction.
   requires_contact boolean NOT NULL DEFAULT false,
   CONSTRAINT teams_pkey    PRIMARY KEY (id),
-  CONSTRAINT teams_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+  CONSTRAINT teams_club_id_fkey FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+  CONSTRAINT teams_default_format_check CHECK (((default_format IS NULL) OR (default_format = ANY (ARRAY[7, 10, 12, 15]))))
 );
 ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
 
@@ -789,6 +794,12 @@ CREATE TABLE public.events (
   -- publishes ROUNDS months before fixtures, so "Round 1, side unknown" is a
   -- real state a placeholder must be able to hold without inventing ADHQ1.
   league_team_tbd boolean NOT NULL DEFAULT false,
+  -- Added 2026-09-02 (fixture_format). Column comment as stored:
+  --   "Players a side: 7, 10, 12 or 15. NULL means not stated and is read as
+  --   15 everywhere. A league match is always 15 (events_league_is_fifteen)."
+  -- ⚠️ NULL IS NOT BACKFILLED. Every pre-existing fixture reads as 15 through
+  -- src/lib/fixtureFormat.js; the migration deliberately wrote nothing.
+  format          smallint,
   -- Added 2026-08-12 (competition_type). Column comment as stored:
   --   "league | tournament. NULL means neither - a friendly - and is a real
   --   answer, never 'assume league'. round belongs to league; competition holds
@@ -936,6 +947,10 @@ CREATE TABLE public.events (
   -- team and simultaneously claim not to know it. The form's single select
   -- makes it unreachable; the constraint is the boundary.
   CONSTRAINT events_league_team_not_both CHECK ((NOT (league_team_tbd AND (league_team_id IS NOT NULL)))),
+  -- Added 2026-09-02 (fixture_format). A league match is always 15s; the
+  -- form never asks, this is the boundary against a hand-rolled write.
+  CONSTRAINT events_format_check        CHECK (((format IS NULL) OR (format = ANY (ARRAY[7, 10, 12, 15])))),
+  CONSTRAINT events_league_is_fifteen   CHECK (((competition_type IS DISTINCT FROM 'league'::text) OR (format IS NULL) OR (format = 15))),
   -- Re-captured 25 Aug 2026, with `tier` above. Widened 2026-09-01
   -- (league_placeholders): 'TBD' is a league/tournament fixture whose
   -- division is not chosen yet. NULL keeps meaning "no tier — a friendly or
