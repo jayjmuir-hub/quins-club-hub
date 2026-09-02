@@ -148,10 +148,13 @@ export default function RosterTable({
   // positionsByPlayer is set (both are staff-only).
   onSaveUnit = null,
   // ⚠️ SENIOR SQUADS 2a — true only when EVERY visible player's own squad
-  // uses jersey numbers (Roster.jsx derives this; see its comment). Used
-  // ONLY to pick the table's starting sort — the "No." column's existence is
-  // already decided by hiddenColumns, and each row reads the player's own
-  // squad directly for its tile and its clash message.
+  // uses jersey numbers (Roster.jsx's `jerseySort`; see its comment there).
+  // Used ONLY to pick the table's starting sort, because there is no single
+  // number order across squads that disagree. The "No." column's existence
+  // uses a DIFFERENT test (Roster.jsx's `jerseyColumn`, "some" not "every")
+  // and is already decided by hiddenColumns before this prop is read; each
+  // row independently reads the player's own squad via `showsJerseyFor`
+  // below for its tile, its editor-vs-"—" choice, and its clash message.
   showJersey = false,
   // Staff only — the "from {squad}" mark on a guest row. A parent must never
   // learn a team-mate is on loan from elsewhere.
@@ -207,7 +210,14 @@ export default function RosterTable({
       setErrors((e) => ({ ...e, [player.id]: 'A jersey number is 1 to 99, or blank to clear it.' }))
       return
     }
-    if (player.jersey_num === parsed) return
+    if (player.jersey_num === parsed) {
+      // A corrected blur — the user fixed the clash themselves, retyped the
+      // number that was already stored, and tabbed away — must not leave the
+      // PREVIOUS attempt's error message sitting under a field that no
+      // longer disagrees with the database.
+      setErrors((e) => ({ ...e, [player.id]: null }))
+      return
+    }
 
     const previous = player.jersey_num
     setErrors((e) => ({ ...e, [player.id]: null }))
@@ -466,7 +476,11 @@ export default function RosterTable({
                     {/* The refusal lands in the row that caused it, not in a
                         toast that scrolls away from a long table. */}
                     {error && (
-                      <span role="alert" className="mt-0.5 block text-[12px] font-semibold text-danger-ink">
+                      <span
+                        id={`roster-row-error-${player.id}`}
+                        role="alert"
+                        className="mt-0.5 block text-[12px] font-semibold text-danger-ink"
+                      >
                         {error}
                       </span>
                     )}
@@ -474,11 +488,17 @@ export default function RosterTable({
 
                   {show('jersey_num') && (
                   <td className={BODY_CELL}>
-                    {editable ? (
+                    {editable && showsJerseyFor(player) ? (
                       <input
                         type="text"
                         inputMode="numeric"
                         aria-label={`Jersey number for ${player.full_name}`}
+                        // The error slot is shared with the row's other
+                        // editable cells (it reports whichever field last
+                        // failed), so this only claims the association while
+                        // THIS field is the one showing it.
+                        aria-invalid={Boolean(error)}
+                        aria-describedby={error ? `roster-row-error-${player.id}` : undefined}
                         // ⚠️ UNCONTROLLED, KEYED ON THE STORED VALUE. A
                         // controlled input needs an onChange to let the user
                         // type at all; this field only ever routes on

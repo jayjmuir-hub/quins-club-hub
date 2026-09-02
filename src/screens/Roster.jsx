@@ -680,17 +680,27 @@ export default function Roster() {
     team: (player) => player.team_id ?? null,
   })
 
-  // ⚠️ THE TABLE'S SCREEN-WIDE JERSEY FLAG. Per-row rendering (the avatar
-  // tile, the guest mark) reads `showsJerseyFor` player by player, which is
-  // always correct. Sorting and the "No." column's very existence are
-  // decisions about the WHOLE table, and there is no single sensible reading
-  // of "sort by number" or "show a number column" across a mixed set of
-  // squads that disagree — so this is true only when every visible player's
-  // own squad agrees, which is always the case once a single pill (or a
-  // one-squad scope) is in view, and correctly false for a mixed "All
-  // squads" table.
-  const showJersey = visible.length > 0 && visible.every(showsJerseyFor)
-  if (!showJersey) hiddenColumns.add('jersey_num')
+  // ⚠️ THE TABLE'S TWO SCREEN-WIDE JERSEY FLAGS — DELIBERATELY DIFFERENT
+  // TESTS. Per-row rendering (the avatar tile, the guest mark, and now each
+  // cell's own editor) reads `showsJerseyFor` player by player, which is
+  // always correct.
+  //
+  // The column's EXISTENCE asks "does ANY visible player's squad use
+  // numbers" (`some`): a mixed "All squads" view with one numbered squad and
+  // one not still has a real "No." to show for the numbered squad's rows,
+  // and hiding the column entirely there would make that squad's numbers
+  // undiscoverable on desktop. Rows outside a numbered squad show "—" in the
+  // cell instead of an editor — never a number of a squad they don't belong
+  // to.
+  //
+  // The default SORT asks "does EVERY visible player's squad agree"
+  // (`every`): there is no single sensible number order across squads that
+  // disagree — a U16 "3" and a 1st XV "3" are not comparable — so a mixed
+  // view falls back to name order rather than half-applying one squad's
+  // numbering to a table that also holds a squad it was never assigned for.
+  const jerseyColumn = visible.some(showsJerseyFor)
+  const jerseySort = visible.length > 0 && visible.every(showsJerseyFor)
+  if (!jerseyColumn) hiddenColumns.add('jersey_num')
 
   // ⚠️ NEVER GROUPED FOR A PARENT, and this became load-bearing the moment
   // grouping went on by default. A parent cannot see grades — RLS refuses
@@ -716,7 +726,7 @@ export default function Roster() {
           teamsById,
           // Numbered first, ascending, then the unnumbered by name — only
           // where the squad in view uses numbers at all.
-          sortPlayers: showJersey ? sortByJersey : undefined,
+          sortPlayers: jerseySort ? sortByJersey : undefined,
         })
 
   // How many of the players on screen have no gender recorded. Distinct from
@@ -1067,12 +1077,12 @@ export default function Roster() {
           photoUrls={photoUrls}
           groups={tableGroups}
           hiddenColumns={hiddenColumns}
-          // The screen-wide read (every visible player's own squad agrees) —
-          // see the comment above where it's derived. Used for the "No."
-          // column's default sort only; the column's existence is already
-          // decided by hiddenColumns above, and each row's tile and clash
-          // message read the player's own squad directly.
-          showJersey={showJersey}
+          // The "every visible squad agrees" read — see the comment above
+          // where it's derived. Used for the "No." column's default sort
+          // only; the column's existence is decided by hiddenColumns above
+          // (the "some" read), and each row's tile, editor and clash message
+          // read the player's own squad directly via showsJerseyFor.
+          showJersey={jerseySort}
           // ⚠️ STAFF ONLY, and it is the SAME gate the mobile row's mark uses
           // below — a parent must never see that a team-mate is a guest.
           showGuestMark={canEditAnything}

@@ -60,6 +60,15 @@ const TEAM_U18B = { id: 'team-u18b', name: 'U18B', sort_order: 2, uses_jersey_nu
 
 const COACH_1XV = [{ id: 'm1', role: 'coach', status: 'active', team_id: 'team-1xv' }]
 const COACH_U18B = [{ id: 'm2', role: 'coach', status: 'active', team_id: 'team-u18b' }]
+// A coach of BOTH squads — needed for the mixed "All squads" test (finding
+// 1): canWritePlayer only makes a row editable for a squad the caller has a
+// membership in, so a single-squad coach would never see the youth row's
+// cell as editable at all and the "no editor there" assertion would pass
+// for the wrong reason.
+const COACH_BOTH_SQUADS = [
+  { id: 'm1', role: 'coach', status: 'active', team_id: 'team-1xv' },
+  { id: 'm2', role: 'coach', status: 'active', team_id: 'team-u18b' },
+]
 // A parent with children in BOTH squads — needed for the guest-mark CONTROL:
 // visibleTeams() scopes a parent to the squads their OWN memberships name,
 // and the mobile list's team grouping then drops any player whose team_id
@@ -347,5 +356,58 @@ describe('RosterTable — inline jersey number edit', () => {
     await screen.findByTestId('roster-table')
 
     expect(screen.queryByLabelText(/Jersey number for/)).not.toBeInTheDocument()
+  })
+
+  // ═════════════════════════════════════════════════════════════════════
+  // Review finding 1 — "All squads" with a MIX of a numbered and an
+  // unnumbered squad. The column's existence is a "some" test (any visible
+  // squad uses numbers), which is a different test from the default sort's
+  // "every" test (all visible squads agree) — a coach of both squads must
+  // still get a usable "No." column for the squad that has one, and must
+  // never see a number editor appear on a squad's row that doesn't use
+  // them.
+  // ═════════════════════════════════════════════════════════════════════
+  it('"All squads" mixed: "No." column exists, only the numbered squad\'s row gets an editor, order stays by name', async () => {
+    useMembershipsMock.mockReturnValue(memberships(COACH_BOTH_SQUADS, [TEAM_1XV, TEAM_U18B]))
+    // team-u18b does not use numbers — this player has no jersey_num, same
+    // as every real player on a non-jersey squad.
+    const YOUTH = {
+      id: 'p-youth',
+      team_id: 'team-u18b',
+      full_name: 'Zaid Karim',
+      position: 'Wing',
+      jersey_num: null,
+      is_captain: false,
+    }
+    listPlayersMock.mockResolvedValue([NUMBERED, YOUTH])
+
+    const user = userEvent.setup()
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+    // Ungroup so the row order is visible end-to-end, same move the sort
+    // test above makes.
+    await user.selectOptions(screen.getByLabelText('Group by'), 'none')
+
+    // The column exists because SOME visible squad (team-1xv) uses numbers.
+    expect(screen.getByRole('columnheader', { name: /^No\.$/ })).toBeInTheDocument()
+
+    // The numbered squad's row: an editable input, showing the stored 9.
+    expect(screen.getByLabelText('Jersey number for Ben Okafor')).toHaveValue('9')
+
+    // CONTROL: the youth player's own squad does not use numbers, so their
+    // cell must show "—" and must NOT grow an editor just because the
+    // column exists for someone else's row.
+    expect(screen.queryByLabelText('Jersey number for Zaid Karim')).not.toBeInTheDocument()
+    // The "No." cell specifically — not just any "—" in the row, since
+    // Captain also reads "—" for a non-captain. Column order is Name, No.,
+    // Position, Gender, Age group, Captain (SORTABLE in RosterTable.jsx), so
+    // the "No." cell is the row's second <td>.
+    const youthRow = rows().find((r) => within(r).queryByText('Zaid Karim'))
+    expect(youthRow.querySelectorAll('td')[1]).toHaveTextContent('—')
+
+    // CONTROL: the two squads disagree, so there is no single number order
+    // across them — the default sort stays by name (Ben before Zaid), not
+    // by jersey number.
+    expect(names()).toEqual(['Ben Okafor', 'Zaid Karim'])
   })
 })
