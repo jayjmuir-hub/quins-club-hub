@@ -35,6 +35,7 @@ vi.mock('../src/data/playerTiers.js', () => ({
   listPlayerGrades: vi.fn().mockResolvedValue(new Map()),
   listPlayerPositions: vi.fn().mockResolvedValue(new Map()),
   listPlayerUnits: vi.fn().mockResolvedValue(new Map()),
+  setPlayerUnit: vi.fn(async () => null),
 }))
 // The sheets are their own suites' problem; here only "did the deep-link
 // open the right one" matters.
