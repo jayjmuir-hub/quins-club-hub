@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { isFormat } from '../lib/fixtureFormat.js'
 
 // Writes against public.teams. Reads live in src/lib/memberships.jsx, which
 // loads the club's squads once per session with `select('*')` and hands them to
@@ -89,5 +90,37 @@ export async function setTeamRequiresContact(teamId, value) {
 
   if (error) throw new Error(error.message || REFUSED_CONTACT)
   if (!data) throw new Error(REFUSED_CONTACT)
+  return data
+}
+
+// ⚠️ ITS OWN MESSAGE, like the two above and for the same reason.
+const REFUSED_FORMAT =
+  "We couldn't save that. Only a club admin can change a squad's usual tournament format."
+
+/**
+ * Sets what a NEW tournament or friendly for this squad pre-selects — 7, 10,
+ * 12 or 15 — or clears it with null (which the form reads as 15).
+ *
+ * ⚠️ A COLUMN, NEVER THE SQUAD'S NAME, the same rule scoring_kinds and
+ * requires_contact carry above. Never read for a league match: those are
+ * always 15 and the database enforces it (events_league_is_fifteen).
+ *
+ * ⚠️ THROWS WHEN RLS FILTERS THE WRITE TO ZERO ROWS — see setTeamScoringKinds.
+ */
+export async function setTeamDefaultFormat(teamId, format) {
+  if (!teamId) throw new Error(REFUSED_FORMAT)
+  if (format !== null && !isFormat(format)) {
+    throw new Error('A squad plays 7s, 10s, 12s or 15s — nothing else can be saved.')
+  }
+
+  const { data, error } = await supabase
+    .from('teams')
+    .update({ default_format: format })
+    .eq('id', teamId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw new Error(error.message || REFUSED_FORMAT)
+  if (!data) throw new Error(REFUSED_FORMAT)
   return data
 }
