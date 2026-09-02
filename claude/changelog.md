@@ -10,7 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(push): the "Waiting to be approved" push sent squad staff to a screen
+- **fix(login): the "Check your email" panel after a password reset now says to
+  check the Junk or Spam folder.** A squad manager's reset mail sat in Hotmail's
+  Junk folder and she reported it as never having arrived; the diagnosis found
+  the mail path was fine and the mail was in Junk. The sign-up panel already
+  carried this line and the reset panel — the one a forgotten password actually
+  goes down — did not. The mothballed sign-in-link panel gets the same sentence
+  so the two do not drift. Asserted in `tests/login.test.jsx`; the assertion
+  was run red before the copy changed.
+- `e5ba299` — **fix(push): the "Waiting to be approved" push sent squad staff to a screen
   that refused them.** A team manager (not an admin) was pushed about a coach
   registering for their squad — the right audience, super admins plus that
   squad's head coach and managers since 19 Aug — and the tap opened
