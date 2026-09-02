@@ -270,3 +270,19 @@ export async function listPlayerPrivate(playerIds = []) {
 export async function listPlayerPrivatePresence() {
   return new Set()
 }
+
+// ⚠️ SENIOR SQUADS 2a (Task 3, src/data/players.js): required only because
+// tests/harness-stubs.test.js demands every export the real module has,
+// exactly as the comment at the top of that file describes. No scenario in
+// this harness currently drives jersey numbers or a second-squad guest, so
+// these are minimal — a Map with nothing in it, and a recorded write —
+// rather than a full second fixture set.
+export async function listPlayerSquads() {
+  return new Map()
+}
+
+export async function setPlayerJerseyNumber(playerId, number) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'update', table: 'players', payload: { id: playerId, jersey_num: number } })
+  return { id: playerId, jersey_num: number }
+}
