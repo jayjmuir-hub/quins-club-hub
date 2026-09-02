@@ -281,6 +281,9 @@ const CLUB_WIDE = '__club__'
 function initialValues(event, editableTeams, initialDate = null, duplicating = false, initialKind = null) {
   const teamIds = editableTeams.map((team) => team.id)
   const fallbackTeamId = teamIds[0] ?? ''
+  // Looked up once and reused by both the pitch portion and format defaults
+  // below, rather than re-running the same `.find` for each.
+  const fallbackTeam = editableTeams.find((team) => team.id === fallbackTeamId)
 
   if (!event) {
     const today = clubToday()
@@ -334,10 +337,7 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       // quarter, U9–U11 a half, U12+ full; training leans smaller). A
       // suggestion, never a rule — the picker below can change it, and an
       // effect keeps it in step with the squad and type until it is overridden.
-      pitchPortion: defaultPitchPortion(
-        editableTeams.find((team) => team.id === fallbackTeamId)?.name ?? null,
-        { type },
-      ),
+      pitchPortion: defaultPitchPortion(fallbackTeam?.name ?? null, { type }),
       competition: '',
       // ⚠️ '' MEANS "NOT A LEAGUE MATCH", and that is the default for every new
       // fixture. Null league_team_id is what makes a fixture not a league one;
@@ -351,9 +351,7 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       // ⚠️ THE SQUAD'S USUAL FORMAT, OR 15. Read once when the sheet opens —
       // the team can change below and the effect after the form re-seeds it.
       format: String(
-        isFormat(editableTeams.find((team) => team.id === fallbackTeamId)?.default_format)
-          ? editableTeams.find((team) => team.id === fallbackTeamId).default_format
-          : DEFAULT_FORMAT,
+        isFormat(fallbackTeam?.default_format) ? fallbackTeam.default_format : DEFAULT_FORMAT,
       ),
       notes: '',
       resultUs: '',
@@ -917,8 +915,26 @@ export default function EventForm({
   // When the squad changes on a NEW fixture, follow that squad's usual format.
   // Editing keeps the row's own answer: a coach correcting the kick-off time
   // must not have the format silently swapped under them.
+  //
+  // ⚠️ A DUPLICATE IS NOT EDITING (see the `editing` flag above), so without a
+  // further guard this effect fires on MOUNT for a duplicate too and stamps
+  // the squad's default straight over the format initialValues deliberately
+  // carried from the original row — a 7s tournament fixture duplicated onto a
+  // 15s squad would silently reopen as 15s. skipFirstReseed exists to eat
+  // exactly that one mount-time run and nothing more: it starts `true` only
+  // when duplicating, so the carried format survives the first render, but it
+  // is cleared straight after, so a team change the coach makes AFTERWARDS —
+  // same as on a plain new fixture — still re-seeds from the new squad's
+  // default. The alternative (skip reseeding for the whole life of a
+  // duplicate) would leave a duplicate that has had its squad changed
+  // carrying the WRONG squad's format with nothing to correct it.
+  const skipFirstReseed = useRef(duplicate)
   useEffect(() => {
     if (editing) return
+    if (skipFirstReseed.current) {
+      skipFirstReseed.current = false
+      return
+    }
     const team = editableTeams.find((candidate) => candidate.id === teamId)
     setValues((current) => ({
       ...current,

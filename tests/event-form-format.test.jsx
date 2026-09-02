@@ -46,7 +46,7 @@ const U18B_TWELVES = { ...U18B, id: 't-u18b-12', default_format: 12 }
 const U8 = { id: 't-u8', club_id: CLUB_ID, name: 'U8 Tag', sort_order: 3 }
 const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
 
-function renderForm({ event = null, teams = [U18B], initialKind = null } = {}) {
+function renderForm({ event = null, teams = [U18B], initialKind = null, duplicate = false } = {}) {
   useMembershipsMock.mockReturnValue({
     memberships: ADMIN,
     teams,
@@ -55,7 +55,15 @@ function renderForm({ event = null, teams = [U18B], initialKind = null } = {}) {
     reload: vi.fn(),
   })
   const onSaved = vi.fn()
-  render(<EventForm event={event} initialKind={initialKind} onClose={() => {}} onSaved={onSaved} />)
+  render(
+    <EventForm
+      event={event}
+      initialKind={initialKind}
+      duplicate={duplicate}
+      onClose={() => {}}
+      onSaved={onSaved}
+    />,
+  )
   return { user: userEvent.setup(), onSaved }
 }
 
@@ -153,5 +161,46 @@ describe('fixture format on the event form', () => {
     await submit(user)
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
     expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ format: null })
+  })
+
+  // ⚠️ THE BUG THIS GUARDS: a duplicate is NOT editing (see the `editing` flag
+  // in EventForm.jsx), so the "follow the squad's default" effect used to fire
+  // on MOUNT for a duplicate too and stamp the squad's default straight over
+  // the format initialValues deliberately carried from the original row. A 7s
+  // tournament fixture duplicated onto a squad whose default is 15 would
+  // silently reopen as 15s.
+  it('a duplicate keeps the ORIGINAL fixture\'s format, not the squad default', async () => {
+    const event = {
+      id: 'e-1', club_id: CLUB_ID, team_id: 't-u18b-12', type: 'match',
+      competition_type: 'tournament', competition: 'Harness Sevens', format: 7,
+      opponent: 'Harness Exiles', home: true, starts_at: '2026-10-10T05:00:00.000Z',
+    }
+    renderForm({ event, teams: [U18B_TWELVES], duplicate: true })
+    const group = await screen.findByRole('group', { name: /format/i })
+    expect(within(group).getByRole('radio', { name: '7s' })).toBeChecked()
+    // CONTROL: the squad's default (12s) is NOT what shows — otherwise the
+    // carried format is untested and this is just re-asserting the default.
+    expect(within(group).getByRole('radio', { name: '12s' })).not.toBeChecked()
+  })
+})
+
+// ── Tournament container: format is never asked, and the save writes null,
+//    not merely "undefined" or the U11+ default. CONTROL alongside it that
+//    the save really is a tournament container, so the format assertion is
+//    reading the right payload. ──────────────────────────────────────────
+describe('fixture format — tournament container', () => {
+  it('a tournament container writes format null', async () => {
+    const { user } = renderForm({ initialKind: 'tournament' })
+    await user.selectOptions(screen.getByLabelText('Tournament'), 'ADHJRT')
+    await pickDate(user, '2026-10-10')
+    await user.type(screen.getByLabelText('Time'), '09:00')
+    await user.type(screen.getByLabelText('End time'), '15:00')
+    await user.click(screen.getByRole('button', { name: /add tournament/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    const written = upsertEventMock.mock.calls[0][0]
+    // CONTROL: this really is the tournament-container save.
+    expect(written).toMatchObject({ competition_type: 'tournament' })
+    expect(written.format).toBeNull()
   })
 })
