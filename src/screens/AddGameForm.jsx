@@ -96,6 +96,9 @@ export default function AddGameForm({ tournament, game = null, onClose, onSaved 
       tier: tournament.tier ?? null,
       venue: tournament.venue ?? null,
       pitch: tournament.pitch ?? null,
+      // A 7s tournament is a 7s day — every game inherits the container's
+      // format rather than asking again per game.
+      format: tournament.format ?? null,
       opponent: values.opponent.trim(),
       // ⚠️ HOME IS NULL FOR A TOURNAMENT GAME. A festival is played at one
       // neutral host; home/away is a fact about a standalone fixture, not a

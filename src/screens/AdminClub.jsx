@@ -723,7 +723,6 @@ export default function AdminClub() {
             <label className="mt-3 block">
               <span className="text-[13px] font-bold text-ink">Usual tournament format</span>
               <select
-                aria-label="Usual tournament format"
                 value={scoringTeam.default_format == null ? '' : String(scoringTeam.default_format)}
                 disabled={saving}
                 onChange={(domEvent) => saveDefaultFormat(domEvent.target.value)}

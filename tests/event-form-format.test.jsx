@@ -65,8 +65,8 @@ function renderForm({ event = null, teams = [U18B], initialKind = null, duplicat
       onSaved={onSaved}
     />
   )
-  render(strict ? <StrictMode>{tree}</StrictMode> : tree)
-  return { user: userEvent.setup(), onSaved }
+  const result = render(strict ? <StrictMode>{tree}</StrictMode> : tree)
+  return { user: userEvent.setup(), onSaved, unmount: result.unmount }
 }
 
 beforeEach(() => {
@@ -127,15 +127,23 @@ describe('fixture format on the event form', () => {
     expect(upsertEventMock.mock.calls[0][0]).toMatchObject({ competition_type: 'league', format: 15 })
   })
 
-  it('a friendly asks too, and a minis squad is never asked', async () => {
-    const { user } = renderForm()
-    await fillMatchBasics(user)
+  it('a friendly asks too, and a minis squad is never asked and writes null', async () => {
+    const first = renderForm()
+    await fillMatchBasics(first.user)
     // "Neither — a friendly" is the default competition.
     expect(screen.getByRole('group', { name: /format/i })).toBeInTheDocument()
+    // Unmounted before the minis form renders, so there is only ever one
+    // "Save" button and one format group on screen for the queries below.
+    first.unmount()
 
     const minis = renderForm({ teams: [U8] })
     await fillMatchBasics(minis.user)
     expect(screen.queryByRole('group', { name: /format/i })).toBeNull()
+    await submit(minis.user)
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalled())
+    // CONTROL: a non-minis squad writes the picked format, not null — see
+    // "a tournament on a U11+ squad …" above, which asserts `format: 7`.
+    expect(upsertEventMock.mock.calls.at(-1)[0]).toMatchObject({ format: null })
   })
 
   it('reopening a 10s fixture shows 10s checked, not the squad default', async () => {
@@ -205,12 +213,33 @@ describe('fixture format on the event form', () => {
   })
 })
 
-// ── Tournament container: format is never asked, and the save writes null,
-//    not merely "undefined" or the U11+ default. CONTROL alongside it that
-//    the save really is a tournament container, so the format assertion is
-//    reading the right payload. ──────────────────────────────────────────
+// ── Tournament container: the container ASKS the day's format, and its games
+//    (AddGameForm.jsx) inherit it — so the container itself must write the
+//    picked format, not null. CONTROL alongside it that the save really is a
+//    tournament container, so the format assertion is reading the right
+//    payload, and a second CONTROL that a container with nothing picked
+//    writes 15 like any other unstated match. ─────────────────────────────
 describe('fixture format — tournament container', () => {
-  it('a tournament container writes format null', async () => {
+  it('a tournament container writes the picked format', async () => {
+    const { user } = renderForm({ initialKind: 'tournament' })
+    await user.selectOptions(screen.getByLabelText('Tournament'), 'ADHJRT')
+    await pickDate(user, '2026-10-10')
+    await user.type(screen.getByLabelText('Time'), '09:00')
+    await user.type(screen.getByLabelText('End time'), '15:00')
+    const group = screen.getByRole('group', { name: /format/i })
+    await user.click(within(group).getByRole('radio', { name: '7s' }))
+    await user.click(screen.getByRole('button', { name: /add tournament/i }))
+
+    await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
+    const written = upsertEventMock.mock.calls[0][0]
+    // CONTROL: this really is the tournament-container save.
+    expect(written).toMatchObject({ competition_type: 'tournament' })
+    expect(written.format).toBe(7)
+  })
+
+  // CONTROL: a container where nothing was picked writes 15, the same
+  // unstated default as any other non-league match — not null.
+  it('a tournament container with nothing picked writes 15', async () => {
     const { user } = renderForm({ initialKind: 'tournament' })
     await user.selectOptions(screen.getByLabelText('Tournament'), 'ADHJRT')
     await pickDate(user, '2026-10-10')
@@ -220,8 +249,7 @@ describe('fixture format — tournament container', () => {
 
     await waitFor(() => expect(upsertEventMock).toHaveBeenCalledTimes(1))
     const written = upsertEventMock.mock.calls[0][0]
-    // CONTROL: this really is the tournament-container save.
     expect(written).toMatchObject({ competition_type: 'tournament' })
-    expect(written.format).toBeNull()
+    expect(written.format).toBe(15)
   })
 })

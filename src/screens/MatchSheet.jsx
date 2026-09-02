@@ -351,11 +351,7 @@ export default function MatchSheet() {
   const [squad, setSquad] = useState([])
   const [lineups, setLineups] = useState([])
   const [sheet, setSheet] = useState(null)
-  // ⚠️ 22 UNTIL THE EVENT LOADS, which is the old, unconditional behaviour —
-  // `slotCount` below cannot know the fixture's format before `getEvent`
-  // returns, and the load effect replaces this with `slotsFrom(...,
-  // sheetSlots(formatOf(row)))` the moment it does.
-  const [slots, setSlots] = useState(() => emptySlots(22))
+  const [slots, setSlots] = useState(() => emptySlots(slotCount))
   const [cardRows, setCardRows] = useState(emptyCards)
   const [fields, setFields] = useState({
     captain_name: '',
@@ -823,6 +819,9 @@ export default function MatchSheet() {
 
   const complete = sheet?.status === 'complete'
   const overdue = isOverdue(deadline, new Date())
+  // Hoisted out of the two-column table's row map below, which used to call
+  // this twice per row.
+  const leftColumnSlots = leftColumn(slots.length)
 
   return (
     <section>
@@ -1006,7 +1005,7 @@ export default function MatchSheet() {
           </h3>
           {lineups.length === 0 ? (
             <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
-              No team was picked for this fixture, so the 22 below start blank. Pick one on the{' '}
+              No team was picked for this fixture, so the {slots.length} below start blank. Pick one on the{' '}
               <button
                 type="button"
                 className="font-bold text-brand-ink underline"
@@ -1034,7 +1033,7 @@ export default function MatchSheet() {
                   confirmRefill === lineup.id ? (
                     <Fragment key={lineup.id}>
                       <Button variant="danger" onClick={() => refillFromLineup(lineup)}>
-                        Yes, replace the 22
+                        Yes, replace the {slots.length}
                       </Button>
                       <Button variant="secondary" onClick={() => setConfirmRefill(null)}>
                         Keep what&rsquo;s there
@@ -1061,7 +1060,7 @@ export default function MatchSheet() {
             slotsFrom() never drops a stored row — see its own comment — so a
             sheet saved as 22 on a fixture later switched to 10s comes back
             with all 22, and this is where the coach is told why boxes 16-22
-            still exist and will not save if left filled. */}
+            still exist. */}
         {slots.length > slotCount && (
           <p className="mb-2 text-[13px] text-warn-ink">
             This sheet holds {slots.length} names but a {formatLabel(formatOf(event))} game allows
@@ -1255,8 +1254,8 @@ export default function MatchSheet() {
                 </th>
                 <th className={`${CELL} w-[34px] text-center`}>FR</th>
               </tr>
-              {leftColumn(slots.length).map((left) => {
-                const right = left + leftColumn(slots.length).length
+              {leftColumnSlots.map((left) => {
+                const right = left + leftColumnSlots.length
                 return (
                   <tr key={left}>
                     <SlotCells slots={slots} squad={squad} index={left - 1} />

@@ -908,9 +908,12 @@ export default function EventForm({
   // NEVER FOR A LEAGUE MATCH — the league is 15s at every age (Jay, 2 Sep
   // 2026) and the database refuses anything else (events_league_is_fifteen).
   // Minis have their own formats and no match sheet, so nothing is offered.
+  // ⚠️ A TOURNAMENT CONTAINER (tournamentMode) ASKS TOO — it holds the day's
+  // format for every game AddGameForm adds underneath it (see the `format`
+  // field in the payload below). Only league and minis are excluded.
   // claude/plans/2026-09-02-fixture-format.md.
   const showFormat =
-    isMatch && !tournamentMode && !minisSquad && values.competitionType !== COMPETITION_LEAGUE
+    isMatch && !minisSquad && values.competitionType !== COMPETITION_LEAGUE
 
   // When the squad changes on a NEW fixture, follow that squad's usual format.
   // Editing keeps the row's own answer: a coach correcting the kick-off time
@@ -1288,10 +1291,13 @@ export default function EventForm({
       // tournament for all of them. Which of our teams played it, and in which
       // round, are facts about the SQUAD, so those stay on the primary payload.
       competition_type: isMatch ? values.competitionType || null : null,
-      // ⚠️ 15 FOR A LEAGUE MATCH, THE PICK OTHERWISE, NULL FOR A NON-MATCH.
-      // Written as a NUMBER — the radio holds a string. A tournament
-      // CONTAINER (tournamentMode) writes null: its games carry the format.
-      format: !isMatch || tournamentMode
+      // ⚠️ 15 FOR A LEAGUE MATCH, NULL FOR A NON-MATCH OR A MINIS SQUAD, THE
+      // PICK OTHERWISE. Written as a NUMBER — the radio holds a string. A
+      // tournament CONTAINER (tournamentMode) writes the picked format like
+      // any other non-league match: it is the day's format, and AddGameForm
+      // has every game underneath it inherit it — see the `format` field it
+      // adds to `common` there.
+      format: !isMatch || minisSquad
         ? null
         : values.competitionType === COMPETITION_LEAGUE
           ? DEFAULT_FORMAT

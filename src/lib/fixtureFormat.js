@@ -21,6 +21,10 @@
 //
 // Pure, no React — the same rule scoring.js and minis.js follow, for the same
 // reason: read by several screens and by tests that must not build a DOM.
+//
+// ⚠️ squadMax and replacements below have no consumer yet — they are
+// provided for the squad-size and availability-count work in
+// claude/plans/2026-09-02-senior-squads.md.
 
 /** The formats the club plays, smallest first. Order is the order the form offers them. */
 export const FORMATS = Object.freeze([7, 10, 12, 15])

@@ -179,6 +179,15 @@ beforeEach(() => {
 // format. The `competition` field is dropped with it — the COMPETITION line
 // reads `round` for a league fixture, not `competition`, which MATCH already
 // supplies.
+// ⚠️ THIS FIXTURE IS DELIBERATELY A ROW THE DATABASE REFUSES. It is a
+// `competition_type: 'league'` row carrying `format: 7`, and the
+// `events_league_is_fifteen` CHECK forbids exactly that combination in
+// production — a league row must be 15. It is written this way here only
+// because matchSheetApplies() admits league fixtures alone (see the comment
+// above), and that is the sole path that reaches the sizing code this test
+// exists to check. So the resizing this suite proves is UNREACHABLE in
+// production today, pending the open question of whether RCM tournaments
+// get a match sheet at all (open question, 2 Sep 2026).
 const SEVENS = {
   ...MATCH,
   id: 'e-7',
