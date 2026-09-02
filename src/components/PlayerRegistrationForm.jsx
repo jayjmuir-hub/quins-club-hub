@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { revealProblem } from '../lib/revealProblem.js'
 import Button from './Button.jsx'
 import DatePicker from './DatePicker.jsx'
 import Segmented from './Segmented.jsx'
@@ -560,6 +561,13 @@ export default function PlayerRegistrationForm({
   )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  // The alert renders above several child cards and the button below them,
+  // so a refused submit used to look like a dead button (2 Sep 2026 UX
+  // review, item 3). Scroll to and focus the problem once it has rendered.
+  const formRef = useRef(null)
+  useEffect(() => {
+    if (error) revealProblem(formRef.current)
+  }, [error])
   // The registrant's own name — see the header note. `profile` resolves
   // asynchronously, so `needsName` is false on the first render and becomes
   // true when the row arrives; that is the right way round, because a field
@@ -854,7 +862,7 @@ export default function PlayerRegistrationForm({
   const atCap = rows.length >= MAX_ROWS
 
   return (
-    <form className="mt-5" onSubmit={handleSubmit} noValidate>
+    <form className="mt-5" onSubmit={handleSubmit} noValidate ref={formRef}>
       {/* Good news and bad news are two elements, not one string. The saved
           list is a `status` — nothing went wrong with those children and a
           parent should not have to read an alert to find that out. */}
@@ -873,6 +881,8 @@ export default function PlayerRegistrationForm({
       {error && (
         <p
           role="alert"
+          data-reveal="problem"
+          tabIndex={-1}
           className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
         >
           {error}

@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **docs(plan): TRAINING — the director's session becomes a suggestion, and
+- **feat(forms): a refused submit now lands on the problem.** Item 3 of the
+  2 Sep 2026 UX review. On the child form and the sign-up children form the
+  alert sat at the top of a long sheet with Save at the bottom, so a parent
+  tapped Save and nothing visible happened; the event form and player form
+  put "Fill in the highlighted fields" at the foot with the highlighted field
+  fifteen fields up. New `src/lib/revealProblem.js` scrolls to and focuses the
+  first invalid control, else the form's own alert, once the error has
+  rendered; all four forms run it. Programme overview and the follow-ups the
+  first two items left behind: `claude/plans/2026-09-02-ux-review-programme.md`.
+- `5cb6c21` — **docs(plan): TRAINING — the director's session becomes a suggestion, and
   age becomes guidance. Nothing built.** A coach, via Jay 2 Sep 2026: the
   performance director's published sessions *"should be simply noted as a
   suggestion and the coach could accept or decline, if accepted then they

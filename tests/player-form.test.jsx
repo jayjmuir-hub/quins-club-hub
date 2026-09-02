@@ -405,6 +405,18 @@ describe('PlayerForm — validation', () => {
     expect(firstNameBox()).toHaveAttribute('aria-invalid', 'true')
   })
 
+  it('⚠️ puts focus ON the offending field, so the banner at the foot is not the only clue', async () => {
+    // 2 Sep 2026 UX review, item 3: the banner sat beside Save while the blank
+    // box was two screens up. Run red before revealProblem was wired in.
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: /add player/i }))
+    await screen.findByRole('alert')
+
+    await waitFor(() => expect(document.activeElement).toBe(firstNameBox()))
+  })
+
   it('clears the error and the invalid highlight as soon as the field is fixed', async () => {
     const user = userEvent.setup()
     renderForm()

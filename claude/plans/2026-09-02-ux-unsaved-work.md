@@ -1,7 +1,8 @@
 # UX review, item 1: stop losing unsaved work
 
-**Status: NOT SHIPPED — being built on `claude/ux-1-unsaved-work`, 2 Sep 2026.**
-Update this line to the squash SHA when it merges.
+**Status: SHIPPED as `2d227af` (PR #631), 2 Sep 2026.** The recorded gap
+(leaving the team sheet via the dock) is still open; see
+`claude/plans/2026-09-02-ux-review-programme.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > or superpowers:executing-plans to implement this plan task-by-task. Steps use
