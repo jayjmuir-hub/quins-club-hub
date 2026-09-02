@@ -14,6 +14,7 @@ import { insertEvents, upsertEvent, updateSeriesFrom, setSeriesTimeFrom } from '
 import { listAvailability } from '../data/availability.js'
 import { SCORE_KINDS, hasNoComponents } from '../lib/scoring.js'
 import { isMinisTeam, recordsScores } from '../lib/minis.js'
+import { DEFAULT_FORMAT, FORMATS, formatLabel, isFormat } from '../lib/fixtureFormat.js'
 
 // The pitch picker's escape hatch. A sentinel rather than '' so "Something
 // else…" stays distinguishable from "No pitch" — they are different answers,
@@ -347,6 +348,13 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
       // '' = neither: a friendly. A tournament pick presets this to 'tournament'
       // so the container saves as one; see the block by COMPETITION_LEAGUE.
       competitionType: isTournamentKind ? COMPETITION_TOURNAMENT : '',
+      // ⚠️ THE SQUAD'S USUAL FORMAT, OR 15. Read once when the sheet opens —
+      // the team can change below and the effect after the form re-seeds it.
+      format: String(
+        isFormat(editableTeams.find((team) => team.id === fallbackTeamId)?.default_format)
+          ? editableTeams.find((team) => team.id === fallbackTeamId).default_format
+          : DEFAULT_FORMAT,
+      ),
       notes: '',
       resultUs: '',
       resultThem: '',
@@ -459,6 +467,10 @@ function initialValues(event, editableTeams, initialDate = null, duplicating = f
     // so nothing in the database can be mistaken for an answer somebody gave.
     competitionType:
       event.competition_type ?? (event.competition ? COMPETITION_TOURNAMENT : ''),
+    // ⚠️ THE ROW'S OWN FORMAT, never the squad default — a reopened 10s
+    // fixture must show 10s. Null reads as 15, the same fallback every reader
+    // applies.
+    format: String(isFormat(event.format) ? event.format : DEFAULT_FORMAT),
     // ⚠️ CARRIED ON A DUPLICATE, unlike the round below. A league team belongs
     // to the SQUAD, and the squad carries over — so ADHQ2's next fixture is
     // still ADHQ2's. Clearing it would make the commonest duplicate (same
@@ -894,6 +906,26 @@ export default function EventForm({
     String(values.resultUs ?? '') !== '' ||
     String(values.resultThem ?? '') !== ''
 
+  // ⚠️ FORMAT IS ASKED FOR A TOURNAMENT OR A FRIENDLY ON A U11+ SQUAD, AND
+  // NEVER FOR A LEAGUE MATCH — the league is 15s at every age (Jay, 2 Sep
+  // 2026) and the database refuses anything else (events_league_is_fifteen).
+  // Minis have their own formats and no match sheet, so nothing is offered.
+  // claude/plans/2026-09-02-fixture-format.md.
+  const showFormat =
+    isMatch && !tournamentMode && !minisSquad && values.competitionType !== COMPETITION_LEAGUE
+
+  // When the squad changes on a NEW fixture, follow that squad's usual format.
+  // Editing keeps the row's own answer: a coach correcting the kick-off time
+  // must not have the format silently swapped under them.
+  useEffect(() => {
+    if (editing) return
+    const team = editableTeams.find((candidate) => candidate.id === teamId)
+    setValues((current) => ({
+      ...current,
+      format: String(isFormat(team?.default_format) ? team.default_format : DEFAULT_FORMAT),
+    }))
+  }, [editing, teamId, editableTeams])
+
   // Extras AND a repeat is refused outright (see the row-count guard in
   // handleSubmit). Naming it here so the SUBMIT BUTTON can tell the truth:
   // before this existed the label read "Add 14 events" — the series count —
@@ -1233,6 +1265,14 @@ export default function EventForm({
       // tournament for all of them. Which of our teams played it, and in which
       // round, are facts about the SQUAD, so those stay on the primary payload.
       competition_type: isMatch ? values.competitionType || null : null,
+      // ⚠️ 15 FOR A LEAGUE MATCH, THE PICK OTHERWISE, NULL FOR A NON-MATCH.
+      // Written as a NUMBER — the radio holds a string. A tournament
+      // CONTAINER (tournamentMode) writes null: its games carry the format.
+      format: !isMatch || tournamentMode
+        ? null
+        : values.competitionType === COMPETITION_LEAGUE
+          ? DEFAULT_FORMAT
+          : Number(values.format),
       // ⚠️ IN `common`, so a multi-squad fan-out and a whole repeating term all
       // carry it: what tier a fixture is played at is a fact about the FIXTURE,
       // true of every squad joining it.
@@ -2324,6 +2364,16 @@ export default function EventForm({
                 </p>
               )}
             </div>
+            )}
+
+            {showFormat && (
+              <Segmented
+                legend="Format"
+                name="event-format"
+                options={FORMATS.map((format) => ({ value: String(format), label: formatLabel(format) }))}
+                value={values.format}
+                onChange={(next) => setValues((current) => ({ ...current, format: next }))}
+              />
             )}
 
             {/* ⚠️ ROUND BELONGS TO THE LEAGUE, so it appears with it and only
