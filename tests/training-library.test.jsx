@@ -37,6 +37,9 @@ const listSubmittedDrillsMock = vi.fn(async () => [])
 const approveDrillToClubMock = vi.fn(async () => ({}))
 const dismissDrillSubmissionMock = vi.fn(async () => ({}))
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   listDrills: (...args) => listDrillsMock(...args),
   upsertDrill: (...args) => upsertDrillMock(...args),
   setDrillActive: (...args) => setDrillActiveMock(...args),

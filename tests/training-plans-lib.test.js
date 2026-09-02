@@ -106,9 +106,11 @@ describe('squadFitsTemplate', () => {
 
 describe('describePublishRow', () => {
   it('reads the three outcomes', () => {
-    expect(describePublishRow({ will_write: 3, skipped_coach_edited: 1, no_events: 0 })).toBe('3 sessions will get the plan · 1 kept (coach edited)')
-    expect(describePublishRow({ will_write: 1, skipped_coach_edited: 0, no_events: 0 })).toBe('1 session will get the plan')
-    expect(describePublishRow({ will_write: 0, skipped_coach_edited: 0, no_events: 1 })).toBe('No training in this range')
+    // suggest_training's rows since 2 Sep 2026: a suggestion, never a plan.
+    expect(describePublishRow({ will_suggest: 3, unchanged: 1, no_events: 0 })).toBe('3 sessions will get the suggestion · 1 already has it')
+    expect(describePublishRow({ will_suggest: 1, unchanged: 2, no_events: 0 })).toBe('1 session will get the suggestion · 2 already have it')
+    expect(describePublishRow({ will_suggest: 1, unchanged: 0, no_events: 0 })).toBe('1 session will get the suggestion')
+    expect(describePublishRow({ will_suggest: 0, unchanged: 0, no_events: 1 })).toBe('No training in this range')
   })
 })
 

@@ -50,6 +50,9 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   getSession: async () => null,
   saveSessionBlocks: async () => {},
   listFocus: async () => [],

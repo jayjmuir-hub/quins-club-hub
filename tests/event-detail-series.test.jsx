@@ -40,6 +40,9 @@ vi.mock('../src/data/events.js', () => ({
 // vars, so the client constructs happily, the promise never settles, and the
 // card sits in `loading` forever — with an error that names nothing.
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   getSession: (...args) => getSessionMock(...args),
   saveSessionBlocks: async () => {},
   listFocus: async () => [],

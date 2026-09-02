@@ -10,7 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **db(training): TRAINING SUGGESTIONS — the schema and the two RPCs, proven
+- **feat(training): THE DIRECTOR'S SESSION IS A SUGGESTION — the screens.**
+  Part 1 of `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`,
+  second pull request, on top of the schema one (#645). The Publish tab now
+  calls `suggest_training`: the button reads "Suggest to N squads" and the
+  sentence afterwards says how many sessions got the suggestion and how many
+  already had it — "The coaches decide from here." Nothing on that screen
+  writes a plan any more. On the session sheet a coach sees "Suggested by the
+  performance director — hour, N min" with the running order, and either
+  **Accept and adjust** (the server copies the blocks in and stamps
+  `coach_edited_at`; the card reloads and opens the editor on the NEW
+  session) or **Decline…** with an optional one-line reason the director can
+  read. With a plan already there the button is "Replace my plan…" and asks
+  once. A declined one collapses to a grey dated line. The Squad Training
+  shelf lists pending suggestions on upcoming nights with Accept / Decline per
+  row and **Accept all**, and tells the date strip to catch up. A parent's
+  card never asks for the row (`canEdit` gates the fetch; the policy gates
+  the read). Push to the squad's coaches and the director's uptake view are
+  the next piece, built on top of the access-request push once it lands.
+  ⚠️ **Deploy order:** this reads a function the schema PR creates, so the
+  migration is applied before this merges, and the changelog says when.
+- `226b64f` — **db(training): TRAINING SUGGESTIONS — the schema and the two RPCs, proven
   and NOT YET APPLIED.** Part 1 of
   `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`, first
   of two pull requests. `db/migrations/20260902_training_suggestions.sql`: a

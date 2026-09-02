@@ -40,6 +40,9 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 // placeholder Supabase env vars, so the client constructs happily, the promise
 // never settles, and the screen sits in `loading` forever. See src/test/setup.js.
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   listTemplates: (...args) => listTemplatesMock(...args),
   previewPublish: (...args) => previewPublishMock(...args),
   publish: (...args) => publishMock(...args),
@@ -161,10 +164,10 @@ beforeEach(() => {
   listTemplatesMock.mockImplementation(async () => [TAG_HOUR, CONTACT_HOUR])
   listFocusMock.mockImplementation(async () => FOCUS_ROWS)
   previewPublishMock.mockImplementation(async () => [
-    { team_id: 't-u14b', will_write: 3, skipped_coach_edited: 1, no_events: false },
+    { team_id: 't-u14b', will_suggest: 3, unchanged: 1, no_events: false },
   ])
   publishMock.mockImplementation(async () => [
-    { team_id: 't-u14b', will_write: 3, skipped_coach_edited: 1, no_events: false },
+    { team_id: 't-u14b', will_suggest: 3, unchanged: 1, no_events: false },
   ])
   upsertFocusMock.mockImplementation(async (focus) => ({ id: 'focus-new', ...focus }))
   deleteFocusMock.mockImplementation(async (id) => ({ id }))
@@ -248,15 +251,15 @@ describe('TrainingPublish', () => {
 
     const row = await screen.findByTestId('preview-t-u14b')
     expect(within(row).getByText('U14B')).toBeInTheDocument()
-    expect(row).toHaveTextContent('3 sessions will get the plan · 1 kept (coach edited)')
+    expect(row).toHaveTextContent('3 sessions will get the suggestion · 1 already has it')
 
-    await user.click(await screen.findByRole('button', { name: /Publish to 1 squad/ }))
+    await user.click(await screen.findByRole('button', { name: /Suggest to 1 squad/ }))
 
     // The SAME arguments. A publish that quietly re-read the boxes could send
     // something the preview never described.
     await waitFor(() => expect(publishMock).toHaveBeenCalledWith(ARGS))
     expect(
-      await screen.findByText('Published to 1 squad — 3 sessions updated, 1 kept.'),
+      await screen.findByText('Suggested to 1 squad — 3 sessions, 1 already had it. The coaches decide from here.'),
     ).toBeInTheDocument()
   })
 
@@ -269,7 +272,7 @@ describe('TrainingPublish', () => {
     expect(screen.queryByRole('button', { name: /publish to/i })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Preview' }))
-    expect(await screen.findByRole('button', { name: /Publish to 1 squad/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Suggest to 1 squad/ })).toBeInTheDocument()
 
     // ⚠️ AND IT GOES AWAY AGAIN. The rows on screen describe the OLD range, so
     // a Publish button surviving a date change would be offering to do
@@ -288,7 +291,7 @@ describe('TrainingPublish', () => {
     // adult contact plan by an argument list nobody could see. Two things have
     // to hold: the tick is gone, and the argument list is built from the fit.
     previewPublishMock.mockImplementation(async () => [
-      { team_id: 't-u14b', will_write: 2, skipped_coach_edited: 0, no_events: false },
+      { team_id: 't-u14b', will_suggest: 2, unchanged: 0, no_events: false },
     ])
 
     const { user } = renderPublish()
@@ -313,7 +316,7 @@ describe('TrainingPublish', () => {
     await user.click(screen.getByRole('button', { name: 'Preview' }))
 
     // One squad, and it is the one that still fits.
-    expect(await screen.findByRole('button', { name: /Publish to 1 squad/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Suggest to 1 squad/ })).toBeInTheDocument()
     await waitFor(() =>
       expect(previewPublishMock).toHaveBeenCalledWith({
         templateId: CONTACT_HOUR.id,
@@ -329,8 +332,8 @@ describe('TrainingPublish', () => {
     // must not produce a different argument list from ticking U12 Mixed first,
     // or two identical publishes read as different ones in a log.
     previewPublishMock.mockImplementation(async () => [
-      { team_id: 't-u12m', will_write: 1, skipped_coach_edited: 0, no_events: false },
-      { team_id: 't-u14b', will_write: 2, skipped_coach_edited: 0, no_events: false },
+      { team_id: 't-u12m', will_suggest: 1, unchanged: 0, no_events: false },
+      { team_id: 't-u14b', will_suggest: 2, unchanged: 0, no_events: false },
     ])
 
     const { user } = renderPublish()
@@ -349,7 +352,7 @@ describe('TrainingPublish', () => {
         expect.objectContaining({ teamIds: ['t-u12m', 't-u14b'] }),
       ),
     )
-    expect(await screen.findByRole('button', { name: /Publish to 2 squads/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Suggest to 2 squads/ })).toBeInTheDocument()
   })
 
   it('counts the squads that got something, not the rows that came back', async () => {
@@ -357,12 +360,12 @@ describe('TrainingPublish', () => {
     // rows told a director the plan had reached a squad whose sessions were
     // never touched, and that sentence is all they get.
     previewPublishMock.mockImplementation(async () => [
-      { team_id: 't-u12m', will_write: 0, skipped_coach_edited: 0, no_events: true },
-      { team_id: 't-u14b', will_write: 3, skipped_coach_edited: 1, no_events: false },
+      { team_id: 't-u12m', will_suggest: 0, unchanged: 0, no_events: true },
+      { team_id: 't-u14b', will_suggest: 3, unchanged: 1, no_events: false },
     ])
     publishMock.mockImplementation(async () => [
-      { team_id: 't-u12m', will_write: 0, skipped_coach_edited: 0, no_events: true },
-      { team_id: 't-u14b', will_write: 3, skipped_coach_edited: 1, no_events: false },
+      { team_id: 't-u12m', will_suggest: 0, unchanged: 0, no_events: true },
+      { team_id: 't-u14b', will_suggest: 3, unchanged: 1, no_events: false },
     ])
 
     const { user } = renderPublish()
@@ -377,10 +380,10 @@ describe('TrainingPublish', () => {
       'No training in this range',
     )
 
-    await user.click(await screen.findByRole('button', { name: /Publish to 2 squads/ }))
+    await user.click(await screen.findByRole('button', { name: /Suggest to 2 squads/ }))
 
     expect(
-      await screen.findByText('Published to 1 squad — 3 sessions updated, 1 kept.'),
+      await screen.findByText('Suggested to 1 squad — 3 sessions, 1 already had it. The coaches decide from here.'),
     ).toBeInTheDocument()
   })
 

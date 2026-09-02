@@ -81,6 +81,7 @@ import {
   submitDrillToClub,
   approveDrillToClub,
   dismissDrillSubmission,
+  decideSuggestion, getSuggestion,
 } from '../src/data/trainingPlans.js'
 
 beforeEach(() => {
@@ -116,7 +117,7 @@ describe('previewPublish / publish', () => {
     rpcMock.mockResolvedValue({ data: [{ team_id: 'team1', sessions: 4 }], error: null })
 
     const preview = await previewPublish(args)
-    expect(rpcMock).toHaveBeenCalledWith('publish_training', {
+    expect(rpcMock).toHaveBeenCalledWith('suggest_training', {
       _template: 'tpl1',
       _teams: ['team1', 'team2'],
       _from: '2026-09-01',
@@ -128,7 +129,7 @@ describe('previewPublish / publish', () => {
     rpcMock.mockClear()
     await publish(args)
     expect(rpcMock).toHaveBeenCalledWith(
-      'publish_training',
+      'suggest_training',
       expect.objectContaining({ _preview: false }),
     )
   })
@@ -424,5 +425,34 @@ describe('coach scoping and suggestions', () => {
     calls.length = 0
     await dismissDrillSubmission('d1')
     expect(opFor('drills', 'update').args[0]).toEqual({ submitted_at: null })
+  })
+})
+
+describe('suggestions (2 Sep 2026)', () => {
+  it('decideSuggestion calls decide_training_suggestion with the id, the answer and the note', async () => {
+    rpcMock.mockResolvedValue({ data: 's-9', error: null })
+    await expect(decideSuggestion('sg-1', true, null)).resolves.toBe('s-9')
+    expect(rpcMock).toHaveBeenCalledWith('decide_training_suggestion', {
+      _suggestion: 'sg-1',
+      _accept: true,
+      _note: null,
+    })
+    rpcMock.mockClear()
+    rpcMock.mockResolvedValue({ data: null, error: null })
+    await expect(decideSuggestion('sg-1', false, 'did it last week')).resolves.toBeNull()
+    expect(rpcMock).toHaveBeenCalledWith('decide_training_suggestion', {
+      _suggestion: 'sg-1',
+      _accept: false,
+      _note: 'did it last week',
+    })
+  })
+
+  it('decideSuggestion surfaces a refusal as an error', async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { message: 'not staff of this squad' } })
+    await expect(decideSuggestion('sg-1', true, null)).rejects.toThrow(/not staff/)
+  })
+
+  it('getSuggestion returns null for no event and for no row', async () => {
+    await expect(getSuggestion(null)).resolves.toBeNull()
   })
 })

@@ -205,8 +205,16 @@ export async function deleteFocus(id) {
   return must(data, error)
 }
 
+/**
+ * ⚠️ suggest_training, NOT publish_training, since 2 Sep 2026. The director's
+ * template becomes a SUGGESTION beside each session — never the plan. A coach
+ * accepts (the blocks are copied in, the editor takes over) or declines. The
+ * exported names keep the screen's vocabulary ("preview", "publish"); the
+ * rows come back as (team_id, will_suggest, unchanged, no_events).
+ * Plan: claude/plans/2026-09-02-training-suggestions-and-age-guidance.md.
+ */
 async function callPublish({ templateId, teamIds, from, to }, preview) {
-  const { data, error } = await supabase.rpc('publish_training', {
+  const { data, error } = await supabase.rpc('suggest_training', {
     _template: templateId,
     _teams: teamIds,
     _from: from,
@@ -224,6 +232,62 @@ export function previewPublish(args) {
 
 export function publish(args) {
   return callPublish(args, false)
+}
+
+const SUGGESTION_SELECT = `id, event_id, template_id, status, suggested_at, decided_at, decline_note, template:session_templates(id,name,total_minutes,requires_contact,min_age,max_age,blocks:session_template_blocks(id,position,drill_id,minutes,coach_note,${DRILL_EMBED}))`
+
+/**
+ * The director's suggestion for one event, with the template's running order
+ * so the card can show it before the coach decides. RLS: squad staff and the
+ * club's admins only — a parent asking gets null, not an error.
+ */
+export async function getSuggestion(eventId) {
+  if (!eventId) return null
+  const { data, error } = await supabase
+    .from('training_suggestions')
+    .select(SUGGESTION_SELECT)
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  const template = data.template
+    ? { ...data.template, blocks: [...(data.template.blocks ?? [])].sort((a, b) => a.position - b.position) }
+    : null
+  return { ...data, template }
+}
+
+/**
+ * Pending suggestions on a squad's UPCOMING training, oldest first, for the
+ * shelf's "N suggestions from the director" list. A suggestion on a session
+ * that has passed is moot and simply not listed — no job, no deletion.
+ */
+export async function listPendingSuggestions(teamId, { now = new Date() } = {}) {
+  if (!teamId) return []
+  const { data, error } = await supabase
+    .from('training_suggestions')
+    .select('id, event_id, template_id, status, suggested_at, event:events!inner(id,team_id,starts_at,title), template:session_templates(id,name,total_minutes)')
+    .eq('status', 'pending')
+    .eq('event.team_id', teamId)
+    .gte('event.starts_at', now.toISOString())
+  if (error) throw error
+  return [...(data ?? [])].sort((a, b) => String(a.event?.starts_at ?? '').localeCompare(String(b.event?.starts_at ?? '')))
+}
+
+/**
+ * Accept or decline. Accept copies the template's blocks into the session on
+ * the server (creating it if there is none, replacing its blocks if there is)
+ * and stamps coach_edited_at; the returned id is that session's. Decline
+ * keeps the trimmed note, or null. Refused (42501) for anyone who cannot edit
+ * the squad; 22023 if it was already answered.
+ */
+export async function decideSuggestion(suggestionId, accept, note = null) {
+  const { data, error } = await supabase.rpc('decide_training_suggestion', {
+    _suggestion: suggestionId,
+    _accept: Boolean(accept),
+    _note: note ?? null,
+  })
+  if (error) throw new Error(error.message || REFUSED)
+  return data ?? null
 }
 
 /**

@@ -23,6 +23,9 @@ vi.mock('../src/data/events.js', () => ({
   listEvents: (...args) => listEventsMock(...args),
 }))
 vi.mock('../src/data/trainingPlans.js', () => ({
+  getSuggestion: async () => null,
+  listPendingSuggestions: async () => [],
+  decideSuggestion: async () => null,
   listSessionsForEvents: (...args) => listSessionsForEventsMock(...args),
 }))
 vi.mock('../src/lib/memberships.jsx', () => ({

@@ -20,6 +20,8 @@ const toggleDrillFavoriteMock = vi.fn()
 const toggleTemplateLikeMock = vi.fn()
 const toggleTemplateFavoriteMock = vi.fn()
 const publishMock = vi.fn()
+const listPendingSuggestionsMock = vi.fn()
+const decideSuggestionMock = vi.fn()
 
 vi.mock('../src/lib/auth.jsx', () => ({
   useAuth: () => ({ user: { id: 'p-coach' } }),
@@ -31,6 +33,8 @@ vi.mock('../src/data/trainingPlans.js', () => ({
   listDrills: (...args) => listDrillsMock(...args),
   getSession: (...args) => getSessionMock(...args),
   submitTemplateToClub: (...args) => submitTemplateToClubMock(...args),
+  listPendingSuggestions: (...args) => listPendingSuggestionsMock(...args),
+  decideSuggestion: (...args) => decideSuggestionMock(...args),
 }))
 
 vi.mock('../src/data/trainingShelf.js', () => ({
@@ -154,6 +158,8 @@ const CLAMP = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  listPendingSuggestionsMock.mockResolvedValue([])
+  decideSuggestionMock.mockResolvedValue(null)
   listTemplatesMock.mockResolvedValue([TACKLE, PASSING])
   listDrillsMock.mockResolvedValue([CLAMP])
   getSessionMock.mockResolvedValue(null)
@@ -490,5 +496,51 @@ describe('library browse', () => {
     expect(within(coaches).getByTestId('used-this-week')).toHaveTextContent('Used this week · 1')
     expect(within(coaches).queryByRole('slider')).not.toBeInTheDocument()
     expect(within(coaches).queryByRole('spinbutton')).not.toBeInTheDocument()
+  })
+})
+
+describe("the director's suggestions on the shelf", () => {
+  // Since 2 Sep 2026 a publish lands as pending suggestions on the squad's
+  // upcoming training. The shelf lists them, one tap each or Accept all, and
+  // every decision goes to the server; the shelf reloads and tells Squad
+  // Training (onApplied) so the date strip catches up. No card when there are
+  // none — the shelf must not grow an empty labelled block.
+  const ROWS = [
+    { id: 'sg-1', event_id: 'e-tue', status: 'pending', event: { id: 'e-tue', team_id: 't-u18b', starts_at: '2026-09-08T16:00:00.000Z', title: 'Training' }, template: { id: 'tpl-tackle', name: 'Tackle hour', total_minutes: 60 } },
+    { id: 'sg-2', event_id: 'e-thu', status: 'pending', event: { id: 'e-thu', team_id: 't-u18b', starts_at: '2026-09-10T16:00:00.000Z', title: 'Training' }, template: { id: 'tpl-passing', name: 'Passing hour', total_minutes: 60 } },
+  ]
+
+  it('shows nothing when there are none', async () => {
+    showShelf(U18_SQUAD)
+    await screen.findByTestId('tonight-hour')
+    expect(screen.queryByTestId('director-suggestions')).not.toBeInTheDocument()
+  })
+
+  it('lists them with the date and the hour, and Accept all decides every one then reloads', async () => {
+    const user = userEvent.setup()
+    listPendingSuggestionsMock.mockResolvedValueOnce(ROWS).mockResolvedValue([])
+    const onApplied = vi.fn()
+    render(<TrainingShelf team={U18_SQUAD} tonight={TONIGHT} onOpenTonight={vi.fn()} onApplied={onApplied} />)
+    const card = await screen.findByTestId('director-suggestions')
+    expect(card).toHaveTextContent('2 suggestions from the director')
+    expect(card).toHaveTextContent('2026-09-08 · Tackle hour · 60 min')
+    expect(card).toHaveTextContent('2026-09-10 · Passing hour · 60 min')
+
+    await user.click(within(card).getByRole('button', { name: 'Accept all' }))
+    await waitFor(() => expect(decideSuggestionMock).toHaveBeenCalledTimes(2))
+    expect(decideSuggestionMock).toHaveBeenNthCalledWith(1, 'sg-1', true, null)
+    expect(decideSuggestionMock).toHaveBeenNthCalledWith(2, 'sg-2', true, null)
+    expect(onApplied).toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByTestId('director-suggestions')).not.toBeInTheDocument())
+  })
+
+  it('declines one on its own row', async () => {
+    const user = userEvent.setup()
+    listPendingSuggestionsMock.mockResolvedValueOnce(ROWS).mockResolvedValue([ROWS[1]])
+    showShelf(U18_SQUAD)
+    const card = await screen.findByTestId('director-suggestions')
+    await user.click(within(card).getAllByRole('button', { name: 'Decline' })[0])
+    await waitFor(() => expect(decideSuggestionMock).toHaveBeenCalledWith('sg-1', false, null))
+    await waitFor(() => expect(screen.getByTestId('director-suggestions')).toHaveTextContent('1 suggestion from the director'))
   })
 })
