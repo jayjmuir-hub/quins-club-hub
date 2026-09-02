@@ -226,6 +226,18 @@
 --                     insert/delete only profile_id = auth.uid(). No UPDATE.
 --                     Cascading off the drill does not relax ON DELETE
 --                     RESTRICT on session_template_blocks.drill_id.
+--   training_suggestions authenticated ← SELECT ONLY
+--   training_suggestions anon          ← NOTHING AT ALL
+--                     ⚠️ ADDED 2 Sep 2026 (db/migrations/20260902_training_suggestions.sql).
+--                     Birth defaults trimmed like photo_backup_runs: REVOKE ALL
+--                     from public, anon AND authenticated, then GRANT SELECT to
+--                     authenticated. No INSERT/UPDATE/DELETE for anyone but the
+--                     owner — the two SECURITY DEFINER RPCs (suggest_training,
+--                     decide_training_suggestion) are the only writers, so the
+--                     table has a read policy and no write policy at all. RLS:
+--                     staff of the event's squad (can_edit_team) or the club's
+--                     admins (is_admin); never is_attached_to_team, so a parent
+--                     or player never sees a suggestion.
 --   photo_backup_runs postgres, service_role                        ALL 8
 --   photo_backup_runs authenticated    ← SELECT ONLY
 --   photo_backup_runs anon             ← NOTHING AT ALL

@@ -897,6 +897,52 @@ cache — where before this task they were live, callable endpoints (the advisor
 "anon/authenticated can execute via RPC" warning). `accept_invite` remains the one function
 genuinely reachable via RPC, exactly as intended.
 
+## 20260902_training_suggestions — the director's session is a SUGGESTION
+
+**Status line: written 2 Sep 2026, proven in a rolled-back transaction
+against production (16/16, and the key step shown to FAIL against an injected
+fault). Application to production is a separate step — see the changelog.**
+
+**Why a second table and not a status column.** A coach, via Jay: the
+director's published sessions "should be simply noted as a suggestion and the
+coach could accept or decline". `publish_training` wrote the template's blocks
+straight into `training_sessions`, skipping only a session a coach had already
+saved. A status column on the session would still put the suggestion IN the
+plan slot, so an un-edited existing plan is still clobbered — the exact
+complaint. `training_suggestions` is one row per event beside the session;
+nothing the coach has is ever overwritten, and a re-publish has somewhere to
+go.
+
+**Blocks are not copied into the suggestion.** It points at the template.
+Accept copies the template's blocks into the session at that moment. So a
+pending suggestion shows the template as it is now (it is the director's
+until accepted) and an accepted one is a copy the director's later edits
+cannot reach. Both are the honest reading.
+
+**Two RPCs, no write policy.** `suggest_training` (admin, same signature and
+preview switch as `publish_training`, returns `will_suggest / unchanged /
+no_events`) and `decide_training_suggestion` (squad staff via
+`private.can_edit_team`). Accept creates the session if there is none
+(`visibility = 'staff'`), replaces its blocks if there is (the screen asks
+first), stamps `coach_edited_at`, and marks the row accepted. An accepted
+session IS a coach's session; the ordinary editor takes over. The table has a
+read policy only and `authenticated` holds SELECT only.
+
+**The state machine, decided here so the RPC does not nag.** Same template,
+any status → `unchanged`. Different template → back to `pending` with the
+decision columns cleared, whatever the old answer was: a different plan is a
+fresh question. A CHECK (`training_suggestions_decision_shape`) pins that a
+pending row has no decision and a decided row has who and when.
+
+**`publish_training` is left in place on purpose.** The deployed app still
+calls it and reads its return shape; a new name lets this migration and the
+app deploy land in either order. A later migration drops it once nothing on
+main calls it.
+
+**Contact is still refused server-side**, exactly the `publish_training_fit_check`
+rule. Age is not checked here and never was; since `7db98ca` it is guidance in
+the UI.
+
 ## 20260901_message_attachment_list — a message carries a LIST of attachments
 
 **The expand half of expand-then-contract, and the halves must not be merged.**
