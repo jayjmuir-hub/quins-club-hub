@@ -318,6 +318,23 @@ GRANT EXECUTE ON FUNCTION public.accept_invite(uuid) TO service_role;
 -- ⚠️ THAT MIRROR IS NOW BROKEN, DELIBERATELY. private.can_see_team gained
 -- `m.status = 'active'` on 8 Aug (membership_pending_status) and this
 -- function did NOT. See the note on can_see_team below.
+--
+-- ⚠️ CHANGED 2026-09-01 (20260901_calendar_token_fn_all_day.sql), and this was
+-- NOT CAPTURED until this 2 Sep re-capture -- functions.sql had been carrying
+-- the 12 Aug body for three weeks. `join public.teams t` became `left join`,
+-- and the visibility predicate was widened from `(m.role = 'admin' and
+-- m.club_id = t.club_id) or m.team_id = e.team_id` to also match
+-- `(e.team_id is null and m.club_id = e.club_id)` -- a club-wide event
+-- (team_id null) is now visible to any club admin via the club_id match, not
+-- only via the admin-role clause reading through the (now-optional) team.
+--
+-- ⚠️ CHANGED 2026-09-02 (20260902_player_leavers_pending_and_feed.sql): ONE
+-- line added, `and m.status <> 'left'` on the memberships join. A 'left'
+-- family's calendar token previously kept receiving the squad's fixtures
+-- indefinitely -- the join carried no status test of any kind before this.
+-- Deliberately `<> 'left'`, not `= 'active'`: a PENDING parent's feed is a
+-- separate question, it works today, and narrowing it here would be an
+-- unrelated behaviour change smuggled in under a leavers fix.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.calendar_events_for_token(_token uuid)
  RETURNS TABLE(id uuid, type text, title text, opponent text, home boolean, venue text, pitch text, competition text, starts_at timestamp with time zone, ends_at timestamp with time zone, notes text, team_name text, league_team_name text, league_division text, round smallint, time_tbd boolean, competition_type text, info_only boolean, all_day boolean)
@@ -330,16 +347,18 @@ AS $function$
          lt.rcm_name as league_team_name, lt.division as league_division, e.round,
          e.time_tbd, e.competition_type, e.info_only, e.all_day
   from public.events e
-  join public.teams t on t.id = e.team_id
+  left join public.teams t on t.id = e.team_id
   left join public.league_teams lt on lt.id = e.league_team_id
   where exists (
     select 1
     from public.calendar_tokens ct
     join public.memberships m on m.profile_id = ct.profile_id
     where ct.token = _token
+      and m.status <> 'left'
       and (
-        (m.role = 'admin' and m.club_id = t.club_id)
+        (m.role = 'admin' and m.club_id = e.club_id)
         or m.team_id = e.team_id
+        or (e.team_id is null and m.club_id = e.club_id)
       )
   )
   and e.starts_at > now() - interval '6 months'
@@ -2069,6 +2088,18 @@ GRANT EXECUTE ON FUNCTION public.register_my_player(text, uuid, text, boolean) T
 -- The migration carries a guard asserting `memb manage` is still exactly
 -- `private.is_admin(club_id)` — this RPC is pointless the moment coaches can
 -- UPDATE the table directly.
+--
+-- ⚠️ CHANGED 2026-09-02 (20260902_player_leavers_pending_and_feed.sql): one
+-- guard added, after private.can_approve_team so the message cannot leak
+-- anything about the child to a caller not entitled to approve for this
+-- squad at all. mark_player_left deliberately leaves a pending request
+-- pending rather than flipping it to 'left', which closes the promotion
+-- route through restore_player but leaves the request itself sitting in the
+-- approvals queue for a child who has quit — approving it would hand the
+-- family full squad access. Refused with errcode 22023 while players.left_at
+-- is not null for target.player_id; restoring the player clears left_at and
+-- the request becomes approvable again. A membership with a null player_id
+-- (staff, admins) is unaffected — the exists() cannot match.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.approve_membership(p_membership_id uuid)
  RETURNS memberships
@@ -2082,26 +2113,29 @@ begin
   if auth.uid() is null then
     raise exception 'You must be signed in.' using errcode = '42501';
   end if;
-
   select * into target from public.memberships where id = p_membership_id;
   if target.id is null then
     raise exception 'That registration no longer exists.' using errcode = '42704';
   end if;
-
   if not private.can_approve_team(target.team_id) then
     raise exception 'You can only approve players for your own age groups.'
       using errcode = '42501';
   end if;
-
+  if exists (
+    select 1 from public.players p
+     where p.id = target.player_id
+       and p.left_at is not null
+  ) then
+    raise exception 'That player has left the squad. Restore them first if they are back.'
+      using errcode = '22023';
+  end if;
   if target.status = 'active' then
     return target;
   end if;
-
   update public.memberships
      set status = 'active'
    where id = p_membership_id
   returning * into target;
-
   return target;
 end;
 $function$
@@ -7545,8 +7579,22 @@ REVOKE ALL ON FUNCTION public.document_push_subscriptions(uuid) FROM authenticat
 -- the photo columns on the row -- the storage OBJECT itself is removed by the
 -- app afterwards via the Storage API (RESTORE.md: SQL cannot delete a storage
 -- object). Every membership row for that player with role in
--- ('parent','player') moves from 'active'/'pending' to 'left'. Refuses if
--- already left.
+-- ('parent','player') moves from 'active' to 'left'. Refuses if already left.
+--
+-- ⚠️ CHANGED 2026-09-02 (20260902_player_leavers_pending_and_feed.sql), four
+-- ways, reversible body quoted in full in that migration:
+--   (a) `for update` on the players read, closing a race between two
+--       concurrent calls.
+--   (b) the "no longer exists" branch is now GATED behind
+--       private.can_write_child() -- a caller with no write access at all
+--       gets the generic 42501 instead of an oracle for whether the uuid
+--       names a real player.
+--   (c) the memberships update is now `and m.status = 'active'`, NOT
+--       `in ('active','pending')` -- a pending row is never flipped to
+--       'left', so restore_player's blanket 'left' → 'active' can no longer
+--       promote a request that was never approved.
+--   (d) that player's FUTURE availability and lineup_players rows (joined
+--       through lineups) are deleted; past rows are history and stay.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.mark_player_left(p_player_id uuid)
  RETURNS TABLE(id uuid, photo_path text)
@@ -7557,9 +7605,12 @@ AS $function$
 declare
   ply public.players%rowtype;
 begin
-  select * into ply from public.players p where p.id = p_player_id;
+  select * into ply from public.players p where p.id = p_player_id for update;
   if ply.id is null then
-    raise exception 'That player no longer exists.' using errcode = '22023';
+    if private.can_write_child() then
+      raise exception 'That player no longer exists.' using errcode = '22023';
+    end if;
+    raise exception 'You are not allowed to change this player.' using errcode = '42501';
   end if;
   if not (private.can_write_child() or private.is_team_staff(ply.team_id)) then
     raise exception 'You are not allowed to change this player.' using errcode = '42501';
@@ -7567,18 +7618,26 @@ begin
   if ply.left_at is not null then
     raise exception 'This player has already been marked as left.' using errcode = '22023';
   end if;
-
   update public.players p
      set left_at = now(), left_by = auth.uid(),
          photo_path = null, photo_focus_x = null, photo_focus_y = null
    where p.id = p_player_id;
-
   update public.memberships m
      set status = 'left'
    where m.player_id = p_player_id
      and m.role in ('parent','player')
-     and m.status in ('active','pending');
-
+     and m.status = 'active';
+  delete from public.availability a
+   using public.events e
+   where e.id = a.event_id
+     and a.player_id = p_player_id
+     and e.starts_at > now();
+  delete from public.lineup_players lp
+   using public.lineups l, public.events e
+   where l.id = lp.lineup_id
+     and e.id = l.event_id
+     and lp.player_id = p_player_id
+     and e.starts_at > now();
   return query select ply.id, ply.photo_path;
 end $function$
 ;
@@ -7594,6 +7653,14 @@ GRANT EXECUTE ON FUNCTION public.mark_player_left(uuid) TO authenticated;
 -- left_at/left_by and flips that child's 'left' memberships back to
 -- 'active' -- the family has its squad access back the moment this
 -- returns. Refuses if the player is not currently a leaver.
+--
+-- ⚠️ CHANGED 2026-09-02 (20260902_player_leavers_pending_and_feed.sql): the
+-- same two edits as mark_player_left's (a) and (b) above -- `for update` on
+-- the players read, and the "no longer exists" branch gated behind
+-- private.can_write_child(). The memberships update is UNCHANGED and stays a
+-- blanket 'left' → 'active'; that is correct only because mark_player_left no
+-- longer produces a 'left' row from a 'pending' one, so the two edits belong
+-- together across both functions.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.restore_player(p_player_id uuid)
  RETURNS players
@@ -7604,9 +7671,12 @@ AS $function$
 declare
   ply public.players%rowtype;
 begin
-  select * into ply from public.players p where p.id = p_player_id;
+  select * into ply from public.players p where p.id = p_player_id for update;
   if ply.id is null then
-    raise exception 'That player no longer exists.' using errcode = '22023';
+    if private.can_write_child() then
+      raise exception 'That player no longer exists.' using errcode = '22023';
+    end if;
+    raise exception 'You are not allowed to change this player.' using errcode = '42501';
   end if;
   if not (private.can_write_child() or private.is_team_staff(ply.team_id)) then
     raise exception 'You are not allowed to change this player.' using errcode = '42501';
@@ -7614,11 +7684,9 @@ begin
   if ply.left_at is null then
     raise exception 'This player has not been marked as left.' using errcode = '22023';
   end if;
-
   update public.players p set left_at = null, left_by = null where p.id = p_player_id;
   update public.memberships m set status = 'active'
    where m.player_id = p_player_id and m.role in ('parent','player') and m.status = 'left';
-
   select * into ply from public.players p where p.id = p_player_id;
   return ply;
 end $function$
