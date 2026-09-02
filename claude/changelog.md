@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(ui): the event form gets a wide sheet on desktop.** The last
+- **fix(ux): the Low findings from the full review, first two batches.**
+  Sign-in: "session expired" is now plain words; the email and password
+  fields freeze while "Please wait…" shows; the sign-in / create-account
+  strip is a group of pressed toggles, not a tablist with no tab
+  behaviour, named "Show sign in" / "Show create account". Phone number: the
+  "doesn't look valid" warning waits for the field to be left. iPad: the
+  install copy says the Share button is at the top there. Sign-up: the
+  password checklist is announced as it changes, like reset. Chat: the list
+  filter chips reach 44px; the reaction trigger and the floating dock's
+  three header buttons get 44px hit areas; poll option fields carry a label.
+  Team sheet: the view strip is pressed toggles; the drag handle is hidden
+  from assistive tech (the "Give shirt N to…" buttons were always the
+  keyboard route). Time picker opens on click or ArrowDown, not on focus.
+  Game Time remembers the squad. Youth dashboard says what an empty list
+  means. Notices and Documents filter chips carry `aria-pressed`. The
+  Accounts editor's chat error is an alert. Notice composer says why Post
+  is disabled. Repeat-until links and the View-as exit button reach 44px.
+  Settings hash-scroll still corrects across the settle window (Jay,
+  29 Aug) but stops the moment the person scrolls. ⚠️ **Deferred:**
+  DatePicker day labels as spoken dates — 40 assertions across four suites
+  select days by the ISO name and need moving to a data attribute first.
+- `dfb38ad` — **feat(ui): the event form gets a wide sheet on desktop.** The last
   desktop finding of the 2 Sep 2026 UX review: about twenty fields in one
   column inside a 520px keyhole. `Sheet` takes `size="wide"` —
   `min(760px, 94vw)` on desktop, unchanged on a phone — and both of the

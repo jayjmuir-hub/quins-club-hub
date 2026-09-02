@@ -120,7 +120,7 @@ export default function InstallPrompt() {
             // Chrome needs to know why they cannot find it.
             <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
               In <strong className="font-semibold text-ink">Safari</strong>, tap the Share button
-              at the bottom of the screen, then choose{' '}
+              (at the bottom of the screen on an iPhone, at the top on an iPad), then choose{' '}
               <strong className="font-semibold text-ink">Add to Home Screen</strong>. It then opens
               like an app, with no address bar.
             </p>

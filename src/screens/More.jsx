@@ -377,10 +377,21 @@ export default function More() {
     }
     // Spread across ~1.7s: Your players in particular renders nothing until its
     // read returns, and on a pitch-side connection that is the slow one.
+    // ⚠️ BUT NEVER AGAINST THE PERSON (2 Sep 2026 UX review, Low): the later
+    // corrections used to snap back somebody who had already started
+    // scrolling. The first sign of their own scroll intent — a wheel, a
+    // touch, an arrow key — ends the series. Jay's 29 Aug ruling that ONE
+    // scroll leaves you high on a page still settling is untouched.
     const timers = [0, 200, 500, 1000, 1700].map((ms, i) => setTimeout(() => scroll(i === 0), ms))
-    return () => {
+    const stop = () => {
       cancelled = true
       timers.forEach(clearTimeout)
+    }
+    const intent = ['wheel', 'touchstart', 'keydown']
+    intent.forEach((type) => window.addEventListener(type, stop, { passive: true }))
+    return () => {
+      stop()
+      intent.forEach((type) => window.removeEventListener(type, stop))
     }
   }, [hash])
 

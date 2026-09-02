@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { COUNTRIES, dialCodeFor, isValidPhone } from '../lib/phone.js'
 
 // A phone field: country picker (flag + dial code) beside a number box.
@@ -47,7 +47,11 @@ export default function PhoneInput({
   const dial = dialCodeFor(country)
   // A warning, never a block (see joinPhone): an unrecognised number still
   // saves. This only tells the user their typo is probably a typo.
-  const looksWrong = !isValidPhone(country, national)
+  // ⚠️ SHOWN AFTER THE FIELD IS LEFT, NOT ON THE FIRST DIGIT (2 Sep 2026 UX
+  // review, parents, Low): a red warning used to fire while a parent was
+  // still typing, on every number that was merely incomplete.
+  const [left, setLeft] = useState(false)
+  const looksWrong = left && !isValidPhone(country, national)
 
   return (
     <div>
@@ -122,6 +126,7 @@ export default function PhoneInput({
           value={national ?? ''}
           disabled={disabled}
           onChange={(event) => onNationalChange?.(event.target.value)}
+          onBlur={() => setLeft(true)}
         />
       </div>
 

@@ -331,6 +331,7 @@ export default function Notices() {
         <div className="mb-3 flex flex-wrap gap-2">
           <button
             type="button"
+            aria-pressed={filter === ALL}
             onClick={() => setFilter(ALL)}
             className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
               filter === ALL
@@ -344,6 +345,7 @@ export default function Notices() {
             <button
               key={team.id}
               type="button"
+              aria-pressed={filter === team.id}
               onClick={() => setFilter(team.id)}
               className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
                 filter === team.id

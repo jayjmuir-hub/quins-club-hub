@@ -88,7 +88,7 @@ export function ReactionTrigger({ messageId, reactions = [], selfId, onToggle, a
         aria-label="Add reaction"
         aria-expanded={picking}
         onClick={toggle}
-        className="grid h-6 w-6 place-items-center rounded-pill border border-line bg-surface-card text-ink-faint hover:text-ink"
+        className="relative grid h-6 w-6 place-items-center rounded-pill border border-line bg-surface-card text-ink-faint hover:text-ink before:absolute before:-inset-2.5 before:content-['']"
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
           <circle cx="12" cy="12" r="9" />

@@ -284,6 +284,7 @@ export default function Documents() {
 
       <div className="mb-3 flex flex-wrap gap-2">
         <button
+          aria-pressed={category === ALL}
           type="button"
           onClick={() => setCategory(ALL)}
           className={`rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
@@ -296,6 +297,7 @@ export default function Documents() {
         </button>
         {DOCUMENT_CATEGORIES.map((cat) => (
           <button
+            aria-pressed={category === cat.key}
             key={cat.key}
             type="button"
             onClick={() => setCategory(cat.key)}

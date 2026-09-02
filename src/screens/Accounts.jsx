@@ -878,7 +878,7 @@ function EditorContactRow({ group }) {
         )}
       </div>
       {chatError && (
-        <p className="mt-2 text-sm font-semibold text-danger" data-testid="editor-chat-error">
+        <p role="alert" className="mt-2 text-sm font-semibold text-danger-ink" data-testid="editor-chat-error">
           {chatError}
         </p>
       )}

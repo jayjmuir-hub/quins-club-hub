@@ -223,7 +223,16 @@ export default function YouthDashboard() {
 
       {shown.length === 0 ? (
         <Card>
-          <Empty message="Nothing here." />
+          {/* Say what the empty list MEANS (2 Sep 2026 UX review, Low): an
+              empty Overdue list is good news, not nothing. */}
+          <Empty
+            message={
+              filter === 'overdue' ? 'Nothing overdue — every sheet is in on time.'
+              : filter === 'todo' ? 'No match is waiting for a sheet.'
+              : filter === 'done' ? 'No sheet is marked ready to send yet.'
+              : 'No matches in this window.'
+            }
+          />
         </Card>
       ) : (
         <Card className="overflow-hidden">

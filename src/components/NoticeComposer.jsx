@@ -248,6 +248,11 @@ export default function NoticeComposer({ open, onClose, teams, clubWide, onPoste
           Pin it to the home screen
         </label>
 
+        {!saving && (nothingChosen || !title.trim() || !body.trim()) && (
+          <p className="mt-3 text-[12.5px] text-ink-muted" data-testid="post-hint">
+            {nothingChosen ? 'Pick who this is for to post it.' : !title.trim() ? 'Add a title to post it.' : 'Add the notice itself to post it.'}
+          </p>
+        )}
         <div className="mt-4 flex items-center gap-3">
           <Button type="submit" disabled={saving || nothingChosen || !title.trim() || !body.trim()}>
             {saving ? 'Posting…' : 'Post'}

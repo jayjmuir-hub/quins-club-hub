@@ -136,7 +136,7 @@ export default function RepeatUntilField({ startDate, value, onChange }) {
           <button
             type="button"
             onClick={goToDateMode}
-            className="ml-1 text-[13px] font-bold text-brand-ink underline"
+            className="ml-1 min-h-[44px] px-2 text-[13px] font-bold text-brand-ink underline"
           >
             or pick an end date
           </button>

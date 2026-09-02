@@ -42,7 +42,25 @@ export default function GameTime() {
     [memberships, teams],
   )
 
-  const [teamId, setTeamId] = useState(null)
+  // ⚠️ REMEMBERED, like the roster's filter (2 Sep 2026 UX review, Low):
+  // a reload used to snap back to the first squad. Same key discipline as
+  // Roster — read once, written on change, a missing store is a session.
+  const [teamId, setTeamIdState] = useState(() => {
+    try {
+      return window.localStorage.getItem('game-time:team') || null
+    } catch {
+      return null
+    }
+  })
+  const setTeamId = (next) => {
+    setTeamIdState(next)
+    try {
+      if (next) window.localStorage.setItem('game-time:team', next)
+      else window.localStorage.removeItem('game-time:team')
+    } catch {
+      // Private mode: the choice lasts the session.
+    }
+  }
   const chosen = editable.some((team) => team.id === teamId) ? teamId : editable[0]?.id ?? null
 
   const [players, setPlayers] = useState([])

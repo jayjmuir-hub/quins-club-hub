@@ -184,7 +184,7 @@ export function friendlyAuthError(error, fallback) {
 // people to the login screen mid-task with no explanation whatsoever — the
 // outcome was right and the experience read as the app breaking.
 const SESSION_EXPIRED_MESSAGE =
-  'You were signed out because your session expired. Sign in again and carry on where you left off.'
+  "You'd been signed in a while, so we signed you out to keep things safe. Sign in again and carry on where you left off."
 
 const FIELD =
   'w-full rounded-[11px] border-[1.5px] border-line px-3 py-2.5 text-base text-ink focus:border-brand'
@@ -518,9 +518,13 @@ export default function Login({ authError = null, embedded = false }) {
       {panel ?? (
         <>
           {/* Tab strip. Hidden when embedded — see the note on the component. */}
+          {/* ⚠️ A GROUP OF PRESSED TOGGLES, NOT A TABLIST (2 Sep 2026 UX
+              review, Low): the old role="tablist" promised arrow-key
+              navigation and tab panels it never had. aria-pressed says
+              exactly what these are. */}
           {!embedded && !forgotting && (
             <div
-              role="tablist"
+              role="group"
               aria-label="Sign in or create an account"
               className="mt-6 grid grid-cols-2 gap-1 rounded-[11px] bg-surface-sunk p-1"
             >
@@ -531,8 +535,10 @@ export default function Login({ authError = null, embedded = false }) {
                 <button
                   key={value}
                   type="button"
-                  role="tab"
-                  aria-selected={mode === value}
+                  aria-pressed={mode === value}
+                  // "Show sign in" / "Show create account": the visible word
+                  // alone would collide with the submit button's own name.
+                  aria-label={`Show ${label.toLowerCase()}`}
                   onClick={() => switchMode(value)}
                   className={
                     'rounded-[8px] px-3 py-2 text-sm font-bold transition ' +
@@ -590,6 +596,7 @@ export default function Login({ authError = null, embedded = false }) {
             </label>
             <input
               id="login-email"
+              disabled={busy}
               name="email"
               type="email"
               required
@@ -616,6 +623,7 @@ export default function Login({ authError = null, embedded = false }) {
                 </div>
                 <input
                   id="login-password"
+                  disabled={busy}
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   required

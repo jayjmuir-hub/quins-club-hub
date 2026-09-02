@@ -347,7 +347,7 @@ export default function ChatList() {
             type="button"
             aria-pressed={filter === chip.key}
             onClick={() => setSearchParams(chip.key ? { filter: chip.key } : {}, { replace: true })}
-            className={`rounded-pill px-3 py-1 text-[12.5px] font-bold ${
+            className={`min-h-[44px] rounded-pill px-3 py-1 text-[12.5px] font-bold ${
               filter === chip.key
                 ? 'bg-chrome text-white'
                 : 'border border-line bg-surface-card text-ink-muted hover:text-ink'

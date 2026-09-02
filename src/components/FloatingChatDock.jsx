@@ -275,7 +275,7 @@ export default function FloatingChatDock({ badge = false }) {
               the contrast gate. */}
           <div className="flex items-center gap-2.5 bg-accent-deep py-2.5 pl-9 pr-3.5 text-white">
             {active ? (
-              <button type="button" aria-label="Back to chats" onClick={() => { setActive(null); setError(null); pendingQuoteRef.current = null }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
+              <button type="button" aria-label="Back to chats" onClick={() => { setActive(null); setError(null); pendingQuoteRef.current = null }} className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10 before:absolute before:-inset-1.5 before:content-['']">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
               </button>
             ) : null}
@@ -283,10 +283,10 @@ export default function FloatingChatDock({ badge = false }) {
               <p className="truncate text-[14px] font-bold">{active ? active.label : 'Chats'}</p>
               {active && <p className="truncate text-[11px] text-white/70">{active.detail}</p>}
             </div>
-            <button type="button" aria-label="Open full view" onClick={expand} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
+            <button type="button" aria-label="Open full view" onClick={expand} className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10 before:absolute before:-inset-1.5 before:content-['']">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" /></svg>
             </button>
-            <button type="button" aria-label="Close chat" onClick={() => setOpen(false)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10">
+            <button type="button" aria-label="Close chat" onClick={() => setOpen(false)} className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full hover:bg-white/10 before:absolute before:-inset-1.5 before:content-['']">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
             </button>
           </div>
