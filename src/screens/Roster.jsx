@@ -17,6 +17,7 @@ import PlayerForm from './PlayerForm.jsx'
 import MyPlayerForm from './MyPlayerForm.jsx'
 import PlayerImport from './PlayerImport.jsx'
 import { listPlayers, listPlayerPrivate } from '../data/players.js'
+import { isLeaver } from '../lib/leavers.js'
 // The club's own age function, so a number on the roster cannot drift from the
 // one that decides which squad a child belongs in.
 import { ageAt } from '../lib/ageGrade.js'
@@ -238,6 +239,11 @@ export default function Roster() {
   const [importing, setImporting] = useState(false)
 
   const [players, setPlayers] = useState([])
+  // Staff-only: departed squad members, held apart from `players` so they
+  // never enter a count, filter, search result, selection list or
+  // `tableGroups` — see the load effect below and the render block near the
+  // bottom of this component.
+  const [leavers, setLeavers] = useState([])
   // path -> signed URL for every photo in the loaded squad(s). Signed in ONE
   // call rather than per row: a 30-player squad would otherwise issue 30
   // sequential signing requests before the first face appeared.
@@ -272,29 +278,6 @@ export default function Roster() {
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
 
-  useEffect(() => {
-    let mounted = true
-    setLoading(true)
-    setError(null)
-
-    listPlayers({ teamIds })
-      .then((rows) => {
-        if (mounted) setPlayers(rows)
-      })
-      .catch((err) => {
-        if (!mounted) return
-        setError(err)
-        setPlayers([])
-      })
-      .finally(() => {
-        if (mounted) setLoading(false)
-      })
-
-    return () => {
-      mounted = false
-    }
-  }, [teamIds, reloadToken])
-
   // Only a load with nothing on screen replaces the content with a spinner.
   // There is no realtime subscription on players today, so this and `loading`
   // currently coincide — but keeping the distinction means adding one later
@@ -313,6 +296,35 @@ export default function Roster() {
   // open the add sheet; which squads they may write to is canEditTeam's call.
   const canEditAnything =
     admin || memberships.some((membership) => isActiveMembership(membership) && isSquadStaffRole(membership.role))
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    setError(null)
+
+    // ⚠️ LEAVERS ARE REQUESTED ONLY FOR STAFF. A parent's query never asks for
+    // them, so a departed child's name never crosses the wire to a family that
+    // has no business seeing it. Spec §4/§5.
+    listPlayers({ teamIds, includeLeft: canEditAnything })
+      .then((rows) => {
+        if (!mounted) return
+        setPlayers(rows.filter((row) => !isLeaver(row)))
+        setLeavers(canEditAnything ? rows.filter(isLeaver) : [])
+      })
+      .catch((err) => {
+        if (!mounted) return
+        setError(err)
+        setPlayers([])
+        setLeavers([])
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [teamIds, reloadToken, canEditAnything])
 
   // The sidebar's Roster sub-menu deep-links: /roster?open=add-player and
   // /roster?open=import (22 Aug 2026). Same consume-and-clear contract as
@@ -626,7 +638,11 @@ export default function Roster() {
   // Derive the open player from the live list rather than storing the row
   // itself, so the sheet's contents stay in step with a reload and a removed
   // player closes it instead of stranding a stale copy on screen.
-  const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null
+  // Search both lists: a leaver is not in `players` (see the load effect
+  // above) but still has to open in the detail sheet, read-only, for a
+  // Restore. Task 5/spec §4.
+  const selectedPlayer =
+    [...players, ...leavers].find((player) => player.id === selectedPlayerId) ?? null
 
   // Applies an inline edit to the loaded list without refetching. Used for
   // both halves of an optimistic write: the table calls it with the new value
@@ -968,6 +984,32 @@ export default function Roster() {
             onSelect={setSelectedPlayerId}
           />
         ))}
+
+      {/* Staff-only, collapsed by default, and only present at all once
+          somebody has left — a coach opening the roster on a normal day sees
+          nothing new. Never desktop/mobile-gated like the two blocks above:
+          it renders in both table and card layouts, always at the bottom.
+          Self-review: leavers never enter `scopedPlayers`, `visible`,
+          `tableGroups`, `missingGender` or `agePlayerIds` — they live only in
+          `leavers`, so none of those counts or lists is touched by this. */}
+      {canEditAnything && !isFirstLoad && !error && leavers.length > 0 && (
+        <details className="mt-6" role="group" aria-label={`Left the squad (${leavers.length})`}>
+          <summary className="cursor-pointer text-[12.5px] font-extrabold uppercase tracking-[.5px] text-ink-muted">
+            Left the squad ({leavers.length})
+          </summary>
+          <div className="mt-2">
+            <RosterGroup
+              label="Left the squad"
+              players={leavers}
+              teamsById={teamsById}
+              photoUrls={photoUrls}
+              ageByPlayer={ageByPlayer}
+              showPosition={false}
+              onSelect={setSelectedPlayerId}
+            />
+          </div>
+        </details>
+      )}
 
       {selectedPlayer && !formState && (
         <PlayerDetail

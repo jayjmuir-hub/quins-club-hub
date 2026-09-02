@@ -302,3 +302,41 @@ describe('the gender gap nudges, and the nudge is clickable', () => {
     expect(screen.queryByRole('button', { name: /no gender recorded/i })).not.toBeInTheDocument()
   })
 })
+
+describe('Left the squad', () => {
+  const LEAVER = { id: 'p-left', team_id: 'team-u16b', full_name: 'Rafiq Delacroix-Obi', left_at: '2026-09-02T08:00:00Z' }
+
+  it('a coach loads leavers, sees a collapsed group at the bottom, and it is not counted', async () => {
+    listPlayersMock.mockResolvedValue([...SQUAD, LEAVER])
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    expect(listPlayersMock).toHaveBeenCalledWith(expect.objectContaining({ includeLeft: true }))
+    const group = await screen.findByRole('group', { name: /left the squad/i })
+    expect(within(group).getByText('Rafiq Delacroix-Obi')).toBeInTheDocument()
+    // Not in the working roster, not in the count
+    const labels = screen.getAllByTestId('group-label').map((el) => el.textContent)
+    expect(labels[labels.length - 1]).toMatch(/left the squad/i)
+    expect(screen.getByText(new RegExp(`${SQUAD.length} players`))).toBeInTheDocument()
+  })
+
+  it('a parent never loads leavers and never sees the group', async () => {
+    useMembershipsMock.mockReturnValue({ memberships: PARENT, teams: [U16B] })
+    listPlayersMock.mockResolvedValue(SQUAD)
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    expect(listPlayersMock).not.toHaveBeenCalledWith(expect.objectContaining({ includeLeft: true }))
+    expect(screen.queryByRole('group', { name: /left the squad/i })).toBeNull()
+  })
+
+  it('a leaver is excluded from search results', async () => {
+    listPlayersMock.mockResolvedValue([...SQUAD, LEAVER])
+    const user = userEvent.setup()
+    render(<MemoryRouter><Roster /></MemoryRouter>)
+    await screen.findByTestId('roster-table')
+
+    await user.type(screen.getByRole('searchbox'), 'Rafiq')
+    expect(screen.getByText(/no players match/i)).toBeInTheDocument()
+  })
+})
