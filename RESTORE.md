@@ -504,10 +504,15 @@ neither knows nor cares.
 tries-only band runs to **11 inclusive**; the match sheet and the league start
 **at 11**.
 
-**The club does not use jersey numbers.** `players.jersey_num` stays in the schema (nullable,
-harmless, available if a senior side ever wants it) but nothing in the UI reads it. Roster rows
-and the PlayerDetail hero show initials instead, via `src/lib/playerFormat.js`. Never add a
-jersey field to the event/player forms.
+**The August ruling above is narrowed, not reversed, since 2 Sep 2026.** Youth squads still do
+not use jersey numbers: `players.jersey_num` stays null for them and the roster and the
+PlayerDetail hero still show initials, via `src/lib/playerFormat.js`. Never add a jersey field
+to a youth squad's event/player forms. But a squad with `teams.uses_jersey_numbers = true` does
+use them — `jersey_num` there is the player's SEASON number in their HOME squad (unique 1–99
+per squad, two squads may both have a 9), shown on the roster tile in place of initials when
+there is no photo, and sortable, searchable and staff-editable there. `claude/plans/2026-09-02-senior-squads.md` is the
+tombstone over the original ruling and `claude/plans/2026-09-02-senior-squads-2a-implementation.md`
+is what built the narrower one.
 
 **A player who has quit is marked LEFT, never deleted.** `players.left_at` non-null is a
 leaver; `left_at IS NULL` means current. `mark_player_left`/`restore_player`

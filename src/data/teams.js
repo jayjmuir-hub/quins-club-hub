@@ -124,3 +124,63 @@ export async function setTeamDefaultFormat(teamId, format) {
   if (!data) throw new Error(REFUSED_FORMAT)
   return data
 }
+
+// ⚠️ ITS OWN MESSAGE, like the three above and for the same reason.
+const REFUSED_JERSEY =
+  "We couldn't save that. Only a club admin can change whether a squad uses jersey numbers."
+
+/**
+ * Marks a squad as using season jersey numbers (true) or not (false).
+ *
+ * ⚠️ MIRRORS setTeamRequiresContact EXACTLY, and for the same reasons: a
+ * column, never derived from the squad's name or from `is_senior` (see
+ * claude/plans/2026-09-02-senior-squads-2a-implementation.md Global
+ * Constraints); the NOT NULL column takes `=== true` rather than the raw
+ * argument, so an undefined/absent value lands as false instead of a null
+ * the database would reject; and it throws when RLS filters the write to
+ * zero rows (`data === null && error === null` — a perfectly successful
+ * nothing), rather than reporting a save that never happened.
+ */
+export async function setTeamUsesJerseyNumbers(teamId, value) {
+  if (!teamId) throw new Error(REFUSED_JERSEY)
+
+  const { data, error } = await supabase
+    .from('teams')
+    .update({ uses_jersey_numbers: value === true })
+    .eq('id', teamId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw new Error(error.message || REFUSED_JERSEY)
+  if (!data) throw new Error(REFUSED_JERSEY)
+  return data
+}
+
+const REFUSED_CREATE = 'Only a club admin can add a squad.'
+
+/**
+ * Creates a new squad via the `create_team` RPC and returns the new row.
+ *
+ * ⚠️ AN RPC, NOT A DIRECT INSERT — unlike every writer above, which updates
+ * an existing row and relies on RLS filtering an unauthorised write to zero
+ * rows, `create_team` is admin-gated INSIDE the function
+ * (db/migrations/20260903_senior_squads_2a.sql) and raises a real Postgres
+ * error for a non-admin rather than silently inserting nothing. `42501` is
+ * that refusal, translated into a sentence; any other error (including
+ * `22023`, an invalid value the function itself rejects) is rethrown with
+ * its own message, since only the function knows what was actually wrong.
+ */
+export async function createTeam({ name, isSenior, usesJerseyNumbers, selfRegistrationAllowed }) {
+  const { data, error } = await supabase.rpc('create_team', {
+    p_name: name,
+    p_is_senior: isSenior === true,
+    p_uses_jersey_numbers: usesJerseyNumbers === true,
+    p_self_registration_allowed: selfRegistrationAllowed === true,
+  })
+
+  if (error) {
+    if (error.code === '42501') throw new Error(REFUSED_CREATE)
+    throw new Error(error.message)
+  }
+  return data
+}

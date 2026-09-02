@@ -5,17 +5,24 @@ import PlayerAvatar from './PlayerAvatar.jsx'
 import Button from './Button.jsx'
 import { POSITIONS_BY_UNIT } from '../lib/positions.js'
 import { GENDERS } from '../lib/gender.js'
-import { upsertPlayer } from '../data/players.js'
+import { upsertPlayer, setPlayerJerseyNumber } from '../data/players.js'
+import { isJerseyNumber, parseJerseyInput } from '../lib/jersey.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The desktop roster table (desktop-spec.md §5.1). Rendered INSTEAD of the
 // mobile card list, not alongside it — see src/lib/useMediaQuery.js for why
 // that switch is made in JS rather than with a `desktop:` class.
 //
-// Five columns are editable in place: forward-or-back, position, gender, age
-// group and captain. Those are the fields that change during a season; everything else
-// still goes through PlayerForm, which is where validation, contacts and the
-// two-table save sequence already live. There is deliberately no jersey
-// column — the club does not use squad numbers (src/lib/playerFormat.js).
+// Six columns are editable in place: jersey number, forward-or-back, position,
+// gender, age group and captain. Those are the fields that change during a
+// season; everything else still goes through PlayerForm, which is where
+// validation, contacts and the two-table save sequence already live.
+//
+// ⚠️ THE JERSEY COLUMN ("No.") EXISTS ONLY WHERE A SQUAD USES NUMBERS
+// (senior squads 2a, task 5, `teams.uses_jersey_numbers`) — most of the club
+// still does not, src/lib/playerFormat.js, and for those squads this table
+// renders byte-for-byte as before: Roster.jsx adds `jersey_num` to
+// `hiddenColumns` whenever the squad in view does not use them.
 //
 // Gender was added here as well as to the form (7 Aug 2026) because it is the
 // one field the club has to fill in for ~300 existing players from scratch,
@@ -47,6 +54,11 @@ const UNIT_LABEL = { forward: 'Forward', back: 'Back' }
 
 const SORTABLE = [
   { key: 'full_name', label: 'Name' },
+  // ⚠️ SENIOR SQUADS 2a — right after Name, where a printed team sheet puts
+  // it. Gated out of existence (not just hidden) by `hiddenColumns` whenever
+  // the squad in view does not use jersey numbers — see the comment in
+  // Roster.jsx that builds that set.
+  { key: 'jersey_num', label: 'No.' },
   // Forward-or-back sits BEFORE position because it is the coarser question
   // and the one a coach can answer for a whole squad in one pass. Jay, 2 Sep
   // 2026, on a U16 roster where 30 of 37 sat under "Other": "there should be
@@ -71,6 +83,18 @@ function compare(a, b, key, teamsById) {
     // Captains first when ascending. Booleans have no natural collation, so
     // this is stated rather than left to whatever true > false does.
     return (b.is_captain ? 1 : 0) - (a.is_captain ? 1 : 0)
+  }
+  if (key === 'jersey_num') {
+    // Numeric, not string — '10' sorts before '9' under localeCompare, which
+    // is the wrong order for a squad number. Unnumbered players sort last in
+    // either direction, matching sortByJersey (src/lib/jersey.js) and the
+    // same "empty sorts last" rule this file already applies below.
+    const an = isJerseyNumber(a.jersey_num) ? a.jersey_num : null
+    const bn = isJerseyNumber(b.jersey_num) ? b.jersey_num : null
+    if (an != null && bn != null) return an - bn
+    if (an != null) return -1
+    if (bn != null) return 1
+    return 0
   }
   // Empty positions — and empty genders, which is currently most of the club
   // — sort last in either direction rather than leading the table with a
@@ -123,8 +147,26 @@ export default function RosterTable({
   // the optimistic unitsByPlayer map, and the column exists only when
   // positionsByPlayer is set (both are staff-only).
   onSaveUnit = null,
+  // ⚠️ SENIOR SQUADS 2a — true only when EVERY visible player's own squad
+  // uses jersey numbers (Roster.jsx's `jerseySort`; see its comment there).
+  // Used ONLY to pick the table's starting sort, because there is no single
+  // number order across squads that disagree. The "No." column's existence
+  // uses a DIFFERENT test (Roster.jsx's `jerseyColumn`, "some" not "every")
+  // and is already decided by hiddenColumns before this prop is read; each
+  // row independently reads the player's own squad via `showsJerseyFor`
+  // below for its tile, its editor-vs-"—" choice, and its clash message.
+  showJersey = false,
+  // Staff only — the "from {squad}" mark on a guest row. A parent must never
+  // learn a team-mate is on loan from elsewhere.
+  showGuestMark = false,
 }) {
-  const [sort, setSort] = useState({ key: 'full_name', dir: 'asc' })
+  // Numbered-first is the natural reading of a squad that uses numbers, so it
+  // is where the table starts rather than something a coach has to click
+  // into on every visit. Read once at mount: RosterTable renders fresh
+  // whenever the roster goes from "no groups" to "has groups" (Roster.jsx's
+  // isFirstLoad/groups.length gate), which is when this prop is first known.
+  const [sort, setSort] = useState(() =>
+    showJersey ? { key: 'jersey_num', dir: 'asc' } : { key: 'full_name', dir: 'asc' })
   // Per-row, keyed by player id: the field currently in flight, and the last
   // refusal message. Kept here rather than in Roster because nothing outside
   // this table needs to know a cell is saving.
@@ -155,9 +197,51 @@ export default function RosterTable({
       : { key, dir: 'asc' }))
   }
 
+  // ⚠️ SENIOR SQUADS 2a — its OWN branch, not folded into the generic path
+  // below. Every other field's `value` arrives already meaning what it says
+  // (a select's option, a toggled boolean); the jersey input hands over a
+  // raw string that has to be PARSED before it can even be compared against
+  // the stored value, and an unparseable one is refused before any request —
+  // task-5-brief.md. It also writes through setPlayerJerseyNumber, not
+  // upsertPlayer: the clash message lives there (src/data/players.js).
+  async function saveJersey(player, rawValue) {
+    const parsed = parseJerseyInput(rawValue)
+    if (parsed === undefined) {
+      setErrors((e) => ({ ...e, [player.id]: 'A jersey number is 1 to 99, or blank to clear it.' }))
+      return
+    }
+    if (player.jersey_num === parsed) {
+      // A corrected blur — the user fixed the clash themselves, retyped the
+      // number that was already stored, and tabbed away — must not leave the
+      // PREVIOUS attempt's error message sitting under a field that no
+      // longer disagrees with the database.
+      setErrors((e) => ({ ...e, [player.id]: null }))
+      return
+    }
+
+    const previous = player.jersey_num
+    setErrors((e) => ({ ...e, [player.id]: null }))
+    setSaving((s) => ({ ...s, [player.id]: 'jersey_num' }))
+    onPatch(player.id, { jersey_num: parsed })
+
+    try {
+      await setPlayerJerseyNumber(player.id, parsed)
+    } catch (err) {
+      onPatch(player.id, { jersey_num: previous })
+      setErrors((e) => ({
+        ...e,
+        [player.id]: friendlyMessage(err, "That didn't save. Try again."),
+      }))
+    } finally {
+      setSaving((s) => ({ ...s, [player.id]: null }))
+    }
+  }
+
   // `value` is the whole ordered positions list when field is 'position'
   // (first = main), and a scalar for everything else.
   async function save(player, field, value) {
+    if (field === 'jersey_num') return saveJersey(player, value)
+
     // No write when nothing changed. Blurring a select the user only opened
     // and closed should cost nothing, and an UPDATE that sets a column to its
     // current value still bumps the row and still has to clear RLS. Position
@@ -232,6 +316,12 @@ export default function RosterTable({
       utility: !have.has('Utility'),
     }
   }
+
+  // ⚠️ PER PLAYER, NOT THE `showJersey` PROP — a player's own HOME squad
+  // decides whether their tile shows a number. The prop above is the
+  // table-wide reading (used only to pick the default sort); this is the
+  // row-level one, correct even inside a mixed "All squads" table.
+  const showsJerseyFor = (player) => teamsById.get(player.team_id)?.uses_jersey_numbers === true
 
   // ⚠️ FLATTENED TO A SINGLE LIST OF ROWS, each either a heading or a player, so
   // the tbody keeps ONE map instead of three nested ones. Group headings and
@@ -333,7 +423,19 @@ export default function RosterTable({
               }
 
               const player = row.player
-              const editable = canEditTeam(player.team_id)
+              // ⚠️ GUEST ROWS ARE READ-ONLY HERE, WHATEVER canEditTeam SAYS.
+              // Finding 2 of the whole-branch review (2 Sep 2026): the
+              // "player edit" RLS policy is keyed on the row's HOME
+              // team_id, so a coach who staffs only the squad being
+              // VIEWED (not the guest's home) already gets false out of
+              // canEditTeam(player.team_id) — player.team_id stays the
+              // home team on a guest row (src/data/players.js). But a
+              // coach who genuinely staffs BOTH squads passes that check,
+              // and RLS would in fact allow the write — this guard exists
+              // anyway, on product grounds: a roster page showing someone
+              // as a GUEST must never offer to edit their real record: that
+              // edit belongs on the player's own squad's roster, not here.
+              const editable = canEditTeam(player.team_id) && !player.guest_of
               const busy = saving[player.id]
               const error = errors[player.id]
 
@@ -365,6 +467,7 @@ export default function RosterTable({
                         player={player}
                         url={player.photo_path ? photoUrls?.[player.photo_path] : undefined}
                         size="xs"
+                        showJersey={showsJerseyFor(player)}
                         className="bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-white"
                       />
                       <span
@@ -374,14 +477,72 @@ export default function RosterTable({
                         {player.full_name}
                       </span>
                     </button>
+                    {/* ⚠️ STAFF ONLY, AND ONLY ON A GUEST ROW — the same rule
+                        PlayerRow's mobile mark follows, and it is a
+                        CONVENIENCE rather than a privacy boundary: this
+                        table is desktop-only staff chrome (see the header
+                        note), but even so, the home squad this names is not
+                        secret — it is printed for a parent too, on the
+                        mobile row's subtitle, and searchable there. Hiding
+                        it here just keeps the table free of a label that is
+                        only useful to staff. `player.team_id` is still the
+                        HOME squad on a guest row (src/data/players.js). */}
+                    {showGuestMark && player.guest_of && (
+                      <span className="mt-0.5 block text-[12px] font-semibold text-ink-faint">
+                        from {teamsById.get(player.team_id)?.name ?? 'another squad'}
+                      </span>
+                    )}
                     {/* The refusal lands in the row that caused it, not in a
                         toast that scrolls away from a long table. */}
                     {error && (
-                      <span role="alert" className="mt-0.5 block text-[12px] font-semibold text-danger-ink">
+                      <span
+                        id={`roster-row-error-${player.id}`}
+                        role="alert"
+                        className="mt-0.5 block text-[12px] font-semibold text-danger-ink"
+                      >
                         {error}
                       </span>
                     )}
                   </td>
+
+                  {show('jersey_num') && (
+                  <td className={BODY_CELL}>
+                    {editable && showsJerseyFor(player) ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        aria-label={`Jersey number for ${player.full_name}`}
+                        // The error slot is shared with the row's other
+                        // editable cells (it reports whichever field last
+                        // failed), so this only claims the association while
+                        // THIS field is the one showing it.
+                        aria-invalid={Boolean(error)}
+                        aria-describedby={error ? `roster-row-error-${player.id}` : undefined}
+                        // ⚠️ UNCONTROLLED, KEYED ON THE STORED VALUE. A
+                        // controlled input needs an onChange to let the user
+                        // type at all; this field only ever routes on
+                        // blur/Enter (task-5-brief.md). Keying on the value
+                        // remounts the input — and re-reads its defaultValue —
+                        // whenever the stored number changes underneath it
+                        // (the optimistic patch, or a reverted refusal), so a
+                        // typed-and-abandoned edit can't outlive the write
+                        // that overrode it.
+                        key={player.jersey_num ?? 'blank'}
+                        defaultValue={isJerseyNumber(player.jersey_num) ? player.jersey_num : ''}
+                        disabled={busy === 'jersey_num'}
+                        className={INLINE_CONTROL}
+                        onBlur={(event) => save(player, 'jersey_num', event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') event.currentTarget.blur()
+                        }}
+                      />
+                    ) : (
+                      <span className="px-2 text-ink-muted">
+                        {isJerseyNumber(player.jersey_num) ? player.jersey_num : '—'}
+                      </span>
+                    )}
+                  </td>
+                  )}
 
                   {show('unit') && (
                   <td className={BODY_CELL}>

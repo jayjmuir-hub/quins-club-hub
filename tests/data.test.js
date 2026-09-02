@@ -777,7 +777,16 @@ describe('listPlayers', () => {
 
     await listPlayers({ teamIds: ['team-1'] })
 
-    expect(calls.in).toEqual([['team_id', ['team-1']]])
+    // ⚠️ TWO CALLS SINCE senior-squads-2a, NOT ONE — a non-empty teamIds now
+    // also runs a `memberships` query (same shared mock builder here, since
+    // this file's createQueryBuilder returns one canned result regardless of
+    // table), scoped to the same requested teams. See
+    // tests/players-list-membership.test.js for the table-aware mock that
+    // exercises the "home OR active membership" behaviour this adds.
+    expect(calls.in).toEqual([
+      ['team_id', ['team-1']],
+      ['team_id', ['team-1']],
+    ])
   })
 
   it('does not query at all when teamIds is an empty array, and returns []', async () => {

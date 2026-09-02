@@ -27,6 +27,7 @@ import { GENDERS, genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
 import { useMediaQuery, DESKTOP_QUERY } from '../lib/useMediaQuery.js'
+import { sortByJersey } from '../lib/jersey.js'
 
 // The team filter survives a reload. Without this, choosing club-wide as the
 // desktop default (desktop-spec.md §10 decision 2) would make a coach who
@@ -86,9 +87,20 @@ function byName(a, b) {
 // Case-insensitive substring match across name, position and age group — the
 // three things printed on a roster row, so anything a user can see, they can
 // search for (design-system.md §4.9).
-function matchesQuery(player, teamName, query) {
+//
+// ⚠️ THE NUMBER JOINS THE HAYSTACK ONLY WHEN `showJersey` IS TRUE (senior
+// squads 2a, task 5) — the same gate the tile itself uses. A squad that does
+// not use jersey numbers must not let "9" match a player who merely has a
+// stray value in the column; the flag is what makes that a decision the
+// squad made, not an accident of the data.
+function matchesQuery(player, teamName, query, showJersey = false) {
   if (!query) return true
-  const haystack = [player.full_name, player.position, teamName]
+  const haystack = [
+    player.full_name,
+    player.position,
+    teamName,
+    showJersey && player.jersey_num != null ? String(player.jersey_num) : null,
+  ]
     .filter((part) => part != null && part !== '')
     .join(' ')
     .toLowerCase()
@@ -112,7 +124,24 @@ function ChevronRightIcon(props) {
   )
 }
 
-function PlayerRow({ player, teamName, photoUrl, age = null, showPosition = false, onSelect }) {
+function PlayerRow({
+  player,
+  teamName,
+  photoUrl,
+  age = null,
+  showPosition = false,
+  showJersey = false,
+  // ⚠️ STAFF ONLY, BUT AS A CONVENIENCE — NOT A PRIVACY BOUNDARY. The home
+  // squad this mark names is already visible to EVERY viewer, parents
+  // included, in the subtitle a few lines down (`{teamName}`, unconditional)
+  // and searchable there too. Hiding the "from {squad}" mark from a parent
+  // does not hide who is on loan from where; it only saves staff a label
+  // they specifically asked for and spares a parent a piece of shorthand
+  // that reads as an insider note about a team-mate. See the "from {squad}"
+  // span below.
+  showGuestMark = false,
+  onSelect,
+}) {
   return (
     <button
       type="button"
@@ -135,6 +164,7 @@ function PlayerRow({ player, teamName, photoUrl, age = null, showPosition = fals
         player={player}
         url={photoUrl}
         size="sm"
+        showJersey={showJersey}
         className="bg-[image:linear-gradient(135deg,theme(colors.brand.deep),theme(colors.brand.DEFAULT))] text-[13px] text-white"
       />
 
@@ -144,6 +174,20 @@ function PlayerRow({ player, teamName, photoUrl, age = null, showPosition = fals
             {player.full_name}
           </span>
           {player.is_captain && <Badge tone="captain">Capt</Badge>}
+          {/* ⚠️ STAFF ONLY, AND ONLY ON A GUEST ROW — A CONVENIENCE, NOT A
+              PRIVACY BOUNDARY (see showGuestMark's own comment above). The
+              home squad this names is already printed for every viewer, in
+              this row's subtitle (`{teamName}` a few lines down) and
+              matched by search there too; hiding this mark from a parent
+              does not hide which squad a team-mate calls home. `guest_of` is
+              set for a player whose home squad is elsewhere and who holds an
+              active membership in the squad being rendered
+              (src/data/players.js) — the name printed is the HOME squad's,
+              from `teamsById`, via `player.team_id` which stays the home
+              team even on a guest row. */}
+          {showGuestMark && player.guest_of && (
+            <span className="text-[12px] font-semibold text-ink-faint">from {teamName}</span>
+          )}
         </span>
         {/* Gender is appended, not given its own line, and is omitted
             entirely when not recorded — which is most players. A third line
@@ -172,7 +216,18 @@ function PlayerRow({ player, teamName, photoUrl, age = null, showPosition = fals
   )
 }
 
-function RosterGroup({ label, players, teamsById, photoUrls, ageByPlayer, showPosition = false, onSelect }) {
+function RosterGroup({
+  label,
+  players,
+  teamsById,
+  photoUrls,
+  ageByPlayer,
+  showPosition = false,
+  // Staff only — see PlayerRow's showGuestMark. Passed through unchanged;
+  // the per-row decision (only a GUEST row is marked) lives there.
+  showGuestMark = false,
+  onSelect,
+}) {
   return (
     <div className="mb-4 last:mb-0">
       <h3 className={`mb-2 flex items-center gap-2 text-[12.5px] font-extrabold uppercase tracking-[.5px] ${MUTED_ON_PAPER}`}>
@@ -193,6 +248,11 @@ function RosterGroup({ label, players, teamsById, photoUrls, ageByPlayer, showPo
             photoUrl={player.photo_path ? photoUrls?.[player.photo_path] : undefined}
             age={ageByPlayer?.get(player.id) ?? null}
             showPosition={showPosition}
+            // ⚠️ PER PLAYER, NOT PER GROUP — a player's own HOME squad decides
+            // whether their tile shows a number (teams.uses_jersey_numbers),
+            // which on an "all squads" view can differ row to row.
+            showJersey={teamsById.get(player.team_id)?.uses_jersey_numbers === true}
+            showGuestMark={showGuestMark}
             onSelect={onSelect}
           />
         ))}
@@ -491,9 +551,23 @@ export default function Roster() {
       }))
     : players
 
+  // ⚠️ SENIOR SQUADS 2a (task 5) — whether a player's row is allowed to show a
+  // jersey number at all. `teams.uses_jersey_numbers` is a per-SQUAD flag, and
+  // `player.team_id` stays the player's HOME squad even on a guest row (see
+  // src/data/players.js), so reading it per player is what makes this correct
+  // both for a single selected squad (every visible player shares that
+  // squad's flag) and for "All squads" (each row answers for its own home
+  // squad) without the two cases needing separate code.
+  const showsJerseyFor = (player) => teamsById.get(player.team_id)?.uses_jersey_numbers === true
+
   const matchingSearch = scopedPlayers.filter(
     (player) =>
-      matchesQuery(player, teamsById.get(player.team_id)?.name ?? '', normalisedQuery) &&
+      matchesQuery(
+        player,
+        teamsById.get(player.team_id)?.name ?? '',
+        normalisedQuery,
+        showsJerseyFor(player),
+      ) &&
       // ⚠️ 'unrecorded' IS NOT ON THE RADIO ROW. It is reachable only by
       // clicking the nudge below, which is the point of the nudge: a coach who
       // is told "9 players have no gender recorded" can then see WHICH nine
@@ -518,7 +592,12 @@ export default function Roster() {
       : players.filter(
           (player) =>
             !player.gender &&
-            matchesQuery(player, teamsById.get(player.team_id)?.name ?? '', normalisedQuery),
+            matchesQuery(
+              player,
+              teamsById.get(player.team_id)?.name ?? '',
+              normalisedQuery,
+              showsJerseyFor(player),
+            ),
         ).length
 
   const visible =
@@ -612,6 +691,28 @@ export default function Roster() {
     team: (player) => player.team_id ?? null,
   })
 
+  // ⚠️ THE TABLE'S TWO SCREEN-WIDE JERSEY FLAGS — DELIBERATELY DIFFERENT
+  // TESTS. Per-row rendering (the avatar tile, the guest mark, and now each
+  // cell's own editor) reads `showsJerseyFor` player by player, which is
+  // always correct.
+  //
+  // The column's EXISTENCE asks "does ANY visible player's squad use
+  // numbers" (`some`): a mixed "All squads" view with one numbered squad and
+  // one not still has a real "No." to show for the numbered squad's rows,
+  // and hiding the column entirely there would make that squad's numbers
+  // undiscoverable on desktop. Rows outside a numbered squad show "—" in the
+  // cell instead of an editor — never a number of a squad they don't belong
+  // to.
+  //
+  // The default SORT asks "does EVERY visible player's squad agree"
+  // (`every`): there is no single sensible number order across squads that
+  // disagree — a U16 "3" and a 1st XV "3" are not comparable — so a mixed
+  // view falls back to name order rather than half-applying one squad's
+  // numbering to a table that also holds a squad it was never assigned for.
+  const jerseyColumn = visible.some(showsJerseyFor)
+  const jerseySort = visible.length > 0 && visible.every(showsJerseyFor)
+  if (!jerseyColumn) hiddenColumns.add('jersey_num')
+
   // ⚠️ NEVER GROUPED FOR A PARENT, and this became load-bearing the moment
   // grouping went on by default. A parent cannot see grades — RLS refuses
   // player_grades and the screen does not ask — so `tierByPlayer` is empty for
@@ -630,7 +731,14 @@ export default function Roster() {
   const tableGroups =
     !canEditAnything || tableGroupBy === 'none'
       ? null
-      : buildRosterGroups(visible, { groupBy: tableGroupBy, tierByPlayer, teamsById })
+      : buildRosterGroups(visible, {
+          groupBy: tableGroupBy,
+          tierByPlayer,
+          teamsById,
+          // Numbered first, ascending, then the unnumbered by name — only
+          // where the squad in view uses numbers at all.
+          sortPlayers: jerseySort ? sortByJersey : undefined,
+        })
 
   // How many of the players on screen have no gender recorded. Distinct from
   // hiddenUnrecorded above, which counts the ones a gender FILTER is hiding;
@@ -719,7 +827,16 @@ export default function Roster() {
   // pitches-only admin gets no dead Edit button. RLS is what actually
   // enforces this; getting it wrong here can only hide a control, never
   // authorise a write.
-  const canEditSelected = selectedPlayer ? canWritePlayer(memberships, selectedPlayer.team_id) : false
+  //
+  // ⚠️ AND guest_of MAKES IT FALSE OUTRIGHT — same guard, same reasoning, as
+  // RosterTable.jsx's per-row `editable` (finding 2, whole-branch review,
+  // 2 Sep 2026). A coach who staffs both the guest's home squad and the
+  // squad being viewed would otherwise pass canWritePlayer here too; this
+  // sheet is reached by tapping a row on THIS squad's roster, and a page
+  // showing someone as a guest must never offer to edit their real record.
+  const canEditSelected = selectedPlayer
+    ? canWritePlayer(memberships, selectedPlayer.team_id) && !selectedPlayer.guest_of
+    : false
   // A parent/player of THIS player, who is not already a coach of the squad.
   // Gates only whether the self-service form is offered; RLS and
   // set_own_player_photo() are what permit the writes.
@@ -980,6 +1097,15 @@ export default function Roster() {
           photoUrls={photoUrls}
           groups={tableGroups}
           hiddenColumns={hiddenColumns}
+          // The "every visible squad agrees" read — see the comment above
+          // where it's derived. Used for the "No." column's default sort
+          // only; the column's existence is decided by hiddenColumns above
+          // (the "some" read), and each row's tile, editor and clash message
+          // read the player's own squad directly via showsJerseyFor.
+          showJersey={jerseySort}
+          // ⚠️ STAFF ONLY, and it is the SAME gate the mobile row's mark uses
+          // below — a parent must never see that a team-mate is a guest.
+          showGuestMark={canEditAnything}
           // ⚠️ PASSED ONLY FOR A COACH, so the Tier column does not exist in a
           // parent's DOM at all. RLS already refuses the underlying rows; this
           // is the second lock, on the screen a parent actually opens.
@@ -1009,6 +1135,7 @@ export default function Roster() {
             photoUrls={photoUrls}
             ageByPlayer={ageByPlayer}
             showPosition={canEditAnything && !minisOnly}
+            showGuestMark={canEditAnything}
             onSelect={setSelectedPlayerId}
           />
         ))}
@@ -1033,6 +1160,10 @@ export default function Roster() {
               photoUrls={photoUrls}
               ageByPlayer={ageByPlayer}
               showPosition={false}
+              // This block only ever renders for staff (canEditAnything gates
+              // the whole <details>, above), so this is always true here —
+              // stated explicitly rather than left implicit.
+              showGuestMark={canEditAnything}
               onSelect={setSelectedPlayerId}
             />
           </div>

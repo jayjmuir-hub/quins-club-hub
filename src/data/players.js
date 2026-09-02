@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase'
 import { upsertById } from './upsertById.js'
 import { fetchAllPages, fetchByIds } from './limits.js'
 import { deletePlayerPhoto } from './photos.js'
+import { jerseyClashMessage, isJerseyNumber } from '../lib/jersey.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Data access for the players and player_contacts tables. RLS already
 // restricts rows to what the calling user's memberships allow. player_contacts
@@ -17,7 +19,22 @@ import { deletePlayerPhoto } from './photos.js'
  *
  * teamIds semantics matter: an empty array means "no teams" and returns []
  * without querying at all. undefined/omitted means "no team filter" and
- * queries normally, letting RLS decide what comes back.
+ * queries normally, letting RLS decide what comes back — and in that shape
+ * behaviour is UNCHANGED from before senior squads: no membership query
+ * runs and no `guest_of` key is added to a row.
+ *
+ * ⚠️ WHEN teamIds IS A NON-EMPTY ARRAY, EACH ROW GAINS `guest_of`: `null` for
+ * a player whose home `team_id` is one of the requested squads, or the first
+ * REQUESTED team id (in `teamIds` order) the player holds an ACTIVE
+ * `memberships` row against otherwise — a "guest" of that squad. A player
+ * can hold several second-squad memberships; `guest_of` names only the first
+ * one that was actually asked for, because that is the squad the caller is
+ * rendering.
+ *
+ * ⚠️ TWO QUERIES, NOT A VIEW — RLS on both tables already decides what comes
+ * back (`private.can_see_player` is what makes the guest row readable at
+ * all); a view would need its own policy, and this module has no route to
+ * add one.
  */
 export async function listPlayers({ teamIds, includeLeft = false } = {}) {
   if (Array.isArray(teamIds) && teamIds.length === 0) return []
@@ -53,7 +70,7 @@ export async function listPlayers({ teamIds, includeLeft = false } = {}) {
   // order those rows differently between two requests: one player returned
   // twice and another dropped, with no error anywhere. Exactly the trap
   // listEvents documents for two fixtures sharing a kick-off.
-  return fetchAllPages(
+  const homeRows = await fetchAllPages(
     buildQuery,
     [
       ['full_name', { ascending: true }],
@@ -62,6 +79,132 @@ export async function listPlayers({ teamIds, includeLeft = false } = {}) {
     'players',
     'Scope the query to a squad by passing `teamIds`.',
   )
+
+  // No team filter: the pre-senior-squads shape, byte for byte. No
+  // membership query, no `guest_of`.
+  if (!Array.isArray(teamIds) || teamIds.length === 0) return homeRows
+
+  const homeWithFlag = homeRows.map((row) => ({ ...row, guest_of: null }))
+  const homeIds = new Set(homeWithFlag.map((row) => row.id))
+
+  // ⚠️ ACTIVE ONLY, AND player_id NOT NULL. A membership row can carry a
+  // parent-only role with no player_id yet (the invite exists before the
+  // child does), and a 'left' status is exactly the case the CONTROL in
+  // tests/players-list-membership.test.js proves stays invisible — dropping
+  // this .eq is the fault that test is built to catch.
+  const { data: memberships, error: membershipError } = await supabase
+    .from('memberships')
+    .select('player_id, team_id')
+    .in('team_id', teamIds)
+    .eq('status', 'active')
+  if (membershipError) throw membershipError
+
+  // playerId -> Set of requested team ids they hold an active membership in.
+  // Home players are skipped here on purpose: their `guest_of` is already
+  // decided (null), and a redundant membership row in their own home squad
+  // must never turn them into a guest of themselves.
+  const membershipMap = new Map()
+  for (const row of memberships ?? []) {
+    if (!row.player_id || homeIds.has(row.player_id)) continue
+    if (!membershipMap.has(row.player_id)) membershipMap.set(row.player_id, new Set())
+    membershipMap.get(row.player_id).add(row.team_id)
+  }
+
+  const guestIds = [...membershipMap.keys()]
+  const guestRows =
+    guestIds.length === 0
+      ? []
+      : await fetchByIds(guestIds, async (chunk) => {
+          let query = supabase.from('players').select('*').in('id', chunk)
+          // Same left_at rule as the home fetch above, so a guest who has
+          // left is hidden exactly as a home leaver would be.
+          if (!includeLeft) query = query.is('left_at', null)
+          const { data, error } = await query
+          if (error) throw error
+          return data ?? []
+        })
+
+  const guestWithFlag = guestRows.map((row) => {
+    const heldTeams = membershipMap.get(row.id)
+    // The FIRST requested team, in `teamIds` order, that this player is
+    // actually a guest of — not just any of them.
+    const guestOf = teamIds.find((teamId) => heldTeams?.has(teamId)) ?? null
+    return { ...row, guest_of: guestOf }
+  })
+
+  // Merge and re-sort in JS with the same comparator the database used, so
+  // the order contract (full_name, then id) holds across the merge of two
+  // separate queries.
+  return [...homeWithFlag, ...guestWithFlag].sort((a, b) => {
+    const byName = (a.full_name ?? '').localeCompare(b.full_name ?? '')
+    if (byName !== 0) return byName
+    return (a.id ?? '').localeCompare(b.id ?? '')
+  })
+}
+
+// ⚠️ listPlayerSquads WAS HERE — deleted 2 Sep 2026, whole-branch review
+// finding 6, zero production callers. It computed the same "which squad(s)
+// beyond home is this player active in" fact that the guest mark actually
+// ships with, but `listPlayers`'s own `guest_of` field (built from `team_id`
+// + an active-memberships lookup, see its header above) is what every real
+// caller reads.
+
+/**
+ * Writes one player's season jersey number, or clears it with null.
+ *
+ * ⚠️ REFUSES BEFORE THE REQUEST when the number is out of range — the same
+ * "ask before the network" shape setTeamDefaultFormat uses for tournament
+ * format, so a bad value never round-trips to the database at all.
+ *
+ * ⚠️ A UNIQUE VIOLATION (23505) IS TRANSLATED, NOT REPEATED. The database's
+ * `players_team_jersey_unique` index is what actually enforces "no two
+ * players share a number in one squad" — this function's job is to turn
+ * that constraint name into a sentence a coach can act on, by looking up who
+ * holds the number in the same squad and naming them via
+ * jerseyClashMessage(). Two lookups (the player's own team_id, then the
+ * holder) rather than one, because the failed update told us nothing about
+ * which squad the clash happened in.
+ *
+ * ⚠️ `data === null && error === null` IS AN RLS REFUSAL, not success — the
+ * same "perfectly successful nothing" every other writer in this module
+ * documents.
+ */
+export async function setPlayerJerseyNumber(playerId, number) {
+  if (!playerId) throw new Error('We could not save that number.')
+  if (number !== null && !isJerseyNumber(number)) {
+    throw new Error('A jersey number is 1 to 99, or blank to clear it.')
+  }
+
+  const { data, error } = await supabase
+    .from('players')
+    .update({ jersey_num: number })
+    .eq('id', playerId)
+    .select('id, team_id')
+    .maybeSingle()
+
+  if (error?.code === '23505') {
+    // ⚠️ NAME THE HOLDER. A constraint name is not a sentence a coach can
+    // act on.
+    const { data: me } = await supabase.from('players').select('team_id').eq('id', playerId).maybeSingle()
+    // ⚠️ NO team_id, NO SECOND QUERY. `.eq('team_id', undefined)` would send a
+    // PostgREST filter with no value — not "match nothing", which is what we
+    // want here, but a malformed request. A lookup with no team to search
+    // within can never name the holder anyway, so bail straight to the
+    // generic clash message.
+    if (!me?.team_id) {
+      throw new Error(jerseyClashMessage(number, 'another player'))
+    }
+    const { data: holder } = await supabase
+      .from('players')
+      .select('full_name')
+      .eq('team_id', me.team_id)
+      .eq('jersey_num', number)
+      .maybeSingle()
+    throw new Error(jerseyClashMessage(number, holder?.full_name ?? 'another player'))
+  }
+  if (error) throw new Error(friendlyMessage(error, 'We could not save that number.'))
+  if (!data) throw new Error("We couldn't save that. Only squad staff can change a jersey number.")
+  return data
 }
 
 /**

@@ -696,6 +696,34 @@ GRANT EXECUTE ON FUNCTION private.can_manage_invite(uuid) TO authenticated;
 
 
 -- ---------------------------------------------------------------------
+-- private.can_see_player(uuid)  — ADDED 2026-09-03 (20260903_senior_squads_2a.sql)
+-- Backs "player read" on public.players. WIDENS READ ONLY over can_see_team:
+-- a home-squad member OR anyone with an active membership in a squad the
+-- caller can see (a guest of a squad the caller runs).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_see_player(_player uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from public.players p
+     where p.id = _player
+       and private.can_see_team(p.team_id))
+  or exists (
+    select 1 from public.memberships m
+     where m.player_id = _player
+       and m.status = 'active'
+       and private.can_see_team(m.team_id));
+$function$
+;
+
+REVOKE ALL ON FUNCTION private.can_see_player(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.can_see_player(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
 -- private.can_see_team(uuid)
 -- prosecdef: true    provolatile: s (STABLE)    proconfig: search_path=public
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
@@ -6459,6 +6487,35 @@ begin
   insert into conversation_members (conversation_id, profile_id, is_owner) values (conv, me, true);
   insert into conversation_members (conversation_id, profile_id) select conv, unnest(others);
   return conv;
+end;
+$function$
+
+-- ADDED 2026-09-03 (20260903_senior_squads_2a.sql). The app has never
+-- created a squad before this — every one to date was inserted by migration.
+-- proacl: {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}
+CREATE OR REPLACE FUNCTION public.create_team(p_name text, p_is_senior boolean DEFAULT false, p_uses_jersey_numbers boolean DEFAULT false, p_self_registration_allowed boolean DEFAULT false)
+ RETURNS teams
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare club uuid; made public.teams;
+begin
+  select m.club_id into club from public.memberships m
+   where m.profile_id = auth.uid() and m.role = 'admin' and m.status = 'active' limit 1;
+  if club is null then
+    raise exception 'Only a club admin can add a squad.' using errcode = '42501';
+  end if;
+  if coalesce(trim(p_name), '') = '' then
+    raise exception 'A squad needs a name.' using errcode = '22023';
+  end if;
+  insert into public.teams (club_id, name, sort_order, is_senior, uses_jersey_numbers, self_registration_allowed)
+  values (club, trim(p_name),
+          (select coalesce(max(sort_order), 0) + 1 from public.teams where club_id = club),
+          coalesce(p_is_senior, false), coalesce(p_uses_jersey_numbers, false),
+          coalesce(p_self_registration_allowed, false))
+  returning * into made;
+  return made;
 end;
 $function$
 

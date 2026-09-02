@@ -116,6 +116,9 @@ harness `jerseyAnywhere` probes prove it.
 A player in two squads appears on both rosters. On the non-home roster the
 row carries a small "from U18B" mark for staff; parents see nothing extra.
 
+Unique per squad is a fact about the data (home squad); a mixed roster with a
+guest can show two 9s.
+
 ### Availability, chat, notices, documents, push
 
 All of these decide their audience from `memberships` already
@@ -323,6 +326,8 @@ division. The season-record view above stays as the seniors' own record.
   render nothing.
 
 ## Order of work
+
+⚠️ Steps 2–4 BUILT as 2a on 2 Sep 2026 — claude/plans/2026-09-02-senior-squads-2a-implementation.md.
 
 1. Piece 1 (format on the fixture) — separate plan, ships first.
 2. `uses_jersey_numbers`, the unique index, roster number display and edit.

@@ -21,6 +21,8 @@ const listAllLeagueTeamsMock = vi.fn()
 const setTeamScoringKindsMock = vi.fn()
 const setRequiresContactMock = vi.fn()
 const setDefaultFormatMock = vi.fn()
+const setUsesJerseyNumbersMock = vi.fn()
+const createTeamMock = vi.fn()
 const reloadMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
@@ -45,10 +47,15 @@ vi.mock('../src/data/leagueTeams.js', () => ({
   upsertLeagueTeam: vi.fn(),
   setLeagueTeamActive: vi.fn(),
 }))
+// ⚠️ EVERY EXPORT AdminClub.jsx IMPORTS MUST BE LISTED HERE, or the import is
+// undefined and the screen breaks. Task 4 added createTeam and
+// setTeamUsesJerseyNumbers to the screen; they belong here too.
 vi.mock('../src/data/teams.js', () => ({
   setTeamScoringKinds: (...args) => setTeamScoringKindsMock(...args),
   setTeamRequiresContact: (...args) => setRequiresContactMock(...args),
   setTeamDefaultFormat: (...args) => setDefaultFormatMock(...args),
+  setTeamUsesJerseyNumbers: (...args) => setUsesJerseyNumbersMock(...args),
+  createTeam: (...args) => createTeamMock(...args),
 }))
 
 import AdminClub from '../src/screens/AdminClub.jsx'
@@ -107,6 +114,8 @@ beforeEach(() => {
   setTeamScoringKindsMock.mockResolvedValue({})
   setRequiresContactMock.mockResolvedValue({})
   setDefaultFormatMock.mockResolvedValue({})
+  setUsesJerseyNumbersMock.mockResolvedValue({})
+  createTeamMock.mockResolvedValue({})
   reloadMock.mockResolvedValue(undefined)
 })
 
@@ -290,7 +299,9 @@ describe('AdminClub — whether a squad plays contact', () => {
     const { user } = renderClub()
 
     await user.click(await screen.findByTestId('scoring-chip-team-u10'))
-    await user.click(within(screen.getByTestId('scoring-panel')).getByRole('switch'))
+    await user.click(
+      within(screen.getByTestId('scoring-panel')).getByRole('switch', { name: /contact rugby/i }),
+    )
 
     await waitFor(() => expect(reloadMock).toHaveBeenCalled())
   })
@@ -347,7 +358,9 @@ describe('AdminClub — whether a squad plays contact', () => {
     const { user } = renderClub()
 
     await user.click(await screen.findByTestId('scoring-chip-team-u10'))
-    await user.click(within(screen.getByTestId('scoring-panel')).getByRole('switch'))
+    await user.click(
+      within(screen.getByTestId('scoring-panel')).getByRole('switch', { name: /contact rugby/i }),
+    )
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/only a club admin/i))
     expect(screen.getByTestId('scoring-panel')).toBeInTheDocument()
@@ -355,6 +368,30 @@ describe('AdminClub — whether a squad plays contact', () => {
       within(screen.getByTestId('scoring-panel')).getByRole('switch', { name: /contact rugby/i }),
     ).toHaveAttribute('aria-checked', 'false')
     expect(reloadMock).not.toHaveBeenCalled()
+  })
+
+  it('offers a jersey-numbers switch beside Contact rugby, and CONTROL: each switch calls its own writer', async () => {
+    // "Jersey numbers" is a column, never derived from Senior — a touch side
+    // can be senior without numbers. The CONTROL half is the point: tapping
+    // Contact rugby must not also fire the jersey writer, and vice versa.
+    const { user } = renderClub()
+
+    await user.click(await screen.findByRole('button', { name: /scoring for u16b/i }))
+    const panel = within(screen.getByTestId('scoring-panel'))
+
+    const jerseyToggle = panel.getByRole('switch', { name: 'Jersey numbers' })
+    expect(jerseyToggle).toHaveAttribute('aria-checked', 'false')
+
+    await user.click(jerseyToggle)
+
+    await waitFor(() => expect(setUsesJerseyNumbersMock).toHaveBeenCalledWith('team-u16b', true))
+    // CONTROL: the Contact switch stayed on its own writer.
+    expect(setRequiresContactMock).not.toHaveBeenCalled()
+
+    await user.click(panel.getByRole('switch', { name: /contact rugby/i }))
+    await waitFor(() => expect(setRequiresContactMock).toHaveBeenCalledWith('team-u16b', true))
+    // CONTROL, the other direction: the contact tap did not also fire jersey.
+    expect(setUsesJerseyNumbersMock).toHaveBeenCalledTimes(1)
   })
 
   it('saves the squad’s usual tournament format from the scoring sheet', async () => {

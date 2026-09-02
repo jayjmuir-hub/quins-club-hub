@@ -129,6 +129,13 @@ describe('RosterTable — rendering', () => {
   it('has no jersey column — the club does not use squad numbers', async () => {
     render(<MemoryRouter><Roster /></MemoryRouter>)
     await screen.findByTestId('roster-table')
+    // ⚠️ THE HEADER READS "No." (src/components/RosterTable.jsx SORTABLE),
+    // which the original /jersey|number|#/i regex never matched — it would
+    // have passed against the shipped column just as readily as against no
+    // column at all. The exact-text check below is the one that actually
+    // catches the column appearing; the loose regex is kept alongside it
+    // only because it is still a true statement about this fixture.
+    expect(screen.queryByRole('columnheader', { name: /^No\.$/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: /jersey|number|#/i })).not.toBeInTheDocument()
   })
 })

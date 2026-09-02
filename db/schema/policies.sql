@@ -689,9 +689,18 @@ CREATE POLICY "parent delete" ON public.player_parents
 -- restores exactly that one row and nothing else.
 --
 -- Note the argument is `id`, not `team_id`: is_own_player takes a PLAYER id.
+--
+-- CHANGED 2026-09-03 (20260903_senior_squads_2a.sql). Was
+-- `private.can_see_team(team_id) OR private.is_own_player(id)`.
+-- private.can_see_player WIDENS READ ONLY: a coach of squad B could not see
+-- a player whose HOME is squad A even with a B membership; can_see_player
+-- adds "or any active membership in a squad the caller can see". Edit
+-- policies keyed on the home squad (positions, player_private) are
+-- deliberately untouched. Re-captured live via
+-- `pg_get_expr(polqual, polrelid)`.
 CREATE POLICY "player read" ON public.players
   AS PERMISSIVE FOR SELECT TO public
-  USING ((private.can_see_team(team_id) OR private.is_own_player(id)));
+  USING ((private.can_see_player(id) OR private.is_own_player(id)));
 
 -- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 (Grok item 14). The 28 Aug S1 write
 -- allowlist (20260828_child_write_allowlist) replaced can_edit_team with
@@ -820,8 +829,12 @@ CREATE POLICY "team manage" ON public.teams
 -- one, with no expiry and no way to revoke short of deleting the file.
 --
 -- READ is `can_see_team` — squad-wide, matching public.players' own
--- "player read" policy, because the photo sits beside the name in the
--- roster and the name is already visible to exactly that audience.
+-- "player read" policy, which since 2 Sep 2026 (senior_squads_2a) is
+-- `can_see_player(id) OR is_own_player(id)` — because the photo sits
+-- beside the name in the roster and the name is already visible to
+-- exactly that audience (can_see_player widens READ to any squad the
+-- player holds an active membership in; this bucket policy was not
+-- widened to match and stays squad-wide on the player's home team).
 -- Jay approved this deliberately. TO TIGHTEN to coaches/admins plus the
 -- player's own account, swap can_see_team for can_edit_team and add
 -- `OR private.is_own_player(private.photo_player(name))`, i.e. exactly the
@@ -1237,12 +1250,15 @@ CREATE POLICY "announcement mark read" ON public.announcement_reads
 -- ---------------------------------------------------------------------
 -- player_private  (3 policies)                          ADDED 2026-08-16
 --
--- ⛔ THE TABLE EXISTS BECAUSE A COLUMN COULD NOT WORK. `player read` is
--- can_see_team(team_id) OR is_own_player(id), and can_see_team is SQUAD-WIDE —
--- so a `date_of_birth` column on public.players would be readable by EVERY
--- PARENT IN THE SQUAD. RLS grants ROWS, not COLUMNS, and a parent and a coach
--- are the same `authenticated` role, so no policy can hide one column of
--- players from a parent while showing them the rest of the row.
+-- ⛔ THE TABLE EXISTS BECAUSE A COLUMN COULD NOT WORK. `player read` is, since
+-- 2 Sep 2026 (senior_squads_2a), `can_see_player(id) OR is_own_player(id)` —
+-- where can_see_player widens READ to any squad the player holds an active
+-- membership in, on top of the underlying can_see_team SQUAD-WIDE reach — so
+-- a `date_of_birth` column on public.players would be readable by EVERY
+-- PARENT IN THE SQUAD (and now every squad the player also belongs to). RLS
+-- grants ROWS, not COLUMNS, and a parent and a coach are the same
+-- `authenticated` role, so no policy can hide one column of players from a
+-- parent while showing them the rest of the row.
 --
 -- ⚠️ THE SCHEMA HAD ALREADY MET THIS AND SOLVED IT THE SAME WAY — see the table
 -- comment on public.player_grades. This is that pattern, second use.
