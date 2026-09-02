@@ -85,6 +85,6 @@ severity order, one pull request per cluster, each a live deploy.
 | Follow-ups from items 1 and 2 | team-sheet draft; sweep allowlist to the helper alone | building, `claude/ux-followups` |
 | Coach/manager Medium | Lineup save chip; match sheet "Mark ready to send" + draft before share; Accounts prose folded; Availability names wrap; admin panels scroll into view; squad screens Try again; Schedule status after multi-add | **SHIPPED** `4093935` (#653). **Deferred:** DatePicker/TimePicker in AddGameForm and TrainingPublish (tests drive the native inputs) |
 | Parent Medium | availability tap-to-clear + own child first; sign-up copy; notifications toggle copy; offline banner; Maps link; wizard draft | building, `claude/ux-parent-cluster`. **Deferred:** avatar caption (masthead row over-full 820-1,280px) |
-| Pattern leftovers | RequireAuth slow-load reload; Home first-load gate includes notices; photo aspect-ratio; PlayerDetail reserved space; Documents `window.confirm`; per-field error helpers | not started |
-| Desktop | event-form sheet width and fieldsets; ChatPhoto Escape and focus trap; starred message scroll-to | not started |
+| Pattern leftovers | RequireAuth slow-load reload; Home first-load gate includes notices; photo placeholder while signing; PlayerDetail reserved space; Documents `window.confirm`; ChatPhoto Escape + focus; starred message scroll-to | building, `claude/ux-leftovers`. **Deferred:** photo dimensions at upload; per-field error helpers |
+| Desktop | event-form sheet width and fieldsets | not started (ChatPhoto and starred scroll-to moved into the leftovers cluster) |
 | Low | the two "Smaller items" lists and the extra findings | not started |

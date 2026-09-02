@@ -10,7 +10,24 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ux): the parent Medium findings from the full review.** (1)
+- **fix(ux): the pattern leftovers from the full review.** (1) Cold start
+  offers Reload after six seconds (`RequireAuth.jsx`, `useSlowLoad`) — the
+  recorded 15-second Supabase stalls looked like a dead app. (2) Documents
+  uses the app's own two-step Remove instead of `window.confirm`, the one
+  place the written rule was broken. (3) The single-photo viewer in chat
+  closes on Escape, takes focus and gives it back, and a photo reserves its
+  space while its URL signs instead of popping the thread down
+  (`ChatPhoto.jsx`). (4) A starred message opens AT the message: rows carry
+  `id="msg-<id>"` and the thread scrolls to a `#msg-` hash once
+  (`StarredMessages.jsx`, `MessageRow.jsx`, `ChannelThread.jsx`). (5) The
+  player card reserves the height of the birthday, parents and contact
+  blocks while they load, so the action row stops moving under the thumb.
+  (6) Home's first-load gate waits for the notices read too, so the pinned
+  board no longer mounts after paint and pushes the hero down; the three
+  Dashboard suites now mock that read. ⚠️ **Deferred:** photo dimensions
+  persisted at upload for a true `aspect-ratio`; per-field error helpers
+  under each invalid field (item 3 was focus-plus-scroll only).
+- `9a6e39d` — **fix(ux): the parent Medium findings from the full review.** (1)
   Availability: tapping the answer you already gave no longer clears it — a
   nervous double-tap on "In" became "No response" with no sign; clearing is
   an explicit Clear after the three buttons, and a parent's own player rows

@@ -648,6 +648,9 @@ export default function Dashboard() {
   //
   // ⚠️ NOT KEYED ON `reloadToken`, like the staff read. That token is bumped by
   // realtime on `events`, and no fixture change can alter a notice.
+  // ⚠️ PART OF THE FIRST-LOAD GATE (2 Sep 2026 UX review, pattern 6): the
+  // pinned notice board used to mount after paint and push the hero down.
+  const [noticesSettled, setNoticesSettled] = useState(false)
   useEffect(() => {
     let mounted = true
     Promise.all([listNotices(), listMyReads()])
@@ -658,6 +661,9 @@ export default function Dashboard() {
       })
       .catch(() => {
         if (mounted) setNotices([])
+      })
+      .finally(() => {
+        if (mounted) setNoticesSettled(true)
       })
     return () => {
       mounted = false
@@ -694,7 +700,7 @@ export default function Dashboard() {
   // realtime refresh fires on every insert/update/delete anywhere in scope,
   // from any user — spinning on those would tear the dashboard out of the DOM
   // and collapse the page height each time somebody else touched a fixture.
-  const isFirstLoad = loading && !settled
+  const isFirstLoad = (loading && !settled) || !noticesSettled
 
   const admin = isAdmin(memberships)
   // Asked per visible team through canEditTeam, rather than by looking for a

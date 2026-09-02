@@ -73,7 +73,10 @@ export default function StarredMessages() {
             {rows.map((m) => (
               <li key={m.id} className="border-b border-line last:border-b-0">
                 <Link
-                  to={m.conversation_id ? `/chat/dm/${m.conversation_id}` : chatPath({ kind: m.channel === 'staff' ? 'staff' : 'squad', team_id: m.team_id })}
+                  // ⚠️ #msg-<id> LANDS ON THE MESSAGE, NOT THE CHAT (2 Sep 2026 UX
+                  // review, desktop keyboard). The thread scrolls to that id
+                  // once the messages are in, the way the pinned banner does.
+                  to={`${m.conversation_id ? `/chat/dm/${m.conversation_id}` : chatPath({ kind: m.channel === 'staff' ? 'staff' : 'squad', team_id: m.team_id })}#msg-${m.id}`}
                   className="block px-3.5 py-2.5 hover:bg-surface-mute"
                   data-testid="starred-row"
                 >

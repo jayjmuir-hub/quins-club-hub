@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../lib/auth.jsx'
+import useSlowLoad from '../lib/useSlowLoad.js'
 import Login from '../screens/Login.jsx'
 
 /**
@@ -53,6 +54,7 @@ export function friendlyAuthError(errorCode, error, description) {
 
 export default function RequireAuth({ children }) {
   const { session, loading } = useAuth()
+  const slow = useSlowLoad(loading)
   const [authError, setAuthError] = useState(null)
   const hadSessionRef = useRef(false)
 
@@ -112,9 +114,26 @@ export default function RequireAuth({ children }) {
         // Dark chrome for the same reason as Login.jsx: the old full-screen
         // red->green gradient reached pure #3bd070, only 2.01:1 behind this
         // white text.
-        className="flex min-h-app items-center justify-center bg-chrome-grad text-white"
+        className="flex min-h-app flex-col items-center justify-center gap-4 bg-chrome-grad text-white"
       >
         <p className="text-sm font-semibold uppercase tracking-widest opacity-80">Loading…</p>
+        {/* ⚠️ A WAY OUT AFTER SIX SECONDS (2 Sep 2026 UX review, pattern 6).
+            The recorded 15-second Supabase stalls made this screen look like
+            a dead app: no timeout, no retry. Same useSlowLoad the shell uses
+            for the membership load; a reload is the honest action here
+            because nothing above this component can be retried in place. */}
+        {slow && (
+          <div className="flex flex-col items-center gap-2 text-center">
+            <p className="text-[13px] opacity-80">This is taking longer than usual.</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="min-h-[44px] rounded-[11px] border border-white/40 px-4 text-sm font-bold text-white hover:bg-white/10"
+            >
+              Reload
+            </button>
+          </div>
+        )}
       </div>
     )
   }

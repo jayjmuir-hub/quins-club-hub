@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { signChatPhotoUrl } from '../data/chatMedia.js'
 
@@ -12,6 +12,30 @@ import { signChatPhotoUrl } from '../data/chatMedia.js'
 export default function ChatPhoto({ path, compact = false }) {
   const [url, setUrl] = useState(null)
   const [full, setFull] = useState(false)
+  const closeRef = useRef(null)
+  const openerRef = useRef(null)
+
+  // ⚠️ ESCAPE CLOSES, FOCUS MOVES IN AND BACK OUT (2 Sep 2026 UX review,
+  // desktop keyboard). The album viewer had both; this one had neither —
+  // Escape did nothing and focus stayed on the thumbnail under the scrim.
+  useEffect(() => {
+    if (!full) return undefined
+    openerRef.current = document.activeElement
+    closeRef.current?.focus?.()
+    const onKey = (e) => {
+      if (e.key === 'Escape') setFull(false)
+      if (e.key === 'Tab') {
+        // One focusable control: keep Tab on it.
+        e.preventDefault()
+        closeRef.current?.focus?.()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      openerRef.current?.focus?.()
+    }
+  }, [full])
 
   useEffect(() => {
     let live = true
@@ -22,7 +46,19 @@ export default function ChatPhoto({ path, compact = false }) {
     }
   }, [path])
 
-  if (!path || !url) return null
+  if (!path) return null
+  // ⚠️ A PLACEHOLDER WHILE THE URL SIGNS (2 Sep 2026 UX review, pattern 6):
+  // rendering nothing and then the image pushed the thread down as each
+  // photo popped in. Same footprint as the thumbnail's ceiling.
+  if (!url) {
+    return (
+      <div
+        aria-hidden="true"
+        data-testid="chat-photo-placeholder"
+        className={`mt-1 ${compact ? 'h-40' : 'h-64'} w-full max-w-[280px] animate-pulse rounded-[10px] bg-surface-sunk`}
+      />
+    )
+  }
   return (
     <>
       <button
@@ -58,6 +94,7 @@ export default function ChatPhoto({ path, compact = false }) {
         >
           <img src={url} alt="Shared photo, full size" className="max-h-full max-w-full rounded-[12px] object-contain" />
           <button
+            ref={closeRef}
             type="button"
             aria-label="Close photo"
             onClick={() => setFull(false)}

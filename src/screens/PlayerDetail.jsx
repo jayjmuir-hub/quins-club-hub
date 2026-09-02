@@ -137,9 +137,10 @@ function ParentsBlock({ playerId }) {
     }
   }, [playerId])
 
-  // Nothing while in flight — the block appears late rather than announcing
-  // itself and then collapsing to nothing on an empty result.
-  if (loading) return null
+  // Reserved while in flight (2 Sep 2026 UX review, pattern 6) — the block
+  // used to appear late and push the action row under the thumb. A player
+  // with no parents collapses it on settle.
+  if (loading) return <div aria-hidden="true" data-testid="reserved-parents" className="mb-4 h-[96px]" />
 
   if (error) {
     return (
@@ -276,7 +277,12 @@ function BirthdayBlock({ playerId }) {
     }
   }, [playerId])
 
-  if (loading || !dob) return null
+  // ⚠️ RESERVED WHILE LOADING (2 Sep 2026 UX review, pattern 6): the Edit /
+  // Mark as left / Delete row used to move under the thumb as this block,
+  // the parents and the contact arrived one by one. The placeholder is the
+  // block's own height; a player with no birthday collapses it on settle.
+  if (loading) return <div aria-hidden="true" data-testid="reserved-birthday" className="mb-4 h-[44px]" />
+  if (!dob) return null
 
   const age = ageAt(dob, new Date())
 
@@ -346,7 +352,7 @@ function ContactBlock({ playerId }) {
   // (It was never a leak — this renders before the outcome is known, so it
   // looked identical for a player with details and one without — but it
   // contradicted this file's own "renders nothing" contract.)
-  if (loading) return null
+  if (loading) return <div aria-hidden="true" data-testid="reserved-contact" className="h-[96px]" />
 
   if (error) {
     return (

@@ -213,6 +213,7 @@ export default function MessageRow({
 
   return (
     <article
+      id={`msg-${message.id}`}
       data-testid="message-row"
       data-staff={staff ? 'true' : 'false'}
       data-mine={mine ? 'true' : 'false'}

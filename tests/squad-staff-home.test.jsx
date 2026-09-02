@@ -22,6 +22,15 @@ import { MemoryRouter } from 'react-router-dom'
 const useMembershipsMock = vi.fn()
 const listMySquadStaffMock = vi.fn()
 
+// Home's first-load gate waits for the notices read since 2 Sep 2026 (UX
+// review, pattern 6); unmocked, the real module never settles in jsdom and
+// the skeleton would stay up forever.
+vi.mock('../src/data/announcements.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  listNotices: async () => [],
+  listMyReads: async () => new Set(),
+}))
+
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
