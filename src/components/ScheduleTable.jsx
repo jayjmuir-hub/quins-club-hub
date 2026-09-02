@@ -19,6 +19,7 @@ import {
   initialVisibleMonthCount,
   showMoreMonthsLabel,
 } from '../lib/scheduleMonthGroups.js'
+import { DEFAULT_FORMAT, formatLabel, formatOf } from '../lib/fixtureFormat.js'
 
 // The desktop schedule table (desktop-spec.md §5.2). Rendered at `wide`
 // instead of the stacked FixtureRow list; below that the list is still the
@@ -133,9 +134,18 @@ function EventRow({ event, teamsById, onSelect }) {
             {homeAwayLabel(event) === 'TBD' ? 'TBD' : homeAwayLabel(event).charAt(0)}
           </span>
         )}
-        {event.competition && (
+        {/* ⚠️ THE FORMAT IS SAID ONLY WHEN IT IS NOT 15s. Fifteen is the norm
+            and naming it on every row is noise; "7s" on a tournament row is
+            the one fact a parent packing boots wants. Null reads as 15
+            (src/lib/fixtureFormat.js) so old rows are silent too. */}
+        {(event.competition || formatOf(event) !== DEFAULT_FORMAT) && (
           <span className="mt-0.5 block text-[12px] font-medium text-ink-faint">
-            {event.competition}
+            {[
+              formatOf(event) !== DEFAULT_FORMAT ? formatLabel(formatOf(event)) : null,
+              event.competition || null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </span>
         )}
       </td>

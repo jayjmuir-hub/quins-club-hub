@@ -170,6 +170,31 @@ describe('ScheduleTable — content', () => {
     await screen.findByTestId('schedule-table')
     expect(screen.getByText('West Asia Cup')).toBeInTheDocument()
   })
+
+  // Task 5 — claude/plans/2026-09-02-fixture-format.md. No `renderRows`/
+  // `FIXTURE` helper exists in this file (every other test here renders
+  // <Schedule /> through listEventsMock, as above); adapted to that pattern
+  // rather than inventing a new one.
+  it('names the format on the subtitle only when it is not 15s', async () => {
+    listEventsMock.mockResolvedValue([
+      { ...FUTURE_MATCH, id: 'sevens', competition: 'Harness Sevens', format: 7 },
+    ])
+    render(withRouter(<Schedule />))
+    await screen.findByTestId('schedule-table')
+    expect(screen.getByText('7s · Harness Sevens')).toBeInTheDocument()
+  })
+
+  it('CONTROL: a 15s or unstated fixture shows no format word at all', async () => {
+    listEventsMock.mockResolvedValue([
+      { ...FUTURE_MATCH, id: 'fifteens', competition: 'Harness Cup', format: 15 },
+      { ...FUTURE_TRAINING, id: 'unstated', competition: 'Harness Shield', format: null },
+    ])
+    render(withRouter(<Schedule />))
+    await screen.findByTestId('schedule-table')
+    expect(screen.getByText('Harness Cup')).toBeInTheDocument()
+    expect(screen.getByText('Harness Shield')).toBeInTheDocument()
+    expect(screen.queryByText(/15s/)).toBeNull()
+  })
 })
 
 describe('ScheduleTable — results', () => {
