@@ -10,7 +10,28 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ui): pitch-side tap targets reach 44px.** Item 5 of the 2 Sep 2026 UX
+- **fix(admin): the Admin badge moves the moment a join request arrives —
+  no refresh, no reopening Admin.** Jay, 2 Sep 2026, desktop: *"when I have
+  the desktop site open and new join approvals come in the little number icon
+  on admin doesn't increment unless I open admin again or refresh"*. The
+  count was taken on mount and on leaving Accounts, and nothing else; Chat
+  has had a realtime subscription since it shipped. New
+  `src/lib/useAdminWaiting.js` behind BOTH the sidebar count and the phone
+  dock's More dot: realtime on `memberships` and `access_requests` (debounced),
+  a recount when the tab comes back (visibilitychange / focus, throttled), and
+  the leave-Accounts tick as before; a failed recount keeps the last good
+  number. ⚠️ **Inert until `db/migrations/20260902_realtime_admin_waiting.sql`
+  is applied** — neither table was in the `supabase_realtime` publication
+  (measured: announcements, availability, conversations, events, feedback,
+  messages), and a subscription outside it connects and never fires.
+  `tests/admin-waiting-live.test.jsx`. Push delivery was measured while here
+  and is NOT slow server-side: outbox empty, no pg_net queue, push-send 2-3 s
+  average, and the two calls that outran pg_net's 5 s timeout still completed
+  200. ⚠️ **A plain access request (a profile with no membership) sends the
+  admin an EMAIL and no push** — `approval_membership_id` only fires for a
+  pending membership — so the badge is the only in-app signal for it; not
+  changed here.
+- `5b38132` — **fix(ui): pitch-side tap targets reach 44px.** Item 5 of the 2 Sep 2026 UX
   review. Availability In / Maybe / Out (measured ~34px) and the lineup row
   actions Bench / Remove / Start / Shirt (~25px) get `min-h-[44px]`; the chat
   message chevron (20px), the composer tray Remove (20px) and every Sheet's
