@@ -183,6 +183,11 @@ function PublishBody() {
   const [editingFocus, setEditingFocus] = useState(null)
   const [focusSaving, setFocusSaving] = useState(false)
   const [focusError, setFocusError] = useState(null)
+  // The focus period whose Remove is ARMED, or null. Two-step inline confirm
+  // (2 Sep 2026 UX review, item 4): the button was `dangerQuiet` and deleted
+  // on first press, against Button.jsx's own contract that dangerQuiet arms
+  // and danger confirms. Notes on the period were gone with no undo.
+  const [confirmingRemove, setConfirmingRemove] = useState(null)
 
   useEffect(() => {
     let mounted = true
@@ -606,14 +611,39 @@ function PublishBody() {
                   {/* ⚠️ THROUGH `run()`, like every other write. deleteFocus
                       throws on the RLS zero-row delete, and this is what turns
                       that into a sentence instead of a silent success. */}
-                  <Button
-                    variant="dangerQuiet"
-                    aria-label={`Remove ${row.title}`}
-                    disabled={focusSaving}
-                    onClick={() => run(() => deleteFocus(row.id))}
-                  >
-                    Remove
-                  </Button>
+                  {confirmingRemove === row.id ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-[12.5px] font-semibold text-danger-ink">
+                        Remove {row.title}?
+                      </span>
+                      <Button
+                        variant="danger"
+                        aria-label={`Yes, remove ${row.title}`}
+                        disabled={focusSaving}
+                        onClick={() =>
+                          run(() => deleteFocus(row.id)).finally(() => setConfirmingRemove(null))
+                        }
+                      >
+                        Yes, remove
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={focusSaving}
+                        onClick={() => setConfirmingRemove(null)}
+                      >
+                        Keep
+                      </Button>
+                    </span>
+                  ) : (
+                    <Button
+                      variant="dangerQuiet"
+                      aria-label={`Remove ${row.title}`}
+                      disabled={focusSaving}
+                      onClick={() => setConfirmingRemove(row.id)}
+                    >
+                      Remove
+                    </Button>
+                  )}
                 </span>
               </li>
             ))}

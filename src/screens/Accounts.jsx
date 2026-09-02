@@ -562,6 +562,8 @@ function PendingStaffRequests({
   teamsById,
   rowState,
   onApprove,
+  // Arms or disarms the two-step approve on one row: (membershipId, boolean).
+  onArm = () => {},
   vouchesByMembership = new Map(),
   onVouch = () => {},
   onOpenCard = null,
@@ -669,14 +671,43 @@ function PendingStaffRequests({
               {/* ⚠️ THE ROLE AND THE SQUAD ARE IN THE ACCESSIBLE NAME. A button
                   reading only "Approve" is what let a staff request look like a
                   child's registration in the first place. */}
-              <Button
-                size="sm"
-                aria-label={`Approve ${personName} as ${asking}`}
-                disabled={Boolean(state.saving)}
-                onClick={() => onApprove(member)}
-              >
-                {state.saving ? 'Approving…' : `Approve as ${roleLabel}`}
-              </Button>
+              {/* ⚠️ TWO TAPS, BECAUSE OF WHAT THIS GRANTS (2 Sep 2026 UX review,
+                  item 4). One tap here handed a stranger every family's contact
+                  details for an age group. The copy above already warned; the
+                  control did not. Same shape as Revoke's confirm. */}
+              {state.confirming ? (
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="text-[12.5px] font-semibold text-ink">
+                    Give {personName} {roleLabel.toLowerCase()} access
+                    {teamName ? ` to ${teamName}` : ''}?
+                  </span>
+                  <Button
+                    size="sm"
+                    aria-label={`Yes, approve ${personName} as ${asking}`}
+                    disabled={Boolean(state.saving)}
+                    onClick={() => onApprove(member)}
+                  >
+                    {state.saving ? 'Approving…' : 'Yes, approve'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={Boolean(state.saving)}
+                    onClick={() => onArm(member.id, false)}
+                  >
+                    Cancel
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  aria-label={`Approve ${personName} as ${asking}`}
+                  disabled={Boolean(state.saving)}
+                  onClick={() => onArm(member.id, true)}
+                >
+                  {`Approve as ${roleLabel}`}
+                </Button>
+              )}
 
               {state.error && (
                 <span
@@ -1554,11 +1585,23 @@ export default function Accounts() {
         team_id: updated.team_id,
         teams: updated.team_id ? teamsById.get(updated.team_id) ?? null : null,
       })
+      return true
     } catch (err) {
       patchRow(member.id, { error: friendlyMessage(err, "We couldn't save that change.") })
+      return false
     } finally {
       patchRow(member.id, { saving: false })
     }
+  }
+
+  // ⚠️ THE SELECTS STAGE, THEY DO NOT SAVE (2 Sep 2026 UX review, item 4).
+  // They used to write on onChange, so a mis-scroll on a phone picker turned a
+  // parent into an admin — or moved a coach onto another squad's children —
+  // the instant the wheel stopped. The draft lives on the row; "Save change"
+  // commits it and clears it, a refusal keeps it so the person can retry.
+  async function commitDraft(member, draft) {
+    const ok = await saveMembership(member, draft)
+    if (ok !== false) patchRow(member.id, { draft: null })
   }
 
   async function revoke(member) {
@@ -1858,6 +1901,7 @@ export default function Accounts() {
             teamsById={teamsById}
             rowState={rowState}
             onApprove={approve}
+            onArm={(id, confirming) => patchRow(id, { confirming, error: null })}
             vouchesByMembership={vouchesByMembership}
             onVouch={handleVouch}
             onOpenCard={setCardFor}
@@ -1944,6 +1988,7 @@ export default function Accounts() {
           teamsById={teamsById}
           rowState={rowState}
           onApprove={approve}
+          onArm={(id, confirming) => patchRow(id, { confirming, error: null })}
           vouchesByMembership={vouchesByMembership}
           onVouch={handleVouch}
           onOpenCard={setCardFor}
@@ -2668,6 +2713,17 @@ export default function Accounts() {
                     : null
                   const rowLabel = `${editingName} (${teamName ?? 'club-wide'})`
                   const joined = formatJoined(member.created_at)
+                  // What the selects show: the staged draft if there is one,
+                  // else the saved row. An admin has no age group, so a draft
+                  // promoting to admin compares as team null (saveMembership
+                  // applies the same rule).
+                  const draftRole = state.draft?.role ?? member.role
+                  const draftTeamId = state.draft ? state.draft.teamId : member.team_id
+                  const draftDiffers =
+                    Boolean(state.draft) &&
+                    (draftRole !== member.role ||
+                      (draftRole === 'admin' ? null : draftTeamId || null) !==
+                        (member.role === 'admin' ? null : member.team_id || null))
 
                   return (
                     <div
@@ -2677,13 +2733,18 @@ export default function Accounts() {
                     >
                       <Badge tone={member.role}>{member.role}</Badge>
 
+                      {/* The draft, when there is one, is what the selects show;
+                          the saved row is what the badge shows. See commitDraft. */}
                       <select
                         className={INLINE_CONTROL}
                         aria-label={`Role for ${rowLabel}`}
-                        value={member.role}
+                        value={draftRole}
                         disabled={Boolean(state.saving)}
                         onChange={(event) =>
-                          saveMembership(member, { role: event.target.value, teamId: member.team_id })
+                          patchRow(member.id, {
+                            draft: { role: event.target.value, teamId: draftTeamId },
+                            error: null,
+                          })
                         }
                       >
                         {ROLE_OPTIONS.map((option) => (
@@ -2693,16 +2754,19 @@ export default function Accounts() {
                         ))}
                       </select>
 
-                      {member.role === 'admin' ? (
+                      {draftRole === 'admin' ? (
                         <span className={`px-2 text-[13px] ${MUTED_ON_PAPER}`}>All age groups</span>
                       ) : (
                         <select
                           className={INLINE_CONTROL}
                           aria-label={`Age group for ${rowLabel}`}
-                          value={member.team_id ?? ''}
+                          value={draftTeamId ?? ''}
                           disabled={Boolean(state.saving)}
                           onChange={(event) =>
-                            saveMembership(member, { role: member.role, teamId: event.target.value })
+                            patchRow(member.id, {
+                              draft: { role: draftRole, teamId: event.target.value },
+                              error: null,
+                            })
                           }
                         >
                           <option value="">No age group</option>
@@ -2712,6 +2776,27 @@ export default function Accounts() {
                             </option>
                           ))}
                         </select>
+                      )}
+
+                      {draftDiffers && (
+                        <span className="flex flex-wrap items-center gap-2">
+                          <Button
+                            size="sm"
+                            aria-label={`Save change for ${rowLabel}`}
+                            disabled={Boolean(state.saving)}
+                            onClick={() => commitDraft(member, state.draft)}
+                          >
+                            {state.saving ? 'Saving…' : 'Save change'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={Boolean(state.saving)}
+                            onClick={() => patchRow(member.id, { draft: null, error: null })}
+                          >
+                            Cancel
+                          </Button>
+                        </span>
                       )}
 
                       {/* Linked player (spec §2's column list). A membership
