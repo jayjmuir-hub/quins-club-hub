@@ -466,6 +466,12 @@ clubs — and the sheet's own instructions read *"U11 to u16 Games"*. `src/lib/m
 holds the threshold and the two formats; the ruling is
 `claude/decisions/2026-08-15-minis-simplified.md`.
 
+**The sheet has as many slots as the fixture's format allows — 12, 15, 18 or
+22 — from `src/lib/fixtureFormat.js`; `SLOT_COUNT` (22) is only the storage
+ceiling.** A league fixture is always format 15 and so always renders 22
+slots, unchanged from before this existed; the sizing only shows up for a
+tournament or friendly.
+
 ⚠️ **IT FAILS OPEN AND `allowsOwnContact` FAILS CLOSED. DO NOT ALIGN THEM.** Both
 are handed `ageBandFromTeamName`'s null — which means "a senior side" AND "cannot
 parse this" — and they answer differently on purpose, because the harm is

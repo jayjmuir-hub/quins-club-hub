@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(roster): MARKING A PLAYER AS LEFT — BUILT, both migrations applied to live 2 Sep 2026, pull request pending.**
+- **feat(format): FORMAT ON THE FIXTURE — 7s, 10s, 12s or 15s.** Piece 1 of the
+  senior-squads work, `claude/plans/2026-09-02-fixture-format.md`. A league match
+  is always 15 and is not asked; a tournament or friendly on a U11+ squad asks,
+  pre-selecting the squad's usual format (`teams.default_format`, set on the
+  Club tab beside scoring); minis are never asked. The match sheet now sizes
+  itself from the format too (12/15/18/22) — today that changes nothing on
+  screen, because the RCM sheet applies to league fixtures only (27 Aug ruling)
+  and league is always 15s; it is there for the day a tournament needs a sheet.
+  ⚠️ The spec's claim that the U18 10s sheet "is already wrong today" was FALSE
+  for that reason. A sheet saved with more rows than a later-changed format
+  allows keeps them and says so. A new lineup opens at the fixture's format.
+  Schedule and detail say "7s" only when it is not 15. Migration
+  `db/migrations/20260902_fixture_format.sql` — applied to live 2 Sep 2026
+  (Jay's go-ahead), harness `db/tests/fixture-format.sql` green against
+  production, rollback proven. Null reads as 15 everywhere, so no existing row
+  changed. The numbers live in `src/lib/fixtureFormat.js` and nowhere else.
+- `8777b45` — **feat(roster): MARKING A PLAYER AS LEFT — BUILT, both migrations applied to live 2 Sep 2026, pull request pending.**
   `claude/specs/2026-09-02-player-leavers-design.md`,
   `claude/plans/2026-09-02-player-leavers-implementation.md`. Two migrations
   applied to live 2 Sep 2026 (Jay's go-ahead): `db/migrations/20260902_player_leavers.sql`

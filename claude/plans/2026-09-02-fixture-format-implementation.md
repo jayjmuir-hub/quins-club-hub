@@ -1,6 +1,6 @@
 # Fixture Format Implementation Plan
 
-**Status: NOT SHIPPED — implementation plan for `claude/plans/2026-09-02-fixture-format.md`, being executed.** Dated 2026-09-02.
+**Status: EXECUTED 2 Sep 2026 — pull request pending.** Implementation plan for `claude/plans/2026-09-02-fixture-format.md`. Dated 2026-09-02.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
