@@ -920,27 +920,34 @@ export default function EventForm({
   // further guard this effect fires on MOUNT for a duplicate too and stamps
   // the squad's default straight over the format initialValues deliberately
   // carried from the original row — a 7s tournament fixture duplicated onto a
-  // 15s squad would silently reopen as 15s. skipFirstReseed exists to eat
-  // exactly that one mount-time run and nothing more: it starts `true` only
-  // when duplicating, so the carried format survives the first render, but it
-  // is cleared straight after, so a team change the coach makes AFTERWARDS —
-  // same as on a plain new fixture — still re-seeds from the new squad's
-  // default. The alternative (skip reseeding for the whole life of a
-  // duplicate) would leave a duplicate that has had its squad changed
+  // 15s squad would silently reopen as 15s.
+  //
+  // openedWithTeam records the team the form OPENED with and is never
+  // mutated afterwards — this must be an identity comparison, not a
+  // one-shot "eat the first call" flag. React 18 StrictMode (main.jsx wraps
+  // the app in it) double-invokes a cleanup-less effect synchronously at
+  // mount — mount, cleanup, remount, all before first paint — so a
+  // consumed-on-first-run flag (the earlier `skipFirstReseed` ref) sees
+  // itself already spent on the SECOND invocation and reseeds anyway,
+  // reproducing the exact bug in `npm run dev`. Comparing `teamId` against
+  // a value that is set once and never changed is naturally idempotent:
+  // both StrictMode calls see the same `teamId` on the still-fresh
+  // duplicate and both skip, however many times the effect body runs. A
+  // real team change later moves `teamId` away from `openedWithTeam.current`
+  // and the effect reseeds from the new squad's default — same as on a
+  // plain new fixture. The alternative (skip reseeding for the whole life
+  // of a duplicate) would leave a duplicate that has had its squad changed
   // carrying the WRONG squad's format with nothing to correct it.
-  const skipFirstReseed = useRef(duplicate)
+  const openedWithTeam = useRef(teamId)
   useEffect(() => {
     if (editing) return
-    if (skipFirstReseed.current) {
-      skipFirstReseed.current = false
-      return
-    }
+    if (duplicate && teamId === openedWithTeam.current) return
     const team = editableTeams.find((candidate) => candidate.id === teamId)
     setValues((current) => ({
       ...current,
       format: String(isFormat(team?.default_format) ? team.default_format : DEFAULT_FORMAT),
     }))
-  }, [editing, teamId, editableTeams])
+  }, [editing, duplicate, teamId, editableTeams])
 
   // Extras AND a repeat is refused outright (see the row-count guard in
   // handleSubmit). Naming it here so the SUBMIT BUTTON can tell the truth:

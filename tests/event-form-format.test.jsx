@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
+import { StrictMode } from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { pickDate } from './helpers/pickDate.js'
@@ -46,7 +47,7 @@ const U18B_TWELVES = { ...U18B, id: 't-u18b-12', default_format: 12 }
 const U8 = { id: 't-u8', club_id: CLUB_ID, name: 'U8 Tag', sort_order: 3 }
 const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
 
-function renderForm({ event = null, teams = [U18B], initialKind = null, duplicate = false } = {}) {
+function renderForm({ event = null, teams = [U18B], initialKind = null, duplicate = false, strict = false } = {}) {
   useMembershipsMock.mockReturnValue({
     memberships: ADMIN,
     teams,
@@ -55,15 +56,16 @@ function renderForm({ event = null, teams = [U18B], initialKind = null, duplicat
     reload: vi.fn(),
   })
   const onSaved = vi.fn()
-  render(
+  const tree = (
     <EventForm
       event={event}
       initialKind={initialKind}
       duplicate={duplicate}
       onClose={() => {}}
       onSaved={onSaved}
-    />,
+    />
   )
+  render(strict ? <StrictMode>{tree}</StrictMode> : tree)
   return { user: userEvent.setup(), onSaved }
 }
 
@@ -180,6 +182,25 @@ describe('fixture format on the event form', () => {
     expect(within(group).getByRole('radio', { name: '7s' })).toBeChecked()
     // CONTROL: the squad's default (12s) is NOT what shows — otherwise the
     // carried format is untested and this is just re-asserting the default.
+    expect(within(group).getByRole('radio', { name: '12s' })).not.toBeChecked()
+  })
+
+  // ⚠️ StrictMode double-invokes a cleanup-less effect synchronously at mount
+  // (call 1, throwaway; call 2, the "real" one) — an `if` that merely eats
+  // the FIRST call sees the ref already consumed on the second and runs
+  // anyway, reintroducing the exact bug the guard exists to prevent in
+  // `npm run dev` (main.jsx renders inside <React.StrictMode>). This is the
+  // same duplicate scenario as the test above, rendered under StrictMode.
+  it('a duplicate keeps the ORIGINAL fixture\'s format under StrictMode double-invoke', async () => {
+    const event = {
+      id: 'e-1', club_id: CLUB_ID, team_id: 't-u18b-12', type: 'match',
+      competition_type: 'tournament', competition: 'Harness Sevens', format: 7,
+      opponent: 'Harness Exiles', home: true, starts_at: '2026-10-10T05:00:00.000Z',
+    }
+    renderForm({ event, teams: [U18B_TWELVES], duplicate: true, strict: true })
+    const group = await screen.findByRole('group', { name: /format/i })
+    expect(within(group).getByRole('radio', { name: '7s' })).toBeChecked()
+    // CONTROL: the squad's default (12s) is NOT what shows.
     expect(within(group).getByRole('radio', { name: '12s' })).not.toBeChecked()
   })
 })
