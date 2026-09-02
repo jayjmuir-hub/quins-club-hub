@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ADMIN_RIGHTS, adminRightLabel } from '../lib/scope.js'
 import { setAdminRights } from '../data/members.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The super-admin control: which specialist dashboards ONE admin can see.
 //
@@ -112,7 +113,7 @@ export default function AdminRightsEditor({ membership, label, onChanged }) {
 
       {error && (
         <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
-          {error.message || "That didn't save. You may not be a super admin."}
+          {friendlyMessage(error, "That didn't save. You may not be a super admin.")}
         </p>
       )}
     </fieldset>

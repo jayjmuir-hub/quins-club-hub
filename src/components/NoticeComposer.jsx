@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Button from './Button.jsx'
 import { Sheet } from './Sheet.jsx'
 import { createNotice } from '../data/announcements.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The "post a notice" composer, as a sheet.
 //
@@ -121,7 +122,7 @@ export default function NoticeComposer({ open, onClose, teams, clubWide, onPoste
       onPosted()
       onClose()
     } catch (err) {
-      setError(err.message || 'That notice could not be posted. Try again.')
+      setError(friendlyMessage(err, 'That notice could not be posted. Try again.'))
     } finally {
       setSaving(false)
     }

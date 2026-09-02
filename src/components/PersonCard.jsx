@@ -90,7 +90,7 @@ function PersonCardBody({ profileId, onClose }) {
       onClose()
       navigate(`/chat/dm/${dm}`)
     } catch (err) {
-      setChatError(err.message || 'Could not open a chat with them.')
+      setChatError(friendlyMessage(err, 'Could not open a chat with them.'))
     }
   }
 

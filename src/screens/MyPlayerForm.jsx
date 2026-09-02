@@ -28,6 +28,7 @@ import {
 import useOwnContactGate from '../lib/useOwnContactGate.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 import { parentNameProblem, toEditorRows, toSaveRows } from '../lib/parentRows.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Today's date, for the birthday cap — nobody is born in the future. The
 // database (player_private_dob_sane) is the real guard; this only saves a
@@ -288,7 +289,7 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
       onSaved?.()
       onClose?.()
     } catch (err) {
-      setError(err.message || "We couldn't save those changes. Try again.")
+      setError(friendlyMessage(err, "We couldn't save those changes. Try again."))
       setSaving(false)
     }
   }

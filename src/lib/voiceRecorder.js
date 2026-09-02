@@ -1,3 +1,4 @@
+import { friendlyMessage } from './friendlyError.js'
 // The voice-note recorder — a thin, testable wrapper over the browser's
 // MediaRecorder. No React here on purpose: the state machine (idle → recording →
 // stopped/cancelled, plus the five-minute auto-stop and format negotiation) is
@@ -68,7 +69,7 @@ export function describeRecorderError(err) {
     case 'AbortError':
       return 'Your microphone is busy or unavailable — close other apps using it, then try again.'
     default:
-      return err?.message || 'Could not start recording. Please try again.'
+      return friendlyMessage(err, 'Could not start recording. Please try again.')
   }
 }
 

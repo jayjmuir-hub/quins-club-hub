@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth.jsx'
 import Button from '../components/Button.jsx'
 import { checkPassword } from '../lib/password.js'
 import crest from '../assets/crest.png'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Where a password-reset link lands. Added 8 Aug 2026 with password auth —
 // see claude/decisions/2026-08-08-parent-self-registration.md.
@@ -69,7 +70,7 @@ export default function ResetPassword() {
       // a different set (expired recovery session, password reuse), and the
       // sign-in screen's translations would mislead. The raw message is the
       // more useful thing for the handful of people who get this far.
-      setError(err?.message || 'Could not set your new password. Try the link again.')
+      setError(friendlyMessage(err, 'Could not set your new password. Try the link again.'))
       setStatus('idle')
     }
   }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Button from './Button.jsx'
 import { listPitchRequests, requestPitch, withdrawRequest } from '../data/pitchRequests.js'
 import { PITCH_TBD } from '../data/pitches.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // "Request a pitch", and the tracking that follows it, on the event sheet.
 //
@@ -205,7 +206,7 @@ export default function PitchRequest({ event, canEdit }) {
 
       {error && (
         <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
-          {error.message || "That didn't send. Try again."}
+          {friendlyMessage(error, "That didn't send. Try again.")}
         </p>
       )}
     </div>

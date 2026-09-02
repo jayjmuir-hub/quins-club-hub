@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Button from './Button.jsx'
 import { inviteParent } from '../data/parents.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The Invite button on one parent/carer row (plan:
 // claude/plans/2026-08-16-account-creation-redesign.md, item 4).
@@ -186,7 +187,7 @@ export default function InviteParentButton({ parent, disabled = false }) {
           role="alert"
           className="mt-2 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
         >
-          {error.message}
+          {friendlyMessage(error, "We couldn't send that invite. Try again.")}
         </p>
       )}
     </div>

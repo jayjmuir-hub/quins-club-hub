@@ -28,6 +28,7 @@ import {
   homeAwayLabel,
 } from '../lib/eventFormat.js'
 import { DEFAULT_FORMAT, formatLabel, formatOf } from '../lib/fixtureFormat.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The compact share tag (¼/⅓/½) ONLY when a booking takes part of a pitch. A
 // full or unset pitch is the whole thing — nobody is sharing it — so it returns
@@ -160,7 +161,7 @@ function AvailabilitySummary({ eventId }) {
   if (error) {
     return (
       <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
-        {error.message || "We couldn't load availability. Try again."}
+        {friendlyMessage(error, "We couldn't load availability. Try again.")}
       </p>
     )
   }
@@ -331,7 +332,7 @@ function FooterActions({ event, canEdit, onEdit, onDuplicate, onDeleted }) {
           role="alert"
           className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
         >
-          {error.message || "We couldn't delete that. Try again."}
+          {friendlyMessage(error, "We couldn't delete that. Try again.")}
         </p>
       )}
 

@@ -35,6 +35,7 @@ import {
   scoringForTeam,
   totalFor,
 } from '../lib/scoring.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The RCM Official Match Result Sheet — Project 2.
 //
@@ -825,7 +826,7 @@ export default function MatchSheet() {
       <Card role="alert" className="p-6 text-center">
         <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t open that sheet</h3>
         <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-          {error.message || 'Something went wrong.'}
+          {friendlyMessage(error, 'Something went wrong.')}
         </p>
         <Button onClick={() => navigate('/schedule')} className="mx-auto mt-4">
           Back to the schedule
@@ -968,7 +969,7 @@ export default function MatchSheet() {
         )}
         {saveError && (
           <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
-            {saveError.message || "That didn't save. Try again."}
+            {friendlyMessage(saveError, "That didn't save. Try again.")}
           </p>
         )}
 

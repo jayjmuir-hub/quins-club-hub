@@ -44,6 +44,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { ADMIN_RIGHTS, adminRightLabel, canApproveAnything, isAdmin, isSuperAdmin } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 import { joinPhone, splitPhone, whatsappUrl } from '../lib/phone.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Admin Accounts screen (design spec 2026-08-03 §2): view and edit who has
 // access to the club — display name, role, age group, and revoking access.
@@ -817,7 +818,7 @@ function EditorContactRow({ group }) {
       const dm = await openConversation(group.profileId)
       navigate(`/chat/dm/${dm}`)
     } catch (err) {
-      setChatError(err.message || 'Could not open a chat with them.')
+      setChatError(friendlyMessage(err, 'Could not open a chat with them.'))
     }
   }
 
@@ -1507,7 +1508,7 @@ export default function Accounts() {
     } catch (err) {
       patchTriage(profile.id, {
         saving: false,
-        error: err.message || "Couldn't dismiss this person. Try again.",
+        error: friendlyMessage(err, "Couldn't dismiss this person. Try again."),
       })
     }
   }
@@ -1521,7 +1522,7 @@ export default function Accounts() {
     } catch (err) {
       patchTriage(profile.id, {
         saving: false,
-        error: err.message || "Couldn't restore this person. Try again.",
+        error: friendlyMessage(err, "Couldn't restore this person. Try again."),
       })
     }
   }
@@ -1554,7 +1555,7 @@ export default function Accounts() {
         teams: updated.team_id ? teamsById.get(updated.team_id) ?? null : null,
       })
     } catch (err) {
-      patchRow(member.id, { error: err?.message || "We couldn't save that change." })
+      patchRow(member.id, { error: friendlyMessage(err, "We couldn't save that change.") })
     } finally {
       patchRow(member.id, { saving: false })
     }
@@ -1577,7 +1578,7 @@ export default function Accounts() {
       })
     } catch (err) {
       patchRow(member.id, {
-        error: err?.message || "We couldn't remove that access.",
+        error: friendlyMessage(err, "We couldn't remove that access."),
         saving: false,
         confirming: false,
       })
@@ -1604,7 +1605,7 @@ export default function Accounts() {
     } catch (err) {
       patchRow(member.id, {
         saving: false,
-        error: err?.message || "We couldn't approve that person.",
+        error: friendlyMessage(err, "We couldn't approve that person."),
       })
     }
   }
@@ -1669,7 +1670,7 @@ export default function Accounts() {
     } catch (err) {
       patchGrant(key, {
         saving: false,
-        error: err?.message || "We couldn't give that person access.",
+        error: friendlyMessage(err, "We couldn't give that person access."),
       })
     }
   }
@@ -1782,7 +1783,7 @@ export default function Accounts() {
           ...prev[group.key],
           saving: false,
           saved: false,
-          error: err?.message || "We couldn't save those details.",
+          error: friendlyMessage(err, "We couldn't save those details."),
         },
       }))
     }
@@ -2349,7 +2350,7 @@ export default function Accounts() {
         <Card role="alert" className="p-6 text-center">
           <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load accounts</h3>
           <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-            {error.message || 'Something went wrong. Try again.'}
+            {friendlyMessage(error, 'Something went wrong. Try again.')}
           </p>
           <Button onClick={() => setReloadToken((token) => token + 1)} className="mt-4">
             Try again

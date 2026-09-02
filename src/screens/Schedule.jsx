@@ -36,6 +36,7 @@ import {
   initialVisibleMonthCount,
   showMoreMonthsLabel,
 } from '../lib/scheduleMonthGroups.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Same reasoning as Roster's: the filter has to outlive a reload, or a coach
 // who runs one age group re-filters on every visit. Separate key from the
@@ -824,7 +825,7 @@ export default function Schedule() {
         <Card role="alert" className="p-6 text-center">
           <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the schedule</h3>
           <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-            {error.message || 'Something went wrong. Try again.'}
+            {friendlyMessage(error, 'Something went wrong. Try again.')}
           </p>
           <Button onClick={() => setReloadToken((token) => token + 1)} className="mt-4">
             Try again

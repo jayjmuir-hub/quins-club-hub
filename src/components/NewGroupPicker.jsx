@@ -4,6 +4,7 @@ import Card from './Card.jsx'
 import Spinner from './Spinner.jsx'
 import { Avatar, RolePill } from './NewChatPicker.jsx'
 import { addGroupMembers, createGroup, listGroupCandidates } from '../data/messages.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // "New group" — the pencil's second option (claude/plans/2026-08-24-group-chats.md).
 // A MULTI-select over group_candidates(): the same audience rule as DMs with
@@ -90,7 +91,7 @@ export default function NewGroupPicker({
         onCreated(await create(name.trim(), [...selected]))
       }
     } catch (err) {
-      setError(err.message || 'Could not save the group just now.')
+      setError(friendlyMessage(err, 'Could not save the group just now.'))
       setBusy(false)
     }
   }

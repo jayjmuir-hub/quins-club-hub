@@ -3,6 +3,7 @@ import Button from './Button.jsx'
 import Card from './Card.jsx'
 import Spinner from './Spinner.jsx'
 import { channelMembers } from '../data/messages.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // WHO IS IN THIS CHANNEL — the WhatsApp gesture (tap the header, see the
 // people), for every channel kind (claude/plans/2026-08-30-role-channels.md).
@@ -36,7 +37,7 @@ export default function ChannelMembersSheet({ open, onClose, channel, teamId = n
         if (stale) return
         setMembers([...rows].sort((a, b) => a.full_name.localeCompare(b.full_name)))
       })
-      .catch((err) => !stale && setError(err.message || 'Could not load the member list.'))
+      .catch((err) => !stale && setError(friendlyMessage(err, 'Could not load the member list.')))
     return () => {
       stale = true
     }

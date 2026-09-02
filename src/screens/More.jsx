@@ -16,6 +16,7 @@ import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 import { roleLabel, visibleTeams } from '../lib/scope.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The "More" tab, for EVERYONE (admin-dashboard plan, 2026-08-05).
 //
@@ -189,7 +190,7 @@ function YouCard({ profile, email, role, squads }) {
       // person straight back in the state this change exists to avoid.
       setEditing(false)
     } catch (err) {
-      setError(err.message || "We couldn't save your details. Try again.")
+      setError(friendlyMessage(err, "We couldn't save your details. Try again."))
     } finally {
       setSaving(false)
     }

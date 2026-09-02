@@ -7,6 +7,7 @@ import { MISMATCH, PLAY_UP, ageGradeCheck } from '../lib/ageGrade.js'
 import { registerMyPlayer, updateProfileNames } from '../data/members.js'
 import { setPlayerDob } from '../data/players.js'
 import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // A parent registers ONE OR MORE children in one go.
 //
@@ -743,7 +744,7 @@ export default function PlayerRegistrationForm({
         // reload.
         primeMyProfileCache(profile.id, updated)
       } catch (err) {
-        setError(err?.message || "We couldn't save your name. Try again in a moment.")
+        setError(friendlyMessage(err, "We couldn't save your name. Try again in a moment."))
         setSubmitting(false)
         return
       }
@@ -814,7 +815,7 @@ export default function PlayerRegistrationForm({
         // registerMyPlayer has already turned the RPC's error code into a
         // sentence (see REGISTER_MESSAGES in src/data/members.js). Anything
         // still without a message is a network-level failure.
-        const reason = err?.message || "We couldn't add that player. Try again in a moment."
+        const reason = friendlyMessage(err, "We couldn't add that player. Try again in a moment.")
         setSaved(done)
         // ⚠️ THE TWO GUARD CODES GET A TICK RATHER THAN A DEAD END. Both
         // refusals describe something that is USUALLY a mistake and

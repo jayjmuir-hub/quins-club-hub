@@ -31,6 +31,7 @@ import {
   groupByCoach,
   shelfRowsForSquad,
 } from '../lib/trainingShelf.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Spotify-style training shelf on Squad Training.
 // Spec: claude/specs/2026-08-27-training-shelf.md
@@ -204,7 +205,7 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
     <div data-testid="training-shelf" className="mb-4">
       {error && (
         <p role="alert" className="mb-3 text-[13px] font-semibold text-danger-ink">
-          {error.message || 'Something went wrong applying that hour.'}
+          {friendlyMessage(error, 'Something went wrong applying that hour.')}
         </p>
       )}
 

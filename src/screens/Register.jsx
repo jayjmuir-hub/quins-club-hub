@@ -8,6 +8,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam } from '../lib/scope.js'
 import { initials } from '../lib/playerFormat.js'
 import { eventDate, eventTitle, formatLongDate } from '../lib/eventFormat.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The register — who actually turned up.
 //
@@ -197,7 +198,7 @@ export default function Register({ event, team, onClose }) {
         </div>
       ) : error ? (
         <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
-          {error.message || "We couldn't load the register. Try again."}
+          {friendlyMessage(error, "We couldn't load the register. Try again.")}
         </p>
       ) : players.length === 0 ? (
         <p className="py-8 text-center text-sm text-ink-faint">
@@ -224,7 +225,7 @@ export default function Register({ event, team, onClose }) {
 
           {saveError && (
             <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
-              {saveError.message || "We couldn't save that. Try again."}
+              {friendlyMessage(saveError, "We couldn't save that. Try again.")}
             </p>
           )}
 

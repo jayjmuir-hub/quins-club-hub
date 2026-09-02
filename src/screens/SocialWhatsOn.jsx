@@ -10,6 +10,7 @@ import { hasAdminRight, visibleTeams } from '../lib/scope.js'
 import { CLUB_TIME_ZONE, clubToday, eventChipKind, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // "What's on" — the Social Media Management all-in-one view. Jay, 12 Aug 2026:
 // "give the social media manager all in one view of the events happening or
@@ -143,7 +144,7 @@ export default function SocialWhatsOn() {
       <Card role="alert" className="p-6 text-center">
         <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load what&apos;s on</h3>
         <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-          {error.message || 'Something went wrong. Try again.'}
+          {friendlyMessage(error, 'Something went wrong. Try again.')}
         </p>
         <Button onClick={() => setReloadToken((token) => token + 1)} className="mx-auto mt-4">
           Try again

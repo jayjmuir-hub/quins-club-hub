@@ -7,6 +7,7 @@ import { enterSends, setEnterSends } from '../lib/chatComposer.js'
 import { effectiveTheme, toggleTheme, watchSystemTheme } from '../lib/theme.js'
 import { ViewAsOptions } from './ViewAsSwitcher.jsx'
 import { GetAppMenuItem } from './AppButton.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The masthead's account menu: the initial button, and everything that used to
 // sit beside it in the row.
@@ -292,7 +293,7 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
     try {
       await signOut()
     } catch (err) {
-      setSignOutError(err.message || 'Something went wrong signing out. Try again.')
+      setSignOutError(friendlyMessage(err, 'Something went wrong signing out. Try again.'))
       setSigningOut(false)
     }
   }

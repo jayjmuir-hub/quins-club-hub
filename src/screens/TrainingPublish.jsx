@@ -16,6 +16,7 @@ import { clubToday } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { describePublishRow, squadFitsTemplate, textOrNull } from '../lib/trainingPlans.js'
 import TrainingGate from './TrainingGate.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The Publish tab of the Rugby Performance Director portal — one template onto
 // several squads' existing training sessions, and the focus periods that label
@@ -408,7 +409,7 @@ function PublishBody() {
           We couldn&apos;t load this screen
         </h3>
         <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-          {error.message || 'Something went wrong. Try again.'}
+          {friendlyMessage(error, 'Something went wrong. Try again.')}
         </p>
         <Button onClick={() => setReloadToken((token) => token + 1)} className="mx-auto mt-4">
           Try again
@@ -553,7 +554,7 @@ function PublishBody() {
 
           {publishError && (
             <p role="alert" className="text-[12.5px] font-semibold text-danger-ink">
-              {publishError.message || "That didn't run. Try again."}
+              {friendlyMessage(publishError, "That didn't run. Try again.")}
             </p>
           )}
         </div>
@@ -707,7 +708,7 @@ function PublishBody() {
 
         {focusError && (
           <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
-            {focusError.message || "That didn't save. Try again."}
+            {friendlyMessage(focusError, "That didn't save. Try again.")}
           </p>
         )}
       </Card>

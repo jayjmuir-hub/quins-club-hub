@@ -147,6 +147,7 @@ import {
   parseDateInput,
   weekdayOf,
 } from '../lib/recurrence.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The event add/edit form (design-system.md §5.6), opened in the shared
 // Sheet from Schedule's "Add event" button and from EventDetail's "Edit".
@@ -2025,7 +2026,7 @@ export default function EventForm({
                 role="alert"
                 className="mt-2 rounded-[9px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink"
               >
-                {previewError.message}
+                {friendlyMessage(previewError, "We couldn't count the later sessions. Try again.")}
               </p>
             ) : (
               <>
@@ -2668,7 +2669,7 @@ export default function EventForm({
             role="alert"
             className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
           >
-            {error.message || "We couldn't save that. Try again."}
+            {friendlyMessage(error, "We couldn't save that. Try again.")}
           </p>
         )}
 

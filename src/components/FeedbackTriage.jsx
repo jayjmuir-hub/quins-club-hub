@@ -14,6 +14,7 @@ import {
   FEEDBACK_STATUS_LABELS,
   OPEN_STATUSES,
 } from '../data/feedback.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // What members have reported, and what has been done about it.
 // Design: claude/plans/2026-08-18-help-and-feedback.md.
@@ -220,7 +221,7 @@ export default function FeedbackTriage() {
     try {
       setRows(await listFeedback())
     } catch (err) {
-      setError(err?.message || 'Could not load reports.')
+      setError(friendlyMessage(err, 'Could not load reports.'))
     }
   }, [])
 
@@ -254,7 +255,7 @@ export default function FeedbackTriage() {
       )
     } catch (err) {
       await load()
-      setError(err?.message || 'That reply did not save.')
+      setError(friendlyMessage(err, 'That reply did not save.'))
     } finally {
       setBusyId(null)
     }
@@ -278,7 +279,7 @@ export default function FeedbackTriage() {
       // silently snapped back to its old value with nothing on screen, which
       // is precisely how somebody believes they closed a report they did not.
       await load()
-      setError(err?.message || 'That status did not save.')
+      setError(friendlyMessage(err, 'That status did not save.'))
     } finally {
       setBusyId(null)
     }
@@ -301,7 +302,7 @@ export default function FeedbackTriage() {
       // message first means the reload wipes it and the row silently
       // reappears with nothing on screen to say why.
       await load()
-      setError(err?.message || 'That report was not deleted.')
+      setError(friendlyMessage(err, 'That report was not deleted.'))
     } finally {
       setBusyId(null)
     }

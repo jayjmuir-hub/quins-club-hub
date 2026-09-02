@@ -37,6 +37,7 @@ import { useMemberships } from './memberships.jsx'
 import { usePresence } from './presence.js'
 import { isAdmin } from './scope.js'
 import useStayPinnedToBottom from './useStayPinnedToBottom.js'
+import { friendlyMessage } from './friendlyError.js'
 
 // The DM/group thread's entire state and behaviour, extracted VERBATIM from
 // src/screens/DirectMessages.jsx on 26 Aug 2026 so the full screen and the
@@ -201,7 +202,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
         logWelfareAccess(conversationId)
       }
     } catch (err) {
-      setError(err.message || 'We could not load this conversation.')
+      setError(friendlyMessage(err, 'We could not load this conversation.'))
     }
   }, [conversationId, selfId, admin])
 
@@ -321,7 +322,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       // ⚠️ The draft and the tray SURVIVE a failure. Everything the member
       // typed and chose is still there, so the retry costs one tap — which
       // matters most on exactly the slow connection that caused the failure.
-      setError(err.message || 'Could not send that.')
+      setError(friendlyMessage(err, 'Could not send that.'))
     } finally {
       setProgress(null)
       setSending(false)
@@ -333,7 +334,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       await toggleReaction(messageId, selfId, emoji, on)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not react to that.')
+      setError(friendlyMessage(err, 'Could not react to that.'))
     }
   }
 
@@ -342,7 +343,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       await setPollVote(optionId, selfId, on)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not record that vote.')
+      setError(friendlyMessage(err, 'Could not record that vote.'))
     }
   }
 
@@ -357,7 +358,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       await sendDirectMessage(conversationId, '', { attachmentPath })
       await load()
     } catch (err) {
-      setError(err.message || 'Could not send that voice message.')
+      setError(friendlyMessage(err, 'Could not send that voice message.'))
     } finally {
       setSending(false)
     }
@@ -373,7 +374,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       await load()
       return true
     } catch (err) {
-      setError(err.message || 'Could not post that poll.')
+      setError(friendlyMessage(err, 'Could not post that poll.'))
       return false
     } finally {
       setPostingPoll(false)
@@ -397,7 +398,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       if (gone?.attachment_path && gone.author_id === selfId) await removeChatPhoto(gone.attachment_path)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not remove that.')
+      setError(friendlyMessage(err, 'Could not remove that.'))
     }
   }
 
@@ -427,7 +428,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       try {
         setForwardRows(await listChats())
       } catch (err) {
-        setError(err.message || 'Could not load your chats.')
+        setError(friendlyMessage(err, 'Could not load your chats.'))
         setForwarding(false)
       }
     }
@@ -441,7 +442,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     } catch (err) {
       // The same refusal a typed message would get — can_dm, announce-only,
       // blocks — worded by the database, surfaced here.
-      setError(err.message || 'Could not forward that.')
+      setError(friendlyMessage(err, 'Could not forward that.'))
     }
   }
 
@@ -458,7 +459,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       await setPinned(m.id, !m.pinned)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not pin that.')
+      setError(friendlyMessage(err, 'Could not pin that.'))
     }
   }
 
@@ -467,7 +468,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       await toggleStar(selfId, m.id, !stars.has(m.id))
       setStars(await listMyStars())
     } catch (err) {
-      setError(err.message || 'Could not star that.')
+      setError(friendlyMessage(err, 'Could not star that.'))
     }
   }
 
@@ -479,7 +480,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       const dm = await openConversation(m.author_id)
       goToDm(dm, { replyTo: m })
     } catch (err) {
-      setError(err.message || 'Could not open a chat with them.')
+      setError(friendlyMessage(err, 'Could not open a chat with them.'))
     }
   }
 
@@ -490,7 +491,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       const dm = await openConversation(profileId)
       goToDm(dm)
     } catch (err) {
-      setError(err.message || 'Could not open a chat with them.')
+      setError(friendlyMessage(err, 'Could not open a chat with them.'))
     }
   }
 
@@ -501,7 +502,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       setReporting(null)
       setReason('')
     } catch (err) {
-      setError(err.message || 'Could not send the report.')
+      setError(friendlyMessage(err, 'Could not send the report.'))
     }
   }
 

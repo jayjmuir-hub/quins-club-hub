@@ -12,6 +12,7 @@ import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel } from '../lib/eve
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { deadlineLabel, isOverdue, matchSheetApplies, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The Club Youth Manager's dashboard — every match, and whether its RCM sheet
 // is done. Behind the `youth` admin right, which already existed in
@@ -174,7 +175,7 @@ export default function YouthDashboard() {
       <Card role="alert" className="p-6 text-center">
         <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the matches</h3>
         <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-          {error.message || 'Something went wrong. Try again.'}
+          {friendlyMessage(error, 'Something went wrong. Try again.')}
         </p>
         <Button onClick={() => setReloadToken((token) => token + 1)} className="mx-auto mt-4">
           Try again

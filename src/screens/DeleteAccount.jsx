@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth.jsx'
 import Login from './Login.jsx'
 import { deleteMyAccount } from '../data/account.js'
 import Button from '../components/Button.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // /delete-account — PUBLIC, and it is both halves of Google Play's account
 // deletion requirement in one screen:
@@ -168,7 +169,7 @@ export default function DeleteAccount() {
                   role="alert"
                   className="mt-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
                 >
-                  {error.message || "We couldn't delete your account. Try again."}
+                  {friendlyMessage(error, "We couldn't delete your account. Try again.")}
                 </p>
               )}
 

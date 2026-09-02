@@ -6,6 +6,7 @@ import { listAppearances } from '../data/appearances.js'
 import { leaverName } from '../lib/leavers.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // "Who hasn't had a chance to play?" — phase 1 of
 // claude/plans/2026-08-14-tiers-and-game-time.md. Jay, 14 Aug 2026:
@@ -149,7 +150,7 @@ export default function GameTime() {
           role="alert"
           className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
         >
-          {error.message || "We couldn't load game time. Try again."}
+          {friendlyMessage(error, "We couldn't load game time. Try again.")}
         </p>
       )}
 

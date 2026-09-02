@@ -7,6 +7,7 @@ import { addClubOfficer, listClubOfficers, removeClubOfficer } from '../data/off
 import { OFFICER_TITLES } from '../lib/identity.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isSuperAdmin } from '../lib/scope.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // /admin/officers — the club's committee list, super admins only
 // (claude/plans/2026-08-26-club-officers.md). Jay: "no special rights with
@@ -48,7 +49,7 @@ export default function AdminOfficers() {
     try {
       setOfficers(await listClubOfficers())
     } catch (err) {
-      setError(err.message || 'We could not load the officers just now.')
+      setError(friendlyMessage(err, 'We could not load the officers just now.'))
     }
     // The picker's people — every adult account the admin can already read.
     // Decoration for the ADD control only; a failure leaves remove working.
@@ -91,7 +92,7 @@ export default function AdminOfficers() {
       setPicks((p) => ({ ...p, [title]: '' }))
       await load()
     } catch (err) {
-      setError(err.message || 'Could not appoint them.')
+      setError(friendlyMessage(err, 'Could not appoint them.'))
     } finally {
       setSaving(false)
     }
@@ -103,7 +104,7 @@ export default function AdminOfficers() {
       await removeClubOfficer(id)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not remove that.')
+      setError(friendlyMessage(err, 'Could not remove that.'))
     }
   }
 
