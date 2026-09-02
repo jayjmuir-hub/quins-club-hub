@@ -43,7 +43,10 @@ export default function AttachmentTray({ items, onRemove, error }) {
                 // them apart. Counted, and recounted after each removal.
                 aria-label={`Remove photo ${index + 1} of ${items.length}`}
                 onClick={() => onRemove(item.id)}
-                className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-ink text-surface shadow-card"
+                // 20px on screen, 44px to the thumb via ::before — the one
+                // control a parent needs after picking the wrong photo
+                // (2 Sep 2026 UX review, item 5).
+                className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-ink text-surface shadow-card before:absolute before:-inset-3 before:content-['']"
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true">
                   <path d="M6 6l12 12M18 6 6 18" />

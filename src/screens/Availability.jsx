@@ -79,7 +79,7 @@ function StatusButtons({ status, disabled, onSet, onClear }) {
               // Task 22 fix: these three toggle buttons had no focus-visible
               // ring at all — a real gap the brief's "focus rings are already
               // everywhere" claim didn't hold for. Same convention app-wide.
-              'rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
+              'min-h-[44px] rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[13px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
               pressed ? STATUS_ON[option.value] : STATUS_OFF,
             ].join(' ')}
           >
@@ -135,7 +135,7 @@ function OverrideControl({ value, disabled, onChange }) {
               aria-pressed={active}
               onClick={() => onChange(option.value)}
               className={[
-                'rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[12.5px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
+                'min-h-[44px] rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-[13px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60',
                 active ? 'border-brand bg-brand/10 text-ink' : 'border-line bg-surface-card text-ink-muted hover:bg-surface-mute',
               ].join(' ')}
             >

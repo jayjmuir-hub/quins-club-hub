@@ -129,7 +129,10 @@ const SIZES = {
   // ⚠️ py-3, not py-2.5. This app is used standing on a pitch, one-handed,
   // often wet; 44px is the floor and the old size sat under it.
   md: 'rounded-btn px-4 py-3 text-sm',
-  sm: 'rounded-[6px] px-3 py-2 text-[13px]',
+  // py-2.5, not py-2: sm measured ~33px tall and it fronts the approval
+  // queue's actions (2 Sep 2026 UX review, item 5). Still short of 44 on
+  // purpose — sm sits in dense rows where a full-height button would wrap.
+  sm: 'rounded-[6px] px-3 py-2.5 text-[13px]',
   // For the full-width submit at the foot of a form, which was 15px type
   // everywhere it was hand-rolled. Routing those to `md` would have quietly
   // shrunk the most important button on the screen.

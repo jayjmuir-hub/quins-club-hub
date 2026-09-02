@@ -55,7 +55,10 @@ export default function MessageMenu({ items = [], mine = false }) {
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={toggle}
-        className={`grid h-5 w-5 place-items-center rounded-full ${mine ? 'text-white/70 hover:bg-white/15 hover:text-white' : 'text-ink-faint hover:bg-surface-mute hover:text-ink'}`}
+        // The chevron stays 20px on screen; the ::before pseudo-element gives
+        // it a 44px hit area (2 Sep 2026 UX review, item 5 — on a phone this
+        // is the only route to Reply, Report and Delete).
+        className={`relative grid h-5 w-5 place-items-center rounded-full before:absolute before:-inset-3 before:content-[''] ${mine ? 'text-white/70 hover:bg-white/15 hover:text-white' : 'text-ink-faint hover:bg-surface-mute hover:text-ink'}`}
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m6 9 6 6 6-6" />
