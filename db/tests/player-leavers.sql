@@ -193,9 +193,14 @@ end $$;
 do $$ begin
   perform pg_temp.act_as('stranger');
   begin
+    -- p_gender is required: U16B is a single-gender squad, and the gender
+    -- guard (errcode 22004) runs BEFORE the duplicate-name guard (42710) in
+    -- register_my_player, so the call must clear it to reach what this step
+    -- is actually testing.
     perform public.register_my_player(
       p_full_name => 'Rafiq Delacroix-Obi',
       p_team_id => (select v from fx where k='team'),
+      p_gender => 'male',
       p_confirm_duplicate => false);
     raise exception 'SELF-TEST FAILED: a leaver''s name re-registered as a NEW row';
   exception when others then

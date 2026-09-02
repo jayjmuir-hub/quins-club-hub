@@ -156,8 +156,12 @@ $$;
 
 -- ── invite_parent: refuse a leaver ────────────────────────────────────────
 -- Live body captured 2 Sep 2026 via pg_get_functiondef('public.invite_parent(uuid)'::regprocedure).
--- ⚠️ ONE guard added directly after the existing
---   "That contact is not attached to a player." check.
+-- ⚠️ ONE guard added, placed directly AFTER the existing may_edit
+-- authorisation check (not after the "not attached to a player" check) — the
+-- live body's own comment on that check says authorisation must come before
+-- anything is read back to the caller, or the error messages become an
+-- oracle. Reading left_at before authorisation would let an unauthorised
+-- caller learn a player's leaver status from the error alone.
 create or replace function public.invite_parent(p_parent_row uuid)
 returns public.invites
 language plpgsql security definer set search_path to 'public' as $$
@@ -184,14 +188,17 @@ begin
     raise exception 'That contact is not attached to a player.' using errcode = '22023';
   end if;
 
-  if ply.left_at is not null then
-    raise exception 'That player has left the squad, so nobody can be invited to them.' using errcode = '22023';
-  end if;
-
+  -- ⚠️ AUTHORISATION BEFORE ANYTHING ELSE IS READ BACK TO THE CALLER. Ordering
+  -- this after the email check would turn the error messages into an oracle for
+  -- whether a given contact row has an address on file.
   may_edit := private.is_own_player(row_p.player_id)
               or private.can_edit_team(ply.team_id);
   if not may_edit then
     raise exception 'You cannot invite that person.' using errcode = '42501';
+  end if;
+
+  if ply.left_at is not null then
+    raise exception 'That player has left the squad, so nobody can be invited to them.' using errcode = '22023';
   end if;
 
   clean := lower(nullif(btrim(row_p.email), ''));
@@ -199,15 +206,24 @@ begin
     raise exception 'There is no email address on that contact yet. Add one first.'
       using errcode = '22023';
   end if;
+  -- Deliberately weak: a real address check is impossible and a strict pattern
+  -- refuses valid addresses. This only catches the obvious typo before an email
+  -- is spent on it.
   if position('@' in clean) = 0 then
     raise exception 'That contact''s email address does not look right.' using errcode = '22023';
   end if;
 
+  -- ⚠️ SOMEBODY WITH AN ACCOUNT MUST NOT BE "INVITED". accept_invite would
+  -- create a SECOND membership for a person who already has one, and the button
+  -- would be offering a duplicate account to someone who simply needs linking.
   if exists (select 1 from public.profiles pr where lower(pr.email) = clean) then
     raise exception 'That person already has an account. Ask an admin to connect them instead.'
       using errcode = '42710';
   end if;
 
+  -- Idempotent: a second press returns the invite already outstanding rather
+  -- than minting a second token. Two live tokens for one address is two ways in
+  -- and one of them is untracked.
   select * into existing
     from public.invites i
    where lower(i.email) = clean
@@ -218,6 +234,7 @@ begin
     return existing;
   end if;
 
+  -- THE RULE. See the header: only what the caller could already approve.
   may_grant := private.can_approve_team(ply.team_id);
 
   insert into public.invites (club_id, email, role, team_id, player_id, created_by, grant_status)
