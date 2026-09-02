@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { mainWidthClass } from '../lib/screenWidth.js'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import FloatingChatDock from './FloatingChatDock.jsx'
@@ -741,7 +742,12 @@ export default function AppShell({ children }) {
         // padding (safe-area included), and any padding under it here is the
         // same jitter at a smaller size — pinned flush mid-scroll, resting
         // N px higher at the end.
-        className={`mx-auto w-full max-w-[1120px] flex-1 px-4 ${conversationScreen ? 'flex flex-col' : 'pb-[calc(108px+env(safe-area-inset-bottom))] desktop:pb-16'} pt-4 desktop:mx-0 desktop:max-w-none desktop:px-6 wide:max-w-none focus:outline-none`}
+        // ⚠️ THE DESKTOP WIDTH IS PER SCREEN SINCE 2 Sep 2026 (UX review item
+        // 8): tables, grids and threads fill it, everything else gets a
+        // readable cap — src/lib/screenWidth.js has the list and the
+        // reasoning, including why this does not reverse the 26 Aug ruling.
+        // Below `desktop` the 1120px centred column is unchanged.
+        className={`mx-auto w-full max-w-[1120px] flex-1 px-4 ${conversationScreen ? 'flex flex-col' : 'pb-[calc(108px+env(safe-area-inset-bottom))] desktop:pb-16'} pt-4 desktop:mx-0 desktop:px-6 ${mainWidthClass(location.pathname)} focus:outline-none`}
       >
         {/* ⚠️ ABOVE THE loading/error/ready SPLIT, DELIBERATELY. Installing is
             not gated on having a membership: a parent who has just signed up
