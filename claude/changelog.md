@@ -10,7 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **feat(seniors): senior squads, jersey numbers, players in more than one
+- **fix(ui): pitch-side tap targets reach 44px.** Item 5 of the 2 Sep 2026 UX
+  review. Availability In / Maybe / Out (measured ~34px) and the lineup row
+  actions Bench / Remove / Start / Shirt (~25px) get `min-h-[44px]`; the chat
+  message chevron (20px), the composer tray Remove (20px) and every Sheet's
+  close button (32px) keep their size on screen and gain a 44px hit area via a
+  `::before` pseudo-element; an idle dock tab is `min-w-[44px]` (was 38);
+  Button `sm` goes from `py-2` to `py-2.5`, and the approval vouch chips from
+  `py-0.5` to `min-h-[36px]`. `tests/tap-targets.test.js` pins each class with
+  a control, and the built CSS was checked for the `before:` utilities.
+- `2e387ee` — - **feat(seniors): senior squads, jersey numbers, players in more than one
   squad, adult sign-up.** Piece 2a of `claude/plans/2026-09-02-senior-squads.md`
   — squads 2, 3 and 4 of "Order of work"
   (`claude/plans/2026-09-02-senior-squads-2a-implementation.md`). An admin can

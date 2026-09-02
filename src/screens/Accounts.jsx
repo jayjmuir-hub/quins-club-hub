@@ -462,7 +462,7 @@ function PendingApprovals({
                       disabled={Boolean(state.saving)}
                       onClick={() => onVouch(member, option.value)}
                       className={[
-                        'rounded-[6px] border px-2 py-0.5 text-[12px] font-bold transition',
+                        'min-h-[36px] rounded-[6px] border px-2.5 py-1 text-[12px] font-bold transition',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                         vouch.mine === option.value
                           ? 'border-brand bg-brand text-white'
@@ -638,7 +638,7 @@ function PendingStaffRequests({
                       disabled={Boolean(state.saving)}
                       onClick={() => onVouch(member, option.value)}
                       className={[
-                        'rounded-[6px] border px-2 py-0.5 text-[12px] font-bold transition',
+                        'min-h-[36px] rounded-[6px] border px-2.5 py-1 text-[12px] font-bold transition',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                         vouch.mine === option.value
                           ? 'border-brand bg-brand text-white'

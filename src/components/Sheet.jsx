@@ -170,7 +170,9 @@ export function Sheet({ open, onClose, title, children, dismissible = true }) {
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-mute text-ink outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              // 32px on screen, 44px to the thumb via ::before, on every one of
+              // the sheets that inherit this (2 Sep 2026 UX review, item 5).
+              className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-mute text-ink outline-none transition before:absolute before:-inset-1.5 before:content-[''] focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
                 <path d="M6 6l12 12M18 6L6 18" />

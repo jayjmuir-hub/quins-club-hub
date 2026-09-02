@@ -120,7 +120,9 @@ function linkClassName({ isActive }) {
     // White again since the chrome-quarters pass (31 Aug 2026): the dock
     // is opaque dark chrome, so the clear-glass reasons for theme ink
     // (24 Aug, above) and full-strength ink (28 Aug) both retire with it.
-    isActive ? 'px-3 text-white' : 'px-2 text-white/90',
+    // min-w-[44px] on the idle tab: 22px icon + px-2 measured 38px wide
+    // (2 Sep 2026 UX review, item 5). The active pill is wider by its label.
+    isActive ? 'px-3 text-white' : 'min-w-[44px] px-2 text-white/90',
   ].join(' ')
 }
 

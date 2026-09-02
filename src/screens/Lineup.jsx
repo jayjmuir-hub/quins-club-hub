@@ -146,7 +146,7 @@ function PickedRow({ player, status, fixtureTier, grade, onRemove, onToggleRole 
         <button
           type="button"
           onClick={onToggleRole}
-          className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand-ink hover:bg-surface-mute"
+          className="shrink-0 rounded-[8px] px-2 min-h-[44px] py-1 text-[12px] font-boldtext-brand-ink hover:bg-surface-mute"
         >
           {player.role === ROLE_STARTER ? '→ Bench' : '→ Start'}
         </button>
@@ -154,7 +154,7 @@ function PickedRow({ player, status, fixtureTier, grade, onRemove, onToggleRole 
           type="button"
           onClick={onRemove}
           aria-label={`Remove ${player.full_name}`}
-          className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted hover:bg-surface-mute"
+          className="shrink-0 rounded-[8px] px-2 min-h-[44px] py-1 text-[12px] font-boldtext-ink-muted hover:bg-surface-mute"
         >
           Remove
         </button>
@@ -673,7 +673,7 @@ export default function Lineup() {
                           type="button"
                           onClick={() => add(player.id, ROLE_STARTER, pendingSlot)}
                           aria-label={`Give shirt ${pendingSlot + 1} to ${player.full_name}`}
-                          className="shrink-0 rounded-[8px] border-[1.5px] border-brand px-2.5 py-1 text-[11.5px] font-bold text-brand-ink hover:bg-surface-mute"
+                          className="shrink-0 rounded-[8px] border-[1.5px] border-brand px-2.5 min-h-[44px] py-1 text-[12px] font-boldtext-brand-ink hover:bg-surface-mute"
                         >
                           Shirt {pendingSlot + 1}
                         </button>
@@ -681,7 +681,7 @@ export default function Lineup() {
                         <button
                           type="button"
                           onClick={() => add(player.id, ROLE_STARTER)}
-                          className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
+                          className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 min-h-[44px] py-1 text-[12px] font-boldtext-ink hover:bg-surface-mute"
                         >
                           Start
                         </button>
@@ -689,7 +689,7 @@ export default function Lineup() {
                       <button
                         type="button"
                         onClick={() => add(player.id, ROLE_REPLACEMENT)}
-                        className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink hover:bg-surface-mute"
+                        className="shrink-0 rounded-[8px] border-[1.5px] border-line px-2.5 min-h-[44px] py-1 text-[12px] font-boldtext-ink hover:bg-surface-mute"
                       >
                         Bench
                       </button>
@@ -1007,7 +1007,7 @@ export default function Lineup() {
                           <button
                             type="button"
                             onClick={() => toggleRole(playerId)}
-                            className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-brand-ink hover:bg-surface-mute"
+                            className="shrink-0 rounded-[8px] px-2 min-h-[44px] py-1 text-[12px] font-boldtext-brand-ink hover:bg-surface-mute"
                           >
                             → Bench
                           </button>
@@ -1015,7 +1015,7 @@ export default function Lineup() {
                             type="button"
                             onClick={() => remove(playerId)}
                             aria-label={`Remove ${player.full_name}`}
-                            className="shrink-0 rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted hover:bg-surface-mute"
+                            className="shrink-0 rounded-[8px] px-2 min-h-[44px] py-1 text-[12px] font-boldtext-ink-muted hover:bg-surface-mute"
                           >
                             Remove
                           </button>
@@ -1085,21 +1085,21 @@ export default function Lineup() {
                     <button
                       type="button"
                       onClick={() => toggleRole(slotted[selectedSlot])}
-                      className="rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink"
+                      className="rounded-[8px] border-[1.5px] border-line px-2.5 min-h-[44px] py-1 text-[12px] font-boldtext-ink"
                     >
                       → Bench
                     </button>
                     <button
                       type="button"
                       onClick={() => remove(slotted[selectedSlot])}
-                      className="rounded-[8px] border-[1.5px] border-line px-2.5 py-1 text-[11.5px] font-bold text-ink-muted"
+                      className="rounded-[8px] border-[1.5px] border-line px-2.5 min-h-[44px] py-1 text-[12px] font-boldtext-ink-muted"
                     >
                       Remove
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelectedSlot(null)}
-                      className="rounded-[8px] px-2 py-1 text-[11.5px] font-bold text-ink-muted"
+                      className="rounded-[8px] px-2 min-h-[44px] py-1 text-[12px] font-boldtext-ink-muted"
                     >
                       Cancel
                     </button>
