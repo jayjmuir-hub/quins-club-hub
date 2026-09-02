@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(rls): chat authors are no longer "Someone" for anybody who is not
+- **feat(push): a push when somebody with no membership asks to join.** Jay,
+  2 Sep 2026: *"add a push for plain access requests"*. A plain access
+  request (an account with no squad and no child yet) only EMAILED the super
+  admins; the pending-membership case has buzzed phones since 19 Aug.
+  `db/migrations/20260902_access_request_push.sql`: an audience function
+  (active super admins, never the requester — the email's rule, now written
+  in SQL as well), a service-role-only subscriptions function, and a second
+  AFTER INSERT trigger beside the email one, so a push that throws cannot
+  stop an email that works. Same `approval` opt-out category, so no new
+  switch. `supabase/functions/push-send/index.ts` gains the
+  `access_request_id` branch: name, role and requested squad, never the
+  note, tap opens `/admin/accounts`. `db/tests/access-request-push.sql`
+  asserts the audience both ways and the requester exclusion;
+  `tests/push-access-request-link.test.js` is the rot detector. ⚠️
+  **Needs the migration applied AND push-send redeployed**, in that order.
+- `8caa09b` — **fix(rls): chat authors are no longer "Someone" for anybody who is not
   an admin.** Jay, 2 Sep 2026, a team manager's screenshot of the club-wide
   managers channel: every post, the admin's welcome included, read "Someone".
   Measured on production as a real manager and a real parent, in a rolled-back

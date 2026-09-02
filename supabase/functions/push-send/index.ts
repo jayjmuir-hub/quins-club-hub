@@ -17,6 +17,10 @@
 //                       somebody is waiting to be approved
 //                       (AFTER INSERT on public.memberships when pending,
 //                        19 Aug 2026)
+//   { access_request_id }
+//                       somebody with no membership has asked to join
+//                       (AFTER INSERT on public.access_requests when pending,
+//                        2 Sep 2026 — db/migrations/20260902_access_request_push.sql)
 //   { message_id }      squad staff posted in the squad chat
 //                       (AFTER INSERT on public.messages, staff top-level
 //                        posts only — the trigger decides, 23 Aug 2026)
@@ -545,6 +549,28 @@ async function approvalTargets(membershipId: string): Promise<Subscription[]> {
   return await response.json()
 }
 
+/**
+ * The subscriptions a PLAIN ACCESS REQUEST should go to — active super
+ * admins, never the requester, only while pending, minus `approval`
+ * opt-outs. The same recipient rule notify-access-request emails to;
+ * db/migrations/20260902_access_request_push.sql owns it in SQL.
+ */
+async function accessRequestTargets(requestId: string): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/access_request_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _request: requestId }),
+  })
+  if (!response.ok) {
+    throw new Error(`access_request_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
 async function messageTargets(messageId: string): Promise<Subscription[]> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/message_push_subscriptions`, {
     method: 'POST',
@@ -659,6 +685,7 @@ Deno.serve(async (request) => {
   let announcementId = ''
   let messageId = ''
   let approvalMembershipId = ''
+  let accessRequestId = ''
   let documentId = ''
   let squad: Record<string, string> | null = null
   let nudge: Record<string, string> | null = null
@@ -668,6 +695,7 @@ Deno.serve(async (request) => {
     announcementId = String(payload?.announcement_id ?? '')
     messageId = String(payload?.message_id ?? '')
     approvalMembershipId = String(payload?.approval_membership_id ?? '')
+    accessRequestId = String(payload?.access_request_id ?? '')
     documentId = String(payload?.document_id ?? '')
     squad = payload?.squad_push ?? null
     nudge = payload?.availability_nudge ?? null
@@ -679,7 +707,7 @@ Deno.serve(async (request) => {
   // notified.
   if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0)
       + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) + (messageId ? 1 : 0)
-      + (documentId ? 1 : 0) !== 1) {
+      + (documentId ? 1 : 0) + (accessRequestId ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
@@ -830,6 +858,51 @@ Deno.serve(async (request) => {
         // about the same thing.
         tag: `approval-${approvalMembershipId}`,
         subscriptions: await approvalTargets(approvalMembershipId),
+      }
+    } else if (accessRequestId) {
+      // ⚠️ THE PROFILE EMBED NAMES ITS FK. access_requests has two foreign
+      // keys to profiles (profile_id and decided_by), so a bare `profiles(...)`
+      // is ambiguous and PostgREST refuses the whole query — the exact 500
+      // that hid the access-request EMAIL for a day on 12 Aug 2026.
+      const rows = await db(
+        `access_requests?id=eq.${encodeURIComponent(accessRequestId)}` +
+          '&select=status,requested_role,profiles!access_requests_profile_id_fkey(full_name),teams(name)',
+      )
+      const ask = rows?.[0]
+      if (!ask) return new Response('not found', { status: 404 })
+
+      // Same guard as the approval branch: pg_net is asynchronous, and an
+      // admin who dismissed within seconds must not be buzzed about it.
+      if (ask.status !== 'pending') {
+        return new Response('ok (no longer pending)', { status: 200 })
+      }
+
+      const who = ask?.profiles?.full_name?.trim() || 'Somebody'
+      const teamName = ask?.teams?.name ?? null
+      // ⚠️ NEVER THE NOTE. It is the one field written by an account the
+      // club has not admitted, and this string lands on a lock screen. The
+      // email shows it, truncated, inside an authenticated inbox; a
+      // notification tray is not that.
+      const roleLabel = APPROVAL_ROLE_LABELS[ask.requested_role as string] ?? null
+
+      job = {
+        title: 'Somebody has asked to join',
+        body: escapeHtmlFree(
+          `${who} has asked for access` +
+            (roleLabel ? ` as a ${roleLabel}` : '') +
+            (teamName ? ` for ${teamName}` : '') +
+            '.',
+        ).slice(0, 200),
+        // ⚠️ /admin/accounts, NOT /approvals. The audience is SUPER ADMINS
+        // ONLY (access_request_push_subscriptions), who pass the isAdmin()
+        // gate on /admin, and the waiting list lives on Accounts. The
+        // approval push links to /approvals because ITS audience includes
+        // squad staff who cannot open /admin; that reasoning does not apply
+        // here. tests/push-access-request-link.test.js pins it.
+        url: `${APP_URL}/admin/accounts`,
+        // Per request: two people asking are two notifications.
+        tag: `access-request-${accessRequestId}`,
+        subscriptions: await accessRequestTargets(accessRequestId),
       }
     } else if (messageId) {
       // ⚠️ THE SQUAD NAME AND THE FIRST LINE — NEVER A CHILD'S NAME BY
