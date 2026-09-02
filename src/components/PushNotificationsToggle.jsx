@@ -149,7 +149,8 @@ export default function PushNotificationsToggle() {
   return (
     <>
       <p className="text-sm leading-relaxed text-ink">
-        Get a notification on this device when somebody at the club replies to a report you sent.
+        Get notifications on this device: notices for your squads, chat, fixture changes,
+        and replies to anything you reported. You choose which below.
       </p>
 
       {error && (

@@ -607,7 +607,26 @@ export default function EventDetail({
         {!event.league_team && event.league_team_tbd === true && (
           <KeyValue label="League team">TBD — not known yet</KeyValue>
         )}
-        <KeyValue label="Venue">{event.venue || 'To be confirmed'}</KeyValue>
+        {/* ⚠️ A MAPS LINK, NOT PLAIN TEXT (2 Sep 2026 UX review, parents,
+            Medium): "find the location" is a stated parent job and nothing
+            linked to a map. The pitch is appended to the search so a venue
+            with several pitches lands closer. A search URL, not an embed —
+            it opens whatever maps app the phone owns. */}
+        <KeyValue label="Venue">
+          {event.venue ? (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([event.venue, pitch].filter(Boolean).join(' '))}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="venue-map-link"
+              className="font-bold text-brand-ink underline underline-offset-2"
+            >
+              {event.venue}
+            </a>
+          ) : (
+            'To be confirmed'
+          )}
+        </KeyValue>
         {/* Only when set. Unlike Venue, which falls back to "To be
             confirmed" because every event has one somewhere, a pitch is
             genuinely optional — a social has none, and every event created

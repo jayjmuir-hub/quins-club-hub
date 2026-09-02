@@ -108,3 +108,22 @@ describe('EventDetail — the format row', () => {
     expect(screen.queryByText('Format')).toBeNull()
   })
 })
+
+describe('EventDetail — the venue is a map link (2 Sep 2026 UX review, parents)', () => {
+  it('links the venue to a maps search with the pitch appended, in a new tab', async () => {
+    mountDetail({ ...MATCH, venue: 'Zayed Sports City', pitch: 'Pitch 4' })
+    const link = await screen.findByTestId('venue-map-link')
+    expect(link).toHaveTextContent('Zayed Sports City')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    expect(link.getAttribute('href')).toBe(
+      'https://www.google.com/maps/search/?api=1&query=Zayed%20Sports%20City%20Pitch%204',
+    )
+  })
+
+  it('"To be confirmed" is plain text, not a link to nowhere', async () => {
+    mountDetail({ ...MATCH, venue: null, pitch: null })
+    expect(await screen.findByText('To be confirmed')).toBeInTheDocument()
+    expect(screen.queryByTestId('venue-map-link')).toBeNull()
+  })
+})
