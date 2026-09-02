@@ -19,7 +19,7 @@ import { deletePlayerPhoto } from './photos.js'
  * without querying at all. undefined/omitted means "no team filter" and
  * queries normally, letting RLS decide what comes back.
  */
-export async function listPlayers({ teamIds } = {}) {
+export async function listPlayers({ teamIds, includeLeft = false } = {}) {
   if (Array.isArray(teamIds) && teamIds.length === 0) return []
 
   // ⚠️ PAGED, NOT CAPPED, SINCE 12 Aug 2026 — the same move listEvents made on
@@ -37,6 +37,12 @@ export async function listPlayers({ teamIds } = {}) {
     if (Array.isArray(teamIds) && teamIds.length > 0) {
       query = query.in('team_id', teamIds)
     }
+    // ⚠️ LEAVERS ARE HIDDEN BY DEFAULT, HERE, FOR EVERY CALLER. Twelve screens
+    // load players through this function; hiding at the query means none of
+    // them can forget. History screens (MatchSheet, GameTime) and the roster's
+    // staff-only "Left the squad" group pass includeLeft: true and tag the
+    // name. Spec: claude/specs/2026-09-02-player-leavers-design.md §4.
+    if (!includeLeft) query = query.is('left_at', null)
     return query
   }
 
@@ -247,6 +253,31 @@ export async function deletePlayer(id) {
   // the removal failed when it did not.
   const photoPath = data[0]?.photo_path
   if (photoPath) await deletePlayerPhoto(photoPath)
+}
+
+/**
+ * Marks a player as LEFT — the club's answer to "the child quit". Never a
+ * delete: attendance, selection and grades keep pointing at a real name.
+ * The database (mark_player_left) decides who may do this — squad staff or a
+ * child-write admin — and also flips this child's parent/player memberships
+ * to 'left', which every access check treats as no access.
+ *
+ * ⚠️ ROW FIRST, OBJECT SECOND, exactly as deletePlayer: the RPC clears the
+ * row's photo columns and hands back the old path; the storage object is
+ * then removed best-effort. A refused RPC touches nothing.
+ */
+export async function markPlayerLeft(id) {
+  const { data, error } = await supabase.rpc('mark_player_left', { p_player_id: id })
+  if (error) throw error
+  const photoPath = Array.isArray(data) ? data[0]?.photo_path : data?.photo_path
+  if (photoPath) await deletePlayerPhoto(photoPath)
+}
+
+/** Undoes markPlayerLeft: clears left_at and reactivates the family's memberships. */
+export async function restorePlayer(id) {
+  const { data, error } = await supabase.rpc('restore_player', { p_player_id: id })
+  if (error) throw error
+  return data
 }
 
 /**
