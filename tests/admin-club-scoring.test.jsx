@@ -20,6 +20,7 @@ const listContactsForPlayersMock = vi.fn()
 const listAllLeagueTeamsMock = vi.fn()
 const setTeamScoringKindsMock = vi.fn()
 const setRequiresContactMock = vi.fn()
+const setDefaultFormatMock = vi.fn()
 const reloadMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
@@ -47,6 +48,7 @@ vi.mock('../src/data/leagueTeams.js', () => ({
 vi.mock('../src/data/teams.js', () => ({
   setTeamScoringKinds: (...args) => setTeamScoringKindsMock(...args),
   setTeamRequiresContact: (...args) => setRequiresContactMock(...args),
+  setTeamDefaultFormat: (...args) => setDefaultFormatMock(...args),
 }))
 
 import AdminClub from '../src/screens/AdminClub.jsx'
@@ -104,6 +106,7 @@ beforeEach(() => {
   listAllLeagueTeamsMock.mockResolvedValue([])
   setTeamScoringKindsMock.mockResolvedValue({})
   setRequiresContactMock.mockResolvedValue({})
+  setDefaultFormatMock.mockResolvedValue({})
   reloadMock.mockResolvedValue(undefined)
 })
 
@@ -352,5 +355,24 @@ describe('AdminClub — whether a squad plays contact', () => {
       within(screen.getByTestId('scoring-panel')).getByRole('switch', { name: /contact rugby/i }),
     ).toHaveAttribute('aria-checked', 'false')
     expect(reloadMock).not.toHaveBeenCalled()
+  })
+
+  it('saves the squad’s usual tournament format from the scoring sheet', async () => {
+    const { user } = renderClub()
+    await user.click(await screen.findByRole('button', { name: /scoring for u16b/i }))
+    const select = await screen.findByLabelText(/usual tournament format/i)
+    expect(select).toHaveValue('')
+    await user.selectOptions(select, '12')
+    await waitFor(() => expect(setDefaultFormatMock).toHaveBeenCalledWith('team-u16b', 12))
+    expect(reloadMock).toHaveBeenCalled()
+  })
+
+  it('clears it back to "15s (default)" with null', async () => {
+    const { user } = renderClub([{ ...U16B, default_format: 7 }])
+    await user.click(await screen.findByRole('button', { name: /scoring for u16b/i }))
+    const select = await screen.findByLabelText(/usual tournament format/i)
+    expect(select).toHaveValue('7')
+    await user.selectOptions(select, '')
+    await waitFor(() => expect(setDefaultFormatMock).toHaveBeenCalledWith('team-u16b', null))
   })
 })
