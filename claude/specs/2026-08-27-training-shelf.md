@@ -35,7 +35,12 @@ remains a message, not a boundary. RLS is the insert rule.
    **One chip per `chip_label`.** Group the club hours by label, then pick the
    template `squadFitsTemplate` accepts for this squad. If several fit, pick
    the tightest age band. If none fit, show **one** disabled chip with the
-   reason — contact mismatch (Publish-tab sentence), or "No hour for this age".
+   reason — contact mismatch (Publish-tab sentence).
+   ⚠️ **Age is guidance, not a gate, since 2 Sep 2026** — this paragraph
+   said "or 'No hour for this age'" until then. An out-of-band hour is now
+   enabled, with the band said beside it in the muted colour, and when no
+   pack is in band the chip is the widest pack the squad may run.
+   `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`.
    Never dump every age pack onto the row. The "never hidden" rule is for
    **contact vs tag** (Tackle on U12G QR / U14G QR stays visible, disabled),
    not for U9 / U11 / U16 copies of Passing. U12G QR / U14G QR are tag
@@ -73,11 +78,12 @@ star average); **My shelf** (personal favorites).
 - **No player names and no player photos** on drill cards. No FaceStack, no
   avatar, no `img` of a person. Opened cards may show `diagram_url` (a
   schematic pitch drawing); list rows still have no photos.
-- **Default to this squad.** Browse (and the shelf list) shows drills that
-  `squadFitsTemplate` accepts for the squad being held — age from the name,
-  contact from `teams.requires_contact`. A **Show all ages** control reveals
-  the other packs. Do not list the U9 and U11 copies of a drill next to the
-  U16 one unless the coach asked.
+- **This squad first.** Browse (and the shelf list) shows every drill the
+  squad may run — contact from `teams.requires_contact` is the only refusal —
+  with the in-band copies first and the other packs after, their band on the
+  card. ⚠️ **Until 2 Sep 2026 this filtered by age and a "Show all ages"
+  control revealed the rest.** A coach, via Jay: drills "should not be age
+  group locked". The control is gone because all ages is the list now.
 
 ## Who can publish (two verbs)
 

@@ -82,14 +82,22 @@ describe('chipHours', () => {
     expect(chips.filter((row) => chipFit(U12G_QR, row).ok)).toEqual([])
   })
 
-  it('names age-miss as no hour for this age, not a specific pack band', () => {
+  // ⚠️ AGE IS GUIDANCE, NOT A GATE — since 2 Sep 2026. A squad below every
+  // pack still gets a working chip, with the band said beside it. (Until then
+  // the chip was disabled as "No hour for this age".)
+  it('enables an out-of-band hour and says the band as guidance', () => {
     const u7 = { name: 'U7 Mixed', requires_contact: true }
     const chips = chipHours(contactPack(9, 10), u7)
     expect(chips).toHaveLength(5)
     const fit = chipFit(u7, chips[0])
-    expect(fit.ok).toBe(false)
-    expect(fit.reason).toBe('No hour for this age')
-    expect(fit.reason).not.toMatch(/U9/)
+    expect(fit.ok).toBe(true)
+    expect(fit.reason).toBeNull()
+    expect(fit.guidance).toBe("U7 is outside this template's U9–U10")
+  })
+  it('falls back to the WIDEST allowed pack when none is in band', () => {
+    const u7 = { name: 'U7 Mixed', requires_contact: true }
+    const chips = chipHours(THREE_PACKS, u7)
+    expect(chips.map((row) => row.id)).toEqual(CHIP_LABELS.map((label) => `${label}-11-14`))
   })
 })
 
@@ -100,8 +108,10 @@ describe('shelfRowsForSquad', () => {
     { id: 'd-u11', title: '4 v 2 Continuous Touch', min_age: 11, max_age: 14, requires_contact: true },
   ]
 
-  it('defaults to drills that fit this squad — U18 hides the U9 and U11 copies', () => {
-    expect(shelfRowsForSquad(copies, U18).map((row) => row.id)).toEqual(['d-u16'])
+  // ⚠️ IN-BAND FIRST, THE REST AFTER — never hidden. Since 2 Sep 2026 age is
+  // guidance; this used to return only 'd-u16'.
+  it('orders the in-band copy first and keeps the others, in their own order', () => {
+    expect(shelfRowsForSquad(copies, U18).map((row) => row.id)).toEqual(['d-u16', 'd-u9', 'd-u11'])
   })
 
   it('hides a contact drill from a tag squad even when the age would fit', () => {
@@ -112,13 +122,6 @@ describe('shelfRowsForSquad', () => {
     expect(shelfRowsForSquad(u12copies, U12G_QR).map((row) => row.id)).toEqual(['d-tag-u12'])
   })
 
-  it('show-all-ages returns every copy', () => {
-    expect(shelfRowsForSquad(copies, U18, { allAges: true }).map((row) => row.id)).toEqual([
-      'd-u16',
-      'd-u9',
-      'd-u11',
-    ])
-  })
 })
 
 describe('blocksFromTemplate', () => {

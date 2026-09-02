@@ -113,10 +113,15 @@ function rangeLabel(startsOn, endsOn) {
  * the sentence says which of the two things to change. And the reason is in the
  * accessible name as well as on screen, because a disabled chip is exactly the
  * one a screen-reader user cannot poke at to find out why.
+ *
+ * Only contact refuses. An out-of-band squad is tickable, with the band said
+ * beside it in the muted colour and in the accessible name — age is guidance,
+ * not a gate, since 2 Sep 2026.
  */
 function SquadChip({ team, checked, fit, ready, busy, onToggle }) {
   const refused = ready && !fit.ok
-  const name = refused ? `${team.name}, ${fit.reason}` : team.name
+  const guidance = ready && fit.ok ? fit.guidance : null
+  const name = refused ? `${team.name}, ${fit.reason}` : guidance ? `${team.name}, ${guidance}` : team.name
 
   return (
     <span className="flex flex-col gap-0.5">
@@ -138,6 +143,9 @@ function SquadChip({ team, checked, fit, ready, busy, onToggle }) {
       </button>
       {refused && (
         <span className="text-[12px] font-semibold leading-snug text-danger-ink">{fit.reason}</span>
+      )}
+      {guidance && (
+        <span className="text-[12px] font-medium leading-snug text-ink-muted">{guidance}</span>
       )}
     </span>
   )
@@ -243,20 +251,29 @@ function PublishBody() {
     )
   }
 
-  /** Does this squad suit the template on screen right now? No template, no. */
+  /** May this squad run the template on screen right now? No template, no.
+   *  Contact is the only refusal; an out-of-band squad is allowed. */
   function fitsChosenTemplate(squad) {
     return template !== null && squadFitsTemplate(squad, template).ok
   }
+
+  /** Squads ticked right now that the club would not have suggested this
+   *  template for, by age. Said in a sentence under the chips, never a gate. */
+  const outsideBand = template
+    ? squads.filter((squad) => selected.includes(squad.id) && squadFitsTemplate(squad, template).guidance)
+    : []
 
   /**
    * ⚠️ THE TEMPLATE BOX PRUNES THE TICKS, AND IT HAS TO. A squad ticked under
    * one template can stop fitting under the next one — and the chip that would
    * let somebody untick it is DISABLED the moment it stops fitting, so the
    * ticked-but-unfit state is one the user cannot get out of. It would then
-   * ride along into publish_training, which does NOT re-check fitness on the
-   * server: this screen is the only gate there is. Prune on the way in, and
-   * derive `teamIds` from the fit as well (below) so that a future path into
-   * `selected` that forgets to prune still cannot publish an unfit squad.
+   * ride along into publish_training, whose server-side check covers contact
+   * only (the age check was always client-side, and since 2 Sep 2026 age is
+   * guidance and not checked at all). Prune on the way in, and derive
+   * `teamIds` from the fit as well (below) so that a future path into
+   * `selected` that forgets to prune still cannot publish a contact hour to a
+   * tag squad.
    */
   function chooseTemplate(nextId) {
     const next = templates.find((row) => row.id === nextId) ?? null
@@ -466,7 +483,7 @@ function PublishBody() {
                     // With none chosen there is no question to answer, so the
                     // chips are simply not ready rather than being told a
                     // reason that is about the template rather than the squad.
-                    fit={template ? squadFitsTemplate(squad, template) : { ok: true, reason: null }}
+                    fit={template ? squadFitsTemplate(squad, template) : { ok: true, reason: null, guidance: null }}
                     ready={template !== null}
                     busy={running}
                     onToggle={toggleSquad}
@@ -477,6 +494,13 @@ function PublishBody() {
             {!template && (
               <p className="mt-1.5 text-[12.5px] text-ink-muted">
                 Choose a template first — which squads it suits depends on it.
+              </p>
+            )}
+            {/* Said once, in a sentence, so the director chooses it knowingly.
+                It is a note and not a gate: the chips above are ticked. */}
+            {outsideBand.length > 0 && (
+              <p role="status" className="mt-1.5 text-[12.5px] font-medium text-ink-muted">
+                {`${outsideBand.length} ${outsideBand.length === 1 ? 'squad is' : 'squads are'} outside this template's band — publishing anyway is your call.`}
               </p>
             )}
           </div>

@@ -27,16 +27,35 @@ describe('drillFitsTemplate', () => {
     expect(r.ok).toBe(false)
     expect(r.reason).toMatch(/contact/i)
   })
-  it('refuses a drill whose minimum age is above the template band', () => {
-    expect(drillFitsTemplate({ min_age: 14 }, T).ok).toBe(false)
+  // ⚠️ AGE IS GUIDANCE, NOT A GATE — since 2 Sep 2026 (a coach, via Jay:
+  // "should not be age group locked"). The band mismatch is still SAID, in
+  // `guidance`, but `ok` stays true. Only contact refuses.
+  it('allows a drill whose minimum age is above the template band, with guidance', () => {
+    const r = drillFitsTemplate({ min_age: 14 }, T)
+    expect(r.ok).toBe(true)
+    expect(r.reason).toBeNull()
+    expect(r.guidance).toBe('Drill is for U14 and up; template is U9–U13')
+  })
+  it('gives no guidance for an in-band drill', () => {
+    expect(drillFitsTemplate({ min_age: 10, max_age: 12 }, T).guidance).toBeNull()
+  })
+  it('a contact refusal carries no age guidance — one sentence, the one that matters', () => {
+    const r = drillFitsTemplate({ requires_contact: true, min_age: 14 }, { ...T, requires_contact: false })
+    expect(r.ok).toBe(false)
+    expect(r.guidance).toBeNull()
   })
 })
 
 describe('squadFitsTemplate', () => {
-  it('refuses an unparseable squad name and SAYS SO — never a default band', () => {
+  // ⚠️ THE NULL BAND IS NOT A REFUSAL ANY MORE — since 2 Sep 2026. A name with
+  // no band in it ("Senior Men") is never "outside" anything, so it is allowed
+  // with no guidance. It used to be refused by anything that set an age,
+  // which left senior coaches a thinner library than juniors.
+  it('allows an unparseable squad name, with no guidance — nothing to be outside of', () => {
     const r = squadFitsTemplate({ name: 'Senior Men', requires_contact: true }, T)
-    expect(r.ok).toBe(false)
-    expect(r.reason).toMatch(/can.t tell/i)
+    expect(r.ok).toBe(true)
+    expect(r.reason).toBeNull()
+    expect(r.guidance).toBeNull()
   })
   it('refuses a tag squad for a contact template', () => {
     const r = squadFitsTemplate({ name: 'U12 Mixed', requires_contact: false }, T)
@@ -46,10 +65,14 @@ describe('squadFitsTemplate', () => {
   it('allows a tag template on a contact squad', () => {
     expect(squadFitsTemplate({ name: 'U12 Mixed', requires_contact: true }, { ...T, requires_contact: false }).ok).toBe(true)
   })
-  it('refuses a squad outside the band, naming it', () => {
+  it('allows a squad outside the band, naming the band as guidance', () => {
     const r = squadFitsTemplate({ name: 'U16B', requires_contact: true }, T)
-    expect(r.ok).toBe(false)
-    expect(r.reason).toMatch(/U9.*U13/)
+    expect(r.ok).toBe(true)
+    expect(r.reason).toBeNull()
+    expect(r.guidance).toBe("U16 is outside this template's U9–U13")
+  })
+  it('gives no guidance for a squad inside the band', () => {
+    expect(squadFitsTemplate({ name: 'U12B', requires_contact: true }, T).guidance).toBeNull()
   })
   it('does not read the B in U14B as anything but a squad', () => {
     expect(squadFitsTemplate({ name: 'U12B', requires_contact: true }, T).ok).toBe(true)
@@ -66,17 +89,18 @@ describe('squadFitsTemplate', () => {
     expect(r.ok).toBe(false)
     expect(r.reason).toMatch(/tag/i)
   })
-  // ...and the null band is NOT a default: put an age on the template and the
-  // unparseable name is refused again, with the reason.
-  it('refuses a squad with no band when the template DOES set an age', () => {
-    const r = squadFitsTemplate({ name: 'Senior Men', requires_contact: true }, T)
+  // ⚠️ THE CONTACT HALF IS UNCHANGED BY THE AGE LOOSENING. A tag squad is
+  // refused whatever the band says, and the refusal carries no age guidance.
+  it('still refuses a tag squad outside the band, on contact alone', () => {
+    const r = squadFitsTemplate({ name: 'U16G', requires_contact: false }, T)
     expect(r.ok).toBe(false)
-    expect(r.reason).toMatch(/can.t tell/i)
+    expect(r.reason).toMatch(/tag/i)
+    expect(r.guidance).toBeNull()
   })
   it('calls the thing being fitted whatever the caller calls it', () => {
     const r = squadFitsTemplate({ name: 'U16B', requires_contact: true }, T, 'session')
-    expect(r.reason).toMatch(/this session's/)
-    expect(r.reason).not.toMatch(/template/)
+    expect(r.guidance).toMatch(/this session's/)
+    expect(r.guidance).not.toMatch(/template/)
   })
 })
 

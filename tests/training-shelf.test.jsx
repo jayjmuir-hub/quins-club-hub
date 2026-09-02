@@ -380,25 +380,29 @@ describe('empty library', () => {
 })
 
 describe('library browse', () => {
-  it('defaults to drills that fit this squad and hides out-of-age copies', async () => {
+  // ⚠️ AGE IS GUIDANCE, NOT A GATE — since 2 Sep 2026 (a coach, via Jay:
+  // "should not be age group locked"). Until then the shelf hid the other age
+  // packs and a "Show all ages" toggle revealed them. Now every copy this
+  // squad may run is listed, in-band first, and the toggle is gone because
+  // all ages IS the list.
+  it('lists every copy this squad may run, the in-band one first', async () => {
     listDrillsMock.mockResolvedValue(TOUCH_COPIES)
     showShelf(U18_SQUAD)
     const shelf = await screen.findByTestId('library-shelf')
-    expect(within(shelf).getAllByText('4 v 2 Continuous Touch')).toHaveLength(1)
-    expect(within(shelf).getByText(/U16–U18/)).toBeInTheDocument()
-    expect(within(shelf).queryByText(/U9–U10/)).not.toBeInTheDocument()
-    expect(within(shelf).queryByText(/U11–U14/)).not.toBeInTheDocument()
+    expect(within(shelf).getAllByText('4 v 2 Continuous Touch')).toHaveLength(3)
+    const bands = within(shelf).getAllByText(/U16–U18|U9–U10|U11–U14/).map((el) => el.textContent)
+    expect(bands[0]).toMatch(/U16–U18/)
+    expect(bands).toHaveLength(3)
   })
 
-  it('library browse defaults to this squad; show all ages reveals the other packs', async () => {
+  it('library browse lists every copy too, and has no show-all-ages toggle', async () => {
     const user = userEvent.setup()
     listDrillsMock.mockResolvedValue(TOUCH_COPIES)
     showShelf(U18_SQUAD)
     await user.click(screen.getAllByRole('button', { name: /see all/i })[1])
     const browse = await screen.findByTestId('library-browse')
-    expect(within(browse).getAllByText('4 v 2 Continuous Touch')).toHaveLength(1)
-    await user.click(within(browse).getByRole('button', { name: /show all ages/i }))
     expect(within(browse).getAllByText('4 v 2 Continuous Touch')).toHaveLength(3)
+    expect(within(browse).queryByRole('button', { name: /show all ages/i })).not.toBeInTheDocument()
   })
 
   it('browse-by-coach groups on created_by; null is Club / World Rugby', async () => {
@@ -407,11 +411,12 @@ describe('library browse', () => {
       CLAMP,
       { id: 'd-club', title: 'Activate', created_by: null, minutes: 10, category: 'warm_up' },
     ])
-    showShelf()
+    // A contact squad: CLAMP is a contact drill, and contact is still the one
+    // refusal — on the tag squad it would (rightly) not be listed at all.
+    showShelf(U18_SQUAD)
     await screen.findByTestId('library-shelf')
     await user.click(screen.getAllByRole('button', { name: /see all/i })[1])
     const browse = await screen.findByTestId('library-browse')
-    await user.click(within(browse).getByRole('button', { name: /show all ages/i }))
     await user.click(within(browse).getByRole('button', { name: /by coach/i }))
     const groups = within(browse).getAllByTestId('coach-group')
     expect(groups.map((g) => g.querySelector('h3').textContent)).toEqual([
@@ -420,7 +425,7 @@ describe('library browse', () => {
     ])
   })
 
-  it('From coaches lists only hours that fit this squad, never a U9 copy on U18B', async () => {
+  it('From coaches lists every hour this squad may run, the in-band one first', async () => {
     listTemplatesMock.mockResolvedValue([
       {
         id: 'tpl-coach-u16',
@@ -445,8 +450,8 @@ describe('library browse', () => {
     ])
     showShelf(U18_SQUAD)
     const coaches = await screen.findByTestId('from-coaches')
-    expect(within(coaches).getByText('Rowan Passing U16–U18')).toBeInTheDocument()
-    expect(within(coaches).queryByText('Rowan Passing U9–U10')).not.toBeInTheDocument()
+    const names = within(coaches).getAllByText(/Rowan Passing/).map((el) => el.textContent)
+    expect(names).toEqual(['Rowan Passing U16–U18', 'Rowan Passing U9–U10'])
   })
 
   it('lets a coach suggest their OWN saved hour to the club, any time, without re-saving', async () => {

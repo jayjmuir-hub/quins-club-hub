@@ -103,63 +103,78 @@ export function ageDraftProblem(minValue, maxValue) {
   return null
 }
 
-/** Whether a drill may be offered inside a template: contact, then age overlap. */
+/**
+ * Whether a drill may be offered inside a template.
+ *
+ * ⚠️ TWO HALVES, AND ONLY ONE OF THEM REFUSES. Contact is safeguarding: a
+ * contact drill on a tag template is `ok: false` with the reason, exactly as
+ * it always was. Age is GUIDANCE since 2 Sep 2026 — the band is compared and
+ * a mismatch is reported in `guidance`, but `ok` stays true. A coach, via
+ * Jay: drills and templates "should not be age group locked".
+ * `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`.
+ * Every caller that read only `ok` keeps working; a caller that wants the
+ * nudge reads `guidance`.
+ */
 export function drillFitsTemplate(drill, template) {
   if (drill?.requires_contact && !template?.requires_contact) {
-    return { ok: false, reason: 'Contact drill; this template is tag' }
+    return { ok: false, reason: 'Contact drill; this template is tag', guidance: null }
   }
   const dMin = drill?.min_age ?? null
   const dMax = drill?.max_age ?? null
   const tMin = template?.min_age ?? null
   const tMax = template?.max_age ?? null
-  if (dMin != null && tMax != null && dMin > tMax) {
-    return { ok: false, reason: `Drill is for ${bandPhrase(dMin, dMax)}; template is ${bandPhrase(tMin, tMax)}` }
+  if ((dMin != null && tMax != null && dMin > tMax) || (dMax != null && tMin != null && dMax < tMin)) {
+    return {
+      ok: true,
+      reason: null,
+      guidance: `Drill is for ${bandPhrase(dMin, dMax)}; template is ${bandPhrase(tMin, tMax)}`,
+    }
   }
-  if (dMax != null && tMin != null && dMax < tMin) {
-    return { ok: false, reason: `Drill is for ${bandPhrase(dMin, dMax)}; template is ${bandPhrase(tMin, tMax)}` }
-  }
-  return { ok: true, reason: null }
+  return { ok: true, reason: null, guidance: null }
 }
 
 /**
- * Whether a template may be published to a squad.
+ * Whether a template may reach a squad — and, separately, whether the club
+ * would have suggested it for that age.
  *
- * ⚠️ THE NULL-BAND RULE. ageBandFromTeamName returns null for a name it cannot
- * parse, and null here means "no guidance" — the squad is refused WITH THE
- * REASON, never given a default band. That null once offered a twelve-year-old
- * girls' squad an adult contact form; this is the place it would recur.
- * ⚠️ Contact is read from teams.requires_contact, never from the name.
+ * ⚠️ CONTACT IS THE ONLY REFUSAL, AND IT IS UNCHANGED. Read from
+ * teams.requires_contact, never from the name. That rule once stopped a
+ * twelve-year-old girls' squad being offered an adult contact form, and the
+ * age loosening below does not touch it.
  *
- * ⚠️ ORDER MATTERS, AND THE NULL BAND IS NOT CHECKED FIRST. A template that
- * sets NEITHER min_age NOR max_age is fine for any squad, because there is
- * nothing a band would be compared against — so it is allowed through before
- * the band is ever consulted. That is NOT a default band: a template that DOES
- * set an age still refuses an unparseable name below. Checking the null band
- * first refused every senior squad ("Senior Men" carries no band by design)
- * for every template, which left a senior coach's whole drill picker disabled.
+ * ⚠️ AGE IS GUIDANCE, NOT A GATE — since 2 Sep 2026. Until then a squad
+ * outside the template's band was refused, and a squad whose name carried no
+ * band ("Senior Men") was refused by ANYTHING that set an age at all, which
+ * left senior coaches a thinner library than juniors for no reason but a
+ * regex. Now: `ok` is true, and `guidance` carries the sentence ("U16 is
+ * outside this template's U9–U13") for a picker to show beside the row or
+ * sort by. A name with no band is simply never "outside" anything.
+ * The 27 Aug 2026 ruling that U18 must not SEE U9 copies is superseded by
+ * this one — the plan above records both.
  *
- * `subject` is the word the refusal calls the thing being fitted. Publish
- * keeps the default ('template'). Session Plan pickers no longer surface a
- * disabled option — they omit via shelfRowsForSquad — so they do not pass
- * 'session' here.
+ * `subject` is the word the sentence calls the thing being fitted.
  */
 export function squadFitsTemplate(team, template, subject = 'template') {
   if (template?.requires_contact && team?.requires_contact !== true) {
-    return { ok: false, reason: `Contact ${subject}; this squad is tag` }
+    return { ok: false, reason: `Contact ${subject}; this squad is tag`, guidance: null }
   }
   const tMin = template?.min_age ?? null
   const tMax = template?.max_age ?? null
   if (tMin == null && tMax == null) {
-    return { ok: true, reason: null }
+    return { ok: true, reason: null, guidance: null }
   }
   const band = ageBandFromTeamName(team?.name)
   if (band === null) {
-    return { ok: false, reason: "Can't tell this squad's age group from its name" }
+    return { ok: true, reason: null, guidance: null }
   }
   if ((tMin != null && band < tMin) || (tMax != null && band > tMax)) {
-    return { ok: false, reason: `U${band} is outside this ${subject}'s ${bandPhrase(tMin, tMax)}` }
+    return {
+      ok: true,
+      reason: null,
+      guidance: `U${band} is outside this ${subject}'s ${bandPhrase(tMin, tMax)}`,
+    }
   }
-  return { ok: true, reason: null }
+  return { ok: true, reason: null, guidance: null }
 }
 
 /** One line per squad on the publish preview. */
