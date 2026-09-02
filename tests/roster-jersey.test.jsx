@@ -447,7 +447,7 @@ describe('RosterTable — guest rows are read-only', () => {
     // the column is hidden entirely by constantColumns, unrelated to guest
     // status, so it would prove nothing either way.)
     expect(screen.queryByLabelText('Jersey number for Sami Rahman')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Position for Sami Rahman')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Add a position for Sami Rahman')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Age group for Sami Rahman')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Captain: Sami Rahman')).not.toBeInTheDocument()
 
@@ -455,7 +455,7 @@ describe('RosterTable — guest rows are read-only', () => {
     // editor — proves the guest row's lack of controls is about guest_of,
     // not a general breakage of editability on this render.
     expect(screen.getByLabelText('Jersey number for Ben Okafor')).toBeInTheDocument()
-    expect(screen.getByLabelText('Position for Ben Okafor')).toBeInTheDocument()
+    expect(screen.getByLabelText('Add a position for Ben Okafor')).toBeInTheDocument()
     expect(screen.getByLabelText('Age group for Ben Okafor')).toBeInTheDocument()
     expect(screen.getByLabelText('Captain: Ben Okafor')).toBeInTheDocument()
   })
