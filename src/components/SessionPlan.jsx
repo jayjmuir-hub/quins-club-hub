@@ -22,6 +22,7 @@ import {
   ageOrNull,
   CATEGORIES,
   CATEGORY_LABELS,
+  squadFitsTemplate,
   textOrNull,
   totalMinutes,
 } from '../lib/trainingPlans.js'
@@ -367,10 +368,14 @@ export default function SessionPlan({ event, team, canEdit }) {
   }, [event.id, event.team_id, clubDate, canEdit, reloadToken])
 
   const building = editing || creating
-  // Club + this squad's rows from the query; this squad's age/contact fit at
-  // the option list. Unbounded rows still appear (any-age Freestyle seed).
+  // Club + this squad's rows from the query. Contact refuses at the option
+  // list; age only ORDERS it — in-band first, then the rest with the band said
+  // in the label. Age is guidance, not a gate, since 2 Sep 2026 (a coach, via
+  // Jay: "should not be age group locked"), which supersedes the 27 Aug ruling
+  // that U18 must not see U9 copies.
   const visibleTemplates = shelfRowsForSquad(templates, team)
   const visibleDrills = shelfRowsForSquad(drills, team)
+  const bandNote = (row, subject) => squadFitsTemplate(team, row, subject).guidance
 
   if (loading) return null
   // Nothing published and no theme for the fortnight. A coach still gets a card
@@ -770,11 +775,11 @@ export default function SessionPlan({ event, team, canEdit }) {
       {building && (
         <div>
           {/* Seed from a template — only when building a NEW plan. Freestyle
-              first, then hours shelfRowsForSquad accepts for THIS squad.
+              first, then the hours shelfRowsForSquad allows for THIS squad:
+              in-band first, the rest after with their band in the label.
               Another squad's rows never appear (listTemplates's teamId);
-              another age pack's hours never appear (the filter). The select
-              stays up so Freestyle remains even when every club hour is
-              the wrong contact or age. */}
+              a contact hour never reaches a tag squad. The select stays up
+              so Freestyle remains even when every club hour is contact. */}
           {creating && templates.length > 0 && (
             <label className="mb-2.5 block">
               <span className={LABEL}>Start from a template</span>
@@ -790,6 +795,7 @@ export default function SessionPlan({ event, team, canEdit }) {
                   <option key={template.id} value={template.id}>
                     {template.name}
                     {template.team_id ? ' (your squad)' : ''}
+                    {bandNote(template, 'template') ? ` — ${bandNote(template, 'template')}` : ''}
                   </option>
                 ))}
               </select>
@@ -824,6 +830,7 @@ export default function SessionPlan({ event, team, canEdit }) {
               {visibleDrills.map((drill) => (
                 <option key={drill.id} value={drill.id}>
                   {`${drill.title} · ${drill.minutes} min`}
+                  {bandNote(drill, 'drill') ? ` — ${bandNote(drill, 'drill')}` : ''}
                 </option>
               ))}
             </select>

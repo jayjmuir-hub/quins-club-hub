@@ -297,8 +297,10 @@ describe('TrainingTemplates', () => {
     expect(contact).toBeDisabled()
     expect(contact).toHaveTextContent('Contact drill; this template is tag')
 
+    // ⚠️ AGE IS GUIDANCE, NOT A GATE — since 2 Sep 2026. The band is still
+    // said in the label, but the option is pickable. (It was disabled before.)
     const tooOld = within(picker).getByRole('option', { name: /Sevens set piece/ })
-    expect(tooOld).toBeDisabled()
+    expect(tooOld).not.toBeDisabled()
     expect(tooOld).toHaveTextContent('Drill is for U14 and up; template is U9–U13')
   })
 

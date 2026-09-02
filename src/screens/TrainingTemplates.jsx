@@ -150,7 +150,7 @@ function TemplateRow({ template, onSelect, busy }) {
  * tells a screen reader — and a test — which one it is on is the group name,
  * not a title spliced into every label.
  */
-function BlockRow({ block, index, count, unfit, onChange, onMove, onRemove, busy }) {
+function BlockRow({ block, index, count, unfit, guidance, onChange, onMove, onRemove, busy }) {
   const title = block.drill?.title ?? 'Drill'
   const category = CATEGORY_LABELS[block.drill?.category] ?? block.drill?.category
 
@@ -226,6 +226,11 @@ function BlockRow({ block, index, count, unfit, onChange, onMove, onRemove, busy
           longer fits and letting them decide. */}
       {unfit && (
         <p className="text-[12.5px] font-semibold text-danger-ink">{unfit}</p>
+      )}
+      {/* Age is guidance, not a gate: the block stays, the band is said in
+          the muted colour rather than the refusal red. */}
+      {!unfit && guidance && (
+        <p className="text-[12.5px] font-medium text-ink-muted">{guidance}</p>
       )}
     </li>
   )
@@ -724,6 +729,7 @@ function TemplatesBody() {
                       index={index}
                       count={blocks.length}
                       unfit={drillFitsTemplate(block.drill, draftTemplate).reason}
+                      guidance={drillFitsTemplate(block.drill, draftTemplate).guidance}
                       onChange={changeBlock}
                       onMove={moveBlock}
                       onRemove={removeBlock}
@@ -746,14 +752,18 @@ function TemplatesBody() {
                 >
                   <option value="">Choose a drill…</option>
                   {drills.map((drill) => {
-                    // ⚠️ DISABLED WITH THE REASON, NOT FILTERED OUT. The reason
-                    // is the library's own sentence, so the picker and the
-                    // publish preview can never say different things.
+                    // ⚠️ DISABLED WITH THE REASON, NOT FILTERED OUT — for
+                    // contact, the only refusal. An out-of-band drill stays
+                    // pickable with its guidance in the label (age is guidance,
+                    // not a gate, since 2 Sep 2026). Both sentences are the
+                    // library's own, so the picker and the block row never
+                    // say different things.
                     const fit = drillFitsTemplate(drill, draftTemplate)
                     const label = `${drill.title} · ${drill.minutes} min`
+                    const note = fit.ok ? fit.guidance : fit.reason
                     return (
                       <option key={drill.id} value={drill.id} disabled={!fit.ok}>
-                        {fit.ok ? label : `${label} — ${fit.reason}`}
+                        {note ? `${label} — ${note}` : label}
                       </option>
                     )
                   })}

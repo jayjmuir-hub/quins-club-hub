@@ -237,6 +237,13 @@ export default function TrainingShelf({ team, tonight, onOpenTonight, onApplied 
                   {fit.reason}
                 </span>
               )}
+              {/* Age is guidance, not a gate: the chip works, the band is
+                  said beside it in the muted colour, never the refusal red. */}
+              {fit.ok && fit.guidance && (
+                <span className="max-w-[11rem] text-[12px] font-medium leading-snug text-ink-muted">
+                  {fit.guidance}
+                </span>
+              )}
             </span>
           )
         })}
@@ -473,12 +480,11 @@ function LibraryBrowse({
   const [category, setCategory] = useState('all')
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState(() => new Set())
-  const [allAges, setAllAges] = useState(false)
-
+  // Every row this squad may run, in-band first (age is guidance since
+  // 2 Sep 2026; the "Show all ages" toggle that used to live here is gone
+  // because all ages IS the list now).
   const isHours = kind === 'hours'
-  const rows = isHours
-    ? shelfRowsForSquad(templates, team, { allAges })
-    : shelfRowsForSquad(drills, team, { allAges })
+  const rows = isHours ? shelfRowsForSquad(templates, team) : shelfRowsForSquad(drills, team)
   const q = query.trim().toLowerCase()
 
   let shown = rows
@@ -584,19 +590,6 @@ function LibraryBrowse({
             </button>
           ))}
         </div>
-
-        <button
-          type="button"
-          aria-pressed={allAges}
-          onClick={() => setAllAges((on) => !on)}
-          className={[
-            CHIP,
-            'mb-3',
-            allAges ? 'border-brand bg-brand text-white' : 'border-line bg-surface-card text-ink',
-          ].join(' ')}
-        >
-          Show all ages
-        </button>
 
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1" data-testid="browse-chips">
           {[

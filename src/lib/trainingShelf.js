@@ -23,14 +23,30 @@ function ageSpan(template) {
   return max - min
 }
 
+/** In-band means the club would have suggested it for this squad's age. */
+function inBand(team, row) {
+  const fit = squadFitsTemplate(team, row)
+  return fit.ok && fit.guidance == null
+}
+
+/**
+ * Which copy of a chip label this squad gets. The tightest IN-BAND pack when
+ * there is one; otherwise any pack the squad may run (age is guidance, not a
+ * gate, since 2 Sep 2026 — the widest of them, as the least specific); and
+ * only when every copy is a contact hour on a tag squad, one of those, so the
+ * chip can show the refusal.
+ */
 function pickChipForSquad(candidates, team) {
-  const fitting = candidates.filter((row) => squadFitsTemplate(team, row).ok)
+  const fitting = candidates.filter((row) => inBand(team, row))
   if (fitting.length === 1) return fitting[0]
   if (fitting.length > 1) {
     return [...fitting].sort((a, b) => ageSpan(a) - ageSpan(b))[0]
   }
-  const contactFail = candidates.find((row) => /this squad is tag/i.test(squadFitsTemplate(team, row).reason ?? ''))
-  return contactFail ?? candidates[0]
+  const allowed = candidates.filter((row) => squadFitsTemplate(team, row).ok)
+  if (allowed.length > 0) {
+    return [...allowed].sort((a, b) => ageSpan(b) - ageSpan(a))[0]
+  }
+  return candidates[0]
 }
 
 /**
@@ -52,25 +68,28 @@ export function chipHours(templates, team) {
 }
 
 /**
- * Why a chip is enabled or not. Age-pack mismatch is "No hour for this age"
- * (the picker already dropped the other copies). Contact stays the Publish-tab
- * sentence. Contact is never inferred from the squad name.
+ * Why a chip is enabled or not. Only contact disables, and it stays the
+ * Publish-tab sentence. An out-of-band hour is enabled with its `guidance`
+ * beside it. Contact is never inferred from the squad name.
  */
 export function chipFit(team, template) {
-  const fit = squadFitsTemplate(team, template)
-  if (fit.ok) return fit
-  if (/outside this /.test(fit.reason ?? '')) {
-    return { ok: false, reason: 'No hour for this age' }
-  }
-  return fit
+  return squadFitsTemplate(team, template)
 }
 
-/** Library rows that fit this squad. Age from the name; contact from the column.
+/**
+ * Library rows this squad may run, in-band first. Contact from the column
+ * refuses; age from the name only ORDERS — an out-of-band row is still
+ * offered, after the ones the club would suggest, carrying its `guidance`.
  * Session Plan's template/drill <select>s and the shelf From-coaches row
- * reuse this — omit, never a disabled option. Chips use chipHours instead. */
-export function shelfRowsForSquad(rows, team, { allAges = false } = {}) {
-  if (allAges) return rows ?? []
-  return (rows ?? []).filter((row) => squadFitsTemplate(team, row).ok)
+ * reuse this. Chips use chipHours instead.
+ * ⚠️ Until 2 Sep 2026 this FILTERED by age and had a `allAges` escape hatch;
+ * age is guidance now and the hatch is gone.
+ */
+export function shelfRowsForSquad(rows, team) {
+  const allowed = (rows ?? []).filter((row) => squadFitsTemplate(team, row).ok)
+  const suggested = allowed.filter((row) => inBand(team, row))
+  const other = allowed.filter((row) => !inBand(team, row))
+  return [...suggested, ...other]
 }
 
 /**

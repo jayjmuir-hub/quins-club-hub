@@ -52,12 +52,14 @@ import TrainingPublish from '../src/screens/TrainingPublish.jsx'
 
 const CLUB = '00000000-0000-0000-0000-0000000000ad'
 
-// Invented squads whose SHAPES are the real ones. The three cases the fit rule
-// has to separate: a tag squad, a contact squad, and a name with no band in it.
+// Invented squads whose SHAPES are the real ones. The four cases the fit rule
+// has to separate: a tag squad, a contact squad in band, a name with no band
+// in it, and a contact squad outside the band.
 const TEAMS = [
   { id: 't-u12m', club_id: CLUB, name: 'U12 Mixed', sort_order: 1, requires_contact: false },
   { id: 't-u14b', club_id: CLUB, name: 'U14B', sort_order: 2, requires_contact: true },
   { id: 't-senior', club_id: CLUB, name: 'Senior Men', sort_order: 3, requires_contact: true },
+  { id: 't-u18b', club_id: CLUB, name: 'U18B', sort_order: 4, requires_contact: true },
 ]
 
 const CONTACT_HOUR = {
@@ -182,25 +184,53 @@ describe('TrainingPublish', () => {
     expect(listFocusMock).not.toHaveBeenCalled()
   })
 
-  it('disables an unparseable squad and a tag squad for a contact template, with reasons', async () => {
+  it('disables a tag squad for a contact template with the reason; age only annotates', async () => {
     const { user } = renderPublish()
     await user.selectOptions(await screen.findByLabelText('Template'), CONTACT_HOUR.id)
 
     // A tag squad under a contact template: offered, refused, and told why.
+    // ⚠️ THE CONTACT HALF IS UNCHANGED by the 2 Sep 2026 age loosening.
     const tagSquad = screen.getByRole('checkbox', { name: /U12 Mixed/ })
     expect(tagSquad).toBeDisabled()
     expect(screen.getByText('Contact template; this squad is tag')).toBeInTheDocument()
 
-    // ⚠️ THE NULL-BAND CASE. "Senior Men" has no band in its name, and null
-    // must mean "no guidance, so refuse" — never a default band. That null
-    // once offered a twelve-year-old squad an adult contact form.
-    const seniors = screen.getByRole('checkbox', { name: /Senior Men/ })
-    expect(seniors).toBeDisabled()
-    expect(
-      screen.getByText("Can't tell this squad's age group from its name"),
-    ).toBeInTheDocument()
+    // ⚠️ THE NULL-BAND CASE, REVERSED. "Senior Men" has no band in its name.
+    // Until 2 Sep 2026 that was a refusal ("Can't tell this squad's age group
+    // from its name"); now a name with no band is never outside anything, so
+    // the squad is tickable with no note at all. Contact, above, is what kept
+    // the twelve-year-old squad away from the adult contact form, and it still
+    // does.
+    const seniors = screen.getByRole('checkbox', { name: /^Senior Men$/ })
+    expect(seniors).toBeEnabled()
+    expect(screen.queryByText(/can.t tell this squad/i)).not.toBeInTheDocument()
 
-    expect(screen.getByRole('checkbox', { name: /U14B/ })).toBeEnabled()
+    // Out of band: tickable, with the band said beside it and in the name —
+    // in the muted colour, never the refusal red.
+    const u18 = screen.getByRole('checkbox', { name: "U18B, U18 is outside this template's U9–U16" })
+    expect(u18).toBeEnabled()
+    const note = screen.getByText("U18 is outside this template's U9–U16")
+    expect(note.className).toMatch(/text-ink-muted/)
+    expect(note.className).not.toMatch(/danger/)
+
+    expect(screen.getByRole('checkbox', { name: /^U14B$/ })).toBeEnabled()
+  })
+
+  it('counts the ticked out-of-band squads in one sentence, and stays a note not a gate', async () => {
+    const { user } = renderPublish()
+    await user.selectOptions(await screen.findByLabelText('Template'), CONTACT_HOUR.id)
+    expect(screen.queryByText(/outside this template's band/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: /^U18B/ }))
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "1 squad is outside this template's band — publishing anyway is your call.",
+    )
+    expect(screen.getByRole('checkbox', { name: /^U18B/ })).toBeChecked()
+
+    await user.click(screen.getByRole('checkbox', { name: /^U14B$/ }))
+    expect(screen.getByRole('status')).toHaveTextContent('1 squad is outside')
+
+    await user.click(screen.getByRole('checkbox', { name: /^U18B/ }))
+    expect(screen.queryByText(/outside this template's band/)).not.toBeInTheDocument()
   })
 
   it('previews before it publishes, and the confirm button carries the counts', async () => {

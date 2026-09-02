@@ -500,19 +500,27 @@ describe('SessionPlan — the coach adjusting it', () => {
     )
   })
 
-  it('omits a drill this squad cannot do — never a disabled option with the reason', async () => {
-    // ⚠️ FILTER THE LIST, never CSS-hide and never a disabled <option>.
-    // Disabled-with-reason is the chip-row rule; a dropdown option you cannot
-    // pick is worse than omitting it. Jay, 27 Aug 2026: U18B must not see
-    // U9/U11 copies, and U12 must not be offered a U16-and-up drill.
+  it('offers an out-of-band drill AFTER the fitting ones, with the band in its label', async () => {
+    // ⚠️ AGE IS GUIDANCE, NOT A GATE — since 2 Sep 2026 (a coach, via Jay:
+    // "should not be age group locked"), which supersedes the 27 Aug ruling
+    // that U12 must not be offered a U16-and-up drill. It is offered, last,
+    // with the band said in the label, and it is pickable. Contact is still
+    // the one refusal, and contact rows are still omitted (the U12G test
+    // below). The list is filtered and ordered by shelfRowsForSquad — never
+    // a disabled <option>, which is worse than either omitting or offering.
     getSessionMock.mockResolvedValue(SESSION)
     const { user } = show({ canEdit: true })
     await user.click(await screen.findByRole('button', { name: /adjust/i }))
 
     const picker = await screen.findByLabelText(/add a drill/i)
-    expect(within(picker).queryByRole('option', { name: /full-contact mauling/i })).not.toBeInTheDocument()
-    expect(within(picker).getByRole('option', { name: /grid passing/i })).not.toBeDisabled()
-    expect(within(picker).queryByRole('option', { name: /outside/i })).not.toBeInTheDocument()
+    const grid = within(picker).getByRole('option', { name: /grid passing/i })
+    const mauling = within(picker).getByRole('option', { name: /full-contact mauling/i })
+    expect(grid).not.toBeDisabled()
+    expect(mauling).not.toBeDisabled()
+    expect(mauling).toHaveTextContent("U12 is outside this drill's U16 and up")
+    expect(grid).not.toHaveTextContent(/outside/)
+    const names = within(picker).getAllByRole('option').map((el) => el.textContent)
+    expect(names.indexOf(grid.textContent)).toBeLessThan(names.indexOf(mauling.textContent))
   })
 
   it('cancels back to the saved plan, writing nothing', async () => {
@@ -607,19 +615,21 @@ describe('SessionPlan — a coach builds their own plan', () => {
     expect(screen.getByRole('button', { name: /save plan/i })).toBeDisabled()
   })
 
-  it('U18B START FROM A TEMPLATE is Freestyle then 16–18 hours, never U9 or U11 packs', async () => {
-    // ⚠️ THE SCREENSHOT. Squad Hub → Training → build a session. The select
-    // used to dump every age pack. Filter is shelfRowsForSquad — same rule as
-    // the shelf chips, at the option list, not CSS. EventDetail and Squad
-    // Training mount this same SessionPlan; they have no sibling picker.
+  it('U18B START FROM A TEMPLATE is Freestyle, then the 16–18 hours, then the other packs with their band', async () => {
+    // ⚠️ THE SCREENSHOT, REVISITED. Squad Hub → Training → build a session.
+    // On 27 Aug the select dumped every age pack in library order and the fix
+    // was to FILTER to the squad's band. Since 2 Sep 2026 age is guidance, not
+    // a gate: the in-band pack comes first, the other packs follow with the
+    // band said in the label, and nothing is disabled. Ordering is
+    // shelfRowsForSquad — same rule as the shelf chips, at the option list,
+    // not CSS. EventDetail and Squad Training mount this same SessionPlan.
     listTemplatesMock.mockResolvedValue(THREE_CONTACT_PACKS)
     const { user } = show({ canEdit: true, event: U18_EVENT, team: U18_TEAM })
     await user.click(await screen.findByTestId('build-session'))
 
     const picker = await screen.findByLabelText(/start from a template/i)
     const options = within(picker).getAllByRole('option')
-    expect(options[0]).toHaveTextContent('Freestyle — an empty plan')
-    expect(options.map((el) => el.textContent)).toEqual([
+    expect(options.slice(0, 6).map((el) => el.textContent)).toEqual([
       'Freestyle — an empty plan',
       'Tackle hour U16–U18',
       'Passing hour U16–U18',
@@ -627,20 +637,24 @@ describe('SessionPlan — a coach builds their own plan', () => {
       'Attack hour U16–U18',
       'Defence hour U16–U18',
     ])
-    expect(picker.textContent).not.toMatch(/U9–U10|U11–U14/)
+    expect(options).toHaveLength(16)
+    const rest = options.slice(6).map((el) => el.textContent)
+    expect(rest.every((text) => /U18 is outside this template's U(9–U10|11–U14)/.test(text))).toBe(true)
     expect(options.every((el) => !el.disabled)).toBe(true)
   })
 
-  it('U18B ADD A DRILL hides out-of-age copies of the same drill', async () => {
+  it('U18B ADD A DRILL lists the in-band copy first and the others after, with their band', async () => {
     listDrillsMock.mockResolvedValue(TOUCH_COPIES)
     const { user } = show({ canEdit: true, event: U18_EVENT, team: U18_TEAM })
     await user.click(await screen.findByTestId('build-session'))
 
     const picker = await screen.findByLabelText(/add a drill/i)
     const copies = within(picker).getAllByRole('option', { name: /4 v 2 Continuous Touch/i })
-    expect(copies).toHaveLength(1)
-    expect(copies[0]).toHaveValue('d-touch-u16')
-    expect(copies[0]).not.toBeDisabled()
+    expect(copies.map((el) => el.value)).toEqual(['d-touch-u16', 'd-touch-u9', 'd-touch-u11'])
+    expect(copies[0]).not.toHaveTextContent(/outside/)
+    expect(copies[1]).toHaveTextContent("U18 is outside this drill's U9–U10")
+    expect(copies[2]).toHaveTextContent("U18 is outside this drill's U11–U14")
+    expect(copies.every((el) => !el.disabled)).toBe(true)
   })
 
   it('U12G QR START FROM A TEMPLATE never lists a contact Tackle hour; Freestyle stays', async () => {
