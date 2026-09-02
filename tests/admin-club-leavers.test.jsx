@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -101,5 +101,48 @@ describe('AdminClub — Left this season', () => {
     listPlayersMock.mockResolvedValue([{ id: 'p-1', team_id: 't-u14', full_name: 'Tomasz Delacroix-Obi', left_at: null }])
     await renderAdminClub()
     expect(screen.queryByRole('region', { name: /left this season/i })).toBeNull()
+  })
+
+  it('shows the RPC failure message on Restore, does not reload, and re-enables the button', async () => {
+    listPlayersMock.mockResolvedValue([
+      { id: 'p-2', team_id: 't-u14', full_name: 'Rafiq Delacroix-Obi', left_at: '2026-09-02T08:00:00Z', left_by: 'pr-coach' },
+    ])
+    restorePlayerMock.mockRejectedValue(new Error('You are not allowed to change this player.'))
+    const user = await renderAdminClub()
+    const section = await screen.findByRole('region', { name: /left this season/i })
+
+    await user.click(within(section).getByRole('button', { name: 'Restore' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/not allowed/i)
+    // Only the initial load — a failed restore must not trigger a reload.
+    expect(listPlayersMock).toHaveBeenCalledTimes(1)
+    expect(within(section).getByRole('button', { name: 'Restore' })).toBeEnabled()
+  })
+
+  it('disables Restore while the RPC is in flight, and reloads once it resolves', async () => {
+    listPlayersMock.mockResolvedValue([
+      { id: 'p-2', team_id: 't-u14', full_name: 'Rafiq Delacroix-Obi', left_at: '2026-09-02T08:00:00Z', left_by: 'pr-coach' },
+    ])
+    let resolveRestore
+    restorePlayerMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRestore = resolve
+        }),
+    )
+    const user = await renderAdminClub()
+    const section = await screen.findByRole('region', { name: /left this season/i })
+
+    await user.click(within(section).getByRole('button', { name: 'Restore' }))
+
+    const button = await within(section).findByRole('button', { name: 'Restoring…' })
+    expect(button).toBeDisabled()
+
+    await act(async () => {
+      resolveRestore({ id: 'p-2', left_at: null })
+    })
+
+    await waitFor(() => expect(listPlayersMock).toHaveBeenCalledTimes(2))
   })
 })
