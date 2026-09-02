@@ -18,6 +18,7 @@ import {
 import { isLeaver, leaverName } from '../lib/leavers.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
+import { formatLabel, formatOf, sheetSlots } from '../lib/fixtureFormat.js'
 import { canEditTeam } from '../lib/scope.js'
 import { CLUB_TIME_ZONE, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
@@ -65,8 +66,18 @@ import {
 /** Every cell on the form is a hairline box. One class, so none can drift. */
 const CELL = 'border border-black px-1.5 py-[3px] align-middle'
 
-/** 1-12 down the left; 13-22 fill the right beside them. */
-const LEFT_COLUMN = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+/**
+ * 1..half down the left; the rest fill the right beside them.
+ *
+ * ⚠️ DERIVED FROM THE COUNT, NEVER HARD-CODED — since 2 Sep 2026. The paper
+ * form is two columns of 11 (1-12 left / 13-22 right) for a 15s sheet; a
+ * 7s sheet's 12 rows are two columns of 6. `LEFT_COLUMN` used to be the fixed
+ * `[1..12]` array a 22-row sheet always needed; every fixture now sizes
+ * itself from `sheetSlots(formatOf(event))`, so the split has to as well.
+ */
+function leftColumn(count) {
+  return Array.from({ length: Math.ceil(count / 2) }, (unused, index) => index + 1)
+}
 
 /** The five blank discipline rows the paper form provides. */
 const CARD_ROWS = 5
@@ -211,8 +222,12 @@ function SlotCells({ slots, squad, index }) {
   )
 }
 
-function emptySlots() {
-  return Array.from({ length: SLOT_COUNT }, (unused, index) => ({
+/**
+ * `count` rows, blank. `count` comes from `sheetSlots(formatOf(event))` —
+ * SLOT_COUNT (22) is the STORAGE ceiling, not the size of any one sheet.
+ */
+function emptySlots(count) {
+  return Array.from({ length: count }, (unused, index) => ({
     slot: index + 1,
     player_id: null,
     full_name: '',
@@ -220,9 +235,19 @@ function emptySlots() {
   }))
 }
 
-/** Fills the 22 rows from whatever the sheet actually stored, gaps included. */
-function slotsFrom(stored) {
-  const base = emptySlots()
+/**
+ * Fills the rows from whatever the sheet actually stored, gaps included.
+ *
+ * ⚠️ NEVER DROPS A STORED ROW. A sheet saved with 22 rows on a fixture that
+ * was later changed to 10s comes back with all 22 — the rows past the
+ * format's limit are kept and the screen labels them (see the note above the
+ * facsimile), because silently losing seven names a coach typed is worse
+ * than showing a note. SLOT_COUNT is the ceiling on what can be stored at
+ * all, so a stray slot 23 is still dropped here rather than rendered.
+ */
+function slotsFrom(stored, count) {
+  const highest = Math.max(count, ...(stored ?? []).map((row) => Number(row.slot) || 0))
+  const base = emptySlots(Math.min(highest, SLOT_COUNT))
   for (const row of stored ?? []) {
     if (row.slot >= 1 && row.slot <= SLOT_COUNT) {
       base[row.slot - 1] = {
@@ -261,16 +286,16 @@ function withLineup(slots, picks) {
 }
 
 /**
- * Replaces all 22 rows with a lineup. The deliberate, confirmed action.
+ * Replaces all `count` rows with a lineup. The deliberate, confirmed action.
  *
  * ⚠️ THE FR TICKS GO WITH THE NAMES. Front row cover is a SAFETY declaration
  * about a named player (see SlotCells); leaving a tick behind on a row whose
  * occupant just changed would tell a referee that somebody can pack down at
  * hooker on the strength of who used to be in that box.
  */
-function slotsFromLineup(picks) {
-  const base = emptySlots()
-  picks.slice(0, SLOT_COUNT).forEach((pick, index) => {
+function slotsFromLineup(picks, count) {
+  const base = emptySlots(count)
+  picks.slice(0, count).forEach((pick, index) => {
     base[index] = { ...base[index], player_id: pick.player_id, full_name: pick.full_name }
   })
   return base
@@ -318,10 +343,19 @@ export default function MatchSheet() {
   const { profile } = useMyProfile()
 
   const [event, setEvent] = useState(null)
+  // ⚠️ 22 UNTIL THE EVENT LOADS. `formatOf` reads a missing event the same
+  // way it reads a missing format — DEFAULT_FORMAT, 15s — so this is 22
+  // before the fixture arrives, matching the old unconditional behaviour
+  // until the load effect below narrows it to the real fixture's format.
+  const slotCount = sheetSlots(formatOf(event))
   const [squad, setSquad] = useState([])
   const [lineups, setLineups] = useState([])
   const [sheet, setSheet] = useState(null)
-  const [slots, setSlots] = useState(emptySlots)
+  // ⚠️ 22 UNTIL THE EVENT LOADS, which is the old, unconditional behaviour —
+  // `slotCount` below cannot know the fixture's format before `getEvent`
+  // returns, and the load effect replaces this with `slotsFrom(...,
+  // sheetSlots(formatOf(row)))` the moment it does.
+  const [slots, setSlots] = useState(() => emptySlots(22))
   const [cardRows, setCardRows] = useState(emptyCards)
   const [fields, setFields] = useState({
     captain_name: '',
@@ -393,7 +427,13 @@ export default function MatchSheet() {
 
         setSquad(players)
         setLineups(fixtureLineups)
-        setSlots(withLineup(slotsFrom(existing?.slots), namesFromLineup(fixtureLineups[0], players)))
+        const rowSlotCount = sheetSlots(formatOf(row))
+        setSlots(
+          withLineup(
+            slotsFrom(existing?.slots, rowSlotCount),
+            namesFromLineup(fixtureLineups[0], players),
+          ),
+        )
 
         if (existing) {
           setSheet(existing)
@@ -493,7 +533,7 @@ export default function MatchSheet() {
   function refillFromLineup(lineup) {
     setSaved(false)
     setConfirmRefill(null)
-    setSlots(slotsFromLineup(namesFromLineup(lineup, squad)))
+    setSlots(slotsFromLineup(namesFromLineup(lineup, squad), slotCount))
   }
 
   /**
@@ -1017,6 +1057,19 @@ export default function MatchSheet() {
           )}
         </Card>
 
+        {/* ⚠️ A STORED SHEET CAN BE WIDER THAN THE FIXTURE'S CURRENT FORMAT.
+            slotsFrom() never drops a stored row — see its own comment — so a
+            sheet saved as 22 on a fixture later switched to 10s comes back
+            with all 22, and this is where the coach is told why boxes 16-22
+            still exist and will not save if left filled. */}
+        {slots.length > slotCount && (
+          <p className="mb-2 text-[13px] text-warn-ink">
+            This sheet holds {slots.length} names but a {formatLabel(formatOf(event))} game allows
+            {' '}{slotCount}. Rows {slotCount + 1}–{slots.length} are beyond the {slotCount} allowed and will not
+            be accepted by the league — clear them, or change the fixture's format.
+          </p>
+        )}
+
         {/* ── FILLING IT IN. THE ONLY EDITOR, AT EVERY WIDTH ────────────────
             ⚠️ THE FORM IS NEVER TYPED ON — Jay, 16 Aug 2026. This started as a
             phone-only measure, because a fixed 860px facsimile is legible on a
@@ -1202,12 +1255,12 @@ export default function MatchSheet() {
                 </th>
                 <th className={`${CELL} w-[34px] text-center`}>FR</th>
               </tr>
-              {LEFT_COLUMN.map((left) => {
-                const right = left + LEFT_COLUMN.length
+              {leftColumn(slots.length).map((left) => {
+                const right = left + leftColumn(slots.length).length
                 return (
                   <tr key={left}>
                     <SlotCells slots={slots} squad={squad} index={left - 1} />
-                    {right <= SLOT_COUNT ? (
+                    {right <= slots.length ? (
                       <SlotCells slots={slots} squad={squad} index={right - 1} />
                     ) : (
                       <>

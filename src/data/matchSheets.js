@@ -16,7 +16,12 @@ import { fetchByIds } from './limits.js'
 // score would then exist in two places, and the day they disagreed both numbers
 // would look plausible. See claude/plans/2026-08-12-scoring-model.md.
 
-/** The 22 positions on the form. Not shirt numbers — the club holds none. */
+/**
+ * The MOST slots a stored sheet may hold — the 15s sheet's 22. Not the size
+ * of any particular sheet: since 2 Sep 2026 that comes from the fixture's
+ * format through src/lib/fixtureFormat.js (7s 12, 10s 15, 12s 18, 15s 22).
+ * Kept as the storage bound so a row with slot 23 is still refused.
+ */
 export const SLOT_COUNT = 22
 
 const REFUSED =
