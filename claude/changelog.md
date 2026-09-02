@@ -23,7 +23,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   ⚠️ **Three files are allowlisted for now** — `AdminClub.jsx`, `Roster.jsx`,
   `RosterTable.jsx` — because the senior-squads-2a session had uncommitted
   edits on those exact lines; a follow-up converts them and shrinks the list.
-- **fix(forms): typed work is no longer lost on the team sheet, the match
+- `2d227af` — **fix(forms): typed work is no longer lost on the team sheet, the match
   sheet, the event form or the sign-up wizard.** Item 1 of the 2 Sep 2026 UX
   review (`claude/plans/2026-09-02-ux-unsaved-work.md`). The event form asks
   "Discard your changes?" when Escape, the backdrop or the X would close it
