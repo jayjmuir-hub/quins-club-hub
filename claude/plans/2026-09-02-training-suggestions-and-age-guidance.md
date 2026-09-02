@@ -1,6 +1,6 @@
 # Training: the director's session becomes a suggestion, and age becomes guidance
 
-**Status: NOT SHIPPED — spec only, no code written.** Dated 2026-09-02.
+**Status: PART 2 SHIPPED as `7db98ca` (#639, 2 Sep 2026); Part 1 NOT SHIPPED — spec only.** Dated 2026-09-02.
 
 Two changes to the training builder, both from one coach's feedback relayed
 by Jay on 2 Sep 2026, and both about the same thing: the club's training
