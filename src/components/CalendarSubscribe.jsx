@@ -7,6 +7,7 @@ import {
   myCalendarToken,
   resetMyCalendarToken,
 } from '../data/calendar.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // "Add to calendar" — hands out a personal subscription URL that Google and
 // Apple Calendar poll, so fixture changes reach people without anyone
@@ -57,7 +58,7 @@ export default function CalendarSubscribe({ openRequest = 0 }) {
     try {
       setToken(await myCalendarToken())
     } catch (err) {
-      setError(err.message || "We couldn't create your calendar link. Try again.")
+      setError(friendlyMessage(err, "We couldn't create your calendar link. Try again."))
     } finally {
       setLoading(false)
     }
@@ -71,7 +72,7 @@ export default function CalendarSubscribe({ openRequest = 0 }) {
       setConfirmingReset(false)
       setCopied(false)
     } catch (err) {
-      setError(err.message || "We couldn't reset your link. Try again.")
+      setError(friendlyMessage(err, "We couldn't reset your link. Try again."))
     } finally {
       setLoading(false)
     }

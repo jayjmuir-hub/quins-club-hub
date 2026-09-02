@@ -21,6 +21,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 import { primeMyProfileCache } from '../lib/useMyProfile.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The sign-in gate: who you are, how to reach you, whether you have a player at
 // the club, and whether you do a job here — asked once each, before the app is
@@ -679,7 +680,7 @@ export default function NamePrompt() {
             role="alert"
             className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
           >
-            {error.message || "We couldn't save that. Try again."}
+            {friendlyMessage(error, "We couldn't save that. Try again.")}
           </p>
         )}
 
@@ -741,7 +742,7 @@ export default function NamePrompt() {
               role="alert"
               className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
             >
-              {error.message || "We couldn't save that. Try again."}
+              {friendlyMessage(error, "We couldn't save that. Try again.")}
             </p>
           )}
 
@@ -797,7 +798,7 @@ export default function NamePrompt() {
               role="alert"
               className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
             >
-              {error.message || "We couldn't save that. Try again."}
+              {friendlyMessage(error, "We couldn't save that. Try again.")}
             </p>
           )}
 
@@ -1003,7 +1004,7 @@ export default function NamePrompt() {
             role="alert"
             className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
           >
-            {error.message || "We couldn't save that name. Try again."}
+            {friendlyMessage(error, "We couldn't save that name. Try again.")}
           </p>
         )}
 

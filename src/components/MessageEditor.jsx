@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Button from './Button.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The inline edit form — one component for every surface that offers Edit
 // (channel posts, replies, DMs), so the affordance cannot drift the way the
@@ -36,7 +37,7 @@ export default function MessageEditor({ body, onSave, onCancel, busyLabel = 'Sav
     try {
       await onSave(text)
     } catch (err) {
-      setError(err.message || 'Could not save that edit.')
+      setError(friendlyMessage(err, 'Could not save that edit.'))
       setSaving(false)
     }
   }

@@ -11,6 +11,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import useChannelThread from '../lib/useChannelThread.js'
 import useDmThread from '../lib/useDmThread.js'
 import { RowAvatar, previewLine, scopeChatRows } from '../screens/ChatList.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The floating chat dock — claude/plans/2026-08-24-floating-chat-dock.md.
 // Jay: "i want the main chat interface to float over the screen when opened"
@@ -184,7 +185,7 @@ export default function FloatingChatDock({ badge = false }) {
     try {
       setRows(await listChats())
     } catch (err) {
-      setError(err.message || 'Could not load your chats.')
+      setError(friendlyMessage(err, 'Could not load your chats.'))
     }
     try {
       // ⚠️ INBOX shape ({ conversation_id, other_id, … }) — same regression

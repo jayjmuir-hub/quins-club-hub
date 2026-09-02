@@ -8,6 +8,7 @@ import { canStillEdit } from '../lib/messageEdit.js'
 import useProfileIcons from '../lib/useProfileIcons.js'
 import ProfileIcon from './ProfileIcon.jsx'
 import { labelForRole } from '../lib/scope.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // One post in a channel, as a BUBBLE, with its replies. The bubble itself
 // is ChatBubble — the same shell the DM thread and the floating dock use —
@@ -165,7 +166,7 @@ export default function MessageRow({
       setDraft('')
       setMentions([])
     } catch (err) {
-      setError(err.message || 'Could not send that.')
+      setError(friendlyMessage(err, 'Could not send that.'))
     } finally {
       setSending(false)
     }
@@ -276,7 +277,7 @@ export default function MessageRow({
               setReporting(false)
               setReason('')
             } catch (err) {
-              setError(err.message || 'Could not send the report.')
+              setError(friendlyMessage(err, 'Could not send the report.'))
             }
           }}
           className="mt-1.5 w-full max-w-[88%] rounded-[12px] bg-surface-mute px-3 py-2"

@@ -29,6 +29,7 @@ import {
   squadMismatch,
   squadRequiresGender,
 } from '../lib/gender.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The player add/edit form (design-system.md §5.8), opened in the shared
 // Sheet from Roster's "Add player" button and from PlayerDetail's "Edit".
@@ -1176,7 +1177,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
             {errorStage === 'grade' && (
               <span className="block">The player was saved, but their tier was not.</span>
             )}
-            {error.message || "We couldn't save that. Try again."}
+            {friendlyMessage(error, "We couldn't save that. Try again.")}
           </p>
         )}
 

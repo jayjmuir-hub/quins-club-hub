@@ -10,7 +10,20 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(forms): typed work is no longer lost on the team sheet, the match
+- **fix(errors): raw database and network text no longer reaches the
+  screen.** Item 2 of the 2 Sep 2026 UX review. `src/lib/friendlyError.js`
+  existed since 30 Aug and was used in nine files while about 150 sites
+  bypassed it with `err.message || 'fallback'` — the `||` only fires on an
+  EMPTY message, so a PostgREST or "Failed to fetch" string always won. A
+  codemod rewrote every such site to `friendlyMessage(err, 'fallback')` and
+  gave the three bare `{error.message}` renders a fallback.
+  `tests/friendly-error-sweep.test.js` now fails the build on either shape,
+  with a control that proves the sweep can see them. Hand-written refusals
+  (codes 42501, 22023, 42710, 22004, P0001) still show word for word.
+  ⚠️ **Three files are allowlisted for now** — `AdminClub.jsx`, `Roster.jsx`,
+  `RosterTable.jsx` — because the senior-squads-2a session had uncommitted
+  edits on those exact lines; a follow-up converts them and shrinks the list.
+- `2d227af` — **fix(forms): typed work is no longer lost on the team sheet, the match
   sheet, the event form or the sign-up wizard.** Item 1 of the 2 Sep 2026 UX
   review (`claude/plans/2026-09-02-ux-unsaved-work.md`). The event form asks
   "Discard your changes?" when Escape, the backdrop or the X would close it

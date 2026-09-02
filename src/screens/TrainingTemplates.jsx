@@ -28,6 +28,7 @@ import {
   totalWarning,
 } from '../lib/trainingPlans.js'
 import TrainingGate from './TrainingGate.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The Templates tab of the Rugby Performance Director portal — the hour builder.
 // Plan: claude/plans/2026-08-21-training-plans-implementation.md (Task 7).
@@ -489,7 +490,7 @@ function TemplatesBody() {
           We couldn&apos;t load the templates
         </h3>
         <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-          {error.message || 'Something went wrong. Try again.'}
+          {friendlyMessage(error, 'Something went wrong. Try again.')}
         </p>
         <Button onClick={() => setReloadToken((token) => token + 1)} className="mx-auto mt-4">
           Try again
@@ -828,7 +829,7 @@ function TemplatesBody() {
 
           {saveError && (
             <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
-              {saveError.message || "That didn't save. Try again."}
+              {friendlyMessage(saveError, "That didn't save. Try again.")}
             </p>
           )}
         </Card>

@@ -27,6 +27,7 @@ import {
   windowFor,
   shiftDay as shiftDayParts,
 } from '../lib/calendarGrid.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The allocation grid — pitches down the side, the day across the top.
 //
@@ -554,7 +555,7 @@ export default function Allocation() {
             <div className="flex items-center gap-2">
               {shareError && (
                 <span role="alert" className="text-[12px] font-semibold text-danger-ink">
-                  {shareError.message || 'That could not be shared.'}
+                  {friendlyMessage(shareError, 'That could not be shared.')}
                 </span>
               )}
               <Button size="sm" variant="secondary" disabled={shareBusy} onClick={shareVisual}>
@@ -582,7 +583,7 @@ export default function Allocation() {
         <Card role="alert" className="p-6 text-center">
           <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the day</h3>
           <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-            {error.message || 'Something went wrong. Try again.'}
+            {friendlyMessage(error, 'Something went wrong. Try again.')}
           </p>
         </Card>
       ) : view === 'month' ? (
@@ -718,7 +719,7 @@ export default function Allocation() {
           Answer uses. */}
       {approveError && (
         <p role="alert" className="mt-3 text-[13px] font-semibold text-danger-ink">
-          {approveError.message || "That didn't save. Try again."}
+          {friendlyMessage(approveError, "That didn't save. Try again.")}
         </p>
       )}
       <PitchOccupancy
@@ -874,7 +875,7 @@ export default function Allocation() {
 
                   {open && decideError && (
                     <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
-                      {decideError.message || "That didn't save. Try again."}
+                      {friendlyMessage(decideError, "That didn't save. Try again.")}
                     </p>
                   )}
                 </li>
@@ -1007,7 +1008,7 @@ export default function Allocation() {
             )}
             {decideError && (
               <p role="alert" className="mb-3 text-[12.5px] font-semibold text-danger-ink">
-                {decideError.message || "That didn't save. Try again."}
+                {friendlyMessage(decideError, "That didn't save. Try again.")}
               </p>
             )}
             <div className="flex gap-2">

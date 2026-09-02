@@ -29,6 +29,7 @@ import { shelfRowsForSquad } from '../lib/trainingShelf.js'
 import { clubDateTimeInputs, eventDate } from '../lib/eventFormat.js'
 import { sessionPlanShareCopy } from '../lib/sessionPlanShare.js'
 import { shareElementAsImage } from '../lib/shareImage.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Who sees a coach's plan. The order is the promotion path: a coach starts a
 // plan as their own (draft), shares it with the squad's other staff, then
@@ -993,7 +994,7 @@ export default function SessionPlan({ event, team, canEdit }) {
 
       {error && (
         <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
-          {error.message || "That didn't save. Try again."}
+          {friendlyMessage(error, "That didn't save. Try again.")}
         </p>
       )}
     </div>

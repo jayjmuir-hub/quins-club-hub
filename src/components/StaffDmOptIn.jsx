@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { setStaffDmOptIn } from '../data/messages.js'
 import { ageBandFromTeamName } from '../lib/ageGroup.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // A guardian's consent for a U16+ player to be messaged directly by their
 // squad's coach or manager. Squad chat phase 3, and the line Jay drew on
@@ -54,7 +55,7 @@ export default function StaffDmOptIn({ player, teamName, isGuardian }) {
       await setStaffDmOptIn(player.id, !state.optIn)
       setState({ optIn: !state.optIn, at: new Date().toISOString() })
     } catch (err) {
-      setError(err.message || 'Could not change that.')
+      setError(friendlyMessage(err, 'Could not change that.'))
     } finally {
       setBusy(false)
     }

@@ -6,6 +6,7 @@ import {
   listSquadsForRequest,
 } from '../data/accessRequests.js'
 import Button from './Button.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // What a signed-in account with NO membership sees. Replaces the older
 // "You're signed in / ask a club admin for an invite" dead end.
@@ -186,7 +187,7 @@ export default function RequestAccess({ userId, email, children }) {
       const created = await createAccessRequest({ profileId: userId, note, role, teamId })
       setRequest(created)
     } catch (err) {
-      setError(err.message || 'Something went wrong sending your request. Try again.')
+      setError(friendlyMessage(err, 'Something went wrong sending your request. Try again.'))
     } finally {
       setSubmitting(false)
     }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Card from './Card.jsx'
 import { listApprovalRecipients, setNotifyApprovals } from '../data/staff.js'
 import { labelForRole } from '../lib/scope.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // "Who is emailed when somebody is waiting to be approved" — the Club admin
 // tab, 23 Aug 2026. Jay: the only lever he could find was the head-coach
@@ -52,7 +53,7 @@ export default function ApprovalRecipients() {
       const saved = await setNotifyApprovals({ membershipId: row.membership_id, notify: !row.notify })
       setRows((prev) => prev.map((r) => (r.membership_id === row.membership_id ? { ...r, notify: saved.notify_approvals } : r)))
     } catch (err) {
-      setError(err.message || "That didn't save.")
+      setError(friendlyMessage(err, "That didn't save."))
     } finally {
       setBusy(null)
     }

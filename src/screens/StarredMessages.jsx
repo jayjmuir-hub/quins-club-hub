@@ -8,6 +8,7 @@ import { chatPath, listMyStarredMessages } from '../data/messages.js'
 import { listMyNicknames } from '../data/nicknames.js'
 import { useAuth } from '../lib/auth.jsx'
 import { postedLabel } from '../lib/notices.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Starred messages — round 4 (claude/plans/2026-08-24-chat-round-4.md).
 // PRIVATE bookmarks: the message_stars table is owner-only by RLS, so this
@@ -36,7 +37,7 @@ export default function StarredMessages() {
         setRows(starred)
         setNames(nicknames)
       } catch (err) {
-        if (live) setError(err.message || 'Could not load your starred messages.')
+        if (live) setError(friendlyMessage(err, 'Could not load your starred messages.'))
       }
     })()
     return () => {

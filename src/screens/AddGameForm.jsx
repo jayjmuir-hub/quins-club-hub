@@ -3,6 +3,7 @@ import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
 import { upsertEvent } from '../data/events.js'
 import { clubDateTimeInputs, clubWallTimeToUtc, eventDate } from '../lib/eventFormat.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // One GAME inside a tournament — a fixture that hangs off the container by
 // tournament_id, sharing its date, squad, venue, competition and tier so none
@@ -136,7 +137,7 @@ export default function AddGameForm({ tournament, game = null, onClose, onSaved 
       <form onSubmit={handleSubmit} noValidate>
         {error && (
           <p role="alert" className="mb-3.5 rounded-[9px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
-            {error.message}
+            {friendlyMessage(error, "We couldn't add that game. Try again.")}
           </p>
         )}
 

@@ -9,6 +9,7 @@ import { canEditTeam, childPlayerIds } from '../lib/scope.js'
 import { isAvailabilitySelfLocked } from '../lib/availabilityLock.js'
 import { initials } from '../lib/playerFormat.js'
 import { eventDate, eventTimeLabel, eventTitle, formatLongDate } from '../lib/eventFormat.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The availability / RSVP sheet (Task 16, design-system.md §4.23's bar +
 // legend has no screen-level mockup — this is new functionality Task 16
@@ -318,7 +319,7 @@ export default function Availability({ event, team, onClose }) {
           role="alert"
           className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
         >
-          {saveError.message || "We couldn't save that RSVP. Try again."}
+          {friendlyMessage(saveError, "We couldn't save that RSVP. Try again.")}
         </p>
       )}
 
@@ -333,7 +334,7 @@ export default function Availability({ event, team, onClose }) {
           role="alert"
           className="rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
         >
-          {error.message || "We couldn't load availability. Try again."}
+          {friendlyMessage(error, "We couldn't load availability. Try again.")}
         </p>
       )}
 

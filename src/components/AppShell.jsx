@@ -26,6 +26,7 @@ import GetAppSheet from './AppButton.jsx'
 import HelpSheet from './HelpSheet.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
 import { touchLastSeenOncePerDay } from '../data/activity.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The frame every screen lives inside: branded header (crest, name, tagline,
 // role label, nav) plus the membership-loading gate that decides whether the
@@ -62,7 +63,7 @@ function SignOutControl({ signOut, className = '' }) {
     try {
       await signOut()
     } catch (err) {
-      setError(err.message || 'Something went wrong signing out. Try again.')
+      setError(friendlyMessage(err, 'Something went wrong signing out. Try again.'))
     } finally {
       setPending(false)
     }
@@ -128,7 +129,7 @@ function ErrorState({ error, reload, children }) {
     >
       <h2 className="text-lg font-extrabold text-danger-ink">Couldn&apos;t load your account</h2>
       <p data-testid="error-message" className="mt-2 text-sm leading-relaxed text-danger-ink">
-        {error.message || 'Something went wrong. Try again.'}
+        {friendlyMessage(error, 'Something went wrong. Try again.')}
       </p>
       <Button onClick={reload} className="mt-4">
         Try again

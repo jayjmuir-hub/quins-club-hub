@@ -50,6 +50,7 @@ import {
   titleRepeatsType,
   venueLine,
 } from '../lib/eventFormat.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Home / dashboard (design-system.md §5.1): scope note, next-fixture hero,
 // stat tiles, then the two-column block — upcoming fixtures on the left,
@@ -841,7 +842,7 @@ export default function Dashboard() {
         <Card role="alert" className="p-6 text-center">
           <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load your dashboard</h3>
           <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-            {error.message || 'Something went wrong. Try again.'}
+            {friendlyMessage(error, 'Something went wrong. Try again.')}
           </p>
           <Button
             onClick={() => setReloadToken((token) => token + 1)}
@@ -1202,7 +1203,7 @@ export default function Dashboard() {
                     const conversationId = await openConversation(member.profileId)
                     navigate(`/chat/dm/${conversationId}`)
                   } catch (err) {
-                    setError(err.message || 'Could not open a chat with them.')
+                    setError(friendlyMessage(err, 'Could not open a chat with them.'))
                   }
                 }}
               />

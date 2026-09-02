@@ -38,6 +38,7 @@ import { useMemberships } from './memberships.jsx'
 import { isRoleChannel } from './roleChannels.js'
 import { canEditTeam, isAdmin, visibleTeams } from './scope.js'
 import useStayPinnedToBottom from './useStayPinnedToBottom.js'
+import { friendlyMessage } from './friendlyError.js'
 
 const CLUB = 'club'
 
@@ -211,7 +212,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
         }
       }
     } catch (err) {
-      setError(err.message || 'We could not load the chat just now.')
+      setError(friendlyMessage(err, 'We could not load the chat just now.'))
     }
   }, [param, teamId, canModerate, staffChannel, roleKey, unknownTeam, selfId])
 
@@ -322,7 +323,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     } catch (err) {
       // ⚠️ The draft and the tray SURVIVE a failure — the retry costs one
       // tap, which matters most on the slow connection that caused it.
-      setSendError(err.message || 'Could not send that.')
+      setSendError(friendlyMessage(err, 'Could not send that.'))
     } finally {
       setProgress(null)
       setSending(false)
@@ -344,7 +345,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       await toggleReaction(messageId, selfId, emoji, on)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not react to that.')
+      setError(friendlyMessage(err, 'Could not react to that.'))
     }
   }
 
@@ -353,7 +354,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       await setPollVote(optionId, selfId, on)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not record that vote.')
+      setError(friendlyMessage(err, 'Could not record that vote.'))
     }
   }
 
@@ -371,7 +372,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       else await postMessage(teamId, '', { eventId: attachEventId || null, attachmentPath })
       await load()
     } catch (err) {
-      setSendError(err.message || 'Could not send that voice message.')
+      setSendError(friendlyMessage(err, 'Could not send that voice message.'))
     } finally {
       setSending(false)
     }
@@ -398,7 +399,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       await load()
       return true
     } catch (err) {
-      setSendError(err.message || 'Could not post that poll.')
+      setSendError(friendlyMessage(err, 'Could not post that poll.'))
       return false
     } finally {
       setPostingPoll(false)
@@ -415,7 +416,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       if (gone?.attachment_path && gone.author_id === selfId) await removeChatPhoto(gone.attachment_path)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not remove that.')
+      setError(friendlyMessage(err, 'Could not remove that.'))
     }
   }
   async function onPin(id, pinnedNow) {
@@ -423,7 +424,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       await setPinned(id, pinnedNow)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not pin that.')
+      setError(friendlyMessage(err, 'Could not pin that.'))
     }
   }
 
@@ -437,7 +438,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       const dm = await openConversation(profileId)
       goToDm(dm)
     } catch (err) {
-      setError(err.message || 'Could not open a chat with them.')
+      setError(friendlyMessage(err, 'Could not open a chat with them.'))
     }
   }
   async function onReplyPrivately(m) {
@@ -445,7 +446,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       const dm = await openConversation(m.author_id)
       goToDm(dm, { replyTo: m })
     } catch (err) {
-      setError(err.message || 'Could not open a chat with them.')
+      setError(friendlyMessage(err, 'Could not open a chat with them.'))
     }
   }
 
@@ -454,7 +455,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       await setAnnounceOnly(teamId, clubId, selfId, !announceOnly)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not change that.')
+      setError(friendlyMessage(err, 'Could not change that.'))
     }
   }
 

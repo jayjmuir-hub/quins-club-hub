@@ -124,6 +124,34 @@ describe('Availability — loading/empty/error', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/availability unavailable/i)
   })
+
+  // ⚠️ THE TWO CASES friendlyMessage EXISTS FOR (2 Sep 2026 UX review, item
+  // 2). Before the sweep this screen rendered `error.message || fallback`,
+  // so a PostgREST failure put its own jargon in the club's red box; the
+  // `||` only fired on an EMPTY message. The first case below was run red
+  // against that code. The second guards the other direction: a refusal the
+  // database wrote FOR the person must not be flattened into the fallback.
+  it('⚠️ hides a coded database failure behind the screen\'s own sentence', async () => {
+    listAvailabilityMock.mockRejectedValue(
+      Object.assign(new Error('JSON object requested, multiple (or no) rows returned'), {
+        code: 'PGRST116',
+      }),
+    )
+    setup()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/couldn.t load availability/i)
+    expect(alert).not.toHaveTextContent(/JSON object/i)
+  })
+
+  it('still shows a refusal the database wrote for the person, word for word', async () => {
+    listAvailabilityMock.mockRejectedValue(
+      Object.assign(new Error('You are not allowed to see this squad.'), { code: '42501' }),
+    )
+    setup()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not allowed to see this squad/i)
+  })
 })
 
 describe('Availability — team sheet tallies', () => {

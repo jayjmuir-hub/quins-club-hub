@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from 'react'
 import Spinner from './Spinner.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // A searchable player picker, single- or multi-select.
 //
@@ -124,7 +125,7 @@ export default function PlayerPicker({
 
       {!loading && error && (
         <p role="alert" className="mt-2 text-[12.5px] font-semibold text-danger-ink">
-          {error.message || "We couldn't load the player list."}
+          {friendlyMessage(error, "We couldn't load the player list.")}
         </p>
       )}
 

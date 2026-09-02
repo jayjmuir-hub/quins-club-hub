@@ -6,6 +6,7 @@ import { createAccessRequest, getMyAccessRequest } from '../data/accessRequests.
 import { getMyProfile, requestStaffRole, updateProfileNames } from '../data/members.js'
 import { primeMyProfileCache } from '../lib/useMyProfile.js'
 import { needsSquads } from '../lib/signupIntent.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // What a signed-in account with NO membership sees: who are you, and what
 // brings you to the Quins? Item 5 of
@@ -470,7 +471,7 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
               role="alert"
               className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
             >
-              {error.message || "We couldn't send that. Try again."}
+              {friendlyMessage(error, "We couldn't send that. Try again.")}
             </p>
           )}
 
@@ -565,7 +566,7 @@ export default function RollCall({ teams = [], userId, email, onDone, children }
             role="alert"
             className="mb-3.5 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
           >
-            {error.message || "We couldn't save that. Try again."}
+            {friendlyMessage(error, "We couldn't save that. Try again.")}
           </p>
         )}
 

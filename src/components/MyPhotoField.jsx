@@ -14,6 +14,7 @@ import PhotoPositioner, {
   clampFocus,
   focusToObjectPosition,
 } from './PhotoPositioner.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // "Your photo" on /more — the upload half of phase 4 of
 // claude/plans/2026-08-13-squad-staff-on-home.md.
@@ -130,7 +131,7 @@ export default function MyPhotoField({ profile, userId }) {
       // ⚠️ THE OBJECT LANDED AND THE ROW DID NOT. Tidy it up, or the bucket
       // accumulates a file per failed save that nothing will ever point at.
       if (uploaded) await deleteStaffPhoto(uploaded)
-      setError(err.message || 'That photo could not be saved.')
+      setError(friendlyMessage(err, 'That photo could not be saved.'))
     } finally {
       setBusy(false)
     }
@@ -143,7 +144,7 @@ export default function MyPhotoField({ profile, userId }) {
       await setMyPhotoFocus(focus)
       setPositioning(false)
     } catch (err) {
-      setError(err.message || 'That position could not be saved.')
+      setError(friendlyMessage(err, 'That position could not be saved.'))
     } finally {
       setBusy(false)
     }
@@ -176,7 +177,7 @@ export default function MyPhotoField({ profile, userId }) {
       setUrl(null)
       await deleteStaffPhoto(previous)
     } catch (err) {
-      setError(err.message || 'That photo could not be removed.')
+      setError(friendlyMessage(err, 'That photo could not be removed.'))
     } finally {
       setBusy(false)
     }

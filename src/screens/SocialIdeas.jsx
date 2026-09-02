@@ -8,6 +8,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight, visibleTeams } from '../lib/scope.js'
 import { CLUB_TIME_ZONE, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The post-idea inbox. Any member submits; the manager marks and removes.
 // Ruling: claude/decisions/2026-08-12-social-media-management.md.
@@ -92,7 +93,7 @@ export default function SocialIdeas() {
       setArming(null)
       setReloadToken((token) => token + 1)
     } catch (err) {
-      setActionError(err.message || 'That did not work. Try again.')
+      setActionError(friendlyMessage(err, 'That did not work. Try again.'))
     } finally {
       setBusyId(null)
     }
@@ -123,7 +124,7 @@ export default function SocialIdeas() {
       <Card role="alert" className="p-6 text-center">
         <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the ideas</h3>
         <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-          {error.message || 'Something went wrong. Try again.'}
+          {friendlyMessage(error, 'Something went wrong. Try again.')}
         </p>
         <Button onClick={() => setReloadToken((token) => token + 1)} className="mx-auto mt-4">
           Try again

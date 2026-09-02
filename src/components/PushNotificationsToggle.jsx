@@ -14,6 +14,7 @@ import {
   listMyOptOuts,
   setCategoryEnabled,
 } from '../data/notificationPreferences.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The ONE toggle for the ONE thing push notifications currently do: tell you
 // when somebody replies to a report you filed. claude/plans/2026-08-18-push-
@@ -92,7 +93,7 @@ export default function PushNotificationsToggle() {
       setOptOuts((current) =>
         enabled ? [...(current ?? []), key] : (current ?? []).filter((c) => c !== key),
       )
-      setError(err.message || "That didn't save. Try again.")
+      setError(friendlyMessage(err, "That didn't save. Try again."))
     } finally {
       setSavingCategory(null)
     }
@@ -110,7 +111,7 @@ export default function PushNotificationsToggle() {
         setOn(true)
       }
     } catch (err) {
-      setError(err.message || "That didn't work. Try again.")
+      setError(friendlyMessage(err, "That didn't work. Try again."))
     } finally {
       setWorking(false)
     }

@@ -4,6 +4,7 @@ import Spinner from '../components/Spinner.jsx'
 import crest from '../assets/crest.png'
 import { acceptInvite } from '../data/members.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The invitee-facing half of Task 18's invite flow, reached via
 // /accept-invite/:token (see src/App.jsx for why this route sits outside
@@ -114,7 +115,7 @@ export default function AcceptInvite() {
           <>
             <h2 className="text-lg font-extrabold text-danger-ink">We couldn&apos;t accept that invite</h2>
             <p role="alert" className="mt-2 text-sm leading-relaxed text-danger-ink">
-              {error?.message || "We couldn't accept that invite. Try again."}
+              {friendlyMessage(error, "We couldn't accept that invite. Try again.")}
             </p>
           </>
         )}

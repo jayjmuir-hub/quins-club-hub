@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Card from '../components/Card.jsx'
 import MyReportsList from '../components/MyReportsList.jsx'
 import { listFeedback, subscribeFeedback } from '../data/feedback.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // /my-reports — the things you have told the club about, and what they said
 // back.
@@ -46,7 +47,7 @@ export default function MyReports() {
       } catch (err) {
         if (!cancelled) {
           setReports([])
-          setError(err?.message || 'Could not load your reports.')
+          setError(friendlyMessage(err, 'Could not load your reports.'))
         }
       }
     }

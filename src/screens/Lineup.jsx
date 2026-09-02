@@ -25,6 +25,7 @@ import {
   venueLine,
 } from '../lib/eventFormat.js'
 import { shareElementAsImage } from '../lib/shareImage.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Picking a team, and sharing it — three VIEWS over one lineup since 25 Aug
 // 2026 (claude/plans/2026-08-25-roster-builder-three-views.md): Quick is the
@@ -807,7 +808,7 @@ export default function Lineup() {
           role="alert"
           className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink"
         >
-          {error.message || "That didn't save. Try again."}
+          {friendlyMessage(error, "That didn't save. Try again.")}
         </p>
       )}
 

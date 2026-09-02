@@ -5,6 +5,7 @@ import Spinner from '../components/Spinner.jsx'
 import { listPitches, upsertPitch, setPitchActive } from '../data/pitches.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { hasAdminRight } from '../lib/scope.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The pitch setup screen — Jay picked "blocks as columns" (option 2) from six
 // laid out at browser width on 11 Aug 2026.
@@ -180,7 +181,7 @@ export default function Pitches() {
       <Card role="alert" className="p-6 text-center">
         <h3 className="text-base font-extrabold text-danger-ink">We couldn&apos;t load the pitches</h3>
         <p className="mt-2 text-sm leading-relaxed text-danger-ink">
-          {error.message || 'Something went wrong. Try again.'}
+          {friendlyMessage(error, 'Something went wrong. Try again.')}
         </p>
         <Button onClick={refresh} className="mx-auto mt-4">
           Try again
@@ -323,7 +324,7 @@ export default function Pitches() {
 
           {saveError && (
             <p role="alert" className="mt-2.5 text-[12.5px] font-semibold text-danger-ink">
-              {saveError.message || "That didn't save. Try again."}
+              {friendlyMessage(saveError, "That didn't save. Try again.")}
             </p>
           )}
         </Card>

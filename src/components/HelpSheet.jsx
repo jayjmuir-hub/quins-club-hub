@@ -9,6 +9,7 @@ import {
   feedbackRef,
   listFeedback,
 } from '../data/feedback.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The sheet that lets any member say "this is broken" or "this would be
 // better", from any signed-in screen. Opened from the account menu's
@@ -117,7 +118,7 @@ export default function HelpSheet({ open, onClose }) {
       setMine(await listFeedback())
     } catch (err) {
       setMine([])
-      setMineError(err?.message || 'Could not load your reports.')
+      setMineError(friendlyMessage(err, 'Could not load your reports.'))
     }
   }
 
@@ -163,7 +164,7 @@ export default function HelpSheet({ open, onClose }) {
       setError(
         noMembership
           ? 'Your account is still waiting to be approved, so this form is not open yet. Email help@adhquins-clubhub.com and we will pick it up.'
-          : err?.message || 'That did not send. Try again in a moment.',
+          : friendlyMessage(err, 'That did not send. Try again in a moment.'),
       )
     } finally {
       setSaving(false)

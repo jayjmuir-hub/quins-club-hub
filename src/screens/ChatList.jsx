@@ -22,6 +22,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { postedLabel } from '../lib/notices.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The Chats list — 24 Aug 2026. claude/plans/2026-08-24-chat-list.md.
 //
@@ -182,7 +183,7 @@ export default function ChatList() {
     try {
       setRows(await listChats())
     } catch (err) {
-      setError(err.message || 'We could not load your chats just now.')
+      setError(friendlyMessage(err, 'We could not load your chats just now.'))
     }
     try {
       setPrefs(await listMyChatPrefs())
@@ -271,7 +272,7 @@ export default function ChatList() {
       await setChatPref(selfId, rowKey(row), patch)
       setPrefs(await listMyChatPrefs())
     } catch (err) {
-      setError(err.message || 'Could not change that.')
+      setError(friendlyMessage(err, 'Could not change that.'))
     }
   }
 
@@ -280,7 +281,7 @@ export default function ChatList() {
       const id = await openConversation(person.profile_id)
       navigate(`/chat/dm/${id}`)
     } catch (err) {
-      setError(err.message || 'Could not start that conversation.')
+      setError(friendlyMessage(err, 'Could not start that conversation.'))
       setPicking(false)
     }
   }

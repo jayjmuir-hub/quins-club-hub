@@ -7,6 +7,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, visibleTeams } from '../lib/scope.js'
 import { parsePlayerPaste, toInsertRows } from '../lib/playerImport.js'
 import { genderLabel } from '../lib/gender.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Bulk player import (desktop-spec.md §5.1). The reason this exists: the club
 // has 15 squads and the app has no players in it, because entering them one
@@ -99,7 +100,7 @@ export default function PlayerImport({ onClose, onImported, existingPlayers = []
       onImported?.(rows.length)
       onClose()
     } catch (err) {
-      setFailure(err?.message || "We couldn't add those players.")
+      setFailure(friendlyMessage(err, "We couldn't add those players."))
     } finally {
       inFlight.current = false
       setSaving(false)

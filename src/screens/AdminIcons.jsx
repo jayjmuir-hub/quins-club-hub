@@ -7,6 +7,7 @@ import { grantIcon, listIconGrants, revokeIcon, setPrimaryIcon } from '../data/p
 import { ICON_LIBRARY, iconEmoji, iconMeaning } from '../lib/profileIcons.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isSuperAdmin } from '../lib/scope.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // /admin/icons — recognition emoji, super admins only
 // (claude/plans/2026-08-31-profile-icons.md). Jay's idea: crown the U11
@@ -48,7 +49,7 @@ export default function AdminIcons() {
     try {
       setGrants(await listIconGrants())
     } catch (err) {
-      setError(err.message || 'We could not load the grants just now.')
+      setError(friendlyMessage(err, 'We could not load the grants just now.'))
     }
     // The person picker — decoration for the ADD control only, a failure
     // leaves revoke working (AdminOfficers' stance).
@@ -94,7 +95,7 @@ export default function AdminIcons() {
       setReason('')
       await load()
     } catch (err) {
-      setError(err.message || 'Could not grant that.')
+      setError(friendlyMessage(err, 'Could not grant that.'))
     } finally {
       setSaving(false)
     }
@@ -106,7 +107,7 @@ export default function AdminIcons() {
       await revokeIcon(id)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not revoke that.')
+      setError(friendlyMessage(err, 'Could not revoke that.'))
     }
   }
 
@@ -116,7 +117,7 @@ export default function AdminIcons() {
       await setPrimaryIcon(id)
       await load()
     } catch (err) {
-      setError(err.message || 'Could not make that the primary.')
+      setError(friendlyMessage(err, 'Could not make that the primary.'))
     }
   }
 

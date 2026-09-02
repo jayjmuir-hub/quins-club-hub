@@ -13,6 +13,7 @@ import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import Button from '../components/Button.jsx'
 import PersonCard from '../components/PersonCard.jsx'
 import PersonName from '../components/PersonName.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The player detail sheet (design-system.md §5.7): a branded hero carrying
 // the player's initials, a set of key/value rows, and — only when the database
@@ -143,7 +144,7 @@ function ParentsBlock({ playerId }) {
   if (error) {
     return (
       <p role="alert" className="mb-4 rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
-        {error.message || "We couldn't load parent details. Try again."}
+        {friendlyMessage(error, "We couldn't load parent details. Try again.")}
       </p>
     )
   }
@@ -350,7 +351,7 @@ function ContactBlock({ playerId }) {
   if (error) {
     return (
       <p role="alert" className="rounded-[11px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">
-        {error.message || "We couldn't load contact details. Try again."}
+        {friendlyMessage(error, "We couldn't load contact details. Try again.")}
       </p>
     )
   }
@@ -456,7 +457,7 @@ function FooterActions({ player, canEdit, canEditOwn, canDelete, onEdit, onEditO
 
   const alert = error && (
     <p role="alert" className="mb-3 rounded-[11px] bg-danger-bg px-3 py-2.5 text-sm font-semibold text-danger-ink">
-      {error.message || "We couldn't change that player. Try again."}
+      {friendlyMessage(error, "We couldn't change that player. Try again.")}
     </p>
   )
 

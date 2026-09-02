@@ -3,6 +3,7 @@ import Button from './Button.jsx'
 import { Sheet } from './Sheet.jsx'
 import { submitIdea } from '../data/socialIdeas.js'
 import { useAuth } from '../lib/auth.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // "Send the club a post idea" — the member-facing half of Social Media
 // Management. Ruling: claude/decisions/2026-08-12-social-media-management.md.
@@ -53,7 +54,7 @@ export default function IdeaForm({ open, onClose, event = null, onSubmitted }) {
       setFile(null)
       onSubmitted?.()
     } catch (err) {
-      setError(err.message || 'That could not be sent. Try again.')
+      setError(friendlyMessage(err, 'That could not be sent. Try again.'))
     } finally {
       setSaving(false)
     }
