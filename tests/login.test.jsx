@@ -473,6 +473,25 @@ describe('Login screen — forgot password', () => {
     expect(panel.textContent).not.toMatch(/we.ve sent you a link/i)
   })
 
+  it('tells the person to check their junk folder', async () => {
+    // 2 Sep 2026: a squad manager's reset mail sat in Hotmail's Junk folder
+    // and she reported that it never arrived. The sign-up path already said
+    // "check your spam folder"; this panel did not. Wording is "Junk or Spam"
+    // because Outlook/Hotmail label the folder "Junk", and that is where club
+    // mail has landed every time so far.
+    sendPasswordReset.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<Login />)
+
+    await user.click(screen.getByRole('button', { name: /forgot password/i }))
+    await user.type(screen.getByLabelText(/email address/i), 'maybe@example.com')
+    await user.click(screen.getByRole('button', { name: /email me a reset link/i }))
+
+    const panel = (await screen.findByRole('heading', { name: /check your email/i }))
+      .parentElement
+    expect(panel).toHaveTextContent(/junk or spam folder/i)
+  })
+
   it('lets the user get back to the form from the confirmation panel', async () => {
     sendPasswordReset.mockResolvedValue(undefined)
     const user = userEvent.setup()

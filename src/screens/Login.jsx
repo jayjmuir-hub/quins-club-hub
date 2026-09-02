@@ -452,11 +452,18 @@ export default function Login({ authError = null, embedded = false }) {
       </div>
     )
   } else if (status === 'reset-sent') {
+    // ⚠️ "Junk or Spam" is here because it was NOT, and it cost a morning on
+    // 2 Sep 2026: a squad manager's reset mail was in Hotmail's Junk folder
+    // and she reported it as never having arrived. The sign-up path already
+    // carried this line; the reset path is the one a forgotten password
+    // actually goes down, and it did not. "Junk" is Outlook's word for the
+    // folder, "Spam" is Gmail's — both, because the club has both.
     panel = sentPanel(
       'Check your email',
       <>
         If there’s an account for <strong className="text-ink">{email.trim()}</strong>, we’ve
-        sent a link to set a new password.
+        sent a link to set a new password. Check your Junk or Spam folder if it isn’t in
+        your inbox.
       </>,
       true,
     )
@@ -465,7 +472,8 @@ export default function Login({ authError = null, embedded = false }) {
       'Check your email',
       <>
         We’ve sent a sign-in link to <strong className="text-ink">{email.trim()}</strong>. Open
-        it on this device to continue.
+        it on this device to continue. Check your Junk or Spam folder if it isn’t in your
+        inbox.
       </>,
       false,
     )
