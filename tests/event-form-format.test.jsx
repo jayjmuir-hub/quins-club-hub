@@ -45,7 +45,7 @@ const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const U18B = { id: 't-u18b', club_id: CLUB_ID, name: 'U18B Contact', sort_order: 14 }
 const U18B_TWELVES = { ...U18B, id: 't-u18b-12', default_format: 12 }
 const U8 = { id: 't-u8', club_id: CLUB_ID, name: 'U8 Tag', sort_order: 3 }
-const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
+const ADMIN = [{ id: 'm-a', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }]
 
 function renderForm({ event = null, teams = [U18B], initialKind = null, duplicate = false, strict = false } = {}) {
   useMembershipsMock.mockReturnValue({

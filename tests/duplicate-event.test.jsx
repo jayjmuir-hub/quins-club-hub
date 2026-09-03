@@ -67,7 +67,7 @@ import EventDetail from '../src/screens/EventDetail.jsx'
 
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const TEAM = { id: 't-u14b', club_id: CLUB_ID, name: 'U14B Contact', sort_order: 9 }
-const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
+const ADMIN = [{ id: 'm-a', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }]
 
 // A Tuesday training session with every detail somebody actually typed. This
 // is the fixture the whole feature is about: the venue, end time and notes are

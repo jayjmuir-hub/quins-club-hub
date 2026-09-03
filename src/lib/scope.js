@@ -161,7 +161,7 @@ export function canApproveAnything(memberships) {
  */
 export function canApproveTeam(memberships, teamId) {
   if (!memberships || teamId == null) return false
-  if (isAdmin(memberships)) return true
+  if (adminTeamReach(memberships, 'edit')) return true
   // ⚠️ isActiveMembership FIRST — see canApproveAnything above. A pending
   // coach request named this squad and would otherwise answer true for it,
   // which is precisely the row that must not approve.
@@ -389,6 +389,38 @@ export function hasAdminRight(memberships, right) {
   return adminRights(memberships).includes(right)
 }
 
+// ══ ADMIN TEAM REACH (the admin split — 3 Sep 2026) ═══════════════════════
+//
+// ⚠️ AN ADMIN ROW REACHES NO SQUAD BY ITSELF. Until 3 Sep 2026 `isAdmin()`
+// short-circuited visibleTeams, canEditTeam, canApproveTeam and the squad arm
+// of canEditEvent — "any admin, every squad" — so a Pitch-only admin, names-
+// read-only for DOB/contacts/photos since 28 Aug, still opened every roster
+// and read every squad chat. These lists MIRROR private.admin_team_reach in
+// db/migrations/20260904_admin_team_reach.sql, read off the 28 Aug matrix
+// (spec §5.2); the SQL is the boundary, this only decides what the UI offers.
+// tests/scope.test.js pins the lists so a change here without a migration is
+// caught. `isAdmin()` itself is untouched and still gates the club-level
+// spine (Accounts, invites, whole-club notices, pitches) — none of it is a
+// squad.
+export const ADMIN_TEAM_REACH = {
+  edit: ['clubadmin', 'youth'],
+  see: ['clubadmin', 'youth', 'media', 'welfare', 'pitches', 'training'],
+  events: ['clubadmin', 'youth', 'media', 'pitches'],
+  attendance: ['clubadmin', 'youth', 'training'],
+}
+
+/**
+ * Does this person's ADMIN hat reach squads in `mode`? Club-wide (an admin
+ * row has no team), so the caller still checks the team belongs to the club
+ * — every screen only ever holds its own club's teams.
+ */
+export function adminTeamReach(memberships, mode) {
+  if (!memberships) return false
+  if (isSuperAdmin(memberships)) return true
+  const allowed = ADMIN_TEAM_REACH[mode] ?? []
+  return adminRights(memberships).some((right) => allowed.includes(right))
+}
+
 // ══ CHILD-CONTACT ALLOWLIST (S2, Phase 1 — 28 Aug 2026) ═══════════════════
 //
 // ⚠️ THIS IS A DATA BOUNDARY, NOT A SCREEN GATE. Unlike ADMIN_RIGHTS above,
@@ -557,7 +589,10 @@ export function visibleTeams(memberships, allTeams) {
       return a.name.localeCompare(b.name)
     })
 
-  if (isAdmin(memberships)) {
+  // The admin split (3 Sep 2026): an admin sees every squad only through a
+  // right that reaches squads. A zero-rights admin falls through to their
+  // squad rows below — usually none, and that is the point.
+  if (adminTeamReach(memberships, 'see')) {
     return sorted(allTeams)
   }
 
@@ -599,7 +634,8 @@ export function canEditTeam(memberships, teamId) {
   // grant a squad event whose id failed to load.
   if (teamId == null) return false
   if (!memberships) return false
-  if (isAdmin(memberships)) return true
+  // The admin split (3 Sep 2026): the admin's RIGHT decides, not the row.
+  if (adminTeamReach(memberships, 'edit')) return true
   // ⚠️ isActiveMembership — a PENDING coach/manager request is not access
   // (Grok item 4, mirroring canApproveTeam and the SQL can_edit_team, which
   // requires status='active'). Without it a self-registered pending coach saw
@@ -618,7 +654,9 @@ export function canEditTeam(memberships, teamId) {
 export function canEditEvent(memberships, event) {
   if (!event) return false
   if (event.team_id == null) return isAdmin(memberships)
-  return canEditTeam(memberships, event.team_id)
+  // Social and Pitch edit events without editing the squad (matrix §5.2) —
+  // mirrors the 'events' arm of the `event edit` policy.
+  return canEditTeam(memberships, event.team_id) || adminTeamReach(memberships, 'events')
 }
 
 /**

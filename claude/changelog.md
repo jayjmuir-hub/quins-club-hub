@@ -10,7 +10,29 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
-- **docs(plan): the admin split — an admin row reaches no squad by itself.**
+- 🔒 **THE ADMIN SPLIT — an admin row reaches no squad by itself.** Jay, 3 Sep
+  2026, all four rulings confirmed (`claude/plans/2026-09-03-admin-team-reach.md`).
+  `db/migrations/20260904_admin_team_reach.sql`: one default-deny helper,
+  `private.admin_team_reach(team, mode)`, and the admin arm of
+  `can_edit_team` / `can_see_team` / `is_attached_to_team` routes through it
+  — so every squad policy follows without being touched. Allowlists off the
+  28 Aug matrix: edit {clubadmin, youth}; see + {media, welfare, pitches,
+  training}; `event edit` gains an 'events' arm {clubadmin, youth, media,
+  pitches}; attendance moves to `private.can_take_register` = can_edit_team OR
+  {clubadmin, youth, training}. `private.is_admin` untouched (the club-level
+  spine, ruling 3). Client mirror `ADMIN_TEAM_REACH` / `adminTeamReach()` in
+  `src/lib/scope.js`; `visibleTeams`, `canEditTeam`, `canApproveTeam`,
+  `canEditEvent` route through it; Dashboard, Roster, Schedule and the
+  document upload sheet drop their bare `admin ||` shortcuts; 41 test files'
+  admin fixtures gain `clubadmin` (every real admin holds it since Phase 0a).
+  Harness `db/tests/admin-team-reach.sql`, run against production rolled back
+  via the MCP: baseline shows the zero-rights admin reading the player and
+  staff chat BEFORE; after, all nine personas match the matrix; the fault
+  (training dropped from attendance) flips the Training probe to refused;
+  control query afterwards shows the live helpers untouched and no probe rows.
+  ⚠️ **Applied to production only on Jay's yes; the changelog says when.**
+  Closes `claude/open-items.md` item 13.
+- `bc464f8` — **docs(plan): the admin split — an admin row reaches no squad by itself.**
   `claude/plans/2026-09-03-admin-team-reach.md` — Jay, 3 Sep 2026, after the
   audit of what a plain admin sees: three helper bodies (`can_edit_team`,
   `can_see_team`, `is_attached_to_team`) route every squad policy, so their

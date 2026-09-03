@@ -57,7 +57,7 @@ function renderForm({ memberships, teams = TEAMS, event = null, ...rest } = {}) 
   return render(<EventForm event={event} onClose={vi.fn()} onSaved={vi.fn()} {...rest} />)
 }
 
-const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
+const ADMIN = [{ id: 'm-a', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }]
 
 const portionField = () => screen.queryByLabelText('How much of the pitch')
 

@@ -425,10 +425,18 @@ CREATE POLICY "event read" ON public.events
   AS PERMISSIVE FOR SELECT TO public
   USING (private.is_attached_to_team(team_id));
 
+-- ⚠️ RE-CAPTURED 3 Sep 2026 (20260904_admin_team_reach). The club-wide arm
+-- (team_id null → any admin) dates from 30 Aug and was missing from this
+-- capture; the 'events' arm lets Social and Pitch edit a squad's events
+-- without editing the squad (matrix §5.2).
 CREATE POLICY "event edit" ON public.events
   AS PERMISSIVE FOR ALL TO public
-  USING (private.can_edit_team(team_id))
-  WITH CHECK (private.can_edit_team(team_id));
+  USING (private.can_edit_team(team_id)
+         OR private.admin_team_reach(team_id, 'events')
+         OR ((team_id IS NULL) AND private.is_admin(club_id)))
+  WITH CHECK (private.can_edit_team(team_id)
+         OR private.admin_team_reach(team_id, 'events')
+         OR ((team_id IS NULL) AND private.is_admin(club_id)));
 
 
 -- ---------------------------------------------------------------------
@@ -982,28 +990,21 @@ CREATE POLICY "staff photo write" ON storage.objects
 -- Verified against live 2026-08-10; harness in db/tests/attendance.sql.
 -- =====================================================================
 
+-- ⚠️ ALL FOUR RE-CAPTURED 3 Sep 2026 (20260904_admin_team_reach): the gate is
+-- private.can_take_register(event_id) = can_edit_team OR the 'attendance'
+-- allowlist (Training). Read stays "the write gate OR is_own_player".
 CREATE POLICY "attendance read" ON public.attendance
-  FOR SELECT USING (
-    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
-    OR private.is_own_player(player_id)
-  );
+  FOR SELECT USING (private.can_take_register(event_id) OR private.is_own_player(player_id));
 
 CREATE POLICY "attendance write insert" ON public.attendance
-  FOR INSERT WITH CHECK (
-    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
-  );
+  FOR INSERT WITH CHECK (private.can_take_register(event_id));
 
 CREATE POLICY "attendance write update" ON public.attendance
-  FOR UPDATE USING (
-    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
-  ) WITH CHECK (
-    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
-  );
+  FOR UPDATE USING (private.can_take_register(event_id))
+  WITH CHECK (private.can_take_register(event_id));
 
 CREATE POLICY "attendance write delete" ON public.attendance
-  FOR DELETE USING (
-    private.can_edit_team((SELECT e.team_id FROM events e WHERE e.id = attendance.event_id))
-  );
+  FOR DELETE USING (private.can_take_register(event_id));
 
 -- ---------------------------------------------------------------------
 -- pitches  (2 policies — 11 Aug 2026)

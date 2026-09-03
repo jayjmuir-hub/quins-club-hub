@@ -53,7 +53,7 @@ import EventForm from '../src/screens/EventForm.jsx'
 
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const TEAM = { id: 't-u14b', club_id: CLUB_ID, name: 'U14B Contact', sort_order: 9 }
-const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
+const ADMIN = [{ id: 'm-a', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }]
 
 // A real repeating occurrence: a training carrying a series_id, mid-term.
 // 14:00Z is 18:00 Abu Dhabi (the form's club wall clock), so leaving the time

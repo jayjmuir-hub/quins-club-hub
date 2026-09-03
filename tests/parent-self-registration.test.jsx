@@ -1325,12 +1325,12 @@ describe('A member waiting to be approved', () => {
 })
 
 describe('Accounts — the approval queue', () => {
-  const ADMIN = [{ id: 'm-admin', role: 'admin', status: 'active', team_id: null, club_id: CLUB_ID }]
+  const ADMIN = [{ id: 'm-admin', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: CLUB_ID }]
 
   const JAY_ADMIN = {
     id: 'mem-jay',
     profile_id: 'profile-jay',
-    role: 'admin',
+    role: 'admin', admin_rights: ['clubadmin'],
     team_id: null,
     status: 'active',
     created_at: '2026-01-05T09:00:00Z',

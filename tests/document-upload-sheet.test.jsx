@@ -16,7 +16,7 @@ import DocumentUploadSheet from '../src/components/DocumentUploadSheet.jsx'
 
 const TEAMS = [{ id: 't1', name: 'U12' }, { id: 't2', name: 'U14' }]
 const coach = [{ role: 'coach', team_id: 't1', status: 'active' }]
-const admin = [{ role: 'admin', team_id: null, status: 'active' }]
+const admin = [{ role: 'admin', admin_rights: ['clubadmin'], team_id: null, status: 'active' }]
 
 function pdf(name = 'pack.pdf') {
   return new File(['x'], name, { type: 'application/pdf' })

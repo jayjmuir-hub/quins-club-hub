@@ -21,7 +21,7 @@ import { isLeaver } from '../lib/leavers.js'
 // one that decides which squad a child belongs in.
 import { ageAt } from '../lib/ageGrade.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canWriteChild, canWritePlayer, isActiveMembership, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
+import { adminTeamReach, canWriteChild, canWritePlayer, isActiveMembership, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
 import { GENDERS, genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
@@ -356,7 +356,8 @@ export default function Roster() {
   // this gate is deliberately not team-scoped: any active squad staff may
   // open the add sheet; which squads they may write to is canEditTeam's call.
   const canEditAnything =
-    admin || memberships.some((membership) => isActiveMembership(membership) && isSquadStaffRole(membership.role))
+    adminTeamReach(memberships, 'edit') ||
+    memberships.some((membership) => isActiveMembership(membership) && isSquadStaffRole(membership.role))
 
   useEffect(() => {
     let mounted = true

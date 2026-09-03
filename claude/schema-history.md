@@ -1071,3 +1071,31 @@ Measured before the change: `messages` `relrowsecurity` = true;
   conversation inside a single transaction — a trigger posting a system
   message alongside a user one, a bulk import, or a future "forward to N
   chats". Add a tie-break before writing one of those.
+
+## 20260904_admin_team_reach — the admin split (3 Sep 2026)
+
+**Why.** The 28 Aug allowlists fenced DOB/contacts, photos, child writes and DM
+review, but every OTHER squad-scoped policy still reached "any active admin"
+through the admin arm of `can_edit_team`, `can_see_team` and
+`is_attached_to_team`. A Pitch-only admin — names-read-only on paper — opened
+every roster, took any register and read every squad chat (open-items item 13).
+
+**What.** One new helper, `private.admin_team_reach(_team, _mode)`, default-deny
+over `admin_rights` (or `is_super`), with four modes read off the matrix. The
+three helpers keep their squad-row arms and route the admin arm through it —
+three bodies, not the ~274 `is_admin` sites, because every squad policy already
+went through them. Two surfaces the matrix grants to non-editors get their own
+arm: `event edit` (Social, Pitch) and attendance via a new
+`private.can_take_register(event)` (Training). `private.is_admin` is untouched.
+
+**Proof.** `db/tests/admin-team-reach.sql`: baseline before the inline
+migration shows the zero-rights admin reading the player and the staff chat;
+after it, nine personas match the matrix exactly; the zero-rights admin still
+reads the `teams` table (session-alive control); dropping `training` from the
+attendance list flips the Training probe to refused. Run rolled back against
+production 3 Sep via the MCP; control query afterwards: helpers absent, no
+probe rows.
+
+**Consequence for real rows.** Supers and clubadmin holders unchanged. The two
+specialist-only admins on 3 Sep lose squad reach; a coach/manager row is the
+designed way back (ruling 4).

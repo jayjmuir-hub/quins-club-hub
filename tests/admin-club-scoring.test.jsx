@@ -77,7 +77,7 @@ const OVERRIDDEN = {
 }
 const TEAMS = [OVERRIDDEN, U10, U12G, U16B]
 
-const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: CLUB }]
+const ADMIN = [{ id: 'm1', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: CLUB }]
 
 // ⚠️ mockImplementation, NOT mockReturnValue, AND THE RETURNED setTeams IS
 // THE REASON. The scoring panel derives the squad it is drawing from `teams`

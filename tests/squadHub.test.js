@@ -26,7 +26,7 @@ describe('groupHubTeams', () => {
 
   it('puts an admin parent’s own squad first, then the rest of the club', () => {
     const memberships = [
-      { role: 'admin', team_id: null, status: 'active' },
+      { role: 'admin', admin_rights: ['clubadmin'], team_id: null, status: 'active' },
       { role: 'parent', team_id: 't-u8', status: 'active', player_id: 'p-child' },
     ]
     const { yours, rest } = groupHubTeams(memberships, TEAMS)
@@ -35,7 +35,7 @@ describe('groupHubTeams', () => {
   })
 
   it('does not put every squad in yours for a club-only admin', () => {
-    const memberships = [{ role: 'admin', team_id: null, status: 'active' }]
+    const memberships = [{ role: 'admin', admin_rights: ['clubadmin'], team_id: null, status: 'active' }]
     const { yours, rest } = groupHubTeams(memberships, TEAMS)
     expect(yours).toEqual([])
     expect(rest.map((t) => t.name)).toEqual(['U8 Tag', 'U12 Mixed', 'U14B'])
@@ -55,7 +55,7 @@ describe('groupHubTeams', () => {
 describe('hubTeamLine', () => {
   it('names the team-scoped role on yours, not Admin', () => {
     const memberships = [
-      { role: 'admin', team_id: null, status: 'active' },
+      { role: 'admin', admin_rights: ['clubadmin'], team_id: null, status: 'active' },
       { role: 'parent', team_id: 't-u8', status: 'active', player_id: 'p-child' },
     ]
     expect(hubTeamLine(memberships, TEAMS[2])).toBe('Parent')
@@ -70,7 +70,7 @@ describe('hubTeamLine', () => {
   })
 
   it('uses Mighty Minis / Club squad on the rest of the club', () => {
-    const memberships = [{ role: 'admin', team_id: null, status: 'active' }]
+    const memberships = [{ role: 'admin', admin_rights: ['clubadmin'], team_id: null, status: 'active' }]
     expect(hubTeamLine(memberships, { id: 't-u8', name: 'U8 Tag' })).toBe('Mighty Minis')
     expect(hubTeamLine(memberships, { id: 't-u12', name: 'U12 Mixed' })).toBe('Club squad')
   })

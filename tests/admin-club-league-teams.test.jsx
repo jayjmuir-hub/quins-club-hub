@@ -65,7 +65,7 @@ const ADHQ2 = { id: 'lt-2', club_id: CLUB, team_id: 'team-u14b', rcm_name: 'ADHQ
 const ADHQ3 = { id: 'lt-3', club_id: CLUB, team_id: 'team-u14b', rcm_name: 'ADHQ3', division: null, is_active: false, sort_order: 0 }
 const LEAGUE_TEAMS = [ADHQ1, ADHQ2, ADHQ3]
 
-const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: CLUB }]
+const ADMIN = [{ id: 'm1', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: CLUB }]
 
 function renderClub() {
   const user = userEvent.setup()

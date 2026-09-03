@@ -121,7 +121,7 @@ const COACH = [
   { id: 'm2', status: 'active', role: 'coach', team_id: 'team-1xv' },
 ]
 const PARENT = [{ id: 'm3', status: 'active', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
-const ADMIN = [{ id: 'm0', status: 'active', role: 'admin', team_id: null }]
+const ADMIN = [{ id: 'm0', status: 'active', role: 'admin', admin_rights: ['clubadmin'], team_id: null }]
 const PLAYER = [{ id: 'm5', status: 'active', role: 'player', team_id: 'team-u10', player_id: 'p1' }]
 // A coach row with no resolvable team. canEditTeam refuses it deliberately;
 // a raw `role === 'coach'` check would grant on it.

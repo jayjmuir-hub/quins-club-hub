@@ -6,7 +6,7 @@ import {
   DOCUMENT_CATEGORIES, documentAccept, validateDocumentFile,
   uploadableTeamIds,
 } from '../lib/documents.js'
-import { isAdmin } from '../lib/scope.js'
+import { adminTeamReach, isAdmin } from '../lib/scope.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Upload a document, as a sheet — the same Sheet-with-checkbox-grid shape as
@@ -41,7 +41,7 @@ export default function DocumentUploadSheet({
   const staffedIds = uploadableTeamIds(memberships)
   const pickable = fixedTeamId
     ? teams.filter((t) => t.id === fixedTeamId)
-    : admin ? teams : teams.filter((t) => staffedIds.includes(t.id))
+    : admin && adminTeamReach(memberships, 'edit') ? teams : teams.filter((t) => staffedIds.includes(t.id))
 
   const [file, setFile] = useState(null)
   const [fileError, setFileError] = useState(null)

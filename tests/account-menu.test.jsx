@@ -16,7 +16,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 import AccountMenu from '../src/components/AccountMenu.jsx'
 import { setTheme, effectiveTheme } from '../src/lib/theme.js'
 
-const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: 'c1' }]
+const ADMIN = [{ id: 'm1', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: 'c1' }]
 const PARENT = [{ id: 'm2', role: 'parent', status: 'active', team_id: 't1', player_id: 'p1' }]
 
 function ctx(realMemberships = PARENT, extra = {}) {

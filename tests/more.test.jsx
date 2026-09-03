@@ -118,7 +118,7 @@ const TEAMS = [TEAM_FIRST_XV, TEAM_U10] // deliberately unsorted; visibleTeams s
 // and every membership fixture in this suite lacked one. That is why nothing
 // here could distinguish a PENDING staff request from granted access, which is
 // exactly the hole found in private.can_approve_team the same day.
-const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null }]
+const ADMIN = [{ id: 'm1', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }]
 const COACH = [{ id: 'm2', role: 'coach', team_id: 'team-u10', status: 'active' }]
 const PARENT = [{ id: 'm3', role: 'parent', team_id: 'team-u10', player_id: 'p1' }]
 
@@ -835,7 +835,7 @@ describe('More — whose players are "Your players"', () => {
   it('shows nothing for an admin with no children at the club', async () => {
     // The exact shape of Jay's account: admin, no team, no linked player.
     useMembershipsMock.mockReturnValue(
-      memberships([{ id: 'm-a', role: 'admin', status: 'active', team_id: null, player_id: null, club_id: 'club-1' }]),
+      memberships([{ id: 'm-a', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, player_id: null, club_id: 'club-1' }]),
     )
     listPlayersMock.mockResolvedValue([A_PLAYER])
 
