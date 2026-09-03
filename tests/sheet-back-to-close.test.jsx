@@ -87,6 +87,67 @@ describe('Sheet — Back closes the sheet', () => {
   })
 })
 
+// 3 Sep 2026: "Take attendance" (and Availability) close the event sheet and
+// open a second sheet in the same commit. The closing sheet's back() used to be
+// queued before the new sheet pushed its entry, so it popped the NEW entry and
+// the register closed itself the instant it opened.
+function SwapHost() {
+  const [which, setWhich] = useState(null)
+  return (
+    <>
+      <button onClick={() => setWhich('a')}>open a</button>
+      {which === 'a' && (
+        <Sheet open onClose={() => setWhich(null)} title="Sheet A">
+          <button onClick={() => setWhich('b')}>swap to b</button>
+        </Sheet>
+      )}
+      {which === 'b' && (
+        <Sheet open onClose={() => setWhich(null)} title="Sheet B">
+          <button onClick={() => setWhich(null)}>done b</button>
+        </Sheet>
+      )}
+    </>
+  )
+}
+
+describe('Sheet — swapping one sheet for another in the same commit', () => {
+  it('⚠️ hands the history entry over instead of popping it out from under the new sheet', async () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    render(<SwapHost />)
+    await act(async () => {
+      screen.getByText('open a').click()
+    })
+    expect(pushState).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      screen.getByText('swap to b').click()
+    })
+    // B is open, A's entry is now B's, and nothing went back.
+    expect(screen.getByRole('dialog', { name: 'Sheet B' })).toBeInTheDocument()
+    expect(pushState).toHaveBeenCalledTimes(1)
+    expect(replaceState).toHaveBeenCalledTimes(1)
+    expect(back).not.toHaveBeenCalled()
+    // B owns the entry: closing it by its own control pops exactly once.
+    await act(async () => {
+      screen.getByText('done b').click()
+    })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(back).toHaveBeenCalledTimes(1)
+    replaceState.mockRestore()
+  })
+
+  it('a sheet that closes with no replacement still pops its own entry', async () => {
+    render(<SwapHost />)
+    await act(async () => {
+      screen.getByText('open a').click()
+    })
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(back).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('Sheet — size', () => {
   it('is the 520px dialog by default and min(760px, 94vw) when wide (2 Sep 2026 UX review, desktop)', () => {
     render(<Sheet open onClose={() => {}} title="Default"><p>x</p></Sheet>)

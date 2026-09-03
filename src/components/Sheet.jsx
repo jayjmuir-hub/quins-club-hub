@@ -60,6 +60,12 @@ const FOCUSABLE_SELECTOR = [
 // Medium): the event form is about twenty fields in one column inside a
 // 520px keyhole, a long internal scroll with only the sticky title. On a
 // phone both sizes are the full-width sheet they always were.
+// A history entry offered by a sheet that is unmounting to a sheet that mounts
+// in the same commit. Module-level on purpose: the two Sheet instances never
+// share a parent they could go through, and there is only ever one swap in
+// flight because React flushes a commit's effects together.
+let pendingHandoff = null
+
 export function Sheet({ open, onClose, title, children, dismissible = true, size = 'default' }) {
   const titleId = useId()
   const panelRef = useRef(null)
@@ -139,7 +145,17 @@ export function Sheet({ open, onClose, title, children, dismissible = true, size
     const marker = { __sheet: titleId }
     let poppedByBack = false
     try {
-      window.history.pushState(marker, '')
+      if (pendingHandoff && !pendingHandoff.taken && window.history.state?.__sheet) {
+        // ⚠️ A SHEET SWAP: the sheet that just unmounted in this same commit
+        // left its entry for us instead of popping it. Adopt it. Pushing a
+        // second entry here and letting the old sheet's back() run is exactly
+        // the 3 Sep 2026 bug — see the cleanup below.
+        pendingHandoff.taken = true
+        pendingHandoff = null
+        window.history.replaceState(marker, '')
+      } else {
+        window.history.pushState(marker, '')
+      }
     } catch {
       // A sandboxed frame or a locked-down browser: the sheet still works,
       // only the Back shortcut is lost.
@@ -170,11 +186,29 @@ export function Sheet({ open, onClose, title, children, dismissible = true, size
       window.removeEventListener('popstate', handlePopState)
       if (!poppedByBack && window.history.state?.__sheet === titleId) {
         // Closed by the X, Escape or the scrim: take our entry with us.
-        try {
-          window.history.back()
-        } catch {
-          // As above.
-        }
+        // ⚠️ DEFERRED BY ONE MICROTASK, AND FOR A REASON (3 Sep 2026). "Take
+        // the register" and "Availability" close the event sheet and open a
+        // second sheet in the SAME commit. React runs this cleanup, then the
+        // new sheet's mount effect, before any microtask. A synchronous
+        // back() here was queued BEFORE the new sheet pushed its own entry,
+        // so the browser resolved it by popping the NEW entry, the new
+        // sheet's popstate handler heard it and called onClose, and the
+        // register closed itself the instant it opened — "clicking Take the
+        // register just pops back to the event screen", reported by an
+        // age-group manager and reproduced by an admin. Offering the entry
+        // to whichever sheet mounts next, and popping only if nobody takes
+        // it, keeps the history one entry long across a swap.
+        const handoff = { taken: false }
+        pendingHandoff = handoff
+        queueMicrotask(() => {
+          if (pendingHandoff === handoff) pendingHandoff = null
+          if (handoff.taken) return
+          try {
+            window.history.back()
+          } catch {
+            // As above.
+          }
+        })
       }
       document.body.style.overflow = previousOverflow
       triggerRef.current?.focus?.()
