@@ -187,3 +187,26 @@ describe('the register', () => {
     })
   })
 })
+
+describe('the register row on a phone (3 Sep 2026)', () => {
+  // jsdom has no layout, so this pins the CLASSES that produce it: the row may
+  // wrap, the button group takes the full width below `sm` and sits beside the
+  // name from `sm` up, and the name is never truncated. An Android at 360px
+  // showed three letters of each name until the phone was turned sideways.
+  it('⚠️ never truncates the name, and stacks the buttons under it below sm', async () => {
+    renderRegister()
+    const rows = await screen.findAllByTestId('register-row')
+    expect(rows[0].className).toMatch(/\bflex-wrap\b/)
+
+    const name = within(rows[0]).getByTestId('register-name')
+    expect(name.className).not.toMatch(/\btruncate\b/)
+    expect(name.className).toMatch(/\bbreak-words\b/)
+
+    const group = within(rows[0]).getByRole('group', { name: /record attendance/i })
+    expect(group.className).toMatch(/\bbasis-full\b/)
+    expect(group.className).toMatch(/\bsm:basis-auto\b/)
+    // Every label is still a word, not a letter.
+    expect(within(group).getByRole('button', { name: 'Present' })).toBeInTheDocument()
+    expect(within(group).getByRole('button', { name: 'Excused' })).toBeInTheDocument()
+  })
+})
