@@ -538,7 +538,7 @@ describe('Accounts — authorisation gate', () => {
     expect(screen.queryByTestId('waiting-for-access')).toBeNull()
     expect(screen.queryByTestId('dismissed-requests')).toBeNull()
     expect(screen.queryByRole('button', { name: /revoke/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /add access/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /add a role/i })).toBeNull()
     expect(screen.queryByRole('combobox')).toBeNull()
     // ⚠️ AND NOT THE COUNTS. "n with access · n logins" is computed from rows
     // a coach cannot read, so it would render zeros and read as "this club has
@@ -1501,11 +1501,11 @@ describe('Accounts — access builder', () => {
     // Sara already coaches U10. She also has a child in U10 — a mixed-role
     // person, which the database has always allowed and the UI never offered.
     const dialog = await openPerson(user, 'Sara Coach')
-    await user.click(within(dialog).getByRole('button', { name: /add access for sara coach/i }))
+    await user.click(within(dialog).getByRole('button', { name: /add a role for sara coach/i }))
     await chooseRole(user, 'Sara Coach', 'parent')
     await screen.findByRole('checkbox', { name: /Zara Ali/ })
     await pickPlayer(user, 'Sara Coach', 'Zara Ali')
-    await submitAccess(user, 'Add access', 'Sara Coach')
+    await submitAccess(user, 'Add a role', 'Sara Coach')
 
     expect(grantMembershipsMock).toHaveBeenCalledWith([
       {
@@ -1533,11 +1533,11 @@ describe('Accounts — access builder', () => {
 
     await screen.findByText('Sara Coach')
     const dialog = await openPerson(user, 'Sara Coach')
-    await user.click(within(dialog).getByRole('button', { name: /add access for sara coach/i }))
+    await user.click(within(dialog).getByRole('button', { name: /add a role for sara coach/i }))
     await chooseRole(user, 'Sara Coach', 'coach')
     // She is already coach of U10 — same role, same team, same (null) player.
     await tickAgeGroup(user, 'Sara Coach', 'U10')
-    await submitAccess(user, 'Add access', 'Sara Coach')
+    await submitAccess(user, 'Add a role', 'Sara Coach')
 
     expect(grantMembershipsMock).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent(/already have that access/i)
@@ -1545,7 +1545,7 @@ describe('Accounts — access builder', () => {
     // The same age group is grantable to someone who does NOT hold it.
     await tickAgeGroup(user, 'Sara Coach', 'U12 Boys')
     await tickAgeGroup(user, 'Sara Coach', 'U10')
-    await submitAccess(user, 'Add access', 'Sara Coach')
+    await submitAccess(user, 'Add a role', 'Sara Coach')
 
     expect(grantMembershipsMock).toHaveBeenCalledWith([
       { profileId: 'profile-sara', clubId: CLUB_ID, role: 'coach', teamId: 'team-u12', playerId: null },
@@ -1560,9 +1560,9 @@ describe('Accounts — access builder', () => {
 
     await screen.findByText('Sara Coach')
     const dialog = await openPerson(user, 'Jay Muir')
-    await user.click(within(dialog).getByRole('button', { name: /add access for jay muir/i }))
+    await user.click(within(dialog).getByRole('button', { name: /add a role for jay muir/i }))
     await chooseRole(user, 'Jay Muir', 'admin')
-    await submitAccess(user, 'Add access', 'Jay Muir')
+    await submitAccess(user, 'Add a role', 'Jay Muir')
 
     expect(grantMembershipsMock).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent(/already have that access/i)
@@ -1573,7 +1573,7 @@ describe('Accounts — access builder', () => {
 
     await screen.findByText('Sara Coach')
     const dialog = await openPerson(user, 'Ali Parent')
-    await user.click(within(dialog).getByRole('button', { name: /add access for ali parent/i }))
+    await user.click(within(dialog).getByRole('button', { name: /add a role for ali parent/i }))
     expect(within(dialog).getByTestId('add-access')).toBeInTheDocument()
 
     await user.click(within(screen.getByTestId('add-access')).getByRole('button', { name: /cancel/i }))
@@ -1677,10 +1677,10 @@ describe('Accounts — access builder', () => {
 
     await screen.findByText('Sara Coach')
     const dialog = await openPerson(user, 'Sara Coach')
-    await user.click(within(dialog).getByRole('button', { name: /add access for sara coach/i }))
+    await user.click(within(dialog).getByRole('button', { name: /add a role for sara coach/i }))
     await chooseRole(user, 'Sara Coach', 'coach')
     await tickAgeGroup(user, 'Sara Coach', 'U12 Boys')
-    await submitAccess(user, 'Add access', 'Sara Coach')
+    await submitAccess(user, 'Add a role', 'Sara Coach')
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/may not have permission/i)
     expect(within(dialog).getByTestId('add-access')).toBeInTheDocument()

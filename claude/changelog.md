@@ -16,6 +16,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   juniors' list is imported when RCM publishes it, so the round grid
   pre-fills from an import for both and the one-off senior seed is to become
   a real season-import route. Docs only.
+- #682 — **feat(staff): ROLE TICKS ON THE STAFF TAB — a coach who is also a
+  medic.** Jay, 4 Sep: "I have no way to tag them so they go into the medic
+  chat"; he had seated Michal into Club Medics by hand. The model was already
+  right — one membership row per role per squad, and every role channel reads
+  the rows — but the only control was Accounts' "Add access", which did not
+  read as "add another role". The Staff tab now shows one card per person per
+  squad (`foldRoles`: coach > manager > medic on top, the rest in
+  `alsoRoles`) with "Roles on this squad" ticks: tick adds the row
+  (`addStaffRole`), untick removes the row that carries it
+  (`removeStaffRole`); the card's own role is fixed, Revoke stays on
+  Accounts. "Add access" reads "Add a role". No database change. Michal's
+  medic row was added by hand the same evening; his manual seat is now
+  redundant.
 - #681 — **feat(signup): A PLAYER WHOSE PARENT ALREADY REGISTERED THEM CLAIMS
   THAT ROW.** Jay, 3 Sep: "look at the signup wizard so players don't do this
   again". The wizard was not the fault — all six U16B intents were correct.

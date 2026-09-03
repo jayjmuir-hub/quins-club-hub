@@ -21,8 +21,12 @@ const setMembershipHeadCoachMock = vi.fn()
 // IdentityBadges fetches member_identity (26 Aug 2026); empty here keeps
 // this file about its own subject and network-free.
 vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] }))
+const addStaffRoleMock = vi.fn()
+const removeStaffRoleMock = vi.fn()
 vi.mock('../src/data/staff.js', () => ({
   listSquadStaff: (...args) => listSquadStaffMock(...args),
+  addStaffRole: (...args) => addStaffRoleMock(...args),
+  removeStaffRole: (...args) => removeStaffRoleMock(...args),
   setMembershipTitle: (...args) => setMembershipTitleMock(...args),
   setMembershipHeadCoach: (...args) => setMembershipHeadCoachMock(...args),
 }))
@@ -62,7 +66,10 @@ import AdminStaff from '../src/screens/AdminStaff.jsx'
 const COACH = {
   membershipId: 'm-coach',
   profileId: 'p-coach',
+  clubId: 'club-1',
+  teamId: 't-u13',
   role: 'coach',
+  alsoRoles: {},
   title: 'Head Coach',
   isHeadCoach: false,
   name: 'Alex Morgan',
@@ -73,7 +80,10 @@ const COACH = {
 const MEDIC = {
   membershipId: 'm-medic',
   profileId: 'p-medic',
+  clubId: 'club-1',
+  teamId: 't-u13',
   role: 'medic',
+  alsoRoles: {},
   title: null,
   name: 'Sam Patel',
   email: 'sam@example.com',
@@ -182,8 +192,10 @@ describe('AdminStaff — a person', () => {
     const { user } = renderStaff()
     await openSquad(user)
 
-    expect(await screen.findByText('Coach')).toBeInTheDocument()
-    expect(screen.getByText('Medic')).toBeInTheDocument()
+    // The label appears on the card AND as a role tick (4 Sep 2026), so "at
+    // least one" is the assertion; the raw role never appears.
+    expect((await screen.findAllByText('Coach')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Medic').length).toBeGreaterThan(0)
     expect(screen.queryByText('medic')).not.toBeInTheDocument()
   })
 
@@ -743,5 +755,55 @@ describe('AdminStaff — names open the person card', () => {
     await user.click(screen.getAllByRole('button', { name: 'Alex Morgan' })[0])
     expect(await screen.findByTestId('person-card')).toBeInTheDocument()
     expect(getPersonCardMock).toHaveBeenCalledWith('p-coach')
+  })
+})
+
+// ── Roles on this squad (Jay, 4 Sep 2026) ────────────────────────────────────
+//
+// "A coach who is also a medic — I have no way to tag them so they go into the
+// medic chat." The tag is a second membership row. One tick adds it, unticking
+// removes it, and the card's own role is fixed (Revoke lives on Accounts).
+describe('roles on this squad', () => {
+  it('ticks the roles the person holds, fixes their own, and adds a role on tick', async () => {
+    addStaffRoleMock.mockResolvedValue({ id: 'm-new' })
+    const { user } = renderStaff()
+    await openSquad(user)
+    const roles = within(await screen.findByTestId('roles-m-coach'))
+    expect(roles.getByRole('checkbox', { name: /coach/i })).toBeChecked()
+    expect(roles.getByRole('checkbox', { name: /coach/i })).toBeDisabled()
+    expect(roles.getByRole('checkbox', { name: /medic/i })).not.toBeChecked()
+
+    await user.click(roles.getByRole('checkbox', { name: /medic/i }))
+    await waitFor(() =>
+      expect(addStaffRoleMock).toHaveBeenCalledWith({ profileId: 'p-coach', clubId: 'club-1', teamId: 't-u13', role: 'medic' }),
+    )
+    // The list is re-read, so the new role shows on the card the data layer folds it into.
+    await waitFor(() => expect(listSquadStaffMock).toHaveBeenCalledTimes(2))
+  })
+
+  it('unticking a held extra role removes the membership that carries it', async () => {
+    listSquadStaffMock.mockResolvedValue([
+      { id: 't-u13', name: 'U13 Mixed', staff: [{ ...COACH, alsoRoles: { medic: 'm-coach-as-medic' } }] },
+    ])
+    removeStaffRoleMock.mockResolvedValue()
+    const { user } = renderStaff()
+    await openSquad(user)
+    const roles = within(await screen.findByTestId('roles-m-coach'))
+    expect(roles.getByRole('checkbox', { name: /medic/i })).toBeChecked()
+    await user.click(roles.getByRole('checkbox', { name: /medic/i }))
+    await waitFor(() => expect(removeStaffRoleMock).toHaveBeenCalledWith('m-coach-as-medic'))
+  })
+
+  it('says why when the role did not save, and leaves the ticks as they were', async () => {
+    const refusal = new Error('new row violates row-level security policy')
+    refusal.code = '42501'
+    addStaffRoleMock.mockRejectedValue(refusal)
+    const { user } = renderStaff()
+    await openSquad(user)
+    const roles = within(await screen.findByTestId('roles-m-coach'))
+    await user.click(roles.getByRole('checkbox', { name: /manager/i }))
+    // A trusted code shows the database's sentence; anything else the fallback.
+    expect(await roles.findByRole('alert')).toHaveTextContent(/row-level security|didn't save/i)
+    expect(roles.getByRole('checkbox', { name: /manager/i })).not.toBeChecked()
   })
 })

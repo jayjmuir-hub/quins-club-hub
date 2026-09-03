@@ -4,6 +4,7 @@ import { compareSquadStaff } from '../lib/squadStaff.js'
 import { unwrapCapped, withCap } from './limits.js'
 import { signStaffPhotoUrls } from './photos.js'
 import { fetchContacts, NO_CONTACT } from './contacts'
+import { deleteMembership, grantMemberships } from './members.js'
 
 // Squad staff — who coaches, manages and doctors each age group.
 //
@@ -58,7 +59,7 @@ export async function listSquadStaff() {
           // ⚠️ `email`/`phone` removed from the embed (Phase 1b) — direct SELECT
           // of them is revoked. Merged from member_contacts below (staff are
           // contactable club-wide, ruling C), so toStaffMember still reads them.
-          .select('id, profile_id, team_id, role, title, is_head_coach, profiles(full_name, photo_path, photo_focus_x, photo_focus_y)')
+          .select('id, profile_id, club_id, team_id, role, title, is_head_coach, profiles(full_name, photo_path, photo_focus_x, photo_focus_y)')
           .in('role', SQUAD_STAFF_ROLES)
           .eq('status', 'active')
           .not('team_id', 'is', null),
@@ -90,6 +91,15 @@ export async function listSquadStaff() {
       photoUrl: urls[row.profiles?.photo_path] ?? null,
     })
     byTeam.set(row.team_id, list)
+  }
+  // ⚠️ ONE ROW PER PERSON PER SQUAD (4 Sep 2026, Jay: "a coach who is also a
+  // medic"). A person holds one membership row per role, and the roles are
+  // what the role channels read; this screen used to draw a second card for
+  // the second role. Now the strongest role (coach > manager > medic) is the
+  // card, and the others sit on it as ticks — `alsoRoles` maps each extra
+  // role to the membership that carries it, which is what unticking removes.
+  for (const [teamId, list] of byTeam) {
+    byTeam.set(teamId, foldRoles(list))
   }
 
   return teams.map((team) => ({
@@ -127,7 +137,10 @@ export function toStaffMember(row) {
     // the PROFILE (`<profile-id>/<timestamp>.jpg`) and `set_staff_photo` keys
     // off it too, so a shape carrying only the membership id cannot upload.
     profileId: row.profile_id ?? null,
+    clubId: row.club_id ?? null,
+    teamId: row.team_id ?? null,
     role: row.role,
+    alsoRoles: {},
     title: String(row.title ?? '').trim() || null,
     // ⚠️ THE FLAG, NOT THE TITLE, AND THEY ARE NOT THE SAME QUESTION. `title`
     // is a label an admin types and it grants nothing; `is_head_coach` is what
@@ -376,4 +389,50 @@ export async function setNotifyApprovals({ membershipId, notify } = {}) {
   if (error) throw error
   if (!data) throw new Error("That didn't save. Only a club admin can change who is emailed.")
   return data
+}
+
+/**
+ * Folds several membership rows for one person on one squad into one member.
+ * The card is the strongest role in SQUAD_STAFF_ROLES order; every other role
+ * the person holds on that squad lands in `alsoRoles` as role → membershipId.
+ * Exported for its test; listSquadStaff is the only caller.
+ */
+export function foldRoles(members) {
+  const rank = (role) => {
+    const at = SQUAD_STAFF_ROLES.indexOf(role)
+    return at === -1 ? SQUAD_STAFF_ROLES.length : at
+  }
+  const byPerson = new Map()
+  for (const member of members) {
+    const key = member.profileId ?? member.membershipId
+    const held = byPerson.get(key)
+    if (!held) {
+      byPerson.set(key, { ...member, alsoRoles: { ...(member.alsoRoles ?? {}) } })
+      continue
+    }
+    if (rank(member.role) < rank(held.role)) {
+      // The stronger role becomes the card; the old card's role moves to the ticks.
+      const also = { ...held.alsoRoles, [held.role]: held.membershipId }
+      byPerson.set(key, { ...member, alsoRoles: also })
+    } else {
+      held.alsoRoles[member.role] = member.membershipId
+    }
+  }
+  return [...byPerson.values()]
+}
+
+/**
+ * Give a person who already staffs a squad another role on it — the Staff
+ * tab's role ticks (4 Sep 2026). A plain active membership row, the same one
+ * Accounts' "Add a role" makes; the role channels follow from it.
+ */
+export async function addStaffRole({ profileId, clubId, teamId, role } = {}) {
+  if (!SQUAD_STAFF_ROLES.includes(role)) throw new Error('addStaffRole needs a coach, manager or medic role.')
+  const [row] = await grantMemberships([{ profileId, clubId, teamId, role }])
+  return row
+}
+
+/** Take one role off a person: the membership that carried it goes, the others stay. */
+export async function removeStaffRole(membershipId) {
+  await deleteMembership(membershipId)
 }

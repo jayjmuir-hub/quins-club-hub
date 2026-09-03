@@ -2660,10 +2660,10 @@ export default function Accounts() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      aria-label={`Add access for ${editingName}`}
+                      aria-label={`Add a role for ${editingName}`}
                       onClick={() => setAdding((prev) => ({ ...prev, [editingGroup.key]: true }))}
                     >
-                      Add access
+                      Add a role
                     </Button>
                   )}
                 </div>
@@ -2699,7 +2699,7 @@ export default function Accounts() {
                       ]}
                       saving={Boolean(grantState[`add:${editingGroup.key}`]?.saving)}
                       error={grantState[`add:${editingGroup.key}`]?.error}
-                      submitLabel="Add access"
+                      submitLabel="Add a role"
                       onSubmit={(rows) => addAccess(editingGroup, rows)}
                       onCancel={() =>
                         setAdding((prev) => {

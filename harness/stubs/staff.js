@@ -262,3 +262,13 @@ export async function listApprovalRecipients() {
 export async function setNotifyApprovals({ membershipId, notify } = {}) {
   return { id: membershipId, notify_approvals: notify === true }
 }
+
+// Mirrors the Staff tab's role ticks (4 Sep 2026). Inert: the harness never
+// reaches production.
+export function foldRoles(members) {
+  return members
+}
+export async function addStaffRole({ profileId, clubId, teamId, role } = {}) {
+  return { id: `stub-${role}-${teamId}`, profile_id: profileId, club_id: clubId, team_id: teamId, role, status: 'active' }
+}
+export async function removeStaffRole() {}
