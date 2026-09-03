@@ -188,10 +188,19 @@ table. A division can use any of them in any week.
 ## "Results missing"
 
 Exact only when the season's fixture list per division is known in advance.
-⚠️ **OPEN — Jay to ask RCM whether they publish the fixture list per
-division.** If yes, the grid pre-fills for the season and "missing" is a
-count of unplayed-and-unrecorded fixtures. If no, the keeper adds fixtures
-as results arrive and "missing" is only what the app knows about.
+✅ **ANSWERED, Jay, 3 Sep 2026: RCM publishes the fixture list per division.**
+For the seniors it is already out — the 2026–27 men's grid (three divisions)
+and the women's dates were loaded on 3 Sep (`db/seeds/2026-09-03-senior-fixtures-2026-27.sql`,
+#678), so the seniors' "missing" count can be exact from Round 1. For the
+juniors, Jay: *"the rcm will eventually publish the fixtures list and we will
+import it when it comes out for juniors."* So the grid pre-fills for the
+season from an IMPORT, not from the keeper typing fixtures in as results
+arrive, and "missing" is a count of unplayed-and-unrecorded fixtures.
+⚠️ **Consequence for the build:** the one-off senior seed becomes a real
+"import a season" route — the RCM grid in, one row per fixture per division,
+with our own sides' rows landing on the squad schedules and every side's
+fixtures landing in `competition_sides`/the round grid. Build it once, for
+both seniors and juniors, rather than a second hand-written seed in October.
 
 ## Privacy
 
