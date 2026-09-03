@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #679 — 📱 **The register's attendance buttons sit under the name on a
+  phone.** Jay, 3 Sep 2026: on an Android the names could not be read
+  unless the phone was turned to landscape, while an iPhone was fine. Not
+  an Android bug — width. `src/screens/Register.jsx` put the initials
+  circle, the name and three word buttons on one line with the name the
+  only flexible part, truncating; the fixed parts take ~280px, so a 360px
+  Android left the name ~45px and a 390–430px iPhone 80–120px. The row now
+  wraps: below `sm` the button group takes a second line indented under
+  the name, from `sm` up it sits beside it as before, and the name no
+  longer truncates. Labels stay words.
 - #678 — 🏉 **Senior divisions, eighteen rounds, and the 2026–27 senior
   fixtures seed.** Jay, 3 Sep 2026, with the RCM men's grid and the women's
   poster. `db/migrations/20260904_senior_divisions.sql` widens the
