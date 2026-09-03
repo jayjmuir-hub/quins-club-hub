@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #683 — 📋 **Standings plan: RCM publishes the fixture list per division.**
+  Jay, 3 Sep 2026, closing `claude/plans/2026-09-02-standings-and-results.md`'s
+  one open question: the seniors' grid is already loaded (#678) and the
+  juniors' list is imported when RCM publishes it, so the round grid
+  pre-fills from an import for both and the one-off senior seed is to become
+  a real season-import route. Docs only.
 - #681 — **feat(signup): A PLAYER WHOSE PARENT ALREADY REGISTERED THEM CLAIMS
   THAT ROW.** Jay, 3 Sep: "look at the signup wizard so players don't do this
   again". The wizard was not the fault — all six U16B intents were correct.
