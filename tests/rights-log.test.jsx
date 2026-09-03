@@ -21,9 +21,11 @@ const listMembershipAuditMock = vi.fn()
 const listAuditProfilesMock = vi.fn()
 const useMembershipsMock = vi.fn()
 
+const listSeatAuditMock = vi.fn(async () => [])
 vi.mock('../src/data/audit.js', () => ({
   listMembershipAudit: (...args) => listMembershipAuditMock(...args),
   listAuditProfiles: (...args) => listAuditProfilesMock(...args),
+  listSeatAudit: (...args) => listSeatAuditMock(...args),
 }))
 
 vi.mock('../src/lib/memberships.jsx', () => ({
@@ -456,5 +458,25 @@ describe('AdminRightsLog — names open the person card', () => {
       within(row).getByText((_, el) => el?.tagName === 'P' && /by the system/.test(el.textContent)),
     ).toBeInTheDocument()
     expect(within(row).queryByRole('button', { name: /the system/ })).toBeNull()
+  })
+})
+
+// ── Channel seats (3 Sep 2026) ───────────────────────────────────────────
+describe('AdminRightsLog — channel seats section', () => {
+  it('lists who was seated where, by whom and why; absent when there are none', async () => {
+    listSeatAuditMock.mockResolvedValueOnce([
+      { id: 1, at: '2026-09-03T10:00:00Z', seat_id: 's1', club_id: 'club-1', profile_id: 'p-seated', channel: 'headcoaches', action: 'seated', actor_id: 'p-super', reason: 'Club Captain' },
+    ])
+    listAuditProfilesMock.mockResolvedValue([
+      { id: 'p-seated', full_name: 'Zz Probe Seated', email: null },
+      { id: 'p-super', full_name: 'Zz Probe Super', email: null },
+    ])
+    render(<AdminRightsLog />)
+    const section = await screen.findByTestId('seat-audit')
+    expect(section).toHaveTextContent('Zz Probe Seated')
+    expect(section).toHaveTextContent('seated in')
+    expect(section).toHaveTextContent('Club Head Coaches')
+    expect(section).toHaveTextContent('Zz Probe Super')
+    expect(section).toHaveTextContent('Club Captain')
   })
 })

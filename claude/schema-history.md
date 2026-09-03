@@ -1099,3 +1099,26 @@ probe rows.
 **Consequence for real rows.** Supers and clubadmin holders unchanged. The two
 specialist-only admins on 3 Sep lose squad reach; a coach/manager row is the
 designed way back (ruling 4).
+
+## 20260904_channel_seats_and_committee — seats and the Committee (3 Sep 2026)
+
+**Why.** Role-channel membership is derived and the only override lived on
+an ADMIN row (the chat-* ticks), so seating an outsider — the Club Captain,
+a senior coach who is not a head coach — meant making them an admin.
+
+**What.** (1) `committee`, a sixth role channel derived from `club_officers`:
+titles only, supers not implied. (2) `channel_seats`: a super seats a person
+in any role channel with a reason; additive only, no exclusions by design;
+audited by trigger into `channel_seat_audit`. Both live inside the two
+functions that answer membership (`in_role_channel`, `role_channel_audience`),
+so every policy follows. Every list of the five keys gained the sixth —
+grep `clubstaff` on the live schema before touching this again.
+
+**Proof.** `db/tests/channel-seats.sql`, nine asserts with controls: titles
+only (a super without a title reads 0 committee messages, 1 Club Staff);
+the sheet's reason is the title; a seat adds a reader and the sheet says
+"Seated by the club — …"; a plain admin and a coach are refused a seat; unseat
+removes the reader; a welfare seat gives the channel and NOT DM review (the
+right holder still reviews); the audit rows carry the super as actor; an
+invented key is refused; revoking the title leaves the Committee at once.
+Run rolled back against production 3 Sep via the MCP.

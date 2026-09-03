@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Role channels (claude/plans/2026-08-30-role-channels.md) — the CLIENT half.
@@ -13,9 +13,9 @@ import { chatPath } from '../src/data/messages.js'
 import { ADMIN_RIGHTS, adminRightLabel } from '../src/lib/scope.js'
 
 describe('the role-channel vocabulary', () => {
-  it('names exactly the five channels the migration created', () => {
+  it('names exactly the six channels the migrations created (five + Committee, 3 Sep 2026)', () => {
     expect(ROLE_CHANNEL_KEYS.sort()).toEqual(
-      ['clubstaff', 'headcoaches', 'managers', 'medics', 'welfare'].sort(),
+      ['clubstaff', 'committee', 'headcoaches', 'managers', 'medics', 'welfare'].sort(),
     )
   })
 
@@ -32,6 +32,7 @@ describe('the role-channel vocabulary', () => {
     expect(roleChannelLabel('medics')).toBe('Club Medics')
     expect(roleChannelLabel('welfare')).toBe('Welfare')
     expect(roleChannelLabel('clubstaff')).toBe('Club Staff')
+    expect(roleChannelLabel('committee')).toBe('Committee')
   })
 })
 
@@ -70,6 +71,14 @@ vi.mock('../src/data/messages.js', async (orig) => ({
   ...(await orig()),
   channelMembers: (...a) => channelMembersMock(...a),
 }))
+const seatMocks = { listChannelSeats: vi.fn(), seatInChannel: vi.fn(), unseatFromChannel: vi.fn() }
+vi.mock('../src/data/channelSeats.js', () => ({
+  listChannelSeats: (...a) => seatMocks.listChannelSeats(...a),
+  seatInChannel: (...a) => seatMocks.seatInChannel(...a),
+  unseatFromChannel: (...a) => seatMocks.unseatFromChannel(...a),
+}))
+const listClubMembersMock = vi.fn()
+vi.mock('../src/data/members.js', () => ({ listClubMembers: (...a) => listClubMembersMock(...a) }))
 
 const { default: ChannelMembersSheet } = await import('../src/components/ChannelMembersSheet.jsx')
 
@@ -109,5 +118,70 @@ describe('ChannelMembersSheet', () => {
   it('fetches nothing until opened', async () => {
     render(<ChannelMembersSheet open={false} channel="managers" selfId="p" onOpenDm={vi.fn()} onClose={vi.fn()} />)
     await waitFor(() => expect(channelMembersMock).not.toHaveBeenCalled())
+  })
+})
+
+// ── Seats (3 Sep 2026) ──────────────────────────────────────────────────────
+describe('ChannelMembersSheet — seats', () => {
+  beforeEach(() => {
+    channelMembersMock.mockReset()
+    seatMocks.listChannelSeats.mockReset()
+    seatMocks.seatInChannel.mockReset()
+    seatMocks.unseatFromChannel.mockReset()
+    listClubMembersMock.mockReset()
+    channelMembersMock.mockResolvedValue([
+      { profile_id: 'p-hc', full_name: 'Zz Probe Headcoach', reason: 'Head coach — U13 Mixed' },
+      { profile_id: 'p-seated', full_name: 'Zz Probe Seated', reason: 'Seated by the club — senior side' },
+    ])
+    seatMocks.listChannelSeats.mockResolvedValue([{ id: 'seat-1', profile_id: 'p-seated', channel: 'headcoaches', reason: 'senior side' }])
+    seatMocks.seatInChannel.mockResolvedValue({ id: 'seat-2' })
+    seatMocks.unseatFromChannel.mockResolvedValue()
+    listClubMembersMock.mockResolvedValue([
+      { profile_id: 'p-hc', profiles: { full_name: 'Zz Probe Headcoach' } },
+      { profile_id: 'p-new', profiles: { full_name: 'Zz Probe Newcomer' } },
+    ])
+  })
+
+  it('a non-super sees no seating controls and fetches no seats', async () => {
+    render(<ChannelMembersSheet open channel="headcoaches" selfId="p-me" onOpenDm={vi.fn()} onClose={vi.fn()} />)
+    await screen.findByText('Zz Probe Headcoach')
+    expect(screen.queryByTestId('seat-someone')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Unseat/ })).toBeNull()
+    expect(seatMocks.listChannelSeats).not.toHaveBeenCalled()
+    expect(listClubMembersMock).not.toHaveBeenCalled()
+  })
+
+  it('a super seats a person with a reason; the picker omits existing members', async () => {
+    const user = userEvent.setup()
+    render(<ChannelMembersSheet open channel="headcoaches" selfId="p-me" onOpenDm={vi.fn()} onClose={vi.fn()} canSeat clubId="club-1" />)
+    await screen.findByText('Zz Probe Headcoach')
+    const select = await screen.findByLabelText('Person to seat')
+    await waitFor(() => expect(within(select).queryByText('Zz Probe Newcomer')).toBeInTheDocument())
+    expect(within(select).queryByText('Zz Probe Headcoach')).toBeNull()
+    const seatButton = screen.getByRole('button', { name: 'Seat' })
+    expect(seatButton).toBeDisabled()
+    await user.selectOptions(select, 'p-new')
+    await user.type(screen.getByLabelText('Reason'), 'Club Captain')
+    expect(seatButton).toBeEnabled()
+    await user.click(seatButton)
+    await waitFor(() =>
+      expect(seatMocks.seatInChannel).toHaveBeenCalledWith({ clubId: 'club-1', profileId: 'p-new', channel: 'headcoaches', reason: 'Club Captain' }),
+    )
+  })
+
+  it('a seated row gets an Unseat control; a derived row does not', async () => {
+    const user = userEvent.setup()
+    render(<ChannelMembersSheet open channel="headcoaches" selfId="p-me" onOpenDm={vi.fn()} onClose={vi.fn()} canSeat clubId="club-1" />)
+    const unseat = await screen.findByRole('button', { name: 'Unseat Zz Probe Seated' })
+    expect(screen.queryByRole('button', { name: 'Unseat Zz Probe Headcoach' })).toBeNull()
+    await user.click(unseat)
+    await waitFor(() => expect(seatMocks.unseatFromChannel).toHaveBeenCalledWith('seat-1'))
+  })
+
+  it('a squad channel offers no seating even to a super', async () => {
+    channelMembersMock.mockResolvedValue([{ profile_id: 'p1', full_name: 'Zz Probe Parent', reason: 'Parent' }])
+    render(<ChannelMembersSheet open channel="squad" teamId="t1" selfId="p-me" onOpenDm={vi.fn()} onClose={vi.fn()} canSeat clubId="club-1" />)
+    await screen.findByText('Zz Probe Parent')
+    expect(screen.queryByTestId('seat-someone')).toBeNull()
   })
 })

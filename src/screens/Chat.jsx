@@ -9,6 +9,8 @@ import ChatHeader from '../components/ChatHeader.jsx'
 import ChatBackgroundPicker from '../components/ChatBackgroundPicker.jsx'
 import { clearChannel } from '../data/messages.js'
 import { ROLE_CHANNELS } from '../lib/roleChannels.js'
+import { useMemberships } from '../lib/memberships.jsx'
+import { isSuperAdmin } from '../lib/scope.js'
 import useChannelThread, { tallyByEvent as tallyByEventImpl } from '../lib/useChannelThread.js'
 import { shortBand } from './ChatList.jsx'
 
@@ -76,6 +78,11 @@ export default function Chat() {
   const [clearing, setClearing] = useState(false)
   const [pickingBackground, setPickingBackground] = useState(false)
   const [showingMembers, setShowingMembers] = useState(false)
+  // Seats (3 Sep 2026): a super may seat a person in a role channel from the
+  // member sheet. The client mirror of `seats write super`; RLS decides.
+  const { memberships } = useMemberships()
+  const canSeat = isSuperAdmin(memberships)
+  const clubId = memberships?.find((m) => m.club_id)?.club_id ?? null
   const threadParam = searchParams.get('thread')
   const eventParam = searchParams.get('event')
 
@@ -212,6 +219,8 @@ export default function Chat() {
         teamId={thread.teamId}
         selfId={thread.selfId}
         onOpenDm={thread.openDmWith}
+        canSeat={canSeat}
+        clubId={clubId}
       />
 
       {/* Announce-only lives in the header's ⋯ menu since 24 Aug 2026; this

@@ -1,6 +1,6 @@
 # Channel seats and a Committee channel (3 Sep 2026)
 
-**Status: NOT SHIPPED — plan only, awaiting Jay's go.** Dated 2026-09-03.
+**Status: SHIPPED 3 Sep 2026** — `db/migrations/20260904_channel_seats_and_committee.sql`, both parts in one PR (see the changelog). Dated 2026-09-03.
 
 ## Why
 

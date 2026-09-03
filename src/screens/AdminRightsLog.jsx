@@ -4,7 +4,8 @@ import Empty from '../components/Empty.jsx'
 import PersonCard from '../components/PersonCard.jsx'
 import PersonName from '../components/PersonName.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { listAuditProfiles, listMembershipAudit } from '../data/audit.js'
+import { listAuditProfiles, listMembershipAudit, listSeatAudit } from '../data/audit.js'
+import { roleChannelLabel } from '../lib/roleChannels.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isSuperAdmin } from '../lib/scope.js'
@@ -153,6 +154,8 @@ export default function AdminRightsLog() {
   const viewerIsSuper = isSuperAdmin(memberships)
 
   const [rows, setRows] = useState(null)
+  // Channel seats (3 Sep 2026): a second, smaller log on the same screen.
+  const [seatRows, setSeatRows] = useState([])
   const [names, setNames] = useState(() => new Map())
   const [error, setError] = useState(null)
   // The tapped person's profile id, or null — one card for the whole screen.
@@ -177,11 +180,20 @@ export default function AdminRightsLog() {
     setError(null)
     try {
       const entries = await listMembershipAudit()
+      // Seats are decoration on this screen: a failure leaves the rights log
+      // intact rather than blanking a safeguarding record.
+      let seats = []
+      try {
+        seats = await listSeatAudit()
+      } catch {
+        seats = []
+      }
       // ⚠️ BOTH IDS, IN ONE QUERY. The actor of one entry is the subject of
       // another often enough that two lists would fetch the same profiles
       // twice; the set is what makes it one round trip.
       const profiles = await listAuditProfiles(
-        entries.flatMap((row) => [row.profile_id, row.actor_id]),
+        entries.flatMap((row) => [row.profile_id, row.actor_id])
+          .concat(seats.flatMap((row) => [row.profile_id, row.actor_id])),
       )
       const byId = new Map()
       for (const profile of profiles) {
@@ -191,6 +203,7 @@ export default function AdminRightsLog() {
       }
       setNames(byId)
       setRows(entries)
+      setSeatRows(seats)
     } catch (err) {
       setError(friendlyMessage(err, "We couldn't load the log. Try again."))
     }
@@ -478,6 +491,31 @@ export default function AdminRightsLog() {
           fetched window, NOT the filtered view — the cap is the database's, and
           it is still true whatever the filter shows. */}
       <PersonCard profileId={cardFor} onClose={() => setCardFor(null)} />
+
+      {seatRows.length > 0 && (
+        <section className="mt-6" data-testid="seat-audit">
+          <h4 className="mb-1.5 text-[12.5px] font-extrabold uppercase tracking-[.5px] text-ink-muted">
+            Channel seats
+          </h4>
+          <Card className="overflow-hidden">
+            <ul>
+              {seatRows.map((row) => (
+                <li key={row.id} className="border-b border-line px-4 py-2.5 text-[13px] last:border-0">
+                  <span className="font-bold text-ink">{names.get(row.profile_id) || 'Unknown account'}</span>
+                  {' '}
+                  {row.action === 'seated' ? 'seated in' : 'unseated from'}
+                  {' '}
+                  <span className="font-bold text-ink">{roleChannelLabel(row.channel)}</span>
+                  {' by '}
+                  {names.get(row.actor_id) || 'the system'}
+                  {row.reason ? <span className="text-ink-muted"> — {row.reason}</span> : null}
+                  <span className="ml-2 text-[12px] text-ink-faint">{stamp(row.at)}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
 
       {rows.length >= 200 && (
         <p className="mt-3 text-[12.5px] text-ink-faint" data-testid="audit-truncated">

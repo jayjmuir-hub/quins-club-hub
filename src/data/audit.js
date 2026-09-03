@@ -86,3 +86,19 @@ export async function listAuditProfiles(ids) {
   const contacts = await fetchContacts(wanted)
   return rows.map((row) => ({ ...row, ...(contacts.get(row.id) ?? NO_CONTACT) }))
 }
+
+/**
+ * Channel seats — who was seated in or unseated from a role channel, by
+ * whom, and why (3 Sep 2026). Written by a trigger on channel_seats, read by
+ * supers only (RLS). Newest first, capped like listMembershipAudit.
+ */
+export async function listSeatAudit({ limit = 100 } = {}) {
+  const { data, error } = await supabase
+    .from('channel_seat_audit')
+    .select('id, at, seat_id, club_id, profile_id, channel, action, actor_id, reason')
+    .order('at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data ?? []
+}

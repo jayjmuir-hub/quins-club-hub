@@ -1,4 +1,4 @@
-// The five ROLE CHANNELS — club-wide chats whose membership is derived from
+// The six ROLE CHANNELS (five until 3 Sep 2026) — club-wide chats whose membership is derived from
 // roles, never stored (claude/plans/2026-08-30-role-channels.md, migration
 // db/migrations/20260830_role_channels.sql).
 //
@@ -18,6 +18,10 @@ export const ROLE_CHANNELS = {
   medics: { label: 'Club Medics', glyph: '⚕️' },
   welfare: { label: 'Welfare', glyph: '🛟' },
   clubstaff: { label: 'Club Staff', glyph: '🏉' },
+  // The sixth (3 Sep 2026, claude/plans/2026-09-03-channel-seats-and-committee.md):
+  // derived from club_officers — hold a title and you are in. Titles only:
+  // a super without one is not in it.
+  committee: { label: 'Committee', glyph: '🏛️' },
 }
 
 export const ROLE_CHANNEL_KEYS = Object.keys(ROLE_CHANNELS)
