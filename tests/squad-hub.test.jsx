@@ -110,6 +110,11 @@ const FUTURE_TRAINING = {
   starts_at: '2099-01-05T15:00:00Z',
 }
 
+// The grid's column label: dd/mm in club time — the same call SquadHub makes.
+function shortDdMm(iso) {
+  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Dubai' })
+}
+
 function renderAt(path) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -330,10 +335,36 @@ describe('the tracking grid', () => {
 
     expect(await screen.findByText(/100% attendance across 40 events this season/)).toBeInTheDocument()
     // The matrix still caps its columns: the footnote names both numbers.
-    expect(screen.getByText(/newest 15 of 40 events/)).toBeInTheDocument()
+    expect(screen.getByText(/latest 15 of 40 events, oldest to newest/)).toBeInTheDocument()
     const table = screen.getByRole('table')
     // Player + 15 event columns + % + No-shows = 18 column headers.
-    expect(within(table).getAllByRole('columnheader')).toHaveLength(18)
+    const headers = within(table).getAllByRole('columnheader').map((th) => th.textContent)
+    expect(headers).toHaveLength(18)
+    // Oldest → newest across the row: the most recent session sits at the
+    // right, beside % (Jay, 3 Sep 2026). e-s39 is the newest fixture.
+    expect(headers[15]).toBe(shortDdMm(seasonTraining[39].starts_at))
+    expect(headers[1]).toBe(shortDdMm(seasonTraining[25].starts_at))
+  })
+
+  // 3 Sep 2026, Jay from the U16B hub: "why are there multiple dates for the
+  // same session? why is it showing a session yesterday?" — club-wide social
+  // events (team_id null) were columns, and divisors in the %.
+  it('keeps club-wide socials and other squads\' events out of the grid and the %', async () => {
+    listEventsMock.mockResolvedValue([
+      { id: 'e-own', team_id: 't-u12', type: 'training', title: 'U12 Training', starts_at: '2026-08-31T14:00:00Z' },
+      { id: 'e-tag', team_id: null, type: 'social', title: 'Adult Social Tag Rugby', starts_at: '2026-09-01T14:00:00Z' },
+      { id: 'e-shop', team_id: null, type: 'social', title: 'Kit shop opens', info_only: true, starts_at: '2026-08-31T15:00:00Z' },
+      { id: 'e-social', team_id: 't-u12', type: 'social', title: 'Squad BBQ', starts_at: '2026-08-30T14:00:00Z' },
+    ])
+    listAvailabilityForEventsMock.mockResolvedValue([])
+    listAttendanceForEventsMock.mockResolvedValue([{ event_id: 'e-own', player_id: 'p1', status: 'present' }])
+    renderAt('/squad/t-u12')
+
+    expect(await screen.findByText(/100% attendance across 1 event this season/)).toBeInTheDocument()
+    const table = screen.getByRole('table')
+    // Player + the one training column + % + No-shows.
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(4)
+    expect(within(table).queryByTitle(/Adult Social Tag Rugby/)).toBeNull()
   })
 })
 
