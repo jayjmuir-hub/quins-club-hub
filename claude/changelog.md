@@ -10,6 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- 🪑 **Channel seats and a Committee channel.** Jay, 3 Sep 2026
+  (`claude/plans/2026-09-03-channel-seats-and-committee.md`, both parts).
+  `db/migrations/20260904_channel_seats_and_committee.sql`: a sixth role
+  channel, `committee`, derived from `club_officers` — titles only, supers
+  not implied, the title is the member-sheet reason; and `channel_seats` —
+  a SUPER seats a person in any role channel with a reason, additive, never
+  an exclusion, audited by trigger into `channel_seat_audit` and shown on
+  /admin/rights-log. `private.in_role_channel` and `role_channel_audience`
+  gained the committee and seats arms; every list of the five keys
+  (channel CHECKs, four messages policies, provenance trigger, `channel_members`,
+  `my_chats`) gained the sixth. ⚠️ A seat in `welfare` grants the channel
+  only — `can_review_dm` untouched, proven. Client: `Committee` in
+  `roleChannels.js`, `src/data/channelSeats.js`, the member sheet grows
+  "Seat someone" and Unseat for supers on role channels, the rights log
+  grows a seats section. Harness `db/tests/channel-seats.sql` (asserts the
+  deployed state; run 3 Sep with the migration pasted above it, rolled back
+  against production via the MCP): nine asserts green, each with its
+  control; afterwards no seat tables, no probe rows.
+  ⚠️ **Applied to production only on Jay's yes; the changelog says when.**
 - `84e4edf` — 🔒 **THE ADMIN SPLIT — an admin row reaches no squad by itself.** Jay, 3 Sep
   2026, all four rulings confirmed (`claude/plans/2026-09-03-admin-team-reach.md`).
   `db/migrations/20260904_admin_team_reach.sql`: one default-deny helper,
@@ -30,15 +49,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   staff chat BEFORE; after, all nine personas match the matrix; the fault
   (training dropped from attendance) flips the Training probe to refused;
   control query afterwards shows the live helpers untouched and no probe rows.
-  ⚠️ **Applied to production only on Jay's yes; the changelog says when.**
-  Closes `claude/open-items.md` item 13.
+  ✅ **APPLIED to production 3 Sep 2026** (Jay's yes; helpers and policies
+  verified live afterwards). Closes `claude/open-items.md` item 13.
 - `bc464f8` — **docs(plan): the admin split — an admin row reaches no squad by itself.**
   `claude/plans/2026-09-03-admin-team-reach.md` — Jay, 3 Sep 2026, after the
   audit of what a plain admin sees: three helper bodies (`can_edit_team`,
   `can_see_team`, `is_attached_to_team`) route every squad policy, so their
   admin arm becomes a default-deny allowlist of rights and a zero-rights admin
   reaches no squad. Rulings in §3 needed before code. Plan only.
-- **feat(ui): THE TOAST EXISTS — design-system.md §4.24, two years of
+- `8188977` — **feat(ui): THE TOAST EXISTS — design-system.md §4.24, two years of
   screens improvising "it worked" replaced by one channel.**
   `src/components/Toast.jsx`: `ToastProvider` at the app root (inside the
   router, outside ErrorBoundary), `useToast()` returns `toast(message,

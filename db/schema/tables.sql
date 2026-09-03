@@ -2584,6 +2584,35 @@ CREATE TABLE public.club_officers (
   UNIQUE (club_id, profile_id, title)
 );
 
+-- channel_seats / channel_seat_audit (20260904_channel_seats_and_committee,
+-- 3 Sep 2026). A SUPER seats a person in a role channel with a reason —
+-- additive to the derived membership, never an exclusion. The audit is
+-- written by trigger private.audit_channel_seat, plain uuids, no FKs.
+-- ---------------------------------------------------------------------
+CREATE TABLE public.channel_seats (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  club_id     uuid NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
+  profile_id  uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  channel     text NOT NULL CHECK (channel IN
+                ('headcoaches','managers','medics','welfare','clubstaff','committee')),
+  reason      text NOT NULL CHECK (length(btrim(reason)) BETWEEN 1 AND 120),
+  granted_by  uuid NOT NULL DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE SET DEFAULT,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (club_id, profile_id, channel)
+);
+
+CREATE TABLE public.channel_seat_audit (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  at          timestamptz NOT NULL DEFAULT now(),
+  seat_id     uuid NOT NULL,
+  club_id     uuid NOT NULL,
+  profile_id  uuid NOT NULL,
+  channel     text NOT NULL,
+  action      text NOT NULL CHECK (action IN ('seated','unseated')),
+  actor_id    uuid,
+  reason      text
+);
+
 -- profile_icons (20260831_profile_icons — the crown for U11, 31 Aug 2026).
 -- Exactly one target: a person, or a squad's staff (the crown follows the
 -- job). Icon is a KEY into the client library; format-checked, not an enum.

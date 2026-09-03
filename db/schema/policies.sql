@@ -2019,3 +2019,30 @@ CREATE POLICY "suggestion read" ON public.training_suggestions
   USING ((EXISTS ( SELECT 1
    FROM events e
   WHERE ((e.id = training_suggestions.event_id) AND (private.can_edit_team(e.team_id) OR private.is_admin(e.club_id))))));
+
+-- ---------------------------------------------------------------------
+-- channel_seats / channel_seat_audit  (3 policies)        ADDED 2026-09-04
+-- 20260904_channel_seats_and_committee. ⚠️ The four `messages` policies
+-- above were RE-CREATED by the same migration with 'committee' in every
+-- role-channel list (read / create / edit / delete), as were the
+-- messages_channel_check and messages_role_channel_shape constraints;
+-- membership itself is answered by private.in_role_channel, which gained a
+-- committee arm (club_officers) and a seats arm (channel_seats).
+-- ---------------------------------------------------------------------
+CREATE POLICY "seats read member" ON public.channel_seats
+  FOR SELECT TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM public.memberships me
+     WHERE me.profile_id = (SELECT auth.uid())
+       AND me.status = 'active'
+       AND me.club_id = channel_seats.club_id
+  ));
+CREATE POLICY "seats write super" ON public.channel_seats
+  FOR INSERT TO authenticated
+  WITH CHECK (private.is_super_admin());
+CREATE POLICY "seats delete super" ON public.channel_seats
+  FOR DELETE TO authenticated
+  USING (private.is_super_admin());
+CREATE POLICY "seat audit read super" ON public.channel_seat_audit
+  FOR SELECT TO authenticated
+  USING (private.is_super_admin());

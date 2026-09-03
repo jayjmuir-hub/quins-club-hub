@@ -1029,6 +1029,19 @@ REVOKE ALL ON public.club_officers FROM PUBLIC, anon;
 
 
 -- ---------------------------------------------------------------------
+-- channel_seats / channel_seat_audit  (3 Sep 2026 — channel seats)
+-- Recorded with the migration (20260904_channel_seats_and_committee):
+-- SELECT/INSERT/DELETE on seats for authenticated (RLS: any active member
+-- reads, supers write and delete; no UPDATE — re-seat to change a reason);
+-- SELECT only on the audit (RLS: supers), written by trigger.
+-- ---------------------------------------------------------------------
+GRANT SELECT, INSERT, DELETE ON public.channel_seats TO authenticated;
+REVOKE ALL ON public.channel_seats FROM PUBLIC, anon;
+GRANT SELECT ON public.channel_seat_audit TO authenticated;
+REVOKE ALL ON public.channel_seat_audit FROM PUBLIC, anon;
+
+
+-- ---------------------------------------------------------------------
 -- profile_icons  (31 Aug 2026 — the crown for U11)
 -- Recorded with the migration (20260831_profile_icons): recognition
 -- emoji, super-admin-granted. SELECT/INSERT/UPDATE/DELETE for

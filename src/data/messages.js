@@ -845,6 +845,7 @@ export function chatPath(row) {
     case 'medics':
     case 'welfare':
     case 'clubstaff':
+    case 'committee':
       return `/chat/${row.kind}`
     default:
       return `/chat/${row.team_id}`

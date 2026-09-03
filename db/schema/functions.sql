@@ -8112,3 +8112,33 @@ begin
   return null;
 end $function$
 ;
+
+-- ---------------------------------------------------------------------
+-- 20260904_channel_seats_and_committee (3 Sep 2026)         ADDED 2026-09-04
+-- private.in_role_channel and private.role_channel_audience gained a
+-- 'committee' arm (public.club_officers — the title is the reason) and a
+-- seats arm (public.channel_seats — "Seated by the club — <reason>").
+-- private.set_message_provenance, public.channel_members and
+-- public.my_chats were re-created with 'committee' in their key lists and
+-- are otherwise unchanged; the migration file carries the full bodies.
+-- New: the audit trigger function.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.audit_channel_seat()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if tg_op = 'INSERT' then
+    insert into channel_seat_audit (seat_id, club_id, profile_id, channel, action, actor_id, reason)
+    values (new.id, new.club_id, new.profile_id, new.channel, 'seated', auth.uid(), new.reason);
+    return new;
+  else
+    insert into channel_seat_audit (seat_id, club_id, profile_id, channel, action, actor_id, reason)
+    values (old.id, old.club_id, old.profile_id, old.channel, 'unseated', auth.uid(), old.reason);
+    return old;
+  end if;
+end;
+$function$
+;
