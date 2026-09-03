@@ -1444,7 +1444,7 @@ Run `get_advisors` rather than trusting this list. As of 14 Aug 2026:
     bypasses RLS. The risky ones were read in source, not assumed:
     `set_admin_rights` gates on `is_super_admin` and raises;
     `welfare_overview`, `approval_recipients`, `announcement_stats`,
-    `storage_usage`, `publish_training`, `clear_channel` gate on `is_admin`
+    `storage_usage`, `suggest_training` (was `publish_training`, dropped 3 Sep 2026), `clear_channel` gate on `is_admin`
     variants; `message_read_stats` filters on `private.can_edit_team` **as a
     WHERE predicate** (a keyword probe for `raise` misses it — it refuses by
     returning nothing); `pitch_occupancy` requires an active staff/admin

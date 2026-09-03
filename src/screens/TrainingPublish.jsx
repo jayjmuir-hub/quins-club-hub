@@ -28,7 +28,7 @@ import { friendlyMessage } from '../lib/friendlyError.js'
 //
 // ⛔ NOTHING ON THIS SCREEN KEYS ON A WEEKDAY, AND NOTHING EVER MAY. There is no
 // day name here, no getDay(), no "which night does this squad train". Publish is
-// a TEMPLATE, some SQUADS and a DATE RANGE; publish_training finds each squad's
+// a TEMPLATE, some SQUADS and a DATE RANGE; suggest_training finds each squad's
 // own training events inside that range and writes the plan onto those. The
 // moment a screen decides "training is Tuesday" it is wrong for every squad that
 // trains on another night, and it is wrong silently — the sessions it should
@@ -50,7 +50,7 @@ import { friendlyMessage } from '../lib/friendlyError.js'
 // template. The sentences come from the one place — src/lib/trainingPlans.js.
 //
 // ⚠️ THE `training` RIGHT IS A MESSAGE, NOT A BOUNDARY. TrainingGate decides what
-// this screen SAYS; RLS and publish_training decide what the database accepts.
+// this screen SAYS; RLS and suggest_training decide what the database accepts.
 // Every write goes through src/data/trainingPlans.js, which turns the RLS
 // zero-row result — a successful nothing — into a thrown error, so a refused
 // write is never drawn as a done one.
@@ -276,7 +276,7 @@ function PublishBody() {
    * one template can stop fitting under the next one — and the chip that would
    * let somebody untick it is DISABLED the moment it stops fitting, so the
    * ticked-but-unfit state is one the user cannot get out of. It would then
-   * ride along into publish_training, whose server-side check covers contact
+   * ride along into suggest_training, whose server-side check covers contact
    * only (the age check was always client-side, and since 2 Sep 2026 age is
    * guidance and not checked at all). Prune on the way in, and derive
    * `teamIds` from the fit as well (below) so that a future path into

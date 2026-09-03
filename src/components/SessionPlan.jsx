@@ -782,7 +782,7 @@ export default function SessionPlan({ event, team, canEdit }) {
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             {session.coach_edited_at && (
-              // ⚠️ NOT DECORATION. publish_training skips a coach-edited
+              // ⚠️ NOT DECORATION. Until 2 Sep 2026 publish_training skipped a coach-edited
               // session, so this is the only thing on screen that explains why
               // tonight's plan did not change when a new template was
               // published to the squad.

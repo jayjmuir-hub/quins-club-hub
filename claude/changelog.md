@@ -10,7 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
-- **fix(errors): THE DATA LAYER CARRIES THE DATABASE'S CODE ACROSS — the
+- **db(training): publish_training DROPPED — nothing has called it since
+  `d98b593`.** `db/migrations/20260903_drop_publish_training.sql`, proven in
+  a rolled-back transaction against production (gone, `suggest_training`
+  present as the control, no dependents). `db/tests/training-plans.sql` swaps
+  its six publish steps for a rot anchor that the function stays gone; those
+  six properties live on for `suggest_training` in
+  `db/tests/training-suggestions.sql`. Source comments that still described
+  publish_training as the thing that skips a coach-edited session are
+  reworded. ⚠️ **Applied to production only on Jay's yes; the changelog says
+  when.**
+- `bfc2092` — **fix(errors): THE DATA LAYER CARRIES THE DATABASE'S CODE ACROSS — the
   data-layer half of the friendly-error sweep.** Item 2 of the 2 Sep UX
   review converted the screens, but every `src/data/*.js` wrap was
   `new Error(error.message || REFUSED)`: the database's words kept, its CODE
