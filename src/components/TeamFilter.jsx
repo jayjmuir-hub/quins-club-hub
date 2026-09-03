@@ -85,6 +85,9 @@ export function TeamFilter({
   allLabel = 'All age groups',
   counts,
   label = 'Age group',
+  // false for a SWITCHER rather than a filter (the squad hub): there is no
+  // "all squads" page to go to, so the option would be a dead end.
+  includeAll = true,
 }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef(null)
@@ -125,7 +128,7 @@ export function TeamFilter({
   const filtered = selected !== ALL_TEAMS_ID && Boolean(selectedTeam)
 
   const options = [
-    { id: ALL_TEAMS_ID, text: allLabel },
+    ...(includeAll ? [{ id: ALL_TEAMS_ID, text: allLabel }] : []),
     ...teams.map((team) => ({ id: team.id, text: team.name })),
   ]
 

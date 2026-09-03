@@ -512,7 +512,7 @@ function FooterActions({ player, canEdit, canEditOwn, canDelete, onEdit, onEditO
         </div>
       )}
       {confirming === null && (
-        <div className="flex gap-2.5">
+        <div className="flex flex-wrap gap-2.5">
           <Button onClick={() => onEdit?.(player)} className={FOOTER_BUTTON}>Edit</Button>
           <Button variant="dangerQuiet" onClick={() => setConfirming('left')} className={FOOTER_BUTTON}>Mark as left</Button>
           {canDelete && (

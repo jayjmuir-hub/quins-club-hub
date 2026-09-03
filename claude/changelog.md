@@ -10,7 +10,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ux): the last two native pickers go, and a calendar day is spoken.**
+- **fix(ux): the last Low batch from the full review.** Share on the team
+  sheet and the match sheet now says what happened — "Downloaded — the
+  picture is in your Downloads folder." on a desktop, "Share cancelled.
+  Nothing was sent." on a dismissed sheet — through `src/lib/shareOutcome.js`
+  (its own module: five lineup suites mock `shareImage.js` with one export).
+  The squad hub's switcher is the same dropdown Schedule and Roster use
+  (`TeamFilter` gains `includeAll={false}`, a switcher having no "all" page)
+  instead of a pill per squad, which stacked three rows deep for an admin.
+  The player form says why Save is greyed while the contact rows load. Tap
+  targets: the player form's position chips, DatePicker's day cells and its
+  clear button, ChatHeader's two icon buttons, ChatList's row menu and
+  Lineup's "Show N who said no" reach 44px; the player card's action row
+  wraps like the event's. That closes the 2 Sep 2026 UX review programme;
+  what remains is recorded as not-doing in
+  `claude/plans/2026-09-02-ux-review-programme.md`.
+- `c314def` — **fix(ux): the last two native pickers go, and a calendar day is spoken.**
   Add-game's Kick-off and Training publish's
   four date boxes (From, To, Focus starts, Focus ends) were the last native
   `<input type="date|time">` fields on a screen a person fills in — the same

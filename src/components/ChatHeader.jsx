@@ -45,7 +45,7 @@ export default function ChatHeader({ avatar, title, subtitle, actions = [], onIn
       <Link
         to="/chat"
         aria-label="Back to chats"
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink hover:bg-surface-mute"
+        className="relative before:absolute before:-inset-1 before:content-[''] grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink hover:bg-surface-mute"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M15 5l-7 7 7 7" />
@@ -77,7 +77,7 @@ export default function ChatHeader({ avatar, title, subtitle, actions = [], onIn
             aria-label="Chat options"
             aria-expanded={open}
             aria-haspopup="menu"
-            className="grid h-9 w-9 place-items-center rounded-full text-ink hover:bg-surface-mute"
+            className="relative before:absolute before:-inset-1 before:content-[''] grid h-9 w-9 place-items-center rounded-full text-ink hover:bg-surface-mute"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <circle cx="5" cy="12" r="2" />

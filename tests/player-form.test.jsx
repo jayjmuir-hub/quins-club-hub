@@ -734,6 +734,8 @@ describe('PlayerForm — editing an existing player', () => {
     renderForm({ player: EXISTING_PLAYER })
 
     expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled()
+    // And it says why (2 Sep 2026 UX review, Low), rather than sitting grey.
+    expect(screen.getByTestId('save-hint')).toHaveTextContent(/Save unlocks in a moment/)
 
     resolveContact(EXISTING_CONTACT)
     await waitFor(() =>

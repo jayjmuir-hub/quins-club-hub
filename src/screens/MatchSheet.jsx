@@ -24,6 +24,7 @@ import { canEditTeam } from '../lib/scope.js'
 import { CLUB_TIME_ZONE, eventDate, eventTimeLabel } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { shareElementAsImage } from '../lib/shareImage.js'
+import { shareOutcomeNote } from '../lib/shareOutcome.js'
 import { deadlineLabel, isOverdue, matchSheetApplies, matchSheetDeadline } from '../lib/matchSheetDeadline.js'
 import { namesFromLineup } from '../lib/lineupSquad.js'
 import { isMinisTeam } from '../lib/minis.js'
@@ -431,6 +432,7 @@ export default function MatchSheet() {
     writeDraft(eventId, { fields, slots, cardRows, score, savedAt: Date.now() })
   }, [dirty, fields, slots, cardRows, score, eventId])
   const [sharing, setSharing] = useState(false)
+  const [shareNote, setShareNote] = useState(null)
   // The id of the lineup whose Refill has been ARMED, or null. Two-step inline
   // confirm — never a native confirm(), which blocks the event loop and is
   // untestable (RESTORE.md; the pattern is Notices' NoticeRow).
@@ -808,10 +810,12 @@ export default function MatchSheet() {
       // lost on the next back-swipe. persist(null) is "Save draft": it keeps
       // whatever status the sheet already has.
       await persist(null)
-      await shareElementAsImage(printRef.current, {
+      setShareNote(null)
+      const outcome = await shareElementAsImage(printRef.current, {
         filename: `match-sheet-${eventId}.png`,
         title: 'RCM match sheet',
       })
+      setShareNote(shareOutcomeNote(outcome))
     } catch (failure) {
       setSaveError(failure)
     } finally {
@@ -973,7 +977,12 @@ export default function MatchSheet() {
           </p>
         )}
         {saved && !saveError && (
-          <p className="mt-2.5 text-[12.5px] font-semibold text-ink-muted">Saved.</p>
+          <p role="status" className="mt-2.5 text-[12.5px] font-semibold text-ink-muted">Saved.</p>
+        )}
+        {shareNote && !sharing && (
+          <p role="status" className="mt-2.5 text-[12.5px] font-semibold text-ink-muted" data-testid="share-note">
+            {shareNote}
+          </p>
         )}
         {restored && !saved && (
           <p role="status" className="mt-2.5 text-[12.5px] font-semibold text-ink-muted">

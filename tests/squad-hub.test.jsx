@@ -158,6 +158,27 @@ describe('the gate', () => {
     expect(listEventsMock).not.toHaveBeenCalled()
   })
 
+  it('switches squads through one dropdown, not a pill per squad', async () => {
+    useMembershipsMock.mockReturnValue(
+      membershipsFor([
+        { role: 'manager', team_id: 't-u12', status: 'active' },
+        { role: 'manager', team_id: 't-u14', status: 'active' },
+      ]),
+    )
+    renderAt('/squad/t-u12')
+    expect(await screen.findByRole('heading', { name: /U12 Mixed/i })).toBeInTheDocument()
+    // 2 Sep 2026 UX review, Low: fifteen squads used to stack as pills.
+    expect(screen.queryByRole('link', { name: 'U14B' })).not.toBeInTheDocument()
+    const switcher = screen.getByRole('combobox', { name: 'Squad' })
+    expect(switcher).toHaveTextContent('U12 Mixed')
+    const user = userEvent.setup()
+    await user.click(switcher)
+    // A switcher, not a filter: there is no "all squads" page to offer.
+    expect(screen.queryByRole('option', { name: /all age groups/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('option', { name: 'U14B' }))
+    expect(await screen.findByRole('heading', { name: /U14B/i })).toBeInTheDocument()
+  })
+
   it('lands a one-squad coach straight in their hub from bare /squad', async () => {
     useMembershipsMock.mockReturnValue(
       membershipsFor([{ role: 'coach', team_id: 't-u12', status: 'active' }]),

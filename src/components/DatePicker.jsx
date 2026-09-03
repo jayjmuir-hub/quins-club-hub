@@ -187,7 +187,7 @@ export default function DatePicker({
             type="button"
             aria-label="Clear date"
             onClick={() => onChange('')}
-            className="absolute right-9 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-ink-muted hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="absolute right-9 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-ink-muted before:absolute before:-inset-2.5 before:content-[''] hover:bg-surface-mute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               <path d="M6 6l12 12M18 6L6 18" />
@@ -269,7 +269,7 @@ export default function DatePicker({
                     pick(cell)
                   }}
                   className={[
-                    'grid h-9 place-items-center rounded-[8px] text-[13.5px] transition',
+                    'grid h-11 place-items-center rounded-[8px] text-[13.5px] transition', // 44px: the floor, not h-9
                     off ? 'cursor-not-allowed text-ink-faint/40' : 'hover:bg-surface-mute',
                     cell.inMonth ? 'text-ink' : 'text-ink-faint',
                     isSel ? 'bg-brand font-extrabold text-white hover:bg-brand' : 'font-semibold',
