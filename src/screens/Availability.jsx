@@ -123,6 +123,14 @@ function PlayerRow({ player, status, editable, locked, saving, onSet, onClear })
         <span className="line-clamp-2 break-words text-[14.5px] font-bold leading-snug text-ink">{player.full_name}</span>
       </div>
 
+      {/* A word while the write is in flight (2 Sep 2026 UX review, extra
+          findings): a greyed 34px button on a bright pitch did not read as
+          "saving". */}
+      {saving && (
+        <span role="status" className="shrink-0 text-[12px] font-semibold text-ink-muted" data-testid="row-saving">
+          Saving…
+        </span>
+      )}
       {editable ? (
         <StatusButtons
           status={status}

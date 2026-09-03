@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
-- **db(training): publish_training DROPPED — nothing has called it since
+- `c6c0e39` — **db(training): publish_training DROPPED — nothing has called it since
   `d98b593`.** `db/migrations/20260903_drop_publish_training.sql`, proven in
   a rolled-back transaction against production (gone, `suggest_training`
   present as the control, no dependents). `db/tests/training-plans.sql` swaps
@@ -63,6 +63,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
+- **fix(ux): the small untaken items from the review's extra findings.**
+  Seven, each measured or tested: (1) the shell's loading state holds 60vh so
+  a cold refresh no longer steps through three heights; (2) closed portal
+  cards sit on `surface-sunk` instead of 70% opacity — muted ink at 70% over a
+  70% card composited to 3.39:1, under the floor; the sunk pair measures
+  5.64:1 and is in `scripts/contrast-check.mjs`; (3) "The app has updated —
+  refresh when convenient" when a new service worker REPLACES a controlling
+  one (`src/sw-register.js` fires `app-updated`, `src/lib/useAppUpdated.js`,
+  AppShell) — registerType stays autoUpdate, the first install says nothing;
+  (4) the availability row being saved says "Saving…"; (5) Needs attention,
+  Officers and Pitch glance load as list skeletons, not blocking spinners;
+  (6) the invite form's email error sits under the email field with
+  `aria-describedby` and focus, not below the whole access builder; (7) a
+  chat bubble in selecting mode carries a real checkbox, so the keyboard has
+  a route the div's onClick never gave it. Not done, on purpose: a shared
+  Toast component — a design-system piece, not a fix.
 - `06511e1` — **fix(ux): the player-import double tap, and the last raw errors on a screen.**
   Two of the 2 Sep 2026 review's extra findings. Player import: after the
   players-in-but-positions-failed case the sheet stays open to show the

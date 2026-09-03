@@ -141,8 +141,11 @@ export default function InviteForm({ onClose, onSaved }) {
 
     const trimmedEmail = email.trim()
     if (!trimmedEmail || !EMAIL_PATTERN.test(trimmedEmail)) {
+      // Under the field it is about (2 Sep 2026 UX review, extra findings) —
+      // it used to land in AccessBuilder's slot below the whole builder.
       setEmailInvalid(true)
-      setError(new Error(BAD_EMAIL))
+      setError(null)
+      document.getElementById('invite-email')?.focus()
       return
     }
     setEmailInvalid(false)
@@ -249,9 +252,15 @@ export default function InviteForm({ onClose, onSaved }) {
                 setEmailInvalid(false)
               }}
               aria-invalid={emailInvalid ? 'true' : undefined}
+              aria-describedby={emailInvalid ? 'invite-email-error' : undefined}
               placeholder="e.g. coach@example.com"
               className={inputClasses(emailInvalid)}
             />
+            {emailInvalid && (
+              <p id="invite-email-error" role="alert" className="mt-1.5 text-[12.5px] font-semibold text-danger-ink">
+                {BAD_EMAIL}
+              </p>
+            )}
             <p className="mt-1.5 text-[12.5px] text-ink-muted">
               They&apos;ll have to sign in with this exact address for the link to work.
             </p>

@@ -220,6 +220,9 @@ describe('InviteForm — validation', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toHaveAttribute('aria-invalid', 'true')
+    // Under the field, and named as its description (2 Sep 2026 UX review).
+    expect(screen.getByLabelText('Email')).toHaveAttribute('aria-describedby', 'invite-email-error')
+    expect(screen.getByLabelText('Email')).toHaveAccessibleDescription(/valid email/i)
     expect(createInviteMock).not.toHaveBeenCalled()
   })
 

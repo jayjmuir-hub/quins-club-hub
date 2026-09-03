@@ -5,7 +5,7 @@ import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import { PitchMonth, PitchOccupancy, PitchWeek } from '../components/PitchCalendar.jsx'
 import Segmented from '../components/Segmented.jsx'
-import Spinner from '../components/Spinner.jsx'
+import { ListSkeleton } from '../components/Skeleton.jsx'
 import { findPitchClashes, listPitchOccupancy, pitchShares } from '../data/pitches.js'
 import { listShareApprovalKeys, shareKey } from '../data/pitchShareApprovals.js'
 import { monthGrid, shiftDay, shiftMonth, weekDays, windowFor } from '../lib/calendarGrid.js'
@@ -111,7 +111,7 @@ export default function PitchGlance() {
   // these that overflow; the panel shows the room left on the ones that fit too.
   const shares = useMemo(() => pitchShares(events), [events])
 
-  if (membershipsLoading) return <Spinner label="Loading…" />
+  if (membershipsLoading) return <ListSkeleton rows={5} />
   if (!mayView) {
     return <Empty message="The pitch calendar is for squad staff. If you should be picking teams and booking pitches, ask an admin to add you." />
   }
@@ -153,7 +153,7 @@ export default function PitchGlance() {
           Something went wrong loading the bookings. Try again shortly.
         </p>
       )}
-      {loading && <Spinner label="Loading bookings…" />}
+      {loading && <ListSkeleton rows={5} />}
 
       {!loading && !error && events.length === 0 && (
         <Card>

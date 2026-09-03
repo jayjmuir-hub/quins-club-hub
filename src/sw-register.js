@@ -45,6 +45,20 @@ const UPDATE_CHECK_MS = 60 * 60 * 1000
 // still costs nothing.
 const MIN_GAP_MS = 60 * 1000
 
+// ⚠️ A PASSIVE LINE, NOT A PROMPT (2 Sep 2026 UX review, extra findings).
+// registerType stays autoUpdate — the new worker still claims clients and the
+// next navigation gets the new bundle, which is what the hourly check above
+// exists for. What was missing is a word to the person mid-form: this fires
+// `app-updated` on window when a worker REPLACES a controlling one, and
+// AppShell shows "refresh when convenient". The first install (controller was
+// null) is not an update and says nothing.
+if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+  const hadController = Boolean(navigator.serviceWorker.controller)
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController) window.dispatchEvent(new CustomEvent('app-updated'))
+  })
+}
+
 registerSW({
   // Runs once the worker is registered. `registration` is the live
   // ServiceWorkerRegistration; calling .update() on it asks the browser to

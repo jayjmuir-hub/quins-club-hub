@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -279,6 +279,15 @@ describe('AppShell', () => {
 
     expect(screen.getByRole('status')).toBeInTheDocument()
     expect(screen.queryByText('Routed content')).not.toBeInTheDocument()
+  })
+
+  it('says the app has updated when a new worker takes over, and offers a refresh', async () => {
+    useMembershipsMock.mockReturnValue(loaded())
+    renderShell()
+    expect(screen.queryByTestId('updated-banner')).toBeNull()
+    act(() => { window.dispatchEvent(new CustomEvent('app-updated')) })
+    expect(screen.getByTestId('updated-banner')).toHaveTextContent(/refresh when convenient/i)
+    expect(screen.getByRole('button', { name: 'Refresh now' })).toBeInTheDocument()
   })
 
   it('renders an error state, not a blank screen, when membership loading fails', () => {
