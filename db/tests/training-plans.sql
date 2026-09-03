@@ -4,28 +4,23 @@
 --  runs inside a transaction that ROLLS BACK.
 -- ══════════════════════════════════════════════════════════════════════════
 --
--- Eight things, each proved against an injected fault rather than by running:
+-- Three things, each proved against an injected fault rather than by running:
 --   1. A drill in use cannot be DELETED (on delete restrict). Retire instead.
 --   2. A second session on one event is refused (UNIQUE event_id).
---   3. publish_training with _preview = true counts and writes NOTHING.
---   4. A real publish writes every training in range and never a match.
---   5. A coach-edited session is SKIPPED and COUNTED, its content untouched.
---   6. A coach cannot call publish_training at all.
---   7. A contact template published to a non-contact squad is refused 42501
---      (the tag-squad rule — teams.requires_contact is the column behind it).
---   8. A team id that is not in this club is refused 42501.
+--   3. publish_training is GONE and stays gone (20260903_drop_publish_training.sql),
+--      with suggest_training present as the control.
 --
--- ✅ 7 AND 8 TEST db/migrations/20260821_publish_training_fit_check.sql, APPLIED
--- 21 Aug 2026 on Jay's "apply publish_training_fit_check". Measured 8/8 live
--- the same minute.
+-- ⚠️ UNTIL 3 Sep 2026 THIS FILE HAD EIGHT STEPS, six of them on
+-- publish_training (preview writes nothing; a real publish writes every
+-- training in range and never a match; a coach-edited session is skipped and
+-- counted; a coach cannot call it; a contact template cannot reach a tag
+-- squad; a foreign team id is refused). The director's publish became a
+-- SUGGESTION on 2 Sep 2026 and those six properties are asserted for
+-- suggest_training in db/tests/training-suggestions.sql. They were not
+-- deleted from the club's guarantees — they moved.
 --
--- ⚠️ 5 IS THE ONE THAT MATTERS. "Publish never overwrites a coach's edit" is
--- the rule that lets multi-squad publish be safe at all; this is the line
--- that stops it being "simplified" away.
---
--- ⚠️ AS `postgres` RLS IS BYPASSED ENTIRELY. Steps 3-6 run as authenticated.
--- ⚠️ The admin uuid is a PROFILE id, the same one the other harnesses use.
--- Every person and squad below is INVENTED — rule 9.
+-- ⚠️ AS `postgres` RLS IS BYPASSED ENTIRELY. Every person and squad below is
+-- INVENTED — rule 9.
 
 begin;
 create temporary table _r(step text, outcome text) on commit drop;
@@ -83,79 +78,26 @@ do $$ begin
 exception when unique_violation then insert into _r values ('second session on one event','PASS — refused 23505'); end $$;
 delete from training_sessions where event_id = 'eee00000-0000-4000-8000-0000000000d1';
 
--- 3. Preview writes nothing. Run as the admin.
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"df730ef7-dce2-4962-babe-96d9999b0173","role":"authenticated"}';
-do $$ declare w int; n int; begin
-  select will_write into w from publish_training('a0000000-0000-4000-8000-0000000000a1',
-    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, true);
-  select count(*) into n from training_sessions where event_id in ('eee00000-0000-4000-8000-0000000000d1','eee00000-0000-4000-8000-0000000000d2');
-  insert into _r values ('preview counts 2 and writes 0', case when w = 2 and n = 0 then 'PASS' else 'FAIL w='||w||' n='||n end);
+-- ── 3. publish_training IS GONE — a rot anchor, not a behaviour test ────────
+-- Steps 3–8 of this harness used to exercise publish_training: preview writes
+-- nothing, a real publish writes every training in range, a coach-edited
+-- session is skipped and counted, a coach cannot call it, a contact template
+-- cannot reach a tag squad, a foreign team id is refused. On 2 Sep 2026 the
+-- director's publish became a SUGGESTION (20260902_training_suggestions.sql)
+-- and every one of those properties is asserted, for suggest_training, in
+-- db/tests/training-suggestions.sql. 20260903_drop_publish_training.sql then
+-- removed the old function. This step pins that it STAYS removed — a function
+-- that writes a coach's plan over their head must not quietly come back — and
+-- the control beside it proves the catalogue query can see a function that
+-- does exist.
+do $$ declare gone int; control int; begin
+  select count(*) into gone from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'publish_training';
+  select count(*) into control from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'suggest_training';
+  insert into _r values ('3 publish_training is gone (control: suggest_training exists)',
+    case when gone = 0 and control = 1 then 'PASS' else 'FAIL gone='||gone||' control='||control end);
 end $$;
-
--- 4. Real publish writes 2 sessions, 2 blocks, and not the match.
-do $$ declare n int; m int; begin
-  perform publish_training('a0000000-0000-4000-8000-0000000000a1',
-    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, false);
-  select count(*) into n from training_sessions where event_id in ('eee00000-0000-4000-8000-0000000000d1','eee00000-0000-4000-8000-0000000000d2');
-  select count(*) into m from training_sessions where event_id = 'eee00000-0000-4000-8000-0000000000d3';
-  insert into _r values ('publish writes both trainings, not the match', case when n = 2 and m = 0 then 'PASS' else 'FAIL n='||n||' m='||m end);
-end $$;
-
--- 5. A coach-edited session is skipped and COUNTED. Inject the edit as the coach.
-reset role; set local role authenticated;
-set local request.jwt.claims = '{"sub":"c0000000-0000-4000-8000-00000000d001","role":"authenticated"}';
-update training_sessions set coach_edited_at = now(), notes = 'coach changed it'
- where event_id = 'eee00000-0000-4000-8000-0000000000d1';
-
-reset role; set local role authenticated;
-set local request.jwt.claims = '{"sub":"df730ef7-dce2-4962-babe-96d9999b0173","role":"authenticated"}';
-do $$ declare s int; w int; kept text; begin
-  select skipped_coach_edited, will_write into s, w from publish_training('a0000000-0000-4000-8000-0000000000a1',
-    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, false);
-  select notes into kept from training_sessions where event_id = 'eee00000-0000-4000-8000-0000000000d1';
-  insert into _r values ('publish skips the coach edit and reports it',
-    case when s = 1 and w = 1 and kept = 'coach changed it' then 'PASS' else 'FAIL s='||s||' w='||w||' kept='||coalesce(kept,'null') end);
-end $$;
-
--- 6. A coach cannot call publish at all.
-reset role; set local role authenticated;
-set local request.jwt.claims = '{"sub":"c0000000-0000-4000-8000-00000000d001","role":"authenticated"}';
-do $$ begin
-  perform publish_training('a0000000-0000-4000-8000-0000000000a1',
-    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, true);
-  insert into _r values ('coach calls publish','FAIL — allowed');
-exception when insufficient_privilege then insert into _r values ('coach calls publish','PASS — refused 42501'); end $$;
-
-reset role;
-
--- ── 7 and 8: the fit check inside publish_training ────────────────────────
--- ⚠️ SET UP AS `postgres` ON PURPOSE. The squad's contact flag is forced to
--- false here so the step does not depend on how production happens to have it
--- set today, and the whole transaction rolls back.
-reset role;
-update teams set requires_contact = false where id = 'c0000000-0000-4000-8000-00000000d0f1';
-insert into session_templates (id, club_id, name, total_minutes, requires_contact)
-select 'a0000000-0000-4000-8000-0000000000a2', club_id, 'HARNESS contact hour', 15, true from teams limit 1;
-insert into session_template_blocks (template_id, position, drill_id, minutes)
-values ('a0000000-0000-4000-8000-0000000000a2', 1, 'd0000000-0000-4000-8000-0000000000a1', 15);
-
--- 7. A contact template cannot reach a tag squad, even by direct RPC.
-set local role authenticated;
-set local request.jwt.claims = '{"sub":"df730ef7-dce2-4962-babe-96d9999b0173","role":"authenticated"}';
-do $$ begin
-  perform publish_training('a0000000-0000-4000-8000-0000000000a2',
-    array['c0000000-0000-4000-8000-00000000d0f1'::uuid], current_date, current_date + 10, true);
-  insert into _r values ('contact template to a tag squad','FAIL — allowed');
-exception when insufficient_privilege then insert into _r values ('contact template to a tag squad','PASS — refused 42501'); end $$;
-
--- 8. A team id that is not in this club at all. SECURITY DEFINER bypasses RLS,
--- so nothing else in the function would have noticed.
-do $$ begin
-  perform publish_training('a0000000-0000-4000-8000-0000000000a1',
-    array['00000000-0000-4000-8000-000000000000'::uuid], current_date, current_date + 10, true);
-  insert into _r values ('a team id not in this club','FAIL — allowed');
-exception when insufficient_privilege then insert into _r values ('a team id not in this club','PASS — refused 42501'); end $$;
 
 reset role;
 

@@ -897,6 +897,25 @@ cache — where before this task they were live, callable endpoints (the advisor
 "anon/authenticated can execute via RPC" warning). `accept_invite` remains the one function
 genuinely reachable via RPC, exactly as intended.
 
+## 20260903_drop_publish_training — nothing calls it, so it goes
+
+**Status line: written 3 Sep 2026, proven in a rolled-back transaction
+against production (the function gone, `suggest_training` present as the
+control, no dependent objects). Applied when its PR merges — see the
+changelog.**
+
+`20260902_training_suggestions` left `publish_training` in place so it and
+the app deploy could land in either order. The app switched to
+`suggest_training` in `d98b593` (#647); the old bundle is off the CDN. A
+SECURITY DEFINER function that writes a coach's plan over their head is the
+one thing the 2 Sep change said must never happen again, so it does not stay
+callable.
+
+`db/tests/training-plans.sql` loses its six `publish_training` steps and
+gains a rot anchor asserting the function stays gone (with a control). The
+six properties were not dropped from the club's guarantees — they are
+asserted for `suggest_training` in `db/tests/training-suggestions.sql`.
+
 ## 20260902_training_suggestion_push — the squad's coaches are told
 
 **Status line: written 2 Sep 2026, proven in a rolled-back transaction

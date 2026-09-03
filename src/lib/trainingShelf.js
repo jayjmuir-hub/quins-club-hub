@@ -106,7 +106,7 @@ export function blocksFromTemplate(template) {
     }))
 }
 
-/** A session the coach has already saved is the one publish_training skips. */
+/** A session the coach has already saved — the one a chip must ask before replacing. */
 export function chipNeedsConfirm(session) {
   return Boolean(session?.coach_edited_at)
 }

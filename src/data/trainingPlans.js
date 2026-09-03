@@ -354,9 +354,9 @@ export async function getSession(eventId) {
  * A coach builds a plan for an event that has none yet. One session per event
  * (event_id is UNIQUE), so this is the create half of saveSessionBlocks.
  *
- * ⚠️ coach_edited_at IS STAMPED AT BIRTH. publish_training skips any session
- * carrying it, so a coach who plans tonight before the Director publishes a
- * template is never silently overwritten — their plan is theirs. `visibility`
+ * ⚠️ coach_edited_at IS STAMPED AT BIRTH. It marks the session as the coach's
+ * own: a suggestion never writes over it and a chip asks before replacing it
+ * (publish_training, which used to skip on this flag, was dropped 3 Sep 2026). `visibility`
  * defaults to 'staff' (the coach ruling, 27 Aug): a half-built plan is not
  * pushed at families the instant it is saved.
  */
@@ -436,7 +436,8 @@ export async function saveSquadTemplate({ clubId, teamId, name, notes = null, bl
 
 /**
  * A coach's adjustment. Replaces the blocks and STAMPS coach_edited_at — the
- * column publish_training reads to leave this session alone from now on.
+ * column that marks this session as the coach's own from now on (publish_training,
+ * which read it, was dropped 3 Sep 2026 — 20260903_drop_publish_training.sql).
  */
 export async function saveSessionBlocks(sessionId, blocks, notes, extras = {}) {
   const upd = await supabase
