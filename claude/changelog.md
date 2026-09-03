@@ -23,9 +23,18 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   History stays exactly one entry long across a swap. Test reproduces the swap
   and fails on the old `Sheet`. The button is renamed "Take attendance" (Jay).
 
+## 3 Sep 2026
+
+- **docs(plan): training plan status — SHIPPED IN FULL.** Verified after the
+  #661 release: the `training_suggestion_push` harness re-run live inside a
+  rolled-back transaction, 10/10; the served bundle carries `b780840` and the
+  "Show uptake" / "Training suggestions" strings; push-send v17 answers the
+  `training_suggestion_push` branch (403 without the secret, the branch is in
+  the deployed source). Plan and state-of-play closed out.
+
 ## 2 Sep 2026
 
-- **feat(training): THE COACHES ARE TOLD, AND THE DIRECTOR SEES THE UPTAKE.**
+- `b780840` — **feat(training): THE COACHES ARE TOLD, AND THE DIRECTOR SEES THE UPTAKE.**
   The two follow-ups Part 1 of
   `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md` left
   open. **Push:** `db/migrations/20260902_training_suggestion_push.sql` —
