@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { upsertById } from './upsertById.js'
 import { fetchByIds } from './limits.js'
+import { wrapDbError } from '../lib/dbError.js'
 
 // RCM match sheets — read and write. claude/plans/2026-08-11-match-sheets.md.
 //
@@ -116,7 +117,7 @@ export async function saveMatchSheet(sheet) {
   return upsertById('match_sheets', row, {
     embed: '*, league_team:league_teams(id, rcm_name, division)',
     refusedMessage: REFUSED,
-    mapError: (error) => new Error(error.message || REFUSED),
+    mapError: (error) => wrapDbError(error, REFUSED),
   })
 }
 
@@ -149,12 +150,12 @@ export async function saveMatchSheetSlots(matchSheetId, slots) {
     .from('match_sheet_slots')
     .delete()
     .eq('match_sheet_id', matchSheetId)
-  if (clearError) throw new Error(clearError.message || REFUSED)
+  if (clearError) throw wrapDbError(clearError, REFUSED)
 
   if (rows.length === 0) return []
 
   const { data, error } = await supabase.from('match_sheet_slots').insert(rows).select()
-  if (error) throw new Error(error.message || REFUSED)
+  if (error) throw wrapDbError(error, REFUSED)
   return data ?? []
 }
 
@@ -178,12 +179,12 @@ export async function saveMatchSheetCards(matchSheetId, cards) {
     .from('match_sheet_cards')
     .delete()
     .eq('match_sheet_id', matchSheetId)
-  if (clearError) throw new Error(clearError.message || REFUSED)
+  if (clearError) throw wrapDbError(clearError, REFUSED)
 
   if (rows.length === 0) return []
 
   const { data, error } = await supabase.from('match_sheet_cards').insert(rows).select()
-  if (error) throw new Error(error.message || REFUSED)
+  if (error) throw wrapDbError(error, REFUSED)
   return data ?? []
 }
 
@@ -207,7 +208,7 @@ export async function setMatchSheetStatus(id, status) {
     .select()
     .maybeSingle()
 
-  if (error) throw new Error(error.message || REFUSED)
+  if (error) throw wrapDbError(error, REFUSED)
   if (!data) throw new Error(REFUSED)
   return data
 }

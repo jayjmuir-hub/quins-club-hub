@@ -10,7 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
-- 🏅 **The tenth officer title: Club Captain** — Jay, 3 Sep 2026. The same
+- **fix(errors): THE DATA LAYER CARRIES THE DATABASE'S CODE ACROSS — the
+  data-layer half of the friendly-error sweep.** Item 2 of the 2 Sep UX
+  review converted the screens, but every `src/data/*.js` wrap was
+  `new Error(error.message || REFUSED)`: the database's words kept, its CODE
+  dropped, so `friendlyMessage()` read "no code" as app-written copy and
+  showed raw PostgREST text through the very mapper meant to stop it — and
+  the identifier fallback dodged the sweep, whose regex matched only a QUOTED
+  one. `src/lib/dbError.js` `wrapDbError(error, fallback)` is the one shape
+  now (message kept, code carried; the pattern `members.js` registerMyPlayer
+  already used), on fifteen sites across matchSheets, teams, trainingPlans,
+  leagueTeams and members. `tests/friendly-error-sweep.test.js` gains two
+  patterns with controls — `.message || IDENTIFIER` and
+  `set*Error(x.message)` — so neither shape comes back; the screen half of
+  the second pattern is the parallel `ux-errors` branch. `tests/db-error.test.js`
+  pins the round trip: raw PostgREST hidden, a hand-written 42501 refusal
+  shown, and the OLD shape leaking as the control.
+- `57c7604` — 🏅 **The tenth officer title: Club Captain** — Jay, 3 Sep 2026. The same
   route as the ninth: one migration widening the CHECK
   (`db/migrations/20260903_officer_title_club_captain.sql`; harness assert 7
   proves it accepted alongside the invented-title refusal), plus the matching
@@ -28,8 +44,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   History stays exactly one entry long across a swap. Test reproduces the swap
   and fails on the old `Sheet`. The button is renamed "Take attendance" (Jay).
 
-## 3 Sep 2026
-
 - `b711844` — **docs(plan): training plan status — SHIPPED IN FULL.** Verified after the
   #661 release: the `training_suggestion_push` harness re-run live inside a
   rolled-back transaction, 10/10; the served bundle carries `b780840` and the
@@ -39,7 +53,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ux): the player-import double tap, and the last raw errors on a screen.**
+- `06511e1` — **fix(ux): the player-import double tap, and the last raw errors on a screen.**
   Two of the 2 Sep 2026 review's extra findings. Player import: after the
   players-in-but-positions-failed case the sheet stays open to show the
   message, and Add stayed live while the roster refetched — a fast second tap
@@ -4848,7 +4862,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   opposite direction, chasing nobody.
 - `4424a9a` — the squash that added the unfinished-signup follow-up emails.
 
-
 - 📮 **NOBODY CHASED THE PEOPLE WHO SIGNED UP AND STOPPED. NOW SOMETHING DOES.**
   Jay asked *"will they be nudged again?"* and the honest answer was: only if
   they choose to come back. One email at 24 hours, one at seven days, then
@@ -4879,7 +4892,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   data rather than a broken predicate.
 - `cb6c2b9` — the squash that let a parent be approved by adding the child.
 
-
 - 🧩 **A PARENT WHOSE CHILD IS NOT ON THE ROSTER CAN NOW BE APPROVED — BY ADDING
   THE CHILD.** The tickbox built a parent row with `player_id` null, and the
   database refuses precisely that:
@@ -4904,7 +4916,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   squad as a PLAYER.
 - `e0340d2` — the squash that stopped the roll-call becoming a dead end.
 
-
 - 🚑 **THE ROLL-CALL BECAME A DEAD END, AND IT WAS SHIPPED AND CAUGHT THE SAME
   DAY.** Jay asked a question — *"will they be nudged again?"* — and the answer
   turned out to be no, when hours earlier it had been yes.
@@ -4924,7 +4935,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   files away, with no test in between. Two existing tests kept passing because
   their fixtures happened to omit a role.
 - `678ee8c` — the squash that put the squads on the first screen.
-
 
 - 🚪 **THE FIRST SCREEN NOW ASKS WHICH SQUADS, AND WRITES THE REQUEST IN THE SAME
   SUBMIT.** Jay: *"is there a way to force people to choose their requested
@@ -4959,7 +4969,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   drive it name their squads differently.
 - `4452849` — the squash that unblocked approvals and added the no-request badge.
 
-
 - 🐛 **AN ADMIN COULD NOT ADD A PLAYER WHO WAS NOT ON THE ROSTER YET.** Granting
   Player access with "they're not on the roster yet" answered with the raw
   database refusal — *null value in column "club_id" of relation "players"
@@ -4986,7 +4995,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   without a club, rather than showing an admin Postgres internals again.
 - `2a4049e` — the squash that added the email-confirmed badge.
 
-
 - 🏷️ **"HASN'T SAID WHAT THEY NEED" — THE ABSENCE OF THE "Asked" BADGE WAS
   CARRYING THE USEFUL FACT, AND WAS INVISIBLE.** Jay, 20 Aug 2026: *"I'm still
   getting approval requests with no indicating who they are or what they are
@@ -5010,7 +5018,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   That is right for the list and wrong for this label: without the guard a
   single dropped connection would tell an admin that every person in the queue
   had said nothing. Pinned by a test that rejects the read.
-
 
 - 🏷️ **THE "WAITING FOR ACCESS" LIST NOW SAYS WHETHER THE LOGIN WAS EVER
   CONFIRMED.** Two very different people land in that list and their cards were
@@ -5044,7 +5051,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   trigger exists, because the way this breaks is that it silently stops moving.
 - `407e5e4` — the squash that pointed the clone check at the main clone.
 
-
 - 🛡️ **THE CLONE CHECK NOW WATCHES THE MAIN CLONE TOO, WHICH IS THE ONE FOLDER
   IT COULD NEVER SEE.** Measured the same day: the main clone was **35 commits
   behind** while `scripts/session-guard.mjs` reported nothing wrong. Both were
@@ -5073,7 +5079,6 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   warning when it is behind AND dirty; and stays silent when run FROM the main
   clone, which is the false positive that would have made it noise.
 - `8344ab6` — the squash that changed the install banner to "Download the App".
-
 
 - ✏️ **THE INSTALL BANNER NOW SAYS "DOWNLOAD THE APP".** Jay, 20 Aug 2026 —
   parents look for a download, and the old heading ("Add Quins to your home

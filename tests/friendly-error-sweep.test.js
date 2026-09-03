@@ -12,6 +12,13 @@ import { join, relative } from 'node:path'
 // shapes that leak raw text:
 //   1. `<anything>.message || '…'` / `"…"` / `` `…` `` — the raw-with-fallback shape;
 //   2. `{<something named error>.message}` — a bare render with no fallback.
+//   3. `<anything>.message || IDENTIFIER` — the same raw-with-fallback shape
+//      with a CONSTANT as the fallback, which the quoted pattern let through
+//      (3 Sep 2026: the whole data layer was written this way, and because the
+//      wrap dropped the database's code, friendlyMessage() then trusted the
+//      raw text — src/lib/dbError.js is the fix, wrapDbError the shape);
+//   4. `setError(x.message)` / `setFooError(x.message)` — the raw message
+//      handed straight to state, no mapper, no fallback.
 // It does NOT fail on `.message` used as data (regex tests, template strings,
 // message maps): those are not shown as-is to a person, and the two patterns
 // above are exactly the ones that are.
@@ -28,6 +35,11 @@ const ROOT = join(process.cwd(), 'src')
 const RAW_WITH_FALLBACK = /\.message\s*\|\|\s*(['"`])(?!\1)/
 // A JSX expression, not a `${…}` template hole.
 const BARE_RENDER = /(?<!\$)\{\s*[\w$?.]*[eE]rror[\w$?.]*\.message\s*\}/
+// `x.message || SOME_CONSTANT` — an identifier fallback. `?? MAP[code]` and
+// `|| ''` are not this shape and are left alone.
+const RAW_WITH_IDENT = /\.message\s*\|\|\s*[A-Za-z_$][\w$]*/
+// `setError(err.message)` and every `set<Something>Error(err.message)`.
+const BARE_SET_STATE = /set[A-Za-z]*Error\(\s*[\w$?.]*\.message\s*\)/
 
 // The mapper is the one file allowed to spell the shape out.
 //
@@ -40,8 +52,14 @@ const BARE_RENDER = /(?<!\$)\{\s*[\w$?.]*[eE]rror[\w$?.]*\.message\s*\}/
 // follow-up the UX programme recorded: senior squads (#640) landed, the two
 // remaining `error.message ||` renders were converted, and RosterTable had
 // already gone through friendlyMessage. Only the helper itself is exempt now.
+// ⚠️ ErrorBoundary IS EXEMPT ON PURPOSE (3 Sep 2026). The crash screen is the
+// one place the raw message IS the point: it is the string Jay pastes into a
+// report and the same string Sentry receives, and friendlyMessage() would
+// replace a stack-derived message with "Something went wrong" — exactly the
+// information loss that screen exists to avoid.
 const ALLOW = new Set([
   'lib/friendlyError.js',
+  'components/ErrorBoundary.jsx',
 ])
 
 function walk(dir, out = []) {
@@ -56,13 +74,15 @@ function walk(dir, out = []) {
 function offenders(source, file) {
   const hits = []
   source.split('\n').forEach((line, index) => {
-    if (RAW_WITH_FALLBACK.test(line) || BARE_RENDER.test(line)) hits.push(`${file}:${index + 1}: ${line.trim()}`)
+    if (RAW_WITH_FALLBACK.test(line) || BARE_RENDER.test(line) || RAW_WITH_IDENT.test(line) || BARE_SET_STATE.test(line)) {
+      hits.push(`${file}:${index + 1}: ${line.trim()}`)
+    }
   })
   return hits
 }
 
 describe('raw error text never reaches the screen', () => {
-  it('finds no `.message || "…"` or bare `{error.message}` under src/', () => {
+  it('finds none of the four shapes under src/', () => {
     const hits = []
     for (const full of walk(ROOT)) {
       const file = relative(ROOT, full).replace(/\\/g, '/')
@@ -72,19 +92,26 @@ describe('raw error text never reaches the screen', () => {
     expect(hits, hits.join('\n')).toEqual([])
   })
 
-  it('control: would catch both shapes if they came back', () => {
+  it('control: would catch all four shapes if they came back', () => {
     const bad = [
       "      setError(err.message || 'Could not load.')",
       '          {error.message}',
       '          {saveError?.message}',
+      '  if (error) throw new Error(error.message || REFUSED)',
+      '    mapError: (error) => new Error(error.message || REFUSED_PERMISSION),',
+      '      setError(err.message)',
+      '      setHeadError(failure?.message)',
     ].join('\n')
-    expect(offenders(bad, 'x.jsx')).toHaveLength(3)
+    expect(offenders(bad, 'x.jsx')).toHaveLength(7)
     // And leaves data uses alone.
     const fine = [
       "    if (LAST_ADMIN.test(error.message || ''))",
       '          {ageCheck.message}',
       "            {contactError?.message ? ` (${contactError.message})` : ''}",
       "    const friendly = MESSAGES[error.code] ?? error.message ?? FALLBACK",
+      '  if (error) throw wrapDbError(error, REFUSED)',
+      "      setError(friendlyMessage(err, 'Could not load.'))",
+      "      setError(err.message || '')",
     ].join('\n')
     expect(offenders(fine, 'y.js')).toHaveLength(0)
   })

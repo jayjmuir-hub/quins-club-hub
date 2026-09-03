@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { totalMinutes } from '../lib/trainingPlans.js'
+import { wrapDbError } from '../lib/dbError.js'
 
 // Training plans — read and write. claude/specs/2026-08-21-training-plans-dashboard-design.md
 //
@@ -11,7 +12,7 @@ const REFUSED = "We couldn't save that — you may not have the Rugby Performanc
 const DRILL_EMBED = 'drill:drills(id,title,summary,body,source_name,source_url,diagram_url,minutes,category,requires_contact,min_age,max_age,is_active)'
 
 function must(data, error) {
-  if (error) throw new Error(error.message || REFUSED)
+  if (error) throw wrapDbError(error, REFUSED)
   if (!data) throw new Error(REFUSED)
   return data
 }
@@ -221,7 +222,7 @@ async function callPublish({ templateId, teamIds, from, to }, preview) {
     _to: to,
     _preview: preview,
   })
-  if (error) throw new Error(error.message || REFUSED)
+  if (error) throw wrapDbError(error, REFUSED)
   return data ?? []
 }
 
@@ -306,7 +307,7 @@ export async function decideSuggestion(suggestionId, accept, note = null) {
     _accept: Boolean(accept),
     _note: note ?? null,
   })
-  if (error) throw new Error(error.message || REFUSED)
+  if (error) throw wrapDbError(error, REFUSED)
   return data ?? null
 }
 

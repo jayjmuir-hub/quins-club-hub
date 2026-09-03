@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { fetchContacts, NO_CONTACT } from './contacts'
+import { wrapDbError } from '../lib/dbError.js'
 
 // Data access for the memberships table. Follows the throw-on-error convention
 // set by src/lib/supabase.js and src/lib/auth.jsx — callers get a thrown Error,
@@ -695,9 +696,7 @@ export async function approveMembership(membershipId) {
     // can only approve players for your own age groups." — so they are passed
     // through rather than replaced. Same reasoning as the 22004 case in
     // registerMyPlayer above.
-    const friendly = new Error(error.message || REFUSED_MEMBERSHIP_APPROVE)
-    friendly.code = error.code
-    throw friendly
+    throw wrapDbError(error, REFUSED_MEMBERSHIP_APPROVE)
   }
   if (!data) throw new Error(REFUSED_MEMBERSHIP_APPROVE)
   return data
