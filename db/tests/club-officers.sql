@@ -15,6 +15,8 @@
 --  6. Social Media Director — the ninth title, added by its own migration
 --     (20260826_officer_title_social_media.sql, inlined below) — is accepted:
 --     the closed-vocabulary design admitting a title the DESIGNED way
+--  7. Club Captain — the tenth (20260903_officer_title_club_captain.sql,
+--     inlined below) — likewise
 begin;
 
 create temporary table _log(seq serial, line text) on commit drop;
@@ -108,6 +110,20 @@ alter table public.club_officers
     'Club Secretary', 'Treasurer', 'Membership Secretary',
     'Director of Rugby', 'Rugby Performance Director',
     'Social Media Director'
+  ));
+
+-- ── and 20260903_officer_title_club_captain.sql, verbatim (begin/commit
+--    stripped) — the tenth title ─────────────────────────────────────────
+
+alter table public.club_officers
+  drop constraint club_officers_title_check;
+
+alter table public.club_officers
+  add constraint club_officers_title_check check (title in (
+    'Club President', 'Vice Chairman', 'Rugby Junior Manager',
+    'Club Secretary', 'Treasurer', 'Membership Secretary',
+    'Director of Rugby', 'Rugby Performance Director',
+    'Social Media Director', 'Club Captain'
   ));
 
 create or replace function public.member_identity(_profile uuid)
@@ -215,6 +231,17 @@ begin
   reset role;
   if n <> 1 then raise exception 'ASSERT 6 FAILED: Social Media Director rows = %, wanted 1', n; end if;
   insert into _log(line) values ('6 ninth title: Social Media Director accepted via its migration');
+
+  -- 7: the tenth title, same route
+  perform pg_temp.as_user(superad::text);
+  insert into club_officers (club_id, profile_id, title) values (clubid, officer, 'Club Captain');
+  reset role;
+  perform pg_temp.as_user(member1::text);
+  select count(*) into n from member_identity(officer) i
+   where i.role = 'officer' and i.title = 'Club Captain';
+  reset role;
+  if n <> 1 then raise exception 'ASSERT 7 FAILED: Club Captain rows = %, wanted 1', n; end if;
+  insert into _log(line) values ('7 tenth title: Club Captain accepted via its migration');
 end $fn$;
 
 select pg_temp.assert_club_officers();

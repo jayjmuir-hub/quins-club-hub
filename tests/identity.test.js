@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { identityBadges } from '../src/lib/identity.js'
+import { OFFICER_TITLES, identityBadges } from '../src/lib/identity.js'
 
 // The DM header's badge order (claude/plans/2026-08-26-dm-identity-rows.md):
 // super-admin first, then squad staff by age-group order wearing their REAL
@@ -93,6 +93,16 @@ describe('identityBadges', () => {
       { label: 'Club Secretary', tone: 'officer' },
       { label: 'ZZ Future Title', tone: 'officer' },
     ])
+  })
+
+  it('Club Captain is the tenth known title, ranked last so it sorts ahead of an unknown one', () => {
+    expect(OFFICER_TITLES[OFFICER_TITLES.length - 1]).toBe('Club Captain')
+    expect(OFFICER_TITLES).toHaveLength(10)
+    const badges = identityBadges([
+      row('officer', { title: 'ZZ Grand Vizier' }),
+      row('officer', { title: 'Club Captain' }),
+    ])
+    expect(badges.map((b) => b.label)).toEqual(['Club Captain', 'ZZ Grand Vizier'])
   })
 
   it('empty or missing rows mean no badges, never a throw', () => {

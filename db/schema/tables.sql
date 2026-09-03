@@ -2572,12 +2572,13 @@ CREATE TABLE public.club_officers (
   club_id uuid NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
   profile_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   -- ⚠️ CHECK REPLACED 26 Aug 2026 by 20260826_officer_title_social_media
-  -- (the ninth title) — APPLIED to production the same day, harness green.
+  -- (the ninth title) and again 3 Sep 2026 by
+  -- 20260903_officer_title_club_captain (the tenth).
   title text NOT NULL CHECK (title IN (
     'Club President', 'Vice Chairman', 'Rugby Junior Manager',
     'Club Secretary', 'Treasurer', 'Membership Secretary',
     'Director of Rugby', 'Rugby Performance Director',
-    'Social Media Director'
+    'Social Media Director', 'Club Captain'
   )),
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (club_id, profile_id, title)
