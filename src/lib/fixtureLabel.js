@@ -1,3 +1,5 @@
+import { divisionShort } from './division.js'
+
 // What to call a fixture: the SQUAD it was drawn from, or the LEAGUE TEAM that
 // actually played it.
 //
@@ -45,7 +47,10 @@ export function fixtureLabel(event, leagueTeam, squadName) {
   }
 
   const parts = [leagueTeam.rcm_name]
-  if (leagueTeam.division) parts.push(`Div ${leagueTeam.division}`)
+  // ⚠️ THE WORD FOR A DIVISION LIVES IN src/lib/division.js — "Div B" for a
+  // junior letter, "Premiership" for the senior men's top flight — so the
+  // calendar feed's copy has one table to match, not a template.
+  if (leagueTeam.division) parts.push(divisionShort(leagueTeam.division))
   if (event?.round != null) parts.push(`Round ${event.round}`)
 
   return parts.join(' · ')

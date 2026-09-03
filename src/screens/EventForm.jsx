@@ -69,6 +69,12 @@ const TIER_TBD = 'TBD'
 // before this line was added. A new call site that tests truthiness will drop
 // Round 0 silently and only for that one round.
 const LEAGUE_ROUNDS = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+// ⚠️ A SENIOR SQUAD GETS ONE TO EIGHTEEN (3 Sep 2026). The 2026–27 West Asia
+// Premiership is a double round-robin of eighteen rounds, Division 1 has
+// eleven and Division 2 nine; none of them numbers from nought. Chosen by
+// teams.is_senior, never by the squad's name — the same rule
+// uses_jersey_numbers follows. Juniors keep the list above untouched.
+const SENIOR_LEAGUE_ROUNDS = Array.from({ length: 18 }, (_, index) => index + 1)
 
 // ══ DURATION ══════════════════════════════════════════════════════════════
 //
@@ -135,6 +141,7 @@ const TOURNAMENTS = [
 const OTHER_TOURNAMENT = '__other_tournament__'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditTeam, isAdmin, visibleTeams } from '../lib/scope.js'
+import { divisionLong, divisionShort, divisionsFor } from '../lib/division.js'
 import {
   clubDateTimeInputs,
   clubToday,
@@ -929,6 +936,18 @@ export default function EventForm({
   // data as a side effect of somebody opening a sheet to change the kick-off
   // time, silently, with no undo.
   const minisSquad = isMinisTeam(editableTeams.find((team) => team.id === teamId)?.name)
+  // ⚠️ A COLUMN, NOT A NAME. Drives which rounds and which divisions the two
+  // league selects offer — eighteen rounds and the named senior competitions
+  // for a senior squad, nought to eight and the letters for a junior one.
+  const seniorSquad = editableTeams.find((team) => team.id === teamId)?.is_senior === true
+  const leagueRounds = seniorSquad ? SENIOR_LEAGUE_ROUNDS : LEAGUE_ROUNDS
+  // ⚠️ THE FIXTURE'S OWN TIER IS ALWAYS OFFERED, even when it is not on the
+  // list for this squad's kind — a select whose value is not among its options
+  // renders blank and would silently drop the tier on the next save.
+  const tierOptions = divisionsFor({ senior: seniorSquad }).some((d) => d.code === values.tier) ||
+    !values.tier || values.tier === TIER_TBD
+    ? divisionsFor({ senior: seniorSquad })
+    : [...divisionsFor({ senior: seniorSquad }), { code: values.tier, long: divisionLong(values.tier) }]
   const leagueApplies = !minisSquad
   const showLeagueTeam = leagueApplies || values.leagueTeamId !== ''
   const showTier = leagueApplies || values.tier !== ''
@@ -2347,7 +2366,7 @@ export default function EventForm({
                 {leagueTeamOptions.map((leagueTeam) => (
                   <option key={leagueTeam.id} value={leagueTeam.id}>
                     {leagueTeam.division
-                      ? `${leagueTeam.rcm_name} — Div ${leagueTeam.division}`
+                      ? `${leagueTeam.rcm_name} — ${divisionShort(leagueTeam.division)}`
                       : leagueTeam.rcm_name}
                   </option>
                 ))}
@@ -2391,9 +2410,13 @@ export default function EventForm({
                     division is not chosen yet. Stored literally ('TBD') in the
                     tier column; the migration widened events_tier_check. */}
                 <option value={TIER_TBD}>TBD — not decided yet</option>
-                <option value="A">A</option>
-                <option value="B">B</option>
-                <option value="C">C</option>
+                {/* Letters for a junior squad, the named senior competitions
+                    for a senior one — src/lib/division.js, by is_senior. */}
+                {tierOptions.map((division) => (
+                  <option key={division.code} value={division.code}>
+                    {division.long}
+                  </option>
+                ))}
               </select>
             </div>
             )}
@@ -2493,7 +2516,7 @@ export default function EventForm({
                       `Pitch TBD`. No new state and no migration: an unknown
                       round has always been a null round. */}
                   <option value="">TBD — not known yet</option>
-                  {LEAGUE_ROUNDS.map((round) => (
+                  {leagueRounds.map((round) => (
                     <option key={round} value={String(round)}>
                       Round {round}
                     </option>

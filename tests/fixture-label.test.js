@@ -24,6 +24,17 @@ describe('fixtureLabel', () => {
     expect(fixtureLabel({ round: 9 }, undefined, 'U16G Contact')).toBe('U16G Contact')
   })
 
+  it('names a senior division rather than lettering it (3 Sep 2026)', () => {
+    // The men's 1st XV plays the West Asia Premiership, stored as the code
+    // 'WAP'. "Div WAP" is what the old template would have said.
+    expect(fixtureLabel({ round: 12 }, { rcm_name: 'ADH', division: 'WAP' }, 'Senior Men')).toBe(
+      'ADH · Premiership · Round 12',
+    )
+    expect(fixtureLabel({ round: 2 }, { rcm_name: 'ADH', division: 'WXV' }, 'Senior Women')).toBe(
+      'ADH · WXVs · Round 2',
+    )
+  })
+
   it('renders team, division and round for a league match', () => {
     expect(
       fixtureLabel({ round: 4 }, { rcm_name: 'ADHQ2', division: 'B' }, 'U14B Contact'),
