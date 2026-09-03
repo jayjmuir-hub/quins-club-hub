@@ -133,12 +133,31 @@ function isCommit(sha) {
   }
 }
 
+// ⚠️ TWO WAYS TO CITE A COMMIT, since 3 Sep 2026. `- \`sha\` — …` is the
+// original. `- #123 — …` cites the pull request instead, and covers whichever
+// commit's subject ends in "(#123)" — the squash `main` produces. The number
+// is known the moment `gh pr create` returns, BEFORE the merge, so the entry
+// can be finished inside the same pull request instead of by the next one.
+// On 3 Sep 2026 the SHA route cost a red docs-check on roughly half the day's
+// pull requests, every time for the same reason: the squash did not exist
+// yet, or the previous entry had been written in a shape a script could not
+// find to prefix. A PR number is stable from the start and never needs
+// prefixing later.
+const PR_REF = /^-\s+#(\d+)\s+[—-]/
+const SUBJECT_PR = /\(#(\d+)\)\s*$/
+
 function checkChangelog() {
   if (!existsSync(join(ROOT, CHANGELOG))) return
   const text = readFileSync(join(ROOT, CHANGELOG), 'utf8')
   const listed = new Set()
+  const listedPrs = new Set()
 
   text.split('\n').forEach((line, i) => {
+    const pr = line.match(PR_REF)
+    if (pr) {
+      listedPrs.add(pr[1])
+      return
+    }
     const m = line.match(/^-\s+`([0-9a-f]{7,40})`/)
     if (!m) return
     const sha = m[1]
@@ -167,10 +186,15 @@ function checkChangelog() {
     return
   }
   for (const sha of range.split('\n').filter(Boolean)) {
-    if (!listed.has(sha)) {
-      const subject = execSync(`git log --format=%s -1 ${sha}`, { encoding: 'utf8' }).trim()
-      fail(CHANGELOG, 0, `commit missing from changelog: ${sha} ${subject}`)
-    }
+    if (listed.has(sha)) continue
+    const subject = execSync(`git log --format=%s -1 ${sha}`, { encoding: 'utf8' }).trim()
+    const pr = subject.match(SUBJECT_PR)
+    if (pr && listedPrs.has(pr[1])) continue
+    fail(
+      CHANGELOG, 0,
+      `commit missing from changelog: ${sha} ${subject}` +
+        (pr ? ` — cite it as "- #${pr[1]} — …" (or the squash SHA)` : ''),
+    )
   }
 }
 

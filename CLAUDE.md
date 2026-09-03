@@ -427,6 +427,16 @@ by whoever remembered:
    A line saying `(project)` is exempt — some docs deliberately live in the
    Claude project because this repo is public.
 2. **Every changelog SHA is a real commit, and no commit is missing.**
+   ✅ **CITE THE PULL REQUEST NUMBER, NOT THE SHA — since 3 Sep 2026 (#676).**
+   `- #123 — **title.**` covers the commit whose subject ends in `(#123)`,
+   which is what `main`'s squash produces. The number exists the moment
+   `gh pr create` returns, so the entry is finished inside its own pull
+   request: commit, push, open the PR, then add the entry citing it in a
+   second commit. Nothing below about "the next pull request cites the
+   squash" applies to an entry written this way; it stays true for the SHA
+   route, which still works. On 3 Sep the SHA route went red in CI on about
+   half the day's pull requests, for the reasons the paragraphs below
+   describe — the number route has none of them.
    ⚠️ **The changelog may be exactly one commit behind** — a commit cannot
    cite its own SHA — so the next commit must catch it up.
    ⚠️ **RUN IT AFTER THE COMMIT, NOT ONLY AFTER `git add` — the line below

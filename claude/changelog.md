@@ -10,6 +10,16 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #676 — **chore(docs-check): a changelog entry may cite its pull request
+  number.** `- #123 — …` covers the commit whose subject ends in "(#123)",
+  the squash `main` produces; the number is known at `gh pr create`, before
+  the merge, so an entry is finished inside its own pull request instead of
+  by the next one. The SHA route still works. Why: the citation rule went
+  red in CI on roughly half of 3 Sep's pull requests, every time because the
+  squash did not exist yet or the previous entry was in a shape a script
+  could not find to prefix. Proven by injection: by-number passes, none
+  fails and names both routes, a wrong number fails. This entry and the one
+  below are the first two written the new way.
 - `c0d28df` — 🪑 **Channel seats and a Committee channel.** Jay, 3 Sep 2026
   (`claude/plans/2026-09-03-channel-seats-and-committee.md`, both parts).
   `db/migrations/20260904_channel_seats_and_committee.sql`: a sixth role
@@ -29,7 +39,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   against production via the MCP): nine asserts green, each with its
   control; afterwards no seat tables, no probe rows.
   ⚠️ **Applied to production only on Jay's yes; the changelog says when.**
-- **fix(forms): A MIS-TAP OUTSIDE A SHEET NO LONGER THROWS THE TYPING AWAY —
+- #674 — **fix(forms): A MIS-TAP OUTSIDE A SHEET NO LONGER THROWS THE TYPING AWAY —
   every sheet with a form in it now asks "Discard your changes?"** Jay, 3 Sep
   2026: "if I mis-click outside the event box while adding something it
   just disappears and I have to start all over." The event form got this in
