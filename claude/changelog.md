@@ -25,7 +25,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
-- **docs(plan): training plan status — SHIPPED IN FULL.** Verified after the
+- `b711844` — **docs(plan): training plan status — SHIPPED IN FULL.** Verified after the
   #661 release: the `training_suggestion_push` harness re-run live inside a
   rolled-back transaction, 10/10; the served bundle carries `b780840` and the
   "Show uptake" / "Training suggestions" strings; push-send v17 answers the
