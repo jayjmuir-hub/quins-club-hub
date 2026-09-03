@@ -816,7 +816,7 @@ export default function EventDetail({
         <div className="mt-4">
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Register</h4>
           <Button variant="secondary" full onClick={() => onOpenRegister(event)}>
-            Take the register
+            Take attendance
           </Button>
         </div>
       )}

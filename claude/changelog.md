@@ -8,9 +8,24 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 3 Sep 2026
+
+- **fix(ui): "Take attendance" opens the register instead of bouncing back to
+  the event.** Reported by an age-group manager on the U18B Tuesday session and
+  reproduced by Jay as admin, so not a rights problem. Since `cc550dc` (#652,
+  Back closes the sheet) a sheet pops its own history entry in its effect
+  cleanup. "Take the register" and "Availability" close the event sheet and
+  open a second sheet in the SAME commit, so that `back()` was queued before
+  the new sheet pushed its entry, popped the NEW entry, and the register's
+  popstate handler closed it the instant it opened. `Sheet` now offers the
+  entry to whichever sheet mounts in the same commit — the newcomer adopts it
+  with `replaceState` — and pops only if nobody takes it, one microtask later.
+  History stays exactly one entry long across a swap. Test reproduces the swap
+  and fails on the old `Sheet`. The button is renamed "Take attendance" (Jay).
+
 ## 2 Sep 2026
 
-- **fix(ux): the last Low batch from the full review.** Share on the team
+- `ab54bc4` — **fix(ux): the last Low batch from the full review.** Share on the team
   sheet and the match sheet now says what happened — "Downloaded — the
   picture is in your Downloads folder." on a desktop, "Share cancelled.
   Nothing was sent." on a dismissed sheet — through `src/lib/shareOutcome.js`
