@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #681 — **feat(signup): A PLAYER WHOSE PARENT ALREADY REGISTERED THEM CLAIMS
+  THAT ROW.** Jay, 3 Sep: "look at the signup wizard so players don't do this
+  again". The wizard was not the fault — all six U16B intents were correct.
+  `private.apply_signup_intent` SKIPPED a same-name row as a duplicate, each
+  boy landed with no access, and the in-app form's only door past the same
+  refusal was "this is a different player". Now:
+  `public.claim_existing_player(name, squad, self)` points a PENDING
+  membership at the existing row (player if self or senior, else parent plus
+  a parent row), the intent applier claims instead of skipping, and
+  `PlayerRegistrationForm` leads with "That's me / That's my child — connect
+  me" and offers "I am the player" on the own-name refusal. A coach still
+  approves. `db/tests/claim-existing-player.sql` 9/9 rolled back against
+  production. Migration applied on Jay's yes; `claude/schema-history.md`.
 - #680 — 🔕 **The app closes its tray notifications when it comes to the
   front.** Jay, 3 Sep 2026: "30 notifications on my app icon, i open it
   and there is nothing for me to check". The database said zero unread for

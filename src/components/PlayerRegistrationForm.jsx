@@ -5,7 +5,7 @@ import DatePicker from './DatePicker.jsx'
 import Segmented from './Segmented.jsx'
 import { GENDERS, genderRequiredMessage, squadRequiresGender } from '../lib/gender.js'
 import { MISMATCH, PLAY_UP, ageGradeCheck } from '../lib/ageGrade.js'
-import { registerMyPlayer, updateProfileNames } from '../data/members.js'
+import { claimExistingPlayer, registerMyPlayer, updateProfileNames } from '../data/members.js'
 import { setPlayerDob } from '../data/players.js'
 import useMyProfile, { primeMyProfileCache } from '../lib/useMyProfile.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
@@ -253,7 +253,7 @@ function partitionTeamsForRow(teams, seniorFirst) {
  * row goes back to "Player's first name", and the "Who are you registering?"
  * control immediately above it is what says the player is them.
  */
-function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange, onRemove }) {
+function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange, onRemove, onClaim, onBecomePlayer }) {
   const selfNamed = row.selfRegister && !askingOwnName
   // ⚠️ THE ROW'S OWN COPY OF "WHO", used wherever the field would otherwise
   // say "your child" — never `selfNamed`, which also depends on
@@ -402,6 +402,32 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
           The message itself is in the alert above the list — it names the
           squad and gives the correct action — so this is just the way past it
           for the case where the person really does know better. */}
+      {/* ⚠️ THE OBVIOUS ANSWER FIRST (4 Sep 2026). A name already on the
+          roster almost always means "that's me" or "that's my child" — six
+          U16B boys took the "different player" tick in one evening because
+          it was the only door. Connect-me makes a PENDING membership on the
+          existing row; the tick stays for the rare true case, below it. */}
+      {row.needsConfirm === 'duplicate' && onClaim && (
+        <div className="mt-2 rounded-[11px] bg-surface-mute px-3 py-2.5">
+          <p className="text-[12.5px] leading-relaxed text-ink">
+            {row.selfRegister
+              ? 'If that is you, you are already on the roster — connect your account to it.'
+              : 'If that is your child, they are already on the roster — connect your account to them.'}
+          </p>
+          <Button type="button" full disabled={disabled} onClick={onClaim} data-testid={`claim-existing-${row.key}`} className="mt-2">
+            {row.selfRegister ? "That's me — connect me" : "That's my child — connect me"}
+          </Button>
+        </div>
+      )}
+      {/* "That is your own name" and the squad lets players register
+          themselves: the likeliest truth is that they ARE the player. One
+          press flips the answer; the tick below remains for the parent who
+          really does share a name with their child. */}
+      {row.needsConfirm === 'selfName' && canSelfRegister && !row.selfRegister && onBecomePlayer && (
+        <Button type="button" full disabled={disabled} onClick={onBecomePlayer} data-testid={`become-player-${row.key}`} className="mt-2">
+          I am the player — register me, not a child
+        </Button>
+      )}
       {row.needsConfirm && (
         <label className="mt-2 flex items-start gap-2 rounded-[11px] bg-danger-bg px-3 py-2.5 text-[12.5px] font-semibold leading-relaxed text-danger-ink">
           <input
@@ -679,6 +705,43 @@ export default function PlayerRegistrationForm({
 
   function updateRow(key, patch) {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)))
+  }
+
+  /**
+   * "That's me / that's my child — connect me": the row's name is already on
+   * the squad's roster, so attach this account to that row instead of adding
+   * a second one. On success the row is gone from the list like a saved one,
+   * and when nothing is left the caller reloads exactly as after a save.
+   */
+  async function claimRow(row) {
+    const team = sortedTeams.find((candidate) => candidate.id === row.teamId)
+    const name = joinName(row)
+    setError(null)
+    setSubmitting(true)
+    try {
+      const canSelfRegister = team?.self_registration_allowed === true
+      const created = await claimExistingPlayer(name, row.teamId, canSelfRegister && row.selfRegister)
+      if (created?.player_id && row.dob) {
+        try {
+          await setPlayerDob(created.player_id, row.dob, {
+            playsUp:
+              row.playUpConsent === true &&
+              ageGradeCheck(team?.name, row.dob).status === PLAY_UP,
+          })
+        } catch {
+          // Same reasoning as the save path: the connection is made, a coach
+          // can add the date.
+        }
+      }
+      const remaining = rows.filter((candidate) => candidate.key !== row.key)
+      setSaved((current) => [...current, name])
+      setRows(remaining)
+      setSubmitting(false)
+      if (remaining.length === 0) await onDone?.()
+    } catch (err) {
+      setError(friendlyMessage(err, "We couldn't connect you to that player. Try again in a moment."))
+      setSubmitting(false)
+    }
   }
 
   function removeRow(key) {
@@ -1044,6 +1107,8 @@ export default function PlayerRegistrationForm({
             disabled={submitting}
             askingOwnName={needsName}
             onChange={(patch) => updateRow(row.key, patch)}
+            onClaim={collectOnly ? null : () => claimRow(row)}
+            onBecomePlayer={() => updateRow(row.key, { selfRegister: true, needsConfirm: null, confirmSelfName: false })}
             onRemove={() => removeRow(row.key)}
           />
         ))}
