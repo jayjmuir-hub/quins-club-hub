@@ -1,6 +1,12 @@
 # Standings and results: league tables from three routes into one table
 
-**Status: NOT SHIPPED — spec only, no code written.** Dated 2026-09-02.
+**Status: STEP 1 AND THE SEASON IMPORT BUILT, #684, 3 Sep 2026** — competitions,
+sides, fixtures, results with a supersedes chain, the standings function, the
+sheet trigger, division setup, route 1 (type it) and the grid import
+(`db/migrations/20260905_competitions_and_standings.sql`, `src/lib/rcmGrid.js`,
+`src/screens/Standings.jsx`, `src/screens/AdminCompetitions.jsx`). Routes 2 and 3,
+the keeper UI and the Monday nudge are NOT built. Keepers are a join table rather
+than a scoped admin right — see the migration header. Dated 2026-09-02.
 
 Piece 4 of the senior-squads work, split out of
 `claude/plans/2026-09-02-senior-squads.md` because it applies to every age
