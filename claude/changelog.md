@@ -36,6 +36,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the second pattern is the parallel `ux-errors` branch. `tests/db-error.test.js`
   pins the round trip: raw PostgREST hidden, a hand-written 42501 refusal
   shown, and the OLD shape leaking as the control.
+- **docs(plan): channel seats and a Committee channel.**
+  `claude/plans/2026-09-03-channel-seats-and-committee.md` — Jay, 3 Sep 2026:
+  role-channel membership stays derived, but a super may SEAT a person in a
+  channel with a reason (audited, additive, never an exclusion), and a sixth
+  channel, Committee, is derived from `club_officers` — titles only, supers
+  not implied. Plan only; nothing built.
 - `57c7604` — 🏅 **The tenth officer title: Club Captain** — Jay, 3 Sep 2026. The same
   route as the ninth: one migration widening the CHECK
   (`db/migrations/20260903_officer_title_club_captain.sql`; harness assert 7
@@ -63,7 +69,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
-- **fix(ux): the small untaken items from the review's extra findings.**
+- `509ecbe` — **fix(ux): the small untaken items from the review's extra findings.**
   Seven, each measured or tested: (1) the shell's loading state holds 60vh so
   a cold refresh no longer steps through three heights; (2) closed portal
   cards sit on `surface-sunk` instead of 70% opacity — muted ink at 70% over a
