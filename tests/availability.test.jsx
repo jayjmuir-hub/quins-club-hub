@@ -96,6 +96,20 @@ function setup(props = {}) {
   return { user, ...utils }
 }
 
+describe('Availability — the row being saved says so', () => {
+  it('shows Saving… on the tapped row while the write is in flight, and nowhere else', async () => {
+    listPlayersMock.mockResolvedValue([PLAYER_TOM, PLAYER_ANA])
+    listAvailabilityMock.mockResolvedValue([])
+    setAvailabilityMock.mockReturnValue(new Promise(() => {}))
+    const { user } = setup()
+    const rows = await screen.findAllByRole('listitem')
+    await user.click(within(rows[0]).getByRole('button', { name: /^in$/i }))
+    // 2 Sep 2026 UX review, extra findings: a greyed button alone did not read as saving.
+    expect(within(rows[0]).getByTestId('row-saving')).toHaveTextContent('Saving…')
+    expect(within(rows[1]).queryByTestId('row-saving')).toBeNull()
+  })
+})
+
 describe('Availability — loading/empty/error', () => {
   it('shows a spinner on first load', () => {
     listPlayersMock.mockReturnValue(new Promise(() => {}))

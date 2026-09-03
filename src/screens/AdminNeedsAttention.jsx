@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
-import Spinner from '../components/Spinner.jsx'
+import { ListSkeleton } from '../components/Skeleton.jsx'
 import { listPlayers, listPlayerPrivatePresence } from '../data/players.js'
 import { listParentsForPlayers } from '../data/parents.js'
 import { missingForPlayer } from '../lib/completeness.js'
@@ -200,7 +200,7 @@ export default function AdminNeedsAttention() {
     )
   }
 
-  if (!squads) return <Spinner />
+  if (!squads) return <ListSkeleton rows={4} />
 
   const players = squads.reduce((n, squad) => n + squad.players.length, 0)
 

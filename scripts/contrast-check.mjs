@@ -77,6 +77,7 @@ const PAIRS = [
   [T.inkMuted, T.surface, 'labels on page', 4.5],
   [T.inkMuted, T.surfaceCard, 'labels on card', 4.5],
   [T.inkMuted, T.surfaceMute, 'Chip/Badge neutral text', 4.5],
+  [T.inkMuted, T.surfaceSunk, 'closed portal card (PortalChooser)', 4.5],
   [T.inkFaint, T.surfaceCard, 'secondary row text on card', 4.5],
   [T.inkFaint, T.surface, 'secondary text on page', 4.5],
   [T.brandInk, T.surfaceCard, 'red text/links on card', 4.5],

@@ -144,6 +144,20 @@ export default function ChatBubble({
       data-mine={mine ? 'true' : 'false'}
       id={id}
     >
+      {/* ⚠️ A REAL CHECKBOX WHILE SELECTING (2 Sep 2026 UX review, extra
+          findings): the bubble's own onClick is the tap route; this is the
+          keyboard and screen-reader one. Not role="button" on the bubble —
+          it holds the message menu, and a button inside a button is invalid. */}
+      {onSelect && (
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onSelect}
+          aria-label="Select message"
+          className="h-5 w-5 shrink-0 self-center accent-brand"
+          data-testid="select-message"
+        />
+      )}
       {mine && canReact && !hideTrigger && (
         <ReactionTrigger messageId={messageId} reactions={tallies} selfId={selfId} onToggle={onReact} align="right" />
       )}

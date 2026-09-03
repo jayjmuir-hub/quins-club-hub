@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
-import Spinner from '../components/Spinner.jsx'
+import { ListSkeleton } from '../components/Skeleton.jsx'
 import { listClubMembers } from '../data/members.js'
 import { addClubOfficer, listClubOfficers, removeClubOfficer } from '../data/officers.js'
 import { OFFICER_TITLES } from '../lib/identity.js'
@@ -126,7 +126,7 @@ export default function AdminOfficers() {
       )}
 
       {officers === null && !error ? (
-        <Spinner />
+        <ListSkeleton rows={4} />
       ) : (
         <Card className="overflow-hidden">
           {OFFICER_TITLES.map((title) => {

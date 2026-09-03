@@ -134,7 +134,11 @@ export default function PortalChooser() {
             key={portal.key}
             data-testid="portal-card-closed"
             data-reason={reason}
-            className="p-5 opacity-70"
+            // ⚠️ bg-surface-sunk, NOT opacity-70 (2 Sep 2026 UX review): the
+            // faded card put muted ink at 3.39:1, under the 4.5 floor. The sunk
+            // surface reads as closed and measures 5.64:1 — the pair is in
+            // scripts/contrast-check.mjs so it cannot drift back.
+            className="bg-surface-sunk p-5"
           >
             <h3 className="text-[17px] font-extrabold tracking-[-0.2px] text-ink-muted">{label}</h3>
             <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">{CLOSED_COPY[reason]}</p>

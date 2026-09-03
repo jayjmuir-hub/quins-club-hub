@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { mainWidthClass } from '../lib/screenWidth.js'
 import useOnline from '../lib/useOnline.js'
+import useAppUpdated from '../lib/useAppUpdated.js'
 import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import FloatingChatDock from './FloatingChatDock.jsx'
@@ -98,7 +99,11 @@ function SignOutControl({ signOut, className = '' }) {
 
 function LoadingState({ slow = false, reload }) {
   return (
-    <div role="status" className="flex flex-1 items-center justify-center py-20">
+    // min-h-[60vh] (2 Sep 2026 UX review, extra findings): a cold refresh used
+    // to step through three heights — RequireAuth's full screen, this py-20
+    // block, then the skeleton. Holding most of the viewport here removes the
+    // middle jump.
+    <div role="status" className="flex min-h-[60vh] flex-1 items-center justify-center py-20">
       <div className="text-center">
         <p className="text-sm font-semibold uppercase tracking-widest text-ink-faint">Loading…</p>
         {/* An honest word when a load is riding out a slow moment, rather than a
@@ -291,6 +296,7 @@ export default function AppShell({ children }) {
   // membership set is known, so a pending parent is never shown a dot for a
   // chat they cannot open.
   const online = useOnline()
+  const appUpdated = useAppUpdated()
   const dockBadges = useDockBadges({ userId: user?.id ?? null, admin: isAdmin(memberships), enabled: ready })
   const currentRoleLabel = roleLabel(memberships)
   // The KEY, for the Badge tone — the same design-system role tag the
@@ -760,6 +766,22 @@ export default function AppShell({ children }) {
         <InstallPrompt />
         {/* 2 Sep 2026 UX review (parents, Medium): the service worker serves
             what it last loaded, and nothing said so. src/lib/useOnline.js. */}
+        {appUpdated && (
+          <p
+            role="status"
+            data-testid="updated-banner"
+            className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-surface-mute px-3 py-2 text-[13px] font-semibold text-ink"
+          >
+            <span>The app has updated — refresh when convenient.</span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="min-h-[44px] px-2 font-bold text-brand-ink"
+            >
+              Refresh now
+            </button>
+          </p>
+        )}
         {!online && (
           <p
             role="status"
