@@ -47,7 +47,7 @@ describe('AdminOfficers', () => {
     expect(m.listClubOfficers).not.toHaveBeenCalled()
   })
 
-  it('renders all eight titles in dignity order, holders under theirs', async () => {
+  it('renders every title in dignity order, holders under theirs', async () => {
     render(<AdminOfficers />)
     const blocks = await screen.findAllByTestId('officer-title')
     expect(blocks.map((b) => b.querySelector('h4').textContent)).toEqual(OFFICER_TITLES)

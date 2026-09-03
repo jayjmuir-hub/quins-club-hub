@@ -10,6 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- 🏅 **The tenth officer title: Club Captain** — Jay, 3 Sep 2026. The same
+  route as the ninth: one migration widening the CHECK
+  (`db/migrations/20260903_officer_title_club_captain.sql`; harness assert 7
+  proves it accepted alongside the invented-title refusal), plus the matching
+  `OFFICER_TITLES` entry so it renders last in the dignity order.
 - `6639963` — **fix(ui): "Take attendance" opens the register instead of bouncing back to
   the event.** Reported by an age-group manager on the U18B Tuesday session and
   reproduced by Jay as admin, so not a rights problem. Since `cc550dc` (#652,
@@ -25,7 +30,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
-- **docs(plan): training plan status — SHIPPED IN FULL.** Verified after the
+- `b711844` — **docs(plan): training plan status — SHIPPED IN FULL.** Verified after the
   #661 release: the `training_suggestion_push` harness re-run live inside a
   rolled-back transaction, 10/10; the served bundle carries `b780840` and the
   "Show uptake" / "Training suggestions" strings; push-send v17 answers the
