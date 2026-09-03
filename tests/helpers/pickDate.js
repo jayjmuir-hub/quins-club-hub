@@ -13,7 +13,9 @@ async function fillOpen(user, iso) {
   const cal = screen.getByTestId('date-picker-calendar')
   await user.selectOptions(within(cal).getByLabelText('Year'), String(year))
   await user.selectOptions(within(cal).getByLabelText('Month'), String(month - 1)) // 0-based value
-  await user.click(within(cal).getByRole('button', { name: iso })) // pick the day; closes
+  // ⚠️ BY data-date, NOT BY NAME: since 2 Sep 2026 a day's accessible name is
+  // the spoken date ("Thursday 17 September 2026"); the ISO string is data-date.
+  await user.click(cal.querySelector(`[data-date="${iso}"]`)) // pick the day; closes
 }
 
 /** Open by the field's accessible name (its <label>). `label` may be a regex. */

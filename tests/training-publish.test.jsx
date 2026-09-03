@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { pickDate } from './helpers/pickDate.js'
 import { MemoryRouter } from 'react-router-dom'
 
 // The Publish tab of the Rugby Performance Director portal.
@@ -135,21 +136,15 @@ function renderPublish(rows = admin()) {
   return { user }
 }
 
-/**
- * ⚠️ `fireEvent.change` FOR A DATE BOX, NOT `user.type`. jsdom's date input
- * takes a whole ISO value; typing into it character by character produces
- * intermediate values that are not dates and the box discards them.
- */
-function setDate(label, value) {
-  fireEvent.change(screen.getByLabelText(label), { target: { value } })
-}
+/** The app's own DatePicker (the native date box went on 2 Sep 2026). */
+const setDate = (user, label, value) => pickDate(user, value, label)
 
 /** Choose the template, tick U14B, and pin both ends of the range. */
 async function pickTheContactHour(user) {
   await user.selectOptions(await screen.findByLabelText('Template'), CONTACT_HOUR.id)
   await user.click(screen.getByRole('checkbox', { name: /U14B/ }))
-  setDate('From', '2026-09-01')
-  setDate('To', '2026-09-29')
+  await setDate(user, 'From', '2026-09-01')
+  await setDate(user, 'To', '2026-09-29')
 }
 
 const ARGS = {
@@ -277,7 +272,7 @@ describe('TrainingPublish', () => {
     // ⚠️ AND IT GOES AWAY AGAIN. The rows on screen describe the OLD range, so
     // a Publish button surviving a date change would be offering to do
     // something nobody has been shown.
-    setDate('To', '2026-10-31')
+    await setDate(user, 'To', '2026-10-31')
     expect(screen.queryByRole('button', { name: /publish to/i })).toBeNull()
     expect(screen.queryByTestId('preview-t-u14b')).toBeNull()
     expect(publishMock).not.toHaveBeenCalled()
@@ -311,8 +306,8 @@ describe('TrainingPublish', () => {
     expect(tagSquad).toBeDisabled()
     expect(screen.getByText('Contact template; this squad is tag')).toBeInTheDocument()
 
-    setDate('From', '2026-09-01')
-    setDate('To', '2026-09-29')
+    await setDate(user, 'From', '2026-09-01')
+    await setDate(user, 'To', '2026-09-29')
     await user.click(screen.getByRole('button', { name: 'Preview' }))
 
     // One squad, and it is the one that still fits.
@@ -343,8 +338,8 @@ describe('TrainingPublish', () => {
     await user.click(screen.getByRole('checkbox', { name: /U14B/ }))
     await user.click(screen.getByRole('checkbox', { name: /U12 Mixed/ }))
 
-    setDate('From', '2026-09-01')
-    setDate('To', '2026-09-29')
+    await setDate(user, 'From', '2026-09-01')
+    await setDate(user, 'To', '2026-09-29')
     await user.click(screen.getByRole('button', { name: 'Preview' }))
 
     await waitFor(() =>
@@ -372,8 +367,8 @@ describe('TrainingPublish', () => {
     await user.selectOptions(await screen.findByLabelText('Template'), TAG_HOUR.id)
     await user.click(screen.getByRole('checkbox', { name: /U12 Mixed/ }))
     await user.click(screen.getByRole('checkbox', { name: /U14B/ }))
-    setDate('From', '2026-09-01')
-    setDate('To', '2026-09-29')
+    await setDate(user, 'From', '2026-09-01')
+    await setDate(user, 'To', '2026-09-29')
 
     await user.click(screen.getByRole('button', { name: 'Preview' }))
     expect(await screen.findByTestId('preview-t-u12m')).toHaveTextContent(
@@ -412,8 +407,8 @@ describe('TrainingPublish', () => {
     await user.click(screen.getByRole('button', { name: 'Add a focus' }))
     await user.selectOptions(screen.getByLabelText('Focus squad'), 't-u14b')
     await user.type(screen.getByLabelText('Focus title'), 'Scrum block')
-    setDate('Focus starts', '2026-09-01')
-    setDate('Focus ends', '2026-09-28')
+    await setDate(user, 'Starts', '2026-09-01')
+    await setDate(user, 'Ends', '2026-09-28')
 
     await user.click(screen.getByRole('button', { name: 'Save focus' }))
 
@@ -440,7 +435,7 @@ describe('TrainingPublish', () => {
     await user.click(screen.getByRole('button', { name: 'Add a focus' }))
     await user.selectOptions(screen.getByLabelText('Focus squad'), 't-u14b')
     await user.type(screen.getByLabelText('Focus title'), 'Scrum block')
-    setDate('Focus starts', '2026-09-01')
+    await setDate(user, 'Starts', '2026-09-01')
 
     expect(screen.getByRole('button', { name: 'Save focus' })).toBeDisabled()
     expect(upsertFocusMock).not.toHaveBeenCalled()
@@ -453,8 +448,8 @@ describe('TrainingPublish', () => {
     await user.click(screen.getByRole('button', { name: 'Add a focus' }))
     await user.selectOptions(screen.getByLabelText('Focus squad'), 't-u14b')
     await user.type(screen.getByLabelText('Focus title'), 'Scrum block')
-    setDate('Focus starts', '2026-09-28')
-    setDate('Focus ends', '2026-09-01')
+    await setDate(user, 'Starts', '2026-09-28')
+    await setDate(user, 'Ends', '2026-09-01')
 
     expect(await screen.findByText("Ends can't be before it starts")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save focus' })).toBeDisabled()

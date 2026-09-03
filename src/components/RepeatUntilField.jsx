@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { monthGrid, sameDay, shiftMonth } from '../lib/calendarGrid.js'
+import { spokenDate } from './DatePicker.jsx'
 
 // "How long does the repeat run?" — the control that replaced the native
 // `<input type="date">` for "Repeat until" on 29 Aug 2026.
@@ -198,7 +199,9 @@ export default function RepeatUntilField({ startDate, value, onChange }) {
                       key={cellStr}
                       type="button"
                       disabled={disabled}
-                      aria-label={cellStr}
+                      // Spoken, not ISO — same reasoning as DatePicker's cells.
+                      aria-label={spokenDate(cell)}
+                      data-date={cellStr}
                       aria-pressed={isSel}
                       onClick={() => {
                         if (!cell.inMonth) setView({ year: cell.year, month: cell.month, day: 1 })
