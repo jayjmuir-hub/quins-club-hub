@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth.jsx'
 import useMyProfile from '../lib/useMyProfile.js'
 import FloatingChatDock from './FloatingChatDock.jsx'
 import useDockBadges from '../lib/useDockBadges.js'
+import useClearNotificationTray from '../lib/useClearNotificationTray.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import useAutoHideOnScroll from '../lib/useAutoHideOnScroll.js'
 import useSlowLoad from '../lib/useSlowLoad.js'
@@ -298,6 +299,10 @@ export default function AppShell({ children }) {
   const online = useOnline()
   const appUpdated = useAppUpdated()
   const dockBadges = useDockBadges({ userId: user?.id ?? null, admin: isAdmin(memberships), enabled: ready })
+  // The tray, as distinct from the icon count above: every push this app has
+  // showed is closed when the app comes to the front, so an Android launcher
+  // stops counting them on the icon — src/lib/useClearNotificationTray.js.
+  useClearNotificationTray()
   const currentRoleLabel = roleLabel(memberships)
   // The KEY, for the Badge tone — the same design-system role tag the
   // Accounts screen uses (claude/specs/design-system.md §4.20). Until 23 Aug
