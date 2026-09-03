@@ -156,3 +156,24 @@ describe('STAFF_TITLES', () => {
     expect(STAFF_TITLES).toContain('Assistant Coach')
   })
 })
+
+// One row per person per squad (4 Sep 2026): a coach who is also a medic is
+// one card, coach on top, medic in the ticks — and the tick knows which
+// membership row it would remove.
+describe('foldRoles', () => {
+  it('folds a person\'s several roles on one squad into one card, strongest first', async () => {
+    const { foldRoles } = await import('../src/data/staff.js')
+    const medicFirst = [
+      { membershipId: 'm-2', profileId: 'p-1', role: 'medic', alsoRoles: {} },
+      { membershipId: 'm-1', profileId: 'p-1', role: 'coach', alsoRoles: {} },
+      { membershipId: 'm-3', profileId: 'p-2', role: 'manager', alsoRoles: {} },
+    ]
+    const folded = foldRoles(medicFirst)
+    expect(folded).toHaveLength(2)
+    const person = folded.find((m) => m.profileId === 'p-1')
+    expect(person.membershipId).toBe('m-1')
+    expect(person.role).toBe('coach')
+    expect(person.alsoRoles).toEqual({ medic: 'm-2' })
+    expect(folded.find((m) => m.profileId === 'p-2').alsoRoles).toEqual({})
+  })
+})

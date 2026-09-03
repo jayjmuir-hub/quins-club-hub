@@ -11,11 +11,11 @@ import PhotoPositioner, {
 } from '../components/PhotoPositioner.jsx'
 import PersonCard from '../components/PersonCard.jsx'
 import PersonName from '../components/PersonName.jsx'
-import { listSquadStaff, setMembershipTitle, setMembershipHeadCoach } from '../data/staff.js'
+import { listSquadStaff, setMembershipTitle, setMembershipHeadCoach, addStaffRole, removeStaffRole } from '../data/staff.js'
 import { useAuth } from '../lib/auth.jsx'
 import { deleteStaffPhoto, setStaffPhoto, signStaffPhotoUrl, uploadStaffPhoto } from '../data/photos.js'
 import { initials } from '../lib/playerFormat.js'
-import { STAFF_TITLES, labelForRole, canHoldHeadCoachFlag } from '../lib/scope.js'
+import { STAFF_TITLES, labelForRole, canHoldHeadCoachFlag, SQUAD_STAFF_ROLES } from '../lib/scope.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The Staff tab of /admin — every squad, and who looks after it.
@@ -302,15 +302,40 @@ function StaffPhoto({ member, onPhoto }) {
  *  "head coach", "Head Coach / Forwards" all claim it. */
 const titleSaysHeadCoach = (value) => /head\s*coach/i.test(value ?? '')
 
-function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = null, selfId = null }) {
+function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onRolesChanged = null, onOpenCard = null, selfId = null }) {
   const [title, setTitle] = useState(member.title ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [headCoach, setHeadCoach] = useState(member.isHeadCoach === true)
   const [headBusy, setHeadBusy] = useState(false)
   const [headError, setHeadError] = useState(null)
+  const [roleBusy, setRoleBusy] = useState(null)
+  const [roleError, setRoleError] = useState(null)
 
   const roleLabel = labelForRole(member.role)
+
+  // ── Roles on this squad (Jay, 4 Sep 2026) ─────────────────────────────────
+  // "A coach who is also a medic — I have no way to tag them so they go into
+  // the medic chat." The tag IS a second membership row; the role channels
+  // read rows, never titles. One tick adds the row, unticking removes it. The
+  // card's own role is shown ticked and fixed — taking that away is Revoke on
+  // Accounts, which is the screen with the guards for it.
+  async function toggleRole(role, next) {
+    setRoleBusy(role)
+    setRoleError(null)
+    try {
+      if (next) {
+        await addStaffRole({ profileId: member.profileId, clubId: member.clubId, teamId: member.teamId, role })
+      } else {
+        await removeStaffRole(member.alsoRoles?.[role])
+      }
+      await onRolesChanged?.()
+    } catch (err) {
+      setRoleError(friendlyMessage(err, "That role didn't save. Try again."))
+    } finally {
+      setRoleBusy(null)
+    }
+  }
 
   // ── The title↔flag LINK (Jay, 30 Aug 2026) ────────────────────────────────
   // Two coaches sat titled "Head Coach" with the flag off, invisible to
@@ -403,7 +428,8 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = nul
       </div>
 
       <div className="mt-2">
-        <StaffPhoto member={member} onPhoto={onPhoto} />
+        <StaffPhoto member={member} onPhoto={onPhoto}
+              onRolesChanged={onRolesChanged} />
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -444,6 +470,36 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = nul
           and ticking another — two explicit actions. A radio would have to
           clear-then-set behind the scenes, and a half-failed pair would leave
           the squad with NO head coach and nobody told about it. */}
+      {onRolesChanged && (
+        <fieldset className="mt-2 border-0 p-0" data-testid={`roles-${member.membershipId}`}>
+          <legend className="text-[12.5px] font-bold text-ink-muted">Roles on this squad</legend>
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+            {SQUAD_STAFF_ROLES.map((role) => {
+              const own = role === member.role
+              const held = own || Boolean(member.alsoRoles?.[role])
+              return (
+                <label key={role} className="flex min-h-[44px] items-center gap-2 text-[12.5px] font-bold text-ink-muted">
+                  <input
+                    type="checkbox"
+                    checked={held}
+                    disabled={own || roleBusy !== null}
+                    onChange={(event) => toggleRole(role, event.target.checked)}
+                    className="h-4 w-4 rounded-[4px] border-line text-brand-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  />
+                  {labelForRole(role)}
+                </label>
+              )
+            })}
+            {roleBusy && <span className="text-[12.5px] text-ink-faint">Saving…</span>}
+            {roleError && (
+              <span role="alert" className="text-[12.5px] font-bold text-brand-ink">
+                {roleError}
+              </span>
+            )}
+          </div>
+        </fieldset>
+      )}
+
       {canHoldHeadCoachFlag(member.role) && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-[12.5px] font-bold text-ink-muted">
@@ -508,7 +564,7 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = nul
  * contacts card it borrows its look from is read-only. Moving editing behind a
  * second tap would have made it prettier and worse.
  */
-function SquadRow({ squad, open, onToggle, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = null, selfId = null }) {
+function SquadRow({ squad, open, onToggle, onSaved, onHeadCoachSaved, onPhoto, onRolesChanged = null, onOpenCard = null, selfId = null }) {
   const panelId = `squad-panel-${squad.id}`
   const missing = squad.staff.length === 0
   // ⚠️ THE TITLE, FALLING BACK TO THE ROLE — Jay, 16 Aug 2026: "should be Head
@@ -595,6 +651,7 @@ function SquadRow({ squad, open, onToggle, onSaved, onHeadCoachSaved, onPhoto, o
                 onSaved={onSaved}
                 onHeadCoachSaved={onHeadCoachSaved}
                 onPhoto={onPhoto}
+              onRolesChanged={onRolesChanged}
                 onOpenCard={onOpenCard}
                 selfId={selfId}
               />
@@ -650,6 +707,13 @@ export default function AdminStaff() {
   // edit would move focus and re-order nothing, for one changed string — and on
   // a screen where somebody is typing several titles in a row it would fight
   // them.
+  // Roles changed on a card: re-read the whole list, because a new role can
+  // change which membership is the card (coach outranks medic) and a removed
+  // one can empty a squad.
+  const onRolesChanged = useCallback(async () => {
+    setSquads(await listSquadStaff())
+  }, [])
+
   const onSaved = useCallback((membershipId, title) => {
     setSquads((current) =>
       (current ?? []).map((squad) => ({
@@ -766,6 +830,7 @@ export default function AdminStaff() {
               onSaved={onSaved}
               onHeadCoachSaved={onHeadCoachSaved}
               onPhoto={onPhoto}
+              onRolesChanged={onRolesChanged}
               onOpenCard={setCardFor}
               selfId={selfId}
             />
