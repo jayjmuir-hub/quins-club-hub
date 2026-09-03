@@ -53,9 +53,24 @@ const STATUS_ON = {
 }
 const STATUS_OFF = 'border-line bg-surface-card text-ink-muted hover:bg-surface-mute'
 
+// ⚠️ THE BUTTON GROUP SITS UNDER THE NAME ON A PHONE, beside it from `sm` up
+// (Jay, 3 Sep 2026: on an Android the names could not be read unless the phone
+// was turned to landscape; an iPhone "works fine"). The three word labels plus
+// the initials circle are ~280px of a row before the name gets a pixel, and a
+// 360px Android leaves the name ~45px — three letters and an ellipsis. A
+// 390–430px iPhone leaves it 80–120px, which is why it looked like an Android
+// bug and is not one. Stacking below `sm` is deterministic — the same layout
+// on every phone rather than a wrap that depends on the font scale — and the
+// left padding lines the buttons up under the name, not under the circle.
+// The labels stay words: a coach on a touchline should not have to remember
+// what "E" means.
 function StatusButtons({ status, disabled, onSet }) {
   return (
-    <div className="flex shrink-0 gap-1.5" role="group" aria-label="Record attendance">
+    <div
+      className="flex shrink-0 basis-full gap-1.5 pl-11 sm:basis-auto sm:pl-0"
+      role="group"
+      aria-label="Record attendance"
+    >
       {STATUSES.map((option) => (
         <button
           key={option.value}
@@ -242,14 +257,23 @@ export default function Register({ event, team, onClose }) {
             {players.map((player) => {
               const status = statusByPlayer.get(player.id)
               return (
-                <li key={player.id} data-testid="register-row" className="flex items-center gap-3 py-2.5">
+                <li
+                  key={player.id}
+                  data-testid="register-row"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5"
+                >
                   <span
                     aria-hidden="true"
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-sunk text-xs font-extrabold text-ink-muted"
                   >
                     {initials(player.full_name)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
+                  {/* No truncation: a long name wraps rather than being cut — the
+                      whole reason for the stacked layout above. */}
+                  <span
+                    data-testid="register-name"
+                    className="min-w-0 flex-1 break-words text-sm font-bold text-ink"
+                  >
                     {player.full_name}
                   </span>
                   {canEdit ? (
