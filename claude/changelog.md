@@ -10,6 +10,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #685 — 🏉 **The senior section: a section on each squad, section-wide
+  reading, one overview.** Jay, 3 Sep 2026: "you can't see everyone and
+  everything, you have to switch between them"
+  (`claude/plans/2026-09-03-senior-section.md`).
+  `db/migrations/20260905_senior_section.sql`: `teams.section` — a column
+  set on the Club tab, never the name — and one arm on each of `player read`,
+  `avail read` (same section) and `event read` (any senior member, both
+  sections: fixtures and results only). `can_see_team` untouched, so chat,
+  notices and documents stay per squad. The under-18 line holds because
+  every child protection keys on the person, not the squad; dry-run on
+  production with a minor in the 1st XV, and `db/tests/senior-section.sql`.
+  `src/screens/SeniorSection.jsx` at `/seniors`: Men / Women switch, this
+  weekend with in / out / not answered per squad, fixtures across the
+  section, the pool with numbers and second-squad tags, season record off
+  the league table; a foreign section is fixtures only. Seniors entry in the
+  sidebar and dock. Not built: section choices on the Roster and Schedule
+  filters, the cross-section roster setting, the all-seniors channel.
 - #684 — 🏆 **League tables from confirmed results, and the season import
   that fills the grid.** Step 1 of `claude/plans/2026-09-02-standings-and-results.md`
   plus the import route. `db/migrations/20260905_competitions_and_standings.sql`:
