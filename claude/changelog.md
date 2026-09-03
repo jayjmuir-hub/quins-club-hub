@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
-- 🔒 **THE ADMIN SPLIT — an admin row reaches no squad by itself.** Jay, 3 Sep
+- `84e4edf` — 🔒 **THE ADMIN SPLIT — an admin row reaches no squad by itself.** Jay, 3 Sep
   2026, all four rulings confirmed (`claude/plans/2026-09-03-admin-team-reach.md`).
   `db/migrations/20260904_admin_team_reach.sql`: one default-deny helper,
   `private.admin_team_reach(team, mode)`, and the admin arm of
