@@ -44,6 +44,7 @@ const TITLES = [
   ['/admin/youth', 'Youth'],
   ['/admin/competitions', 'Leagues'],
   ['/standings', 'League table'],
+  ['/seniors', 'Seniors'],
   ['/admin', 'Admin'],
   ['/accounts', 'Accounts'],
   ['/approvals', 'Approvals'],

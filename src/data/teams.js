@@ -142,6 +142,24 @@ const REFUSED_JERSEY =
  * zero rows (`data === null && error === null` — a perfectly successful
  * nothing), rather than reporting a save that never happened.
  */
+// The senior section a squad belongs to — 'senior_men' | 'senior_women' |
+// null. A COLUMN, set here by an admin (RLS: team manage), never parsed from
+// the name. claude/plans/2026-09-03-senior-section.md.
+export async function setTeamSection(teamId, section) {
+  if (!teamId) throw new Error(REFUSED_JERSEY)
+
+  const { data, error } = await supabase
+    .from('teams')
+    .update({ section: section || null })
+    .eq('id', teamId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw wrapDbError(error, "Only a club admin can change a squad's section.")
+  if (!data) throw new Error("Only a club admin can change a squad's section.")
+  return data
+}
+
 export async function setTeamUsesJerseyNumbers(teamId, value) {
   if (!teamId) throw new Error(REFUSED_JERSEY)
 

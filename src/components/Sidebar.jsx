@@ -81,7 +81,7 @@ function itemClassName({ isActive }) {
 // the same screen mounted for squad staff (src/App.jsx).
 const ACCOUNTS_PATHS = ['/admin/accounts', '/approvals']
 
-export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
+export default function Sidebar({ showSquadHub = false, showSeniors = false, showAdmin = false }) {
   const { memberships } = useMemberships()
   const location = useLocation()
   const { user } = useAuth()
@@ -186,6 +186,7 @@ export default function Sidebar({ showSquadHub = false, showAdmin = false }) {
   const items = [
     ...NAV_ITEMS,
     ...(showSquadHub ? [{ to: '/squad', label: 'Squad Hub', icon: SquadIcon }] : []),
+    ...(showSeniors ? [{ to: '/seniors', label: 'Seniors', icon: SquadIcon }] : []),
     { to: '/notices', label: 'Notices', icon: NoticesIcon },
     { to: '/documents', label: 'Documents', icon: DocumentsIcon },
     ...(showAdmin ? [{ to: '/admin', label: 'Admin', icon: AdminIcon }] : []),

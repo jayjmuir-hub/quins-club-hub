@@ -12,6 +12,7 @@ import { useMemberships } from '../lib/memberships.jsx'
 import useAutoHideOnScroll from '../lib/useAutoHideOnScroll.js'
 import useSlowLoad from '../lib/useSlowLoad.js'
 import { highestRole, isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
+import { sectionsFor } from '../lib/section.js'
 import { isLeftOnly } from '../lib/leavers.js'
 import Nav from './Nav.jsx'
 import NamePrompt from './NamePrompt.jsx'
@@ -324,6 +325,10 @@ export default function AppShell({ children }) {
   const showSquadHub =
     isAdmin(memberships) ||
     (memberships ?? []).some((m) => isSquadStaffRole(m.role) && m.team_id)
+  // The Seniors entry: anyone in a squad with a section, and every admin.
+  // teams.section is a column set on the Club tab (3 Sep 2026).
+  const showSeniors =
+    isAdmin(memberships) ? (teams ?? []).some((t) => t.section) : sectionsFor(memberships, teams).mine.length > 0
 
   return (
     // desktop:pl-64 clears the fixed 256px sidebar (phase 2 of the 2.0
@@ -355,7 +360,7 @@ export default function AppShell({ children }) {
           focusable element on every screen (the a11y test enforces it), and
           the sidebar is a fixed element whose DOM position does not affect
           its paint. */}
-      <Sidebar showSquadHub={showSquadHub} showAdmin={isAdmin(memberships)} />
+      <Sidebar showSquadHub={showSquadHub} showSeniors={showSeniors} showAdmin={isAdmin(memberships)} />
       {/* Diagnostic overlay, flag-gated — see its header. Mounted in the
           shell so it renders on EVERY screen once armed. */}
       <PaintDebug />
@@ -917,7 +922,7 @@ export default function AppShell({ children }) {
       {/* Chrome-free conversations: no tab bar inside a thread. Nav is the
           phone dock only (desktop:hidden throughout), so skipping it costs
           desktop nothing — the Sidebar above is desktop's navigation. */}
-      {!conversationScreen && <Nav showSquadHub={showSquadHub} badges={dockBadges} />}
+      {!conversationScreen && <Nav showSquadHub={showSquadHub} showSeniors={showSeniors} badges={dockBadges} />}
 
       {/* The floating chat dock — desktop only, never on /chat. Lives here
           (not per screen) so an open panel and its half-written draft

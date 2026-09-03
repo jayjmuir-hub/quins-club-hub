@@ -218,20 +218,23 @@ function Dot() {
 // the sidebar's Admin item — same isAdmin() gate, same destination. The tab
 // bar never showed it and still does not: the phone's route to /admin is the
 // Admin row in the account menu (AccountMenu.jsx), not a tab.
-export default function Nav({ showSquadHub = false, badges = {} }) {
+export default function Nav({ showSquadHub = false, showSeniors = false, badges = {} }) {
   // Squad Hub joins the bar for the same people the sidebar shows it to
   // (22 Aug 2026, Jay). ⚠️ INSERTED BEFORE CHAT, NOT AFTER — so CHAT keeps the
   // rightmost slot. Its short caption meets the dock's rounded corner cleanly;
   // "SQUAD HUB", the longest caption, sat ON the outline out there (Jay's phone,
   // 29 Aug 2026: "the b is sitting on the menu outline"). Interior, it has the
   // room. findIndex rather than a hard slice so it survives a NAV_ITEMS reorder.
-  const base = showSquadHub
+  // Seniors (3 Sep 2026) sits where Squad Hub does, for a person who has a
+  // senior section and no Squad Hub; someone with both gets both.
+  const base = showSquadHub || showSeniors
     ? (() => {
         const chatAt = NAV_ITEMS.findIndex((item) => item.to === '/chat')
         const at = chatAt < 0 ? NAV_ITEMS.length : chatAt
         return [
           ...NAV_ITEMS.slice(0, at),
-          { to: '/squad', label: 'Squad Hub', icon: SquadIcon },
+          ...(showSquadHub ? [{ to: '/squad', label: 'Squad Hub', icon: SquadIcon }] : []),
+          ...(showSeniors ? [{ to: '/seniors', label: 'Seniors', icon: SquadIcon }] : []),
           ...NAV_ITEMS.slice(at),
         ]
       })()
