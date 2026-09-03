@@ -7,6 +7,8 @@ import { listPlayers } from '../data/players.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { visibleTeams } from '../lib/scope.js'
+import useDiscardGuard from '../lib/useDiscardGuard.js'
+import DiscardConfirm from '../components/DiscardConfirm.jsx'
 
 // The admin-only invite creation form, opened in the shared Sheet from
 // Admin.jsx's "Invite a member" entry point. Two fields, conceptually: WHO
@@ -99,6 +101,9 @@ export default function InviteForm({ onClose, onSaved }) {
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [invite, setInvite] = useState(null)
+  // A mis-tap on the backdrop must not throw a typed address away (Jay, 3 Sep
+  // 2026). Once the invite exists there is nothing left to lose.
+  const guard = useDiscardGuard({ dirty: email.trim() !== '' && invite === null, saving, onClose })
 
   // The roster, loaded ONCE and only when AccessBuilder actually asks for it
   // (a parent's children, or a player invite) — ~315 rows that most invites
@@ -204,7 +209,8 @@ export default function InviteForm({ onClose, onSaved }) {
   const acceptLink = invite?.token ? `${window.location.origin}/accept-invite/${invite.token}` : ''
 
   return (
-    <Sheet open onClose={onClose} title="Invite a member">
+    <Sheet open onClose={guard.requestClose} title="Invite a member">
+      {guard.confirming && <DiscardConfirm id="invite-discard" onDiscard={guard.discard} onKeep={guard.keep} />}
       {invite ? (
         <div>
           {/* ⚠️ THE LINK STAYS, AND IT IS NOT LEFTOVER COPY. The email is queued
