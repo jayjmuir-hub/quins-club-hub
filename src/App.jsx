@@ -40,6 +40,8 @@ import MatchRosterPicker from './screens/MatchRosterPicker.jsx'
 import SquadTraining from './screens/SquadTraining.jsx'
 import PitchGlance from './screens/PitchGlance.jsx'
 import YouthDashboard from './screens/YouthDashboard.jsx'
+import AdminCompetitions from './screens/AdminCompetitions.jsx'
+import Standings from './screens/Standings.jsx'
 import MatchSheet from './screens/MatchSheet.jsx'
 import Lineup from './screens/Lineup.jsx'
 import GameTime from './screens/GameTime.jsx'
@@ -280,6 +282,9 @@ export default function App() {
               so both tabs below inherit the gate — typing
               /admin/accounts as a coach gets the same "not authorised"
               card as /admin itself. */}
+          {/* The league table for one division, readable by any signed-in
+              member; a keeper or admin types the round's results under it. */}
+          <Route path="/standings/:competitionId" element={<AppShell><Standings /></AppShell>} />
           <Route path="/admin" element={<AppShell><AdminDashboard /></AppShell>}>
             {/* ⚠️ /admin IS THE CHOOSER, and until 12 Aug 2026 it redirected
                 straight to Accounts. Every URL below is unchanged — only bare
@@ -331,6 +336,10 @@ export default function App() {
                 right decides which dashboard somebody is SHOWN, never what
                 the database will let them do. */}
             <Route path="youth" element={<YouthDashboard />} />
+            {/* Divisions, points rules and the season import — admin only,
+                gated in the screen and by RLS on every table behind it.
+                claude/plans/2026-09-02-standings-and-results.md. */}
+            <Route path="competitions" element={<AdminCompetitions />} />
             {/* Social Media Management. ⚠️ NESTED, unlike every other admin
                 tab — /admin/social/ideas sits under /admin/social. That is
                 why the tab row now passes `end` to NavLink; without it the

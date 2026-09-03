@@ -196,6 +196,14 @@
 --                     auth.uid(), verified live by db/tests/rls-league-teams.sql
 --                     (anon reads zero rows). This is the same shape the note
 --                     at the top of this file describes for every new table.
+--   competitions, competition_sides, competition_fixtures,
+--   competition_results, competition_keepers
+--                     anon, authenticated, postgres, service_role   ALL 8
+--                     ⚠️ ADDED 5 Sep 2026 (db/migrations/20260905_competitions_and_standings.sql),
+--                     the league_teams shape: Supabase's default privileges, no
+--                     grant written, RLS keeps anon out (every read policy is
+--                     auth.uid() is not null) and results insert is keeper-only
+--                     with confirmed_by = auth.uid(). Harness: db/tests/standings.sql.
 --   match_sheets      anon, authenticated, postgres, service_role   ALL 8
 --   match_sheet_slots anon, authenticated, postgres, service_role   ALL 8
 --   match_sheet_cards anon, authenticated, postgres, service_role   ALL 8

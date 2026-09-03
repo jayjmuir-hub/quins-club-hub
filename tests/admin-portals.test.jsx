@@ -522,12 +522,18 @@ describe('AdminDashboard — inside a portal', () => {
     expect(within(tabs).getByRole('link', { name: 'Templates' })).not.toHaveAttribute('aria-current')
   })
 
-  it('⚠️ draws NO tab row for a one-tab portal', () => {
+  it('the youth portal draws its tab row now that Leagues sits beside Match sheets (3 Sep 2026)', () => {
+    // ⚠️ Until 3 Sep 2026 this portal had ONE tab and this test asserted that a
+    // one-tab portal draws no tab row. No portal has a single tab any more, so
+    // that rule is unexercised here; it still lives in the component. What is
+    // asserted instead is the thing that changed: both tabs, the current one marked.
     useMembershipsMock.mockReturnValue(memberships(admin(['youth'])))
     renderAt('/admin/youth')
 
     expect(screen.getByRole('heading', { name: 'Club Youth Manager' })).toBeInTheDocument()
-    expect(screen.queryByRole('navigation', { name: /admin sections/i })).not.toBeInTheDocument()
+    const tabs = screen.getByRole('navigation', { name: /admin sections/i })
+    expect(within(tabs).getByRole('link', { name: 'Match sheets' })).toHaveAttribute('aria-current', 'page')
+    expect(within(tabs).getByRole('link', { name: 'Leagues' })).toHaveAttribute('href', '/admin/competitions')
   })
 
   it('still refuses a non-admin, unchanged', () => {

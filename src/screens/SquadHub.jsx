@@ -13,6 +13,7 @@ import { listAttendanceForEvents } from '../data/attendance.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
 import { listMatchSheetsFor } from '../data/matchSheets.js'
+import { listLeagueTeams } from '../data/leagueTeams.js'
 import { listPlayers } from '../data/players.js'
 import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
@@ -190,6 +191,19 @@ export default function SquadHub() {
   // Full schedule). Delete is withheld for the same reason.
   const [formState, setFormState] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
+  // This squad's league teams that sit in a division with a table
+  // (league_teams.competition_id, set by the season import). Fails to an
+  // empty list: no table link is better than a broken one.
+  const [leagueTables, setLeagueTables] = useState([])
+  useEffect(() => {
+    let mounted = true
+    listLeagueTeams({ teamId })
+      .then((rows) => mounted && setLeagueTables(rows.filter((row) => row.competition_id)))
+      .catch(() => mounted && setLeagueTables([]))
+    return () => {
+      mounted = false
+    }
+  }, [teamId])
   const navigate = useNavigate()
 
   const team = teams?.find((candidate) => candidate.id === teamId)
@@ -453,6 +467,19 @@ export default function SquadHub() {
               by side, the tracking grid takes the full width beneath them.
               Grid PLACEMENT classes, not DOM order, so the phone keeps
               tracking directly under the calendar — its headline position. */}
+          {leagueTables.length > 0 && (
+            <p data-testid="league-table-links" className="mb-3 text-sm text-ink-muted">
+              League table:{' '}
+              {leagueTables.map((lt, i) => (
+                <span key={lt.id}>
+                  {i > 0 ? ' · ' : ''}
+                  <Link to={`/standings/${lt.competition_id}`} className="font-bold text-brand-ink underline-offset-2 hover:underline">
+                    {lt.rcm_name}{lt.division ? ` (${lt.division})` : ''}
+                  </Link>
+                </span>
+              ))}
+            </p>
+          )}
           <div className="desktop:grid desktop:grid-cols-[1.15fr_.85fr] desktop:gap-x-4">
 
           {/* ---- Upcoming -------------------------------------------------- */}

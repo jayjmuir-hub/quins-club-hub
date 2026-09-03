@@ -42,6 +42,8 @@ const TITLES = [
   ['/admin/welfare/reports', 'Welfare reports'],
   ['/admin/welfare', 'Welfare'],
   ['/admin/youth', 'Youth'],
+  ['/admin/competitions', 'Leagues'],
+  ['/standings', 'League table'],
   ['/admin', 'Admin'],
   ['/accounts', 'Accounts'],
   ['/approvals', 'Approvals'],
