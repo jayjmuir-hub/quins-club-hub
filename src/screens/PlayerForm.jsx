@@ -1091,7 +1091,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           >
             We couldn&apos;t load this player&apos;s contact details, so they can&apos;t be edited
             right now. Saving will leave them exactly as they are.
-            {contactError?.message ? ` (${contactError.message})` : ''}
+            {friendlyMessage(contactError, '') ? ` (${friendlyMessage(contactError, '')})` : ''}
           </p>
         )}
 

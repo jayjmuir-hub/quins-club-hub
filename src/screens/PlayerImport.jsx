@@ -65,7 +65,13 @@ export default function PlayerImport({ onClose, onImported, existingPlayers = []
   )
 
   const hasInput = text.trim() !== ''
-  const canSubmit = parsed.validCount > 0 && !saving
+  // ⚠️ `done` ENDS THE IMPORT (2 Sep 2026 UX review, extra findings): after
+  // the players-in-but-positions-failed case the sheet stays open to show the
+  // message, and Add used to stay live while the roster refetched — a fast
+  // second tap re-parsed against the STALE existingPlayers and inserted the
+  // whole squad again. Once anything is inserted, this sheet only closes.
+  const [done, setDone] = useState(false)
+  const canSubmit = parsed.validCount > 0 && !saving && !done
 
   async function handleImport() {
     if (inFlight.current || parsed.validCount === 0) return
@@ -94,6 +100,7 @@ export default function PlayerImport({ onClose, onImported, existingPlayers = []
         // a retry that duplicates the whole squad. The positions can be
         // re-entered from the roster; the import must report what happened.
         setFailure('The players were added, but some positions were not saved. Set them from the roster.')
+        setDone(true)
         onImported?.(rows.length)
         return
       }
@@ -253,13 +260,15 @@ export default function PlayerImport({ onClose, onImported, existingPlayers = []
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <Button variant="secondary" onClick={onClose}>
-              Cancel
+              {done ? 'Done' : 'Cancel'}
             </Button>
-            <Button onClick={handleImport} disabled={!canSubmit} data-testid="import-submit">
-              {saving
-                ? 'Adding…'
-                : `Add ${parsed.validCount} ${parsed.validCount === 1 ? 'player' : 'players'}`}
-            </Button>
+            {!done && (
+              <Button onClick={handleImport} disabled={!canSubmit} data-testid="import-submit">
+                {saving
+                  ? 'Adding…'
+                  : `Add ${parsed.validCount} ${parsed.validCount === 1 ? 'player' : 'players'}`}
+              </Button>
+            )}
           </div>
         </div>
       )}

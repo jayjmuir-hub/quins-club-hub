@@ -241,6 +241,23 @@ describe('Import — writing', () => {
     expect(screen.getByTestId('import-paste')).toBeInTheDocument()
   })
 
+  it('after a partial failure the import is over: Add is gone, Close remains, nothing re-inserts', async () => {
+    const user = userEvent.setup()
+    insertPlayersMock.mockResolvedValue([{ id: 'new-1' }])
+    savePlayerPositionsMock.mockRejectedValue(new Error('boom'))
+
+    await openImport(user)
+    await paste(user, 'Tom Fletcher,Flanker,U10')
+    await user.click(screen.getByTestId('import-submit'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/positions were not saved/i)
+    // 2 Sep 2026 UX review, extra findings: Add used to stay live here, and a
+    // fast second tap inserted the whole squad again.
+    expect(screen.queryByTestId('import-submit')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
+    expect(insertPlayersMock).toHaveBeenCalledTimes(1)
+  })
+
   it('does not double-insert when the button is clicked twice', async () => {
     const user = userEvent.setup()
     let release

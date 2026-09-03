@@ -16,6 +16,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { deleteStaffPhoto, setStaffPhoto, signStaffPhotoUrl, uploadStaffPhoto } from '../data/photos.js'
 import { initials } from '../lib/playerFormat.js'
 import { STAFF_TITLES, labelForRole, canHoldHeadCoachFlag } from '../lib/scope.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // The Staff tab of /admin — every squad, and who looks after it.
 //
@@ -182,7 +183,7 @@ function StaffPhoto({ member, onPhoto }) {
       close()
     } catch (err) {
       if (key) deleteStaffPhoto(key)
-      setError(err.message)
+      setError(friendlyMessage(err, "That photo didn't save. Try again."))
     } finally {
       setBusy(false)
     }
@@ -204,7 +205,7 @@ function StaffPhoto({ member, onPhoto }) {
       onPhoto(member.membershipId, saved)
       close()
     } catch (err) {
-      setError(err.message)
+      setError(friendlyMessage(err, "That photo didn't save. Try again."))
     } finally {
       setBusy(false)
     }
@@ -350,7 +351,7 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = nul
       }
     } catch (err) {
       setHeadCoach(member.isHeadCoach === true)
-      setHeadError(err.message)
+      setHeadError(friendlyMessage(err, "That change didn't save. Try again."))
     } finally {
       setHeadBusy(false)
     }
@@ -368,7 +369,7 @@ function StaffRow({ member, onSaved, onHeadCoachSaved, onPhoto, onOpenCard = nul
     } catch (err) {
       // Back to the last value the database confirmed, not to the typed one.
       setTitle(member.title ?? '')
-      setError(err.message)
+      setError(friendlyMessage(err, "That title didn't save. Try again."))
     } finally {
       setBusy(false)
     }
@@ -637,7 +638,7 @@ export default function AdminStaff() {
     try {
       setSquads(await listSquadStaff())
     } catch (err) {
-      setError(err.message)
+      setError(friendlyMessage(err, "We couldn't load the squads. Try again."))
     }
   }, [])
 
