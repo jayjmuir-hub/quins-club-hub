@@ -10,6 +10,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
+- **fix(ux): the last two native pickers go, and a calendar day is spoken.**
+  (`938f2b6`, the previous entry.) Add-game's Kick-off and Training publish's
+  four date boxes (From, To, Focus starts, Focus ends) were the last native
+  `<input type="date|time">` fields on a screen a person fills in — the same
+  month-swipe-commits-a-date trap the event form left on 29 Aug. Both now
+  use the app's `TimePicker` / `DatePicker`. And a day button in either
+  calendar (`DatePicker`, `RepeatUntilField`) is called out as "Thursday 17
+  September 2026" rather than "2026-09-17"; the ISO string moves to
+  `data-date`, and `tests/helpers/pickDate.js` selects by that. The name is
+  built from fixed tables, not `toLocaleDateString` — ICU's en-GB puts a
+  comma after the weekday and varies by build. `AdminRightsLog`'s two date
+  FILTERS stay native on purpose: they are a range on an admin log, not a
+  field a swipe can commit.
 - **fix(ux): the Low findings from the full review, first two batches.**
   Sign-in: "session expired" is now plain words; the email and password
   fields freeze while "Please wait…" shows; the sign-in / create-account

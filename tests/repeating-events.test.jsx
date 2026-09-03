@@ -84,9 +84,10 @@ async function fillTuesdayThursdaySeries(user) {
   await user.click(screen.getByRole('checkbox', { name: 'Thu' }))
   // The end date is now set through the app's own inline calendar (the native
   // date picker was retired 29 Aug 2026). Start is 11 Aug, so the calendar opens
-  // on August — the day buttons carry the ISO date as their accessible name.
+  // on August — the day buttons carry the ISO date as `data-date` (their
+  // accessible name is the spoken date, since 2 Sep 2026).
   await user.click(screen.getByRole('button', { name: /or pick an end date/i }))
-  await user.click(screen.getByRole('button', { name: '2026-08-20' }))
+  await user.click(document.querySelector('[data-date="2026-08-20"]'))
 }
 
 beforeEach(() => {

@@ -38,6 +38,19 @@ function toParts(str) {
   return { year: Number(m[1]), month: Number(m[2]) - 1, day: Number(m[3]) }
 }
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const LONG_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/**
+ * "Thursday 17 September 2026" — what a day button is called out as. Built
+ * from fixed tables, not `toLocaleDateString`: ICU's en-GB inserts a comma
+ * after the weekday and the punctuation varies by ICU build, which would make
+ * the spoken name differ between a phone, Node and CI.
+ */
+export function spokenDate({ year, month, day }) {
+  return `${DAY_NAMES[new Date(year, month, day).getDay()]} ${day} ${LONG_MONTHS[month]} ${year}`
+}
+
 /** 0-based { year, month, day } → 'yyyy-mm-dd'. */
 function toStr({ year, month, day }) {
   return `${year}-${pad(month + 1)}-${pad(day)}`
@@ -244,7 +257,12 @@ export default function DatePicker({
                   key={cellStr}
                   type="button"
                   disabled={off}
-                  aria-label={cellStr}
+                  // ⚠️ SPOKEN, NOT ISO (2 Sep 2026 UX review, Low): a screen
+                  // reader used to hear "2026-09-17"; now "Thursday 17
+                  // September 2026". `month` is 0-based here, so no -1. The
+                  // ISO string moves to data-date, which is what tests select by.
+                  aria-label={spokenDate(cell)}
+                  data-date={cellStr}
                   aria-pressed={isSel}
                   onClick={() => {
                     if (!cell.inMonth) setView({ year: cell.year, month: cell.month, day: 1 })

@@ -43,7 +43,7 @@ describe('DatePicker', () => {
     // The whole reason this control exists.
     expect(onChange).not.toHaveBeenCalled()
 
-    await user.click(within(cal).getByRole('button', { name: '2026-09-15' }))
+    await user.click(cal.querySelector('[data-date="2026-09-15"]'))
     expect(onChange).toHaveBeenCalledWith('2026-09-15')
     // Picking closes the calendar.
     expect(screen.queryByTestId('date-picker-calendar')).toBeNull()
@@ -58,18 +58,26 @@ describe('DatePicker', () => {
 
     await user.selectOptions(within(cal).getByLabelText('Year'), '2015')
     await user.selectOptions(within(cal).getByLabelText('Month'), '7') // August (0-based)
-    await user.click(within(cal).getByRole('button', { name: '2015-08-15' }))
+    await user.click(cal.querySelector('[data-date="2015-08-15"]'))
 
     expect(onChange).toHaveBeenCalledWith('2015-08-15')
+  })
+
+  it('calls a day out as a spoken date, not an ISO string', async () => {
+    const { user } = setup({ value: '2026-09-17' })
+    await user.click(screen.getByLabelText('Date'))
+    const cal = screen.getByTestId('date-picker-calendar')
+    expect(within(cal).getByRole('button', { name: 'Thursday 17 September 2026' })).toHaveAttribute('data-date', '2026-09-17')
+    expect(within(cal).queryByRole('button', { name: '2026-09-17' })).toBeNull()
   })
 
   it('disables days outside min/max', async () => {
     const { user } = setup({ value: '2026-08-15', min: '2026-08-10', max: '2026-08-20' })
     await user.click(screen.getByLabelText('Date'))
     const cal = screen.getByTestId('date-picker-calendar')
-    expect(within(cal).getByRole('button', { name: '2026-08-09' })).toBeDisabled()
-    expect(within(cal).getByRole('button', { name: '2026-08-21' })).toBeDisabled()
-    expect(within(cal).getByRole('button', { name: '2026-08-15' })).toBeEnabled()
+    expect(cal.querySelector('[data-date="2026-08-09"]')).toBeDisabled()
+    expect(cal.querySelector('[data-date="2026-08-21"]')).toBeDisabled()
+    expect(cal.querySelector('[data-date="2026-08-15"]')).toBeEnabled()
   })
 
   it('closes on Escape', async () => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Chip from '../components/Chip.jsx'
+import DatePicker from '../components/DatePicker.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import {
@@ -509,31 +510,29 @@ function PublishBody() {
 
           <div className="flex flex-wrap items-end gap-2.5">
             {/* ⛔ A RANGE, NOT A NIGHT. See the header of this file. */}
-            {/* ⚠️ min-w-[150px], NOT min-w-0 — a date input needs ~150px for
-                dd/mm/yyyy, and min-w-0 lets flex-1 shrink it past that instead
+            {/* ⚠️ min-w-[150px], NOT min-w-0 — a date field needs ~150px for
+                "17 Sep 2026", and min-w-0 lets flex-1 shrink it past that instead
                 of letting the wrap engage. On a phone (admin renders at every
                 width since retheme phase 4) the pair stacks; on desktop it
-                still shares the row. Same fix on the focus pair below. */}
+                still shares the row. Same fix on the focus pair below.
+                The app's own DatePicker, not the native box (2 Sep 2026 UX
+                review, Low): the native one commits a date on a month swipe. */}
             <label className="min-w-[150px] flex-1">
               <span className={LABEL}>From</span>
-              <input
-                type="date"
-                aria-label="From"
+              <DatePicker
+                id="publish-from"
                 value={from}
                 disabled={running}
-                onChange={(domEvent) => change(() => setFrom(domEvent.target.value))}
-                className={INPUT}
+                onChange={(next) => change(() => setFrom(next))}
               />
             </label>
             <label className="min-w-[150px] flex-1">
               <span className={LABEL}>To</span>
-              <input
-                type="date"
-                aria-label="To"
+              <DatePicker
+                id="publish-to"
                 value={to}
                 disabled={running}
-                onChange={(domEvent) => change(() => setTo(domEvent.target.value))}
-                className={INPUT}
+                onChange={(next) => change(() => setTo(next))}
               />
             </label>
           </div>
@@ -712,24 +711,20 @@ function PublishBody() {
             <div className="flex flex-wrap items-end gap-2.5">
               <label className="min-w-[150px] flex-1">
                 <span className={LABEL}>Starts</span>
-                <input
-                  type="date"
-                  aria-label="Focus starts"
+                <DatePicker
+                  id="focus-starts"
                   value={editingFocus.starts_on}
                   disabled={focusSaving}
-                  onChange={(domEvent) => setFocusField('starts_on', domEvent.target.value)}
-                  className={INPUT}
+                  onChange={(next) => setFocusField('starts_on', next)}
                 />
               </label>
               <label className="min-w-[150px] flex-1">
                 <span className={LABEL}>Ends</span>
-                <input
-                  type="date"
-                  aria-label="Focus ends"
+                <DatePicker
+                  id="focus-ends"
                   value={editingFocus.ends_on}
                   disabled={focusSaving}
-                  onChange={(domEvent) => setFocusField('ends_on', domEvent.target.value)}
-                  className={INPUT}
+                  onChange={(next) => setFocusField('ends_on', next)}
                 />
               </label>
             </div>

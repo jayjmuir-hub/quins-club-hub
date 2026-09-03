@@ -59,7 +59,7 @@ describe('RepeatUntilField', () => {
     expect(screen.getByTestId('repeat-calendar-month')).toHaveTextContent('September 2026')
 
     // Clicking an actual day IS a commit.
-    await user.click(screen.getByRole('button', { name: '2026-09-15' }))
+    await user.click(document.querySelector('[data-date="2026-09-15"]'))
     expect(onChange).toHaveBeenCalledWith('2026-09-15')
   })
 
@@ -67,7 +67,7 @@ describe('RepeatUntilField', () => {
     const { user } = setup()
     await user.click(screen.getByRole('button', { name: /or pick an end date/i }))
     // 10 Aug is before the 11 Aug start.
-    expect(screen.getByRole('button', { name: '2026-08-10' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '2026-08-12' })).toBeEnabled()
+    expect(document.querySelector('[data-date="2026-08-10"]')).toBeDisabled()
+    expect(document.querySelector('[data-date="2026-08-12"]')).toBeEnabled()
   })
 })

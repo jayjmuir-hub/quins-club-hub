@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
+import TimePicker from '../components/TimePicker.jsx'
 import { upsertEvent } from '../data/events.js'
 import { clubDateTimeInputs, clubWallTimeToUtc, eventDate } from '../lib/eventFormat.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
@@ -160,13 +161,16 @@ export default function AddGameForm({ tournament, game = null, onClose, onSaved 
           <label className={LABEL} htmlFor="game-time">
             Kick-off
           </label>
-          <input
+          {/* The app's own picker, not the native one (2 Sep 2026 UX review,
+              Low) — the event form moved on 29 Aug and this screen was left
+              behind. Emits the same 'HH:MM' string; onChange takes the value
+              directly, hence not `set('time')`. */}
+          <TimePicker
             id="game-time"
-            type="time"
+            testId="game-time"
             value={values.time}
-            onChange={set('time')}
-            aria-invalid={invalid.time ? 'true' : undefined}
-            className={INPUT}
+            invalid={invalid.time}
+            onChange={(next) => setValues((v) => ({ ...v, time: next }))}
           />
           <p className="mt-1.5 text-[12.5px] text-ink-muted">
             On {tournament.competition || 'the tournament'}&apos;s day. Abu Dhabi time.
