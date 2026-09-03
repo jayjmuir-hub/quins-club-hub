@@ -11,7 +11,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 ## 2 Sep 2026
 
 - **fix(ux): the last two native pickers go, and a calendar day is spoken.**
-  (`938f2b6`, the previous entry.) Add-game's Kick-off and Training publish's
+  Add-game's Kick-off and Training publish's
   four date boxes (From, To, Focus starts, Focus ends) were the last native
   `<input type="date|time">` fields on a screen a person fills in — the same
   month-swipe-commits-a-date trap the event form left on 29 Aug. Both now
@@ -23,7 +23,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   comma after the weekday and varies by build. `AdminRightsLog`'s two date
   FILTERS stay native on purpose: they are a range on an admin log, not a
   field a swipe can commit.
-- **fix(ux): the Low findings from the full review, first two batches.**
+- `938f2b6` — **fix(ux): the Low findings from the full review, first two batches.**
   Sign-in: "session expired" is now plain words; the email and password
   fields freeze while "Please wait…" shows; the sign-in / create-account
   strip is a group of pressed toggles, not a tablist with no tab
