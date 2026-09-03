@@ -10,6 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #686 — 🐛 **Seniors page: the date window, and a dock that fits.** Jay's
+  screenshots the evening #685 shipped. `src/screens/SeniorSection.jsx`
+  handed `listEvents` Date objects, which reach PostgREST as "GMT+0400 (Gulf
+  Standard Time)" and Postgres refused: ISO strings now, with a test that the
+  call receives a string. `src/components/Nav.jsx`: six tabs overlapped on a
+  phone for anyone with a Squad Hub and a section, so the dock never carries
+  both — Seniors takes Squad Hub's slot only when there is no Squad Hub, and
+  `src/screens/SquadHub.jsx` links a section squad to the whole section.
 - #685 — 🏉 **The senior section: a section on each squad, section-wide
   reading, one overview.** Jay, 3 Sep 2026: "you can't see everyone and
   everything, you have to switch between them"
