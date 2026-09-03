@@ -150,6 +150,21 @@ type Event = {
  * to a friendly stays hidden, because a friendly has no competition_type —
  * stale data, not a label, exactly as before.
  */
+// ⚠️ A COPY OF THE TABLE IN src/lib/division.js — an edge function cannot
+// import src/. Junior letters render as "Div B"; the senior competitions
+// (3 Sep 2026) by name. An unknown code falls back to "Div <code>", the
+// wording every division had before the table existed. Change both files.
+const DIVISION_SHORT: Record<string, string> = {
+  A: 'Div A',
+  B: 'Div B',
+  C: 'Div C',
+  WAP: 'Premiership',
+  D1: 'Div 1',
+  D2: 'Div 2',
+  W7s: 'W7s',
+  WXV: 'WXVs',
+}
+
 function leagueLabel(event: Event): string {
   if (!event.league_team_name) {
     if (event.competition_type === 'league' && event.round !== null && event.round !== undefined) {
@@ -158,7 +173,9 @@ function leagueLabel(event: Event): string {
     return ''
   }
   const parts = [event.league_team_name]
-  if (event.league_division) parts.push(`Div ${event.league_division}`)
+  if (event.league_division) {
+    parts.push(DIVISION_SHORT[event.league_division] ?? `Div ${event.league_division}`)
+  }
   if (event.round !== null && event.round !== undefined) parts.push(`Round ${event.round}`)
   return parts.join(' · ')
 }

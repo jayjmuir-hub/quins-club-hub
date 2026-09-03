@@ -262,3 +262,53 @@ describe('AdminClub — the club\'s league teams', () => {
     expect(u14b).toHaveTextContent('1 missing contact info')
   })
 })
+
+describe('AdminClub — a SENIOR squad\'s divisions (3 Sep 2026)', () => {
+  // ⚠️ is_senior is a COLUMN, so the senior squad here is flagged by it and the
+  // junior control is a squad without the flag. The named senior competitions
+  // come from src/lib/division.js; the letters stay for juniors.
+  const SENIOR = { id: 'team-men1', club_id: CLUB, name: 'Senior Men - 1st XV', sort_order: 16, is_senior: true }
+
+  it('offers the named senior competitions, not the junior letters', async () => {
+    useMembershipsMock.mockReturnValue({
+      memberships: ADMIN,
+      teams: [TEAM_U16B, SENIOR],
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+    })
+    const { user } = renderClub()
+
+    const men = await squadRow('team-men1')
+    await user.click(within(men).getByRole('button', { name: /add league team to Senior Men - 1st XV/i }))
+    const values = [...screen.getByLabelText('Division').options].map((option) => option.value)
+    expect(values).toEqual(['', 'WAP', 'D1', 'D2', 'W7s', 'WXV'])
+    expect(screen.getByRole('option', { name: 'West Asia Premiership' })).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('League team name'), 'ADH')
+    await user.selectOptions(screen.getByLabelText('Division'), 'WAP')
+    await user.click(screen.getByRole('button', { name: /add league team$/i }))
+    await waitFor(() => expect(upsertLeagueTeamMock).toHaveBeenCalled())
+    expect(upsertLeagueTeamMock).toHaveBeenCalledWith({
+      club_id: CLUB,
+      team_id: 'team-men1',
+      rcm_name: 'ADH',
+      division: 'WAP',
+    })
+  })
+
+  it('CONTROL: a junior squad on the same screen still gets A, B, C', async () => {
+    useMembershipsMock.mockReturnValue({
+      memberships: ADMIN,
+      teams: [TEAM_U16B, SENIOR],
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+    })
+    const { user } = renderClub()
+    const u16b = await squadRow('team-u16b')
+    await user.click(within(u16b).getByRole('button', { name: /add league team to U16B Contact/i }))
+    const values = [...screen.getByLabelText('Division').options].map((option) => option.value)
+    expect(values).toEqual(['', 'A', 'B', 'C'])
+  })
+})

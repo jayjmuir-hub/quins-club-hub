@@ -10,6 +10,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #678 — 🏉 **Senior divisions, eighteen rounds, and the 2026–27 senior
+  fixtures seed.** Jay, 3 Sep 2026, with the RCM men's grid and the women's
+  poster. `db/migrations/20260904_senior_divisions.sql` widens the
+  `league_teams.division` and `events.tier` checks from A/B/C to admit the
+  senior codes WAP, D1, D2, W7s and WXV; `src/lib/division.js` is the one
+  table from code to words (Premiership, Division 1, Women's XVs), read by
+  `src/lib/fixtureLabel.js`, the event form, the Club tab and — as a copy,
+  because an edge function cannot import `src/` — the calendar feed. A senior
+  squad (`teams.is_senior`, never the name) is offered Round 1–18 and the
+  named competitions as tiers; juniors keep 0–8 and the letters.
+  `db/seeds/2026-09-03-senior-fixtures-2026-27.sql` is the one-off load:
+  the 2nd XV, 3rd XV and Senior Women squads with their league sides, then
+  all 47 fixtures in ONE insert so the per-statement push trigger stays
+  silent — Saturday with Time TBD by default, JA away on Friday 23 Oct, the
+  Doha pair reversed, the women's 7s rounds and Dubai 7s as 7s tournament
+  containers (`events_league_is_fifteen` refuses a league row in 7s), the
+  WXVs rounds as league placeholders. Dry-run in a rolled-back block against
+  production before the real run. Why a seed and not the form: fifty-three
+  form fills, and a file the next season starts from.
 - #677 — **fix(squad-hub): the register grid shows the squad's own sessions,
   newest at the right.** Jay, from the U16B hub: "why are there multiple
   dates for the same session? why is it showing a session yesterday?"

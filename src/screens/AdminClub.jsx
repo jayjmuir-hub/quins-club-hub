@@ -20,6 +20,7 @@ import {
   createTeam,
 } from '../data/teams.js'
 import { useMemberships } from '../lib/memberships.jsx'
+import { divisionLong, divisionsFor } from '../lib/division.js'
 import { SCORE_KINDS, SCORE_LABELS, scoringForBand, scoringForTeam } from '../lib/scoring.js'
 import { ageBandFromTeamName } from '../lib/ageGroup.js'
 import { formatLeftDate, isLeaver } from '../lib/leavers.js'
@@ -76,7 +77,11 @@ function SectionTitle({ children }) {
 
 // Nullable on purpose: a club can enter a team that is in no lettered division
 // at all, and forcing a letter would invent data.
-const DIVISIONS = ['A', 'B', 'C']
+//
+// ⚠️ THE LIST DEPENDS ON THE SQUAD (3 Sep 2026). A junior squad is offered the
+// letters; a senior squad is offered the named competitions — Premiership,
+// Division 1 and 2, the women's 7s and XVs — from src/lib/division.js, keyed
+// on teams.is_senior and never on the name.
 
 const CHIP =
   'rounded-[8px] border-[1.5px] px-2.5 py-1 text-[12.5px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2'
@@ -88,7 +93,7 @@ function LeagueTeamChip({ leagueTeam, onSelect, busy }) {
   // entering, and in which division" is the question this section answers.
   const label = [
     leagueTeam.rcm_name,
-    leagueTeam.division ? `Division ${leagueTeam.division}` : null,
+    leagueTeam.division ? divisionLong(leagueTeam.division) : null,
     retired ? 'retired' : null,
   ]
     .filter(Boolean)
@@ -384,7 +389,8 @@ export default function AdminClub() {
   }
 
   function saveLeagueTeam() {
-    // ⚠️ NULL, NEVER ''. `division` carries a check constraint of ('A','B','C'),
+    // ⚠️ NULL, NEVER ''. `division` carries a check constraint (the codes in
+    // src/lib/division.js — db/migrations/20260904_senior_divisions.sql),
     // so an empty string is not "no division" to Postgres — it is a violation,
     // and the save would fail on a field somebody deliberately left blank.
     const division = draftDivision === '' ? null : draftDivision
@@ -697,9 +703,12 @@ export default function AdminClub() {
                 {/* "None" is a real answer, not a prompt to choose — a club can
                     enter a team that is in no lettered division. */}
                 <option value="">None</option>
-                {DIVISIONS.map((division) => (
-                  <option key={division} value={division}>
-                    {division}
+                {divisionsFor({
+                  senior:
+                    (adding ?? teams.find((team) => team.id === editing?.team_id))?.is_senior === true,
+                }).map((division) => (
+                  <option key={division.code} value={division.code}>
+                    {division.long}
                   </option>
                 ))}
               </select>
