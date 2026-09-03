@@ -40,7 +40,7 @@ const MEMBERSHIP_ROW = {
 }
 const ADMIN_ROW = {
   id: 'm-admin',
-  role: 'admin',
+  role: 'admin', admin_rights: ['clubadmin'],
   status: 'active',
   team_id: null,
   player_id: null,

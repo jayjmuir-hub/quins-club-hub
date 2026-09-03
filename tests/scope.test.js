@@ -18,6 +18,8 @@ import {
   isPendingOnly,
   isSuperAdmin,
   adminRights,
+  adminTeamReach,
+  ADMIN_TEAM_REACH,
 } from '../src/lib/scope.js'
 
 // Unit tests for src/lib/scope.js (Task 7: pure membership/scope helpers) and
@@ -66,7 +68,7 @@ function membership(overrides) {
 
 describe('visibleTeams', () => {
   it('returns every team for an admin, even though the admin membership has team_id null', () => {
-    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
+    const memberships = [membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null })]
 
     const result = visibleTeams(memberships, ALL_TEAMS)
 
@@ -107,7 +109,7 @@ describe('visibleTeams', () => {
 
   it('does not mutate the allTeams array passed in', () => {
     const original = [...ALL_TEAMS]
-    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
+    const memberships = [membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null })]
 
     visibleTeams(memberships, ALL_TEAMS)
 
@@ -122,7 +124,7 @@ describe('visibleTeams', () => {
   })
 
   it('handles a null or undefined allTeams without throwing', () => {
-    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
+    const memberships = [membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null })]
 
     expect(visibleTeams(memberships, null)).toEqual([])
     expect(visibleTeams(memberships, undefined)).toEqual([])
@@ -134,7 +136,7 @@ describe('visibleTeams', () => {
     // (a.sort_order ?? 0) - (b.sort_order ?? 0) keeps the result numeric.
     const teamWithoutOrder = { id: 'team-no-order', club_id: 'club-1', name: 'Mystery XV' }
     const teams = [U12, teamWithoutOrder, U6]
-    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
+    const memberships = [membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null })]
 
     const result = visibleTeams(memberships, teams)
 
@@ -182,7 +184,7 @@ describe('visibleTeams', () => {
 
   it('shows every team for an admin even if some other row of theirs is left', () => {
     const memberships = [
-      membership({ role: 'admin', status: 'active', team_id: null }),
+      membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }),
       membership({ role: 'parent', team_id: U8.id, player_id: 'player-gone', status: 'left' }),
     ]
 
@@ -224,7 +226,7 @@ describe('isPendingOnly — a left row is not a counter-example', () => {
 
 describe('canEditTeam', () => {
   it('is true for an admin on any team', () => {
-    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
+    const memberships = [membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null })]
 
     expect(canEditTeam(memberships, U6.id)).toBe(true)
     expect(canEditTeam(memberships, SENIOR_1XV.id)).toBe(true)
@@ -272,14 +274,14 @@ describe('canEditTeam', () => {
   })
 
   it('is true for an admin on a real team id, but false for an admin on a null teamId', () => {
-    const memberships = [membership({ role: 'admin', status: 'active', team_id: null })]
+    const memberships = [membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null })]
 
     expect(canEditTeam(memberships, U12.id)).toBe(true)
     expect(canEditTeam(memberships, null)).toBe(false)
   })
 
   it('is false for a null or undefined teamId even for an admin or coach', () => {
-    const adminMemberships = [membership({ role: 'admin', status: 'active', team_id: null })]
+    const adminMemberships = [membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null })]
     const coachMemberships = [membership({ role: 'coach', team_id: U12.id })]
 
     expect(canEditTeam(adminMemberships, null)).toBe(false)
@@ -323,7 +325,7 @@ describe('canEditTeam', () => {
 })
 
 describe('canEditEvent', () => {
-  const admin = [membership({ role: 'admin', status: 'active', team_id: null })]
+  const admin = [membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null })]
   const coach = [membership({ role: 'coach', team_id: U12.id })]
   const parent = [membership({ role: 'parent', team_id: U12.id })]
 
@@ -354,7 +356,7 @@ describe('isAdmin', () => {
   it('is true when any membership row is an ACTIVE admin', () => {
     const memberships = [
       membership({ role: 'coach', team_id: U12.id }),
-      membership({ role: 'admin', status: 'active', team_id: null }),
+      membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }),
     ]
 
     expect(isAdmin(memberships)).toBe(true)
@@ -377,7 +379,7 @@ describe('isAdmin', () => {
   // bug happened because a new writer made a pending STAFF row possible and
   // the old readers were never audited.
   it('⚠️ is false for a PENDING admin row — a request for admin is not admin', () => {
-    const memberships = [membership({ role: 'admin', status: 'pending', team_id: null })]
+    const memberships = [membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'pending', team_id: null })]
 
     expect(isAdmin(memberships)).toBe(false)
   })
@@ -386,7 +388,7 @@ describe('isAdmin', () => {
     // The "every row must be active" reading would be wrong: somebody who is
     // already an admin and has separately registered a child is still an admin.
     const memberships = [
-      membership({ role: 'admin', status: 'active', team_id: null }),
+      membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }),
       membership({ role: 'parent', status: 'pending', team_id: U12.id }),
     ]
 
@@ -417,7 +419,7 @@ describe('roleLabel', () => {
   it('returns Admin when an admin row is present, regardless of other roles', () => {
     const memberships = [
       membership({ role: 'coach', team_id: U12.id }),
-      membership({ role: 'admin', status: 'active', team_id: null }),
+      membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }),
     ]
 
     expect(roleLabel(memberships)).toBe('Admin')
@@ -497,7 +499,7 @@ describe('childPlayerIds', () => {
 
   it('ignores admin/coach rows and null player_ids', () => {
     const memberships = [
-      membership({ role: 'admin', status: 'active', team_id: null, player_id: null }),
+      membership({ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, player_id: null }),
       membership({ role: 'coach', team_id: U12.id, player_id: null }),
     ]
 
@@ -712,7 +714,7 @@ describe('createInvite', () => {
     const { builder, calls } = createInsertBuilder({ data: { id: 'inv-2', token: 'tok' } })
     supabase.from.mockReturnValue(builder)
 
-    await createInvite({ clubId: 'club-1', email: 'admin@example.com', role: 'admin', createdBy: 'user-1' })
+    await createInvite({ clubId: 'club-1', email: 'admin@example.com', role: 'admin', admin_rights: ['clubadmin'], createdBy: 'user-1' })
 
     expect(calls.insert[0][0]).toMatchObject({ team_id: null, player_id: null })
   })
@@ -843,7 +845,7 @@ describe('roleLabel — the new roles', () => {
       { role: 'medic', team_id: 't' },
       { role: 'manager', team_id: 't' },
       { role: 'coach', team_id: 't' },
-      { role: 'admin', status: 'active', team_id: null },
+      { role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null },
     ]
     expect(roleLabel(all)).toBe('Admin')
     expect(roleLabel(all.slice(0, 5))).toBe('Coach')
@@ -917,8 +919,8 @@ describe('canApproveAnything — a request is not access', () => {
   })
 
   it('refuses a pending admin row', () => {
-    expect(canApproveAnything([{ role: 'admin', team_id: null, status: 'pending' }])).toBe(false)
-    expect(canApproveAnything([{ role: 'admin', status: 'active', team_id: null }])).toBe(true)
+    expect(canApproveAnything([{ role: 'admin', admin_rights: ['clubadmin'], team_id: null, status: 'pending' }])).toBe(false)
+    expect(canApproveAnything([{ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }])).toBe(true)
   })
 
   // ⚠️ THE CONTROL. Somebody can hold both — a parent at the club who has also
@@ -949,5 +951,69 @@ describe('canApproveTeam — the same rule, per squad', () => {
   // change that re-checks only one of the two cannot pass this file.
   it('still refuses a medic, active or not', () => {
     expect(canApproveTeam([{ role: 'medic', team_id: 'team-u12', status: 'active' }], 'team-u12')).toBe(false)
+  })
+})
+
+// ══ THE ADMIN SPLIT — 3 Sep 2026 (claude/plans/2026-09-03-admin-team-reach.md)
+// An admin row reaches no squad by itself. These mirror
+// private.admin_team_reach in db/migrations/20260904_admin_team_reach.sql.
+describe('adminTeamReach — the admin split', () => {
+  const admin = (rights, extra = {}) =>
+    [membership({ role: 'admin', team_id: null, admin_rights: rights, ...extra })]
+
+  it('⚠️ pins the four allowlists — change the migration first, then this', () => {
+    expect(ADMIN_TEAM_REACH).toEqual({
+      edit: ['clubadmin', 'youth'],
+      see: ['clubadmin', 'youth', 'media', 'welfare', 'pitches', 'training'],
+      events: ['clubadmin', 'youth', 'media', 'pitches'],
+      attendance: ['clubadmin', 'youth', 'training'],
+    })
+  })
+
+  it('a zero-rights admin reaches nothing: no squads, no edit, no approve', () => {
+    const m = admin([])
+    expect(isAdmin(m)).toBe(true)
+    expect(adminTeamReach(m, 'see')).toBe(false)
+    expect(visibleTeams(m, ALL_TEAMS)).toEqual([])
+    expect(canEditTeam(m, U8.id)).toBe(false)
+    expect(canApproveTeam(m, U8.id)).toBe(false)
+    expect(canEditEvent(m, { id: 'e', team_id: U8.id })).toBe(false)
+  })
+
+  it('a super reaches everything implicitly', () => {
+    const m = admin([], { is_super: true })
+    expect(visibleTeams(m, ALL_TEAMS).map((t) => t.id)).toEqual([U6.id, U8.id, U12.id, U16.id, SENIOR_1XV.id])
+    expect(canEditTeam(m, U8.id)).toBe(true)
+  })
+
+  it('Pitch: sees squads, edits events, cannot edit the squad', () => {
+    const m = admin(['pitches'])
+    expect(visibleTeams(m, ALL_TEAMS).length).toBe(ALL_TEAMS.length)
+    expect(canEditTeam(m, U8.id)).toBe(false)
+    expect(canApproveTeam(m, U8.id)).toBe(false)
+    expect(canEditEvent(m, { id: 'e', team_id: U8.id })).toBe(true)
+  })
+
+  it('Training: sees squads, attendance only — no lineup, no event', () => {
+    const m = admin(['training'])
+    expect(adminTeamReach(m, 'attendance')).toBe(true)
+    expect(canEditTeam(m, U8.id)).toBe(false)
+    expect(canEditEvent(m, { id: 'e', team_id: U8.id })).toBe(false)
+  })
+
+  it('Club Hub Admin and Youth are unchanged: full squad reach', () => {
+    for (const right of ['clubadmin', 'youth']) {
+      const m = admin([right])
+      expect(canEditTeam(m, U8.id)).toBe(true)
+      expect(canApproveTeam(m, U8.id)).toBe(true)
+    }
+  })
+
+  it('a club-wide event still needs only an admin row (club-level spine, ruling 3)', () => {
+    expect(canEditEvent(admin([]), { id: 'e', team_id: null })).toBe(true)
+  })
+
+  it('a pending admin row reaches nothing even with rights', () => {
+    expect(adminTeamReach(admin(['clubadmin'], { status: 'pending' }), 'see')).toBe(false)
   })
 })

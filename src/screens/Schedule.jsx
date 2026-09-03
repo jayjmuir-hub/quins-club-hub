@@ -15,7 +15,7 @@ import EventKindChooser from '../components/EventKindChooser.jsx'
 import TournamentDetail, { isTournamentEvent } from './TournamentDetail.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canEditEvent, canEditTeam, isAdmin, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
+import { adminTeamReach, canEditEvent, canEditTeam, isAdmin, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
 import {
   clubDayParts,
   clubToday,
@@ -616,7 +616,11 @@ export default function Schedule() {
   // rights (SQUAD_STAFF_ROLES in src/lib/scope.js, mirrored by
   // private.can_edit_team). Asking the helper rather than testing the string
   // is what stops the next role needing an edit here.
-  const canEditAnything = admin || memberships.some((membership) => isSquadStaffRole(membership.role))
+  // The admin split (3 Sep 2026): the admin's RIGHT decides, not the row.
+  const canEditAnything =
+    adminTeamReach(memberships, 'edit') ||
+    adminTeamReach(memberships, 'events') ||
+    memberships.some((membership) => isSquadStaffRole(membership.role))
   const teamNames = scopedTeams.map((team) => team.name).join(', ')
 
   // The sidebar's Schedule sub-menu deep-links: /schedule?open=subscribe and
@@ -763,7 +767,7 @@ export default function Schedule() {
                 calendared makes any sense". It is a word, but a lawyer's one. */}
             <AccentTitle lead="What's on," accent="when." />
           </div>
-          <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin ? 'All squads' : teamNames || 'No squads yet'}</p>
+          <p className={`text-[13px] font-medium ${MUTED_ON_PAPER}`}>{admin && adminTeamReach(memberships, 'see') ? 'All squads' : teamNames || 'No squads yet'}</p>
         </div>
         {/* "Add to calendar" sits beside "Add event" and is for EVERYONE — a
             parent subscribing to their child's fixtures is the main case, not

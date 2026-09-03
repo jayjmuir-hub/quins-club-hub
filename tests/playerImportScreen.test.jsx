@@ -45,7 +45,7 @@ import Roster from '../src/screens/Roster.jsx'
 const TEAM_U10 = { id: 'team-u10', name: 'U10', sort_order: 5 }
 const TEAM_U12 = { id: 'team-u12', name: 'U12', sort_order: 6 }
 const TEAMS = [TEAM_U10, TEAM_U12]
-const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: 'club-1' }]
+const ADMIN = [{ id: 'm1', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: 'club-1' }]
 
 function setDesktop(isDesktop = true) {
   window.matchMedia = vi.fn().mockImplementation((query) => ({

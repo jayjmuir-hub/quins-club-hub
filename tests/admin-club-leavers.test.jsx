@@ -51,7 +51,7 @@ const CLUB = '00000000-0000-0000-0000-0000000000ad'
 const U14 = { id: 't-u14', club_id: CLUB, name: 'U14B Contact', sort_order: 1 }
 const TEAMS = [U14]
 
-const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: CLUB }]
+const ADMIN = [{ id: 'm1', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: CLUB }]
 
 async function renderAdminClub(teams = TEAMS) {
   const user = userEvent.setup()

@@ -49,7 +49,7 @@ import { pickDate } from './helpers/pickDate.js'
 
 const CLUB_ID = '00000000-0000-0000-0000-0000000000ad'
 const TEAM_U16 = { id: 't-u16', club_id: CLUB_ID, name: 'U16', sort_order: 11 }
-const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null }]
+const ADMIN = [{ id: 'm-a', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }]
 
 function renderForm({ memberships = ADMIN, teams = [TEAM_U16], ...rest } = {}) {
   useMembershipsMock.mockReturnValue({ memberships, teams, loading: false, error: null })

@@ -175,7 +175,7 @@ describe('who may post', () => {
     { id: 't2', name: 'U13 Mixed' },
   ]
   const coach = [{ role: 'coach', status: 'active', team_id: 't1' }]
-  const admin = [{ role: 'admin', status: 'active', team_id: null }]
+  const admin = [{ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }]
   const parent = [{ role: 'parent', status: 'active', team_id: 't1' }]
   const pendingCoach = [{ role: 'coach', status: 'pending', team_id: 't1' }]
 
@@ -374,7 +374,7 @@ describe('scopeNotices', () => {
     notice({ id: 'eighteen', team_id: 'u18' }),
   ]
   const parentOfU7 = [{ role: 'parent', status: 'active', team_id: 'u7' }]
-  const admin = [{ role: 'admin', status: 'active', team_id: null }]
+  const admin = [{ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }]
 
   it('shows a U7 parent the club notice and the U7 one, never the U18B one', () => {
     expect(scopeNotices(rows, parentOfU7, teams).map((n) => n.id)).toEqual(['club', 'seven'])

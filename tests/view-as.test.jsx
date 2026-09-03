@@ -40,7 +40,7 @@ const TEAMS = [
   { id: 't2', name: 'U14 Girls', sort_order: 6 },
 ]
 
-const ADMIN_ROWS = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: 'c1' }]
+const ADMIN_ROWS = [{ id: 'm1', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: 'c1' }]
 
 function synthetic(role, teamId) {
   return [{ id: 'view-as', role, team_id: teamId, player_id: null, club_id: 'c1' }]

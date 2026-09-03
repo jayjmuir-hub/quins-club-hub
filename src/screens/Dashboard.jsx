@@ -711,7 +711,9 @@ export default function Dashboard() {
   // would grant, enabling an action that opens a form with no squad to pick.
   // canEditTeam's own null guard is the second line of defence behind that.
   // Same shape as Schedule.jsx's precedent.
-  const canEdit = admin || scopedTeams.some((team) => canEditTeam(memberships, team.id))
+  // The admin split (3 Sep 2026): no `admin ||` — canEditTeam already asks
+  // whether the admin's RIGHT reaches squads, and a zero-rights admin's does not.
+  const canEdit = scopedTeams.some((team) => canEditTeam(memberships, team.id))
   // Null for anyone who can edit; otherwise the role noun for the read-only
   // explanation, from the same roleLabel() the scope note uses.
   const readOnlyRole = canEdit ? null : roleLabel(memberships).toLowerCase()

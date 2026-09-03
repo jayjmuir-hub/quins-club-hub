@@ -77,7 +77,7 @@ beforeEach(() => {
   m.subscribeMessages.mockReturnValue(() => {})
   m.listDmCandidates.mockResolvedValue([
     { profile_id: 'p9', full_name: 'Zz Other Parent', role: 'parent', via_team: 'ZZ Probe U13' },
-    { profile_id: 'a1', full_name: 'Zz Admin Probe', role: 'admin', via_team: null },
+    { profile_id: 'a1', full_name: 'Zz Admin Probe', role: 'admin', admin_rights: ['clubadmin'], via_team: null },
   ])
   m.openConversation.mockResolvedValue('c-new')
 })

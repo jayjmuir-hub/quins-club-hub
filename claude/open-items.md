@@ -198,7 +198,16 @@ Grok's sibling comparison was the only imprecise word and the substance holds).
   until the tick exists. That is the intended Phase-4 posture *after* the grant,
   not a window in which minor-DM review is a total lockout. The SQL must not go
   to `main` before/without the grant.
-- **Item 13 — rule on the `is_admin` matrix (S4–S8) before any of it is built.**
+- ✅ **Item 13 RULED AND BUILT, 3 Sep 2026** — the admin split,
+  `claude/plans/2026-09-03-admin-team-reach.md`, migration
+  `20260904_admin_team_reach`: the admin arm of `can_edit_team` /
+  `can_see_team` / `is_attached_to_team` is a default-deny allowlist of rights,
+  so a zero-rights admin reaches no squad and a Pitch-only admin is names-read
+  on rosters, not edit. Harness green rolled back against production; the
+  changelog records when it is applied. The club-blind `can_see_child_contacts`
+  and the S10 sensitive-read audit sub-findings below are NOT closed by it.
+  The original item, kept for the record:
+- ~~**Item 13 — rule on the `is_admin` matrix (S4–S8) before any of it is built.**~~
   `private.is_admin` is still all-or-nothing; match sheets, lineups, attendance,
   grades/positions/units, squad chat + chat-media, and availability override are
   gated by `can_edit_team`/`can_see_team` (= any active admin), NOT a narrowed

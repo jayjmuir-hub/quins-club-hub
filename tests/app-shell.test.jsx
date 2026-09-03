@@ -103,7 +103,7 @@ function renderShell(path = '/', children = <div>Routed content</div>) {
 
 function loaded(overrides = {}) {
   return {
-    memberships: [{ role: 'admin', status: 'active', team_id: null }],
+    memberships: [{ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }],
     teams: [],
     loading: false,
     error: null,

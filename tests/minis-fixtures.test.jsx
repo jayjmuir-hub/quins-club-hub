@@ -139,7 +139,7 @@ function fixture(team, extra = {}) {
   }
 }
 
-const ADMIN = [{ id: 'm-a', role: 'admin', status: 'active', team_id: null, club_id: CLUB }]
+const ADMIN = [{ id: 'm-a', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: CLUB }]
 const ADMIN_YOUTH = [{ ...ADMIN[0], admin_rights: ['youth'] }]
 
 function provide(memberships = ADMIN, teams = TEAMS) {

@@ -67,7 +67,7 @@ vi.mock('../src/data/polls.js', () => ({
 
 import useDmThread from '../src/lib/useDmThread.js'
 
-const ADMIN_ROWS = [{ id: 'm1', role: 'admin', status: 'active', team_id: null, club_id: 'club-1' }]
+const ADMIN_ROWS = [{ id: 'm1', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: 'club-1' }]
 const SYNTHETIC_PARENT = [{ id: 'view-as', role: 'parent', status: 'active', team_id: 't1', club_id: 'club-1' }]
 
 function mount() {

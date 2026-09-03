@@ -221,7 +221,7 @@ describe('the picker — yours first', () => {
   it('leads an admin parent with their squad, then the rest of the club', async () => {
     useMembershipsMock.mockReturnValue(
       membershipsFor([
-        { role: 'admin', team_id: null, status: 'active' },
+        { role: 'admin', admin_rights: ['clubadmin'], team_id: null, status: 'active' },
         { role: 'parent', team_id: 't-u8', status: 'active', player_id: 'p-child' },
       ]),
     )
@@ -243,7 +243,7 @@ describe('the picker — yours first', () => {
 
   it('does not invent an empty Your squads card for a club-only admin', async () => {
     useMembershipsMock.mockReturnValue(
-      membershipsFor([{ role: 'admin', team_id: null, status: 'active' }]),
+      membershipsFor([{ role: 'admin', admin_rights: ['clubadmin'], team_id: null, status: 'active' }]),
     )
     renderAt('/squad')
     expect(await screen.findByTestId('section-club-squads')).toBeInTheDocument()

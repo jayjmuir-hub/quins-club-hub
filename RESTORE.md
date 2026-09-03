@@ -432,8 +432,18 @@ user with zero memberships reads **zero rows** from them — no error, just empt
 `private.is_attached_to_team` accepts any status and gates **fixtures**. So a **pending**
 member sees the schedule and not the roster. That is deliberate. Do not "align" them.
 
-**Admin memberships have `team_id = NULL`** — admin is club-wide. `visibleTeams`
-special-cases admin rather than collecting `team_id` values.
+**Admin memberships have `team_id = NULL`** — admin is club-wide FOR THE
+CLUB-LEVEL SPINE ONLY. ⚠️ **SINCE 3 Sep 2026 (`20260904_admin_team_reach`) AN
+ADMIN ROW REACHES NO SQUAD BY ITSELF.** `private.admin_team_reach(team, mode)`
+is default-deny: an admin reaches a squad only through `is_super` or a right on
+the mode's allowlist — edit {clubadmin, youth}; see + {media, welfare, pitches,
+training}; events + {media, pitches}; attendance {clubadmin, youth, training}.
+`can_edit_team`, `can_see_team` and `is_attached_to_team` route their admin arm
+through it, so every squad policy follows. `private.is_admin` still means "any
+active admin" for clubs, the teams table, invites, feedback, whole-club notices
+and chat, pitches, social ideas — none of it a squad. `visibleTeams` mirrors:
+it asks `adminTeamReach(memberships, 'see')`, not `isAdmin()`, and a zero-rights
+admin sees no squads. Rulings: `claude/plans/2026-09-03-admin-team-reach.md`.
 
 ❌ **The reasoning this used to give was wrong twice over.** It said the `teams` read
 policy "matches on `club_id`, so an admin still sees all **15** teams". The policy stopped

@@ -628,6 +628,62 @@ GRANT EXECUTE ON FUNCTION private.can_admin_see_pending(uuid) TO anon;  -- inert
 
 
 -- ---------------------------------------------------------------------
+-- private.admin_team_reach(uuid, text)                     ADDED 2026-09-04
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- THE ADMIN SPLIT (claude/plans/2026-09-03-admin-team-reach.md). Default-deny:
+-- an admin reaches a squad only through a right on the mode's allowlist, or
+-- is_super. Called by can_edit_team ('edit'), can_see_team and
+-- is_attached_to_team ('see'), the `event edit` policy ('events') and
+-- can_take_register ('attendance'). src/lib/scope.js ADMIN_TEAM_REACH mirrors.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.admin_team_reach(_team uuid, _mode text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1 from memberships m
+     where m.profile_id = auth.uid()
+       and m.status = 'active'
+       and m.role = 'admin'
+       and m.club_id = (select club_id from teams where id = _team)
+       and (m.is_super
+            or m.admin_rights && case _mode
+                 when 'edit'       then array['clubadmin','youth']
+                 when 'see'        then array['clubadmin','youth','media','welfare','pitches','training']
+                 when 'events'     then array['clubadmin','youth','media','pitches']
+                 when 'attendance' then array['clubadmin','youth','training']
+                 else array[]::text[]
+               end));
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.admin_team_reach(uuid, text) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- private.can_take_register(uuid)                          ADDED 2026-09-04
+-- proacl: {postgres=X/postgres,authenticated=X/postgres}
+-- The attendance gate: squad staff / editing admins, OR the 'attendance'
+-- allowlist (Training). All four attendance policies route through it.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION private.can_take_register(_event uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select private.can_edit_team(e.team_id)
+      or private.admin_team_reach(e.team_id, 'attendance')
+    from events e where e.id = _event;
+$function$
+;
+
+GRANT EXECUTE ON FUNCTION private.can_take_register(uuid) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
 -- private.can_edit_team(uuid)
 -- proacl: {postgres=X/postgres,authenticated=X/postgres,anon=X/postgres}
 --
@@ -663,11 +719,14 @@ CREATE OR REPLACE FUNCTION private.can_edit_team(_team uuid)
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  select exists (select 1 from memberships m
-    where m.profile_id = auth.uid()
-      and m.status = 'active'
-      and ((m.role = 'admin' and m.club_id = (select club_id from teams where id = _team))
-           or (m.role in ('coach','manager','medic') and m.team_id = _team)));
+  -- ⚠️ ADMIN ARM REWRITTEN 3 Sep 2026 (20260904_admin_team_reach): an admin
+  -- reaches a squad only through a right on the 'edit' allowlist, or is_super.
+  select private.admin_team_reach(_team, 'edit')
+      or exists (select 1 from memberships m
+           where m.profile_id = auth.uid()
+             and m.status = 'active'
+             and m.role in ('coach','manager','medic')
+             and m.team_id = _team);
 $function$
 ;
 
@@ -746,11 +805,12 @@ CREATE OR REPLACE FUNCTION private.can_see_team(_team uuid)
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  select exists (select 1 from memberships m
-    where m.profile_id = auth.uid()
-      and m.status = 'active'
-      and ((m.role = 'admin' and m.club_id = (select club_id from teams where id = _team))
-           or m.team_id = _team));
+  -- ⚠️ ADMIN ARM REWRITTEN 3 Sep 2026 (20260904_admin_team_reach): 'see' allowlist.
+  select private.admin_team_reach(_team, 'see')
+      or exists (select 1 from memberships m
+           where m.profile_id = auth.uid()
+             and m.status = 'active'
+             and m.team_id = _team);
 $function$
 ;
 
@@ -1616,11 +1676,13 @@ CREATE OR REPLACE FUNCTION private.is_attached_to_team(_team uuid)
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  select exists (select 1 from memberships m
-    where m.profile_id = auth.uid()
-      and m.status <> 'left'
-      and ((m.role = 'admin' and m.club_id = (select club_id from teams where id = _team))
-           or m.team_id = _team));
+  -- ⚠️ ADMIN ARM REWRITTEN 3 Sep 2026 (20260904_admin_team_reach): 'see' allowlist;
+  -- the squad arm keeps status <> 'left' (a pending member sees the schedule).
+  select private.admin_team_reach(_team, 'see')
+      or exists (select 1 from memberships m
+           where m.profile_id = auth.uid()
+             and m.status <> 'left'
+             and m.team_id = _team);
 $function$
 ;
 

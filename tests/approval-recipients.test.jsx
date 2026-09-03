@@ -22,7 +22,7 @@ vi.mock('../src/data/staff.js', async (orig) => ({
 import ApprovalRecipients from '../src/components/ApprovalRecipients.jsx'
 
 const ROWS = [
-  { membership_id: 'm1', profile_id: 'p1', full_name: 'Zz Admin Probe', role: 'admin', team_id: null, team_name: null, notify: true },
+  { membership_id: 'm1', profile_id: 'p1', full_name: 'Zz Admin Probe', role: 'admin', admin_rights: ['clubadmin'], team_id: null, team_name: null, notify: true },
   { membership_id: 'm2', profile_id: 'p2', full_name: 'Zz Coach Probe', role: 'coach', team_id: 't1', team_name: 'ZZ Probe U13', notify: true },
   { membership_id: 'm3', profile_id: 'p3', full_name: 'Zz Assistant Probe', role: 'coach', team_id: 't1', team_name: 'ZZ Probe U13', notify: false },
   { membership_id: 'm4', profile_id: 'p4', full_name: 'Zz Manager Probe', role: 'manager', team_id: 't1', team_name: 'ZZ Probe U13', notify: true },

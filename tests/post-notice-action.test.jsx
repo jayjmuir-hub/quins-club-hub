@@ -101,7 +101,7 @@ describe('PostNoticeAction', () => {
 
   it('gives an admin every squad', async () => {
     const user = userEvent.setup()
-    useMembershipsMock.mockReturnValue(ctx([{ role: 'admin', status: 'active', team_id: null }]))
+    useMembershipsMock.mockReturnValue(ctx([{ role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null }]))
     render(<PostNoticeAction />)
 
     await user.click(screen.getByTestId('post-notice-action'))
