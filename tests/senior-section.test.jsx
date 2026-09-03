@@ -98,6 +98,11 @@ describe('the senior section — a 2nd XV player', () => {
     // Asked for the whole section in one call, never a junior squad.
     expect(listEventsMock.mock.calls[0][0].teamIds).toEqual(['men1', 'men2'])
     expect(listPlayersMock.mock.calls[0][0]).toEqual({ teamIds: ['men1', 'men2'] })
+    // ⚠️ ISO strings, never Date objects: a Date reached Postgres as
+    // "GMT+0400 (Gulf Standard Time)" and the page errored on its first
+    // opening (3 Sep 2026).
+    expect(typeof listEventsMock.mock.calls[0][0].from).toBe('string')
+    expect(listEventsMock.mock.calls[0][0].from).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
 
   it('this weekend: each squad’s match with in, out and not-answered counts', async () => {

@@ -81,8 +81,12 @@ export default function SeniorSection() {
     let mounted = true
     setLoading(true)
     setError(null)
-    const from = new Date(Date.now() - 7 * 24 * 3600 * 1000)
-    const to = new Date(Date.now() + 200 * 24 * 3600 * 1000)
+    // ⚠️ ISO STRINGS, NOT Date OBJECTS. listEvents hands these to PostgREST
+    // as-is; a Date stringifies to "… GMT+0400 (Gulf Standard Time)" and
+    // Postgres answers 'time zone "gmt+0400" not recognized' — Jay's
+    // screenshot, 3 Sep 2026, the first time the page was opened on a phone.
+    const from = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
+    const to = new Date(Date.now() + 200 * 24 * 3600 * 1000).toISOString()
     Promise.all([
       listEvents({ teamIds, from, to }),
       foreign ? Promise.resolve([]) : listPlayers({ teamIds }),

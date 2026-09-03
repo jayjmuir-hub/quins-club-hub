@@ -226,15 +226,19 @@ export default function Nav({ showSquadHub = false, showSeniors = false, badges 
   // 29 Aug 2026: "the b is sitting on the menu outline"). Interior, it has the
   // room. findIndex rather than a hard slice so it survives a NAV_ITEMS reorder.
   // Seniors (3 Sep 2026) sits where Squad Hub does, for a person who has a
-  // senior section and no Squad Hub; someone with both gets both.
+  // senior section and no Squad Hub. ⚠️ NEVER BOTH ON THE DOCK: six tabs
+  // overlapped on a phone (Jay's screenshot the same day — SCHEDULEROSTER ran
+  // together and Chat fell off the edge). Staff with a Squad Hub reach the
+  // section from the Squad Hub page and the desktop sidebar instead.
   const base = showSquadHub || showSeniors
     ? (() => {
         const chatAt = NAV_ITEMS.findIndex((item) => item.to === '/chat')
         const at = chatAt < 0 ? NAV_ITEMS.length : chatAt
         return [
           ...NAV_ITEMS.slice(0, at),
-          ...(showSquadHub ? [{ to: '/squad', label: 'Squad Hub', icon: SquadIcon }] : []),
-          ...(showSeniors ? [{ to: '/seniors', label: 'Seniors', icon: SquadIcon }] : []),
+          ...(showSquadHub
+            ? [{ to: '/squad', label: 'Squad Hub', icon: SquadIcon }]
+            : [{ to: '/seniors', label: 'Seniors', icon: SquadIcon }]),
           ...NAV_ITEMS.slice(at),
         ]
       })()
