@@ -60,6 +60,9 @@ Both migrations are applied (`training_plans`, `publish_training_fit_check`),
 plus `training_suggestions` — APPLIED 2 Sep 2026 and live with the screens
 (`d98b593`, Part 1 of `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md`):
 the director's publish is now a suggestion the coaches accept or decline;
+`training_suggestion_push` APPLIED 3 Sep 2026 with push-send v17 (`b780840`) —
+the squad's coaches are pushed once per squad per publish, and the Publish tab
+has an Uptake card;
 harness 8/8 against production. The `training` right is held by the club's
 Rugby Performance Director. Ten squads are marked contact and five tag —
 `claude/decisions/2026-08-21-quick-rip-is-tag.md`. Nothing has been published
