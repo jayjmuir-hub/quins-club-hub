@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   totalMinutes, totalWarning, drillFitsTemplate, squadFitsTemplate, describePublishRow,
-  ageOrNull, textOrNull, bandLabel, ageDraftProblem,
+  ageOrNull, textOrNull, bandLabel, ageDraftProblem, summariseUptake, describeUptake,
 } from '../src/lib/trainingPlans.js'
 
 const T = { min_age: 9, max_age: 13, requires_contact: true }
@@ -158,5 +158,36 @@ describe('ageDraftProblem', () => {
   })
   it('refuses youngest above oldest', () => {
     expect(ageDraftProblem('13', '9')).toBe('Youngest is above oldest')
+  })
+})
+
+describe('summariseUptake / describeUptake', () => {
+  const row = (team, status, extra = {}) => ({
+    status, decided_at: '2026-09-01T10:00:00Z', decline_note: null,
+    event: { team_id: team, session: null }, ...extra,
+  })
+  it('buckets per squad and counts adjusted only when the coach saved AFTER accepting', () => {
+    const rows = [
+      row('a', 'accepted', { event: { team_id: 'a', session: { coach_edited_at: '2026-09-01T10:00:00Z' } } }),
+      row('a', 'accepted', { event: { team_id: 'a', session: { coach_edited_at: '2026-09-02T10:00:00Z' } } }),
+      // PostgREST may hand the unique-FK embed back as a one-element array.
+      row('a', 'accepted', { event: { team_id: 'a', session: [{ coach_edited_at: '2026-09-03T10:00:00Z' }] } }),
+      row('a', 'declined', { decline_note: '  too much contact ' }),
+      row('a', 'declined', { decline_note: '' }),
+      row('b', 'pending', { decided_at: null }),
+    ]
+    const out = summariseUptake(rows)
+    expect(out).toEqual([
+      { team_id: 'a', total: 5, accepted: 3, adjusted: 2, declined: 2, pending: 0, notes: ['too much contact'] },
+      { team_id: 'b', total: 1, accepted: 0, adjusted: 0, declined: 0, pending: 1, notes: [] },
+    ])
+    expect(describeUptake(out[0])).toBe('3 accepted (2 adjusted) · 2 declined')
+    expect(describeUptake(out[1])).toBe('1 unanswered')
+    expect(describeUptake({ total: 0 })).toBe('Nothing suggested')
+    expect(describeUptake({ total: 1, accepted: 1, adjusted: 0, declined: 0, pending: 0 })).toBe('1 accepted')
+  })
+  it('skips a row with no squad and is empty-safe', () => {
+    expect(summariseUptake([{ status: 'pending', event: null }])).toEqual([])
+    expect(summariseUptake(undefined)).toEqual([])
   })
 })

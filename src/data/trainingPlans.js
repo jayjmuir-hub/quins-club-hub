@@ -274,6 +274,26 @@ export async function listPendingSuggestions(teamId, { now = new Date() } = {}) 
 }
 
 /**
+ * Every suggestion on training in a date range, for the director's uptake
+ * view — with the squad, the answer, the note, and whether the coach has
+ * touched the session since accepting. RLS: the club's admins see all; a
+ * coach asking gets only their own squads, which is fine and not this
+ * screen's audience. Summarised by summariseUptake in src/lib/trainingPlans.js.
+ */
+export async function listSuggestionUptake({ from, to }) {
+  if (!from || !to) return []
+  const { data, error } = await supabase
+    .from('training_suggestions')
+    .select(
+      'id, status, suggested_at, decided_at, decline_note, template:session_templates(id,name), event:events!inner(id,team_id,starts_at,session:training_sessions(coach_edited_at))',
+    )
+    .gte('event.starts_at', `${from}T00:00:00+04:00`)
+    .lte('event.starts_at', `${to}T23:59:59+04:00`)
+  if (error) throw error
+  return data ?? []
+}
+
+/**
  * Accept or decline. Accept copies the template's blocks into the session on
  * the server (creating it if there is none, replacing its blocks if there is)
  * and stamps coach_edited_at; the returned id is that session's. Decline

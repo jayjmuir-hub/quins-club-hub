@@ -190,3 +190,52 @@ export function describePublishRow(row) {
   if (row.unchanged > 0) parts.push(`${row.unchanged} already ${row.unchanged === 1 ? 'has' : 'have'} it`)
   return parts.join(' · ')
 }
+
+/**
+ * The director's uptake, per squad: did the programme land? Rows are
+ * listSuggestionUptake's. A session embed may arrive as an object or a
+ * one-element array depending on how PostgREST reads the unique FK — both
+ * are handled, and a missing session simply means "not adjusted".
+ *
+ * `adjusted` is accepted AND the coach saved the session AFTER accepting
+ * (coach_edited_at later than decided_at) — accept itself stamps
+ * coach_edited_at, so "later than" is what separates a tweak from a plain yes.
+ */
+export function summariseUptake(rows) {
+  const byTeam = new Map()
+  for (const row of rows ?? []) {
+    const teamId = row?.event?.team_id
+    if (!teamId) continue
+    if (!byTeam.has(teamId)) {
+      byTeam.set(teamId, { team_id: teamId, total: 0, accepted: 0, adjusted: 0, declined: 0, pending: 0, notes: [] })
+    }
+    const bucket = byTeam.get(teamId)
+    bucket.total += 1
+    const session = Array.isArray(row.event.session) ? row.event.session[0] : row.event.session
+    if (row.status === 'accepted') {
+      bucket.accepted += 1
+      const edited = session?.coach_edited_at ? Date.parse(session.coach_edited_at) : NaN
+      const decided = row.decided_at ? Date.parse(row.decided_at) : NaN
+      if (Number.isFinite(edited) && Number.isFinite(decided) && edited > decided + 1000) bucket.adjusted += 1
+    } else if (row.status === 'declined') {
+      bucket.declined += 1
+      const note = (row.decline_note ?? '').trim()
+      if (note) bucket.notes.push(note)
+    } else {
+      bucket.pending += 1
+    }
+  }
+  return [...byTeam.values()]
+}
+
+/** One line per squad on the uptake card. */
+export function describeUptake(bucket) {
+  if (!bucket || bucket.total === 0) return 'Nothing suggested'
+  const parts = []
+  if (bucket.accepted > 0) {
+    parts.push(`${bucket.accepted} accepted${bucket.adjusted > 0 ? ` (${bucket.adjusted} adjusted)` : ''}`)
+  }
+  if (bucket.declined > 0) parts.push(`${bucket.declined} declined`)
+  if (bucket.pending > 0) parts.push(`${bucket.pending} unanswered`)
+  return parts.join(' · ')
+}

@@ -12,10 +12,11 @@ import {
   previewPublish,
   publish,
   upsertFocus,
+  listSuggestionUptake,
 } from '../data/trainingPlans.js'
 import { clubToday } from '../lib/eventFormat.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { describePublishRow, squadFitsTemplate, textOrNull } from '../lib/trainingPlans.js'
+import { describePublishRow, describeUptake, squadFitsTemplate, summariseUptake, textOrNull } from '../lib/trainingPlans.js'
 import TrainingGate from './TrainingGate.jsx'
 import { friendlyMessage } from '../lib/friendlyError.js'
 
@@ -188,6 +189,12 @@ function PublishBody() {
   const [publishError, setPublishError] = useState(null)
   const [done, setDone] = useState(null)
 
+  // The uptake card: what the coaches did with what was suggested, for the
+  // dates in the boxes above. Asked for on a button, never on every keystroke.
+  const [uptake, setUptake] = useState(null) // null = not asked; [] = asked, nothing
+  const [uptakeBusy, setUptakeBusy] = useState(false)
+  const [uptakeError, setUptakeError] = useState(null)
+
   // The focus form. null means it is closed.
   const [editingFocus, setEditingFocus] = useState(null)
   const [focusSaving, setFocusSaving] = useState(false)
@@ -326,6 +333,19 @@ function PublishBody() {
    * here would be a second opinion that can disagree with the one on screen —
    * and the only moment it would disagree is the moment it matters.
    */
+  async function loadUptake() {
+    setUptakeBusy(true)
+    setUptakeError(null)
+    try {
+      setUptake(summariseUptake(await listSuggestionUptake({ from, to })))
+    } catch (failure) {
+      setUptakeError(failure)
+      setUptake(null)
+    } finally {
+      setUptakeBusy(false)
+    }
+  }
+
   async function doPublish() {
     setRunning(true)
     setPublishError(null)
@@ -588,6 +608,66 @@ function PublishBody() {
             </p>
           )}
         </div>
+      </Card>
+
+      {/* ⚠️ UPTAKE, NOT A WRITE COUNT. Since 2 Sep 2026 a publish is a
+          suggestion, and the honest measure of whether the programme landed
+          is what the coaches did with it. Per squad, for the dates in the
+          boxes above: accepted (and how many were then adjusted), declined
+          with the coaches' reasons, unanswered. */}
+      <Card className="mb-3.5 p-3.5" data-testid="uptake-card">
+        <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
+          <h3 className="text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-muted">
+            Uptake
+          </h3>
+          <Button
+            className="ml-auto"
+            size="sm"
+            variant="secondary"
+            disabled={uptakeBusy || from === '' || to === ''}
+            onClick={loadUptake}
+          >
+            {uptakeBusy ? 'Working…' : uptake === null ? 'Show uptake' : 'Refresh'}
+          </Button>
+        </div>
+        {uptake === null && !uptakeError && (
+          <p className="text-[12.5px] text-ink-muted">
+            What the coaches did with the suggestions for {from || '…'} to {to || '…'}.
+          </p>
+        )}
+        {uptakeError && (
+          <p role="alert" className="text-[12.5px] font-semibold text-danger-ink">
+            {friendlyMessage(uptakeError, "Couldn't load the uptake. Try again.")}
+          </p>
+        )}
+        {uptake !== null && uptake.length === 0 && (
+          <p role="status" className="text-[12.5px] text-ink-muted">
+            Nothing suggested for those dates.
+          </p>
+        )}
+        {uptake !== null && uptake.length > 0 && (
+          <ul className="rounded-[10px] border-[1.5px] border-line">
+            {uptake.map((bucket) => (
+              <li
+                key={bucket.team_id}
+                data-testid={`uptake-${bucket.team_id}`}
+                className="flex flex-col gap-1 border-b border-line px-3.5 py-2.5 last:border-b-0"
+              >
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-extrabold text-ink">{squadName(bucket.team_id)}</span>
+                  <span className="text-[12.5px] text-ink-muted">{describeUptake(bucket)}</span>
+                </span>
+                {bucket.notes.length > 0 && (
+                  <ul className="text-[12.5px] text-ink-muted">
+                    {bucket.notes.map((note, index) => (
+                      <li key={index}>“{note}”</li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card className="p-3.5">
