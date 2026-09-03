@@ -632,6 +632,32 @@ export async function registerMyPlayer(
   return data
 }
 
+/**
+ * "That's me" / "that's my child" — attach this account to a roster row that
+ * already exists, instead of adding the name a second time.
+ *
+ * ⚠️ THE OTHER HALF OF GUARD 1. register_my_player refuses a name already on
+ * the squad's roster, and until 4 Sep 2026 the only way past was the tick
+ * that says "a different player" — which is how six U16B boys, each with a
+ * row their parent had made, became six duplicates in one evening. This is
+ * what they actually meant. The membership it makes is PENDING like any
+ * registration; a coach still approves it.
+ * db/migrations/20260904_claim_existing_player.sql.
+ */
+export async function claimExistingPlayer(fullName, teamId, selfRegister = false) {
+  const { data, error } = await supabase.rpc('claim_existing_player', {
+    p_full_name: fullName,
+    p_team_id: teamId,
+    p_self_register: selfRegister === true,
+  })
+  if (error) {
+    const friendly = new Error(REGISTER_MESSAGES[error.code] ?? error.message ?? REGISTER_FALLBACK)
+    friendly.code = error.code
+    throw friendly
+  }
+  return data
+}
+
 // Same silent-refusal shape as every other write in this module: `memb manage`
 // is `private.is_admin(club_id)`, so a non-admin's UPDATE matches zero rows and
 // PostgREST reports that as a successful empty response rather than an error.

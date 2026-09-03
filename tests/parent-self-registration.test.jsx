@@ -31,6 +31,7 @@ import { MemoryRouter } from 'react-router-dom'
 const useAuthMock = vi.fn()
 const useMembershipsMock = vi.fn()
 const registerMyPlayerMock = vi.fn()
+const claimExistingPlayerMock = vi.fn()
 const approveMembershipMock = vi.fn()
 const getMyProfileMock = vi.fn()
 const getMyAccessRequestMock = vi.fn()
@@ -63,6 +64,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 vi.mock('../src/data/members.js', () => ({
   countAdminWaiting: () => Promise.resolve(0),
   registerMyPlayer: (...args) => registerMyPlayerMock(...args),
+  claimExistingPlayer: (...args) => claimExistingPlayerMock(...args),
   approveMembership: (...args) => approveMembershipMock(...args),
   getMyProfile: (...args) => getMyProfileMock(...args),
   updateProfileNames: (...args) => updateProfileNamesMock(...args),
@@ -989,6 +991,81 @@ describe('Add your player — a signed-in account with no access', () => {
     // Re-enabled, not stuck in "Adding…": the fix for an unconfirmed email is
     // to go and click a link and come back, and the form has to still work.
     expect(screen.getByRole('button', { name: /add my player/i })).toBeEnabled()
+  })
+
+  // ── A name already on the roster (4 Sep 2026) ────────────────────────
+  //
+  // Six U16B boys, one evening: each already had a row their parent had made,
+  // the server refused the name, and the only door was the tick that says
+  // "a different player". "That's me — connect me" is the door they meant.
+  describe('a name already on the roster', () => {
+    function duplicateRefusal() {
+      const refusal = new Error('Someone with that name is already registered in U13. If that is your player, they are already on the roster.')
+      refusal.code = '42710'
+      return refusal
+    }
+
+    it('offers to connect the account to the existing row, and does so through the claim call', async () => {
+      const user = userEvent.setup()
+      registerMyPlayerMock.mockRejectedValueOnce(duplicateRefusal())
+      claimExistingPlayerMock.mockResolvedValue({ id: 'mm-claim', status: 'pending', player_id: 'p-existing' })
+      const reload = vi.fn()
+      useMembershipsMock.mockReturnValue(shellState({ reload }))
+      await renderShell()
+
+      await user.type(screen.getByLabelText(/player's first name/i), 'Chidi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Okafor')
+      await pickDate(user, '2014-03-04', /date of birth/i)
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_U13.id)
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/already registered/i)
+      // The connect-me button leads; the "different player" tick is still there, after it.
+      const connect = screen.getByRole('button', { name: /that's my child — connect me/i })
+      expect(screen.getByRole('checkbox', { name: /different player/i })).toBeInTheDocument()
+      await user.click(connect)
+
+      await waitFor(() => expect(claimExistingPlayerMock).toHaveBeenCalledWith('Chidi Okafor', TEAM_U13.id, false))
+      // No second registration attempt, and the provider reloads as after a save.
+      expect(registerMyPlayerMock).toHaveBeenCalledTimes(1)
+      await waitFor(() => expect(reload).toHaveBeenCalled())
+    })
+
+    it('words the button for the player themselves, and sends the self flag', async () => {
+      const user = userEvent.setup()
+      registerMyPlayerMock.mockRejectedValueOnce(duplicateRefusal())
+      claimExistingPlayerMock.mockResolvedValue({ id: 'mm-claim', status: 'pending', player_id: 'p-existing' })
+      await renderShell()
+
+      await pickDate(user, '2014-03-04', /date of birth/i)
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
+      await user.click(screen.getByRole('radio', { name: /i'm the player/i }))
+      await user.type(screen.getByLabelText(/your first name/i), 'Tobi')
+      await user.type(screen.getByLabelText(/your family name/i), 'Adeyemi')
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      await user.click(await screen.findByRole('button', { name: /that's me — connect me/i }))
+      await waitFor(() => expect(claimExistingPlayerMock).toHaveBeenCalledWith('Tobi Adeyemi', TEAM_SELF.id, true))
+    })
+
+    it('on "that is your own name", one press makes them the player instead of a parent', async () => {
+      const user = userEvent.setup()
+      const refusal = new Error('That is your own name, but you have said you are registering a child.')
+      refusal.code = '42809'
+      registerMyPlayerMock.mockRejectedValueOnce(refusal)
+      await renderShell()
+
+      await pickDate(user, '2014-03-04', /date of birth/i)
+      await user.selectOptions(screen.getByLabelText(/age group/i), TEAM_SELF.id)
+      await user.type(screen.getByLabelText(/player's first name/i), 'Tobi')
+      await user.type(screen.getByLabelText(/player's family name/i), 'Adeyemi')
+      await user.click(screen.getByRole('button', { name: /add my player/i }))
+
+      await user.click(await screen.findByRole('button', { name: /i am the player/i }))
+      expect(screen.getByRole('radio', { name: /i'm the player/i })).toBeChecked()
+      // The refusal's tick has gone with the answer that caused it.
+      expect(screen.queryByRole('checkbox', { name: /really is my child/i })).not.toBeInTheDocument()
+    })
   })
 
   // ── The birthday against the age group (17 Aug 2026) ──────────────────
