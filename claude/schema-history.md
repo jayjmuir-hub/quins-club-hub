@@ -1122,3 +1122,34 @@ removes the reader; a welfare seat gives the channel and NOT DM review (the
 right holder still reviews); the audit rows carry the super as actor; an
 invented key is refused; revoking the title leaves the Committee at once.
 Run rolled back against production 3 Sep via the MCP.
+
+## 20260904_claim_existing_player — "that's me" (4 Sep 2026)
+
+**Why.** On 3 Sep 2026 eight U16B players signed up for themselves in one
+evening. Every intent was correct. Six already had a roster row their parent
+had made the week before, and `private.apply_signup_intent` treated the
+same-name row as a duplicate and SKIPPED it — silently, so each boy landed with
+no access, went to the in-app form, was refused again by `register_my_player`'s
+GUARD 1, and took the only door: the "this is a different player" tick. Six
+duplicate rows; four self-parent rows from the ones who guessed "my child".
+Cleaned up by hand that night (`claude/changelog.md`, 3 Sep).
+
+**What it adds.** `public.claim_existing_player(name, squad, self)`: the one
+live roster row with that name on that squad gets a PENDING membership from the
+caller — player if self or a senior squad, otherwise parent plus a
+`player_parents` row with the claimer's name and email. 42704 when nothing
+matches (add as new), 42710 when two rows match (the club untangles it).
+Idempotent. Nothing here grants access; a coach approves as before.
+
+**What it changes.** `private.apply_signup_intent` re-created in full; the only
+difference is the same-name branch, which now claims under the same rules
+instead of `continue`. A new name still creates a player, and `confirm_duplicate`
+still forces a new row for the rare true case.
+
+**Proof.** `db/tests/claim-existing-player.sql`, nine steps, run against
+production inside a rolled-back transaction with the migration applied in the
+same transaction: player claim (roster +0); claiming again makes no second
+membership; unknown name refused 42704; parent claim leaves a parent row and
+the self-claim left NO self-parent row; the wizard intent on an existing name
+claims (+0) while a new name still creates (+1, the control); two live rows with
+one name refused 42710.

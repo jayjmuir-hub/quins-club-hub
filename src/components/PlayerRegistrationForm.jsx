@@ -414,15 +414,9 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
               ? 'If that is you, you are already on the roster — connect your account to it.'
               : 'If that is your child, they are already on the roster — connect your account to them.'}
           </p>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={onClaim}
-            data-testid={`claim-existing-${row.key}`}
-            className="mt-2 min-h-[44px] w-full rounded-[11px] bg-brand px-3 text-sm font-bold text-white disabled:opacity-60"
-          >
+          <Button type="button" full disabled={disabled} onClick={onClaim} data-testid={`claim-existing-${row.key}`} className="mt-2">
             {row.selfRegister ? "That's me — connect me" : "That's my child — connect me"}
-          </button>
+          </Button>
         </div>
       )}
       {/* "That is your own name" and the squad lets players register
@@ -430,15 +424,9 @@ function PlayerRow({ row, index, total, teams, disabled, askingOwnName, onChange
           press flips the answer; the tick below remains for the parent who
           really does share a name with their child. */}
       {row.needsConfirm === 'selfName' && canSelfRegister && !row.selfRegister && onBecomePlayer && (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onBecomePlayer}
-          data-testid={`become-player-${row.key}`}
-          className="mt-2 min-h-[44px] w-full rounded-[11px] bg-brand px-3 text-sm font-bold text-white disabled:opacity-60"
-        >
+        <Button type="button" full disabled={disabled} onClick={onBecomePlayer} data-testid={`become-player-${row.key}`} className="mt-2">
           I am the player — register me, not a child
-        </button>
+        </Button>
       )}
       {row.needsConfirm && (
         <label className="mt-2 flex items-start gap-2 rounded-[11px] bg-danger-bg px-3 py-2.5 text-[12.5px] font-semibold leading-relaxed text-danger-ink">

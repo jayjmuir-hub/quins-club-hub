@@ -520,6 +520,12 @@ const PENDING_MEMBERSHIPS = [
 // or unknown age group), 42901 (five already pending). The message returned
 // matches src/data/members.js's REGISTER_MESSAGES, so the alert is
 // screenshot-able without a live database.
+// Mirrors claimExistingPlayer (4 Sep 2026): an inert success, like the
+// register stub's happy path. The harness never reaches production.
+export async function claimExistingPlayer(fullName, teamId, selfRegister = false) {
+  return { id: `stub-claim-${teamId}`, status: 'pending', role: selfRegister ? 'player' : 'parent', player_id: `stub-player-${teamId}` }
+}
+
 export async function registerMyPlayer(fullName, teamId) {
   const params = new URLSearchParams(window.location.search)
   const delay = Number(params.get('registerDelay') || 0)
