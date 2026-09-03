@@ -467,6 +467,14 @@ export default function SquadHub() {
               by side, the tracking grid takes the full width beneath them.
               Grid PLACEMENT classes, not DOM order, so the phone keeps
               tracking directly under the calendar — its headline position. */}
+          {team?.section && (
+            <p data-testid="senior-section-link" className="mb-3 text-sm text-ink-muted">
+              <Link to={`/seniors?section=${team.section}`} className="font-bold text-brand-ink underline-offset-2 hover:underline">
+                The whole senior section
+              </Link>
+              {' '}— every squad's weekend, fixtures and pool.
+            </p>
+          )}
           {leagueTables.length > 0 && (
             <p data-testid="league-table-links" className="mb-3 text-sm text-ink-muted">
               League table:{' '}

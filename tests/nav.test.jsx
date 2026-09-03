@@ -295,3 +295,25 @@ describe('Nav — Admin pill', () => {
     expect(screen.queryByRole('link', { name: 'Accounts' })).not.toBeInTheDocument()
   })
 })
+
+describe('the dock never carries Squad Hub AND Seniors (3 Sep 2026)', () => {
+  // Six tabs overlapped on a phone the day Seniors shipped. A person with a
+  // Squad Hub reaches the section from the Squad Hub page instead.
+  it('shows Seniors only when there is no Squad Hub', () => {
+    const { unmount } = render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Nav showSquadHub showSeniors />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('link', { name: /squad hub/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /seniors/i })).not.toBeInTheDocument()
+    unmount()
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Nav showSeniors />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('link', { name: /seniors/i })).toHaveAttribute('href', '/seniors')
+    expect(screen.queryByRole('link', { name: /squad hub/i })).not.toBeInTheDocument()
+  })
+})
