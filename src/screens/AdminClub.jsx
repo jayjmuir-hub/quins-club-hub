@@ -16,6 +16,7 @@ import {
   setTeamScoringKinds,
   setTeamRequiresContact,
   setTeamDefaultFormat,
+  setTeamSection,
   setTeamUsesJerseyNumbers,
   createTeam,
 } from '../data/teams.js'
@@ -26,6 +27,7 @@ import { ageBandFromTeamName } from '../lib/ageGroup.js'
 import { formatLeftDate, isLeaver } from '../lib/leavers.js'
 import { FORMATS, formatLabel } from '../lib/fixtureFormat.js'
 import { isMinisTeam } from '../lib/minis.js'
+import { SECTIONS } from '../lib/section.js'
 import InviteForm from './InviteForm.jsx'
 import Sheet from '../components/Sheet.jsx'
 import StorageCard from '../components/StorageCard.jsx'
@@ -481,6 +483,22 @@ export default function AdminClub() {
    * and refusal. See saveRequiresContact above for the full reasoning; it
    * applies here unchanged.
    */
+  // The senior section — a COLUMN, never the name (3 Sep 2026). Same
+  // save-on-change shape as the jersey switch.
+  async function saveSection(next) {
+    const id = scoringTeamId
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await setTeamSection(id, next)
+      await reloadTeams()
+    } catch (failure) {
+      setSaveError(failure)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function saveUsesJerseyNumbers(next) {
     const id = scoringTeamId
     setSaving(true)
@@ -837,6 +855,24 @@ export default function AdminClub() {
             </button>
           </div>
 
+          {/* Which senior section this squad belongs to. Drives section-wide
+              reading of rosters and availability for its members —
+              claude/plans/2026-09-03-senior-section.md. */}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-[13px] font-bold text-ink">Section</span>
+            <select
+              aria-label="Section"
+              value={scoringTeam.section ?? ''}
+              disabled={saving}
+              onChange={(domEvent) => saveSection(domEvent.target.value || null)}
+              className="rounded-[8px] border-[1.5px] border-line bg-surface-card px-3 py-2 text-[14px] text-ink outline-none transition focus:border-brand"
+            >
+              <option value="">None</option>
+              {SECTIONS.map((s) => (
+                <option key={s.code} value={s.code}>{s.long}</option>
+              ))}
+            </select>
+          </div>
           {/* ⚠️ "Jersey numbers" IS A COLUMN, NEVER DERIVED FROM SENIOR — a
               touch side is senior without numbers, exactly as a squad's name
               says nothing reliable about contact above. Same shape as the

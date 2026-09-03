@@ -42,6 +42,7 @@ import PitchGlance from './screens/PitchGlance.jsx'
 import YouthDashboard from './screens/YouthDashboard.jsx'
 import AdminCompetitions from './screens/AdminCompetitions.jsx'
 import Standings from './screens/Standings.jsx'
+import SeniorSection from './screens/SeniorSection.jsx'
 import MatchSheet from './screens/MatchSheet.jsx'
 import Lineup from './screens/Lineup.jsx'
 import GameTime from './screens/GameTime.jsx'
@@ -285,6 +286,10 @@ export default function App() {
           {/* The league table for one division, readable by any signed-in
               member; a keeper or admin types the round's results under it. */}
           <Route path="/standings/:competitionId" element={<AppShell><Standings /></AppShell>} />
+          {/* The senior section in one place — claude/plans/2026-09-03-senior-section.md.
+              What it shows is decided by RLS; the screen only chooses which
+              section pills to draw. */}
+          <Route path="/seniors" element={<AppShell><SeniorSection /></AppShell>} />
           <Route path="/admin" element={<AppShell><AdminDashboard /></AppShell>}>
             {/* ⚠️ /admin IS THE CHOOSER, and until 12 Aug 2026 it redirected
                 straight to Accounts. Every URL below is unchanged — only bare
