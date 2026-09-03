@@ -27,6 +27,11 @@ describe('pitch-side tap targets', () => {
 
   it('lineup row actions (Bench / Remove / Start / Shirt) are 44px tall, and none is left at 11.5px', () => {
     const lineup = src('screens/Lineup.jsx')
+    // ⚠️ The codemod that added min-h-[44px] on 2 Sep 2026 ate the space after
+    // font-bold on ten buttons (`font-boldtext-ink`), which Tailwind silently
+    // drops: no weight, no colour, live for two hours. A class list is a
+    // space-separated string; the sweep now refuses any glued utility.
+    expect(lineup).not.toMatch(/font-bold(?=text-)/)
     expect(lineup.match(/min-h-\[44px\] py-1 text-\[12px\] font-bold/g)?.length ?? 0).toBeGreaterThanOrEqual(4)
     expect(lineup).not.toMatch(/py-1 text-\[11\.5px\] font-bold/)
   })
