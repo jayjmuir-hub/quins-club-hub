@@ -897,6 +897,36 @@ cache — where before this task they were live, callable endpoints (the advisor
 "anon/authenticated can execute via RPC" warning). `accept_invite` remains the one function
 genuinely reachable via RPC, exactly as intended.
 
+## 20260902_training_suggestion_push — the squad's coaches are told
+
+**Status line: written 2 Sep 2026, proven in a rolled-back transaction
+against production (10/10; and with the audience function's role filter
+removed, "a parent on the squad is not" went red). Applied when the PR that
+carries it merges — see the changelog.**
+
+**Who is told, and why not the admins by role.** Active coach, manager and
+medic memberships on the squad — the team-level half of
+`private.can_edit_team` — never the director who pressed the button, minus
+the new `training` opt-out. Club admins are not included as a role: the
+director is one, and an admin who also coaches gets it through that
+membership. A parent never is; the audience function selects on role and the
+harness asserts it in both directions with a control.
+
+**One push per squad per publish, sent from inside `suggest_training`** after
+each squad's loop, only when `will_suggest > 0` and never on preview — a
+fortnight's publish is many sessions and one buzz is the whole message. The
+outbox pattern from `20260830_push_hardening.sql`: the sender writes the
+strings into `push_outbox`, posts only the id under the key
+`training_suggestion_push`, push-send deletes the row before sending. The
+tap lands on `/squad/<team>/training`, where Accept / Decline live.
+
+**`suggest_training` is re-created in full** rather than patched; the body is
+the `20260902_training_suggestions` one plus one `perform`.
+
+**`training` joins the opt-out constraint**, restated in full because
+`tests/notification-categories.test.js` requires some migration to state
+exactly the app's list.
+
 ## 20260902_training_suggestions — the director's session is a SUGGESTION
 
 **Status line: written 2 Sep 2026, proven in a rolled-back transaction

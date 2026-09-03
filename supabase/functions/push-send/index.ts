@@ -27,6 +27,12 @@
 //   { document_id }     somebody published a document to a squad
 //                       (public.create_document with _notify => true —
 //                        an RPC, not a trigger, 31 Aug 2026)
+//   { training_suggestion_push: { outbox_id } }
+//                       the performance director suggested sessions to a
+//                       squad; its staff are told, one push per squad
+//                       (private.send_training_suggestion_push from inside
+//                        public.suggest_training, 2 Sep 2026 —
+//                        db/migrations/20260902_training_suggestion_push.sql)
 //
 // ⚠️ NO TRIGGER'S TEXT ARRIVES IN THE BODY ANY MORE (Grok item 11, 30 Aug
 // 2026 — 20260830_push_hardening.sql). `squad_push` used to arrive fully
@@ -630,6 +636,30 @@ async function documentTargets(documentId: string): Promise<Subscription[]> {
   return await response.json()
 }
 
+/**
+ * The subscriptions a TRAINING SUGGESTION should go to: the squad's coaches,
+ * managers and medics, never the director who pressed the button, minus the
+ * `training` opt-outs. All of that lives in
+ * public.training_suggestion_push_subscriptions, beside the read policy on
+ * training_suggestions that it mirrors — a disclosure rule belongs in the
+ * database, not in a file that deploys separately.
+ */
+async function trainingSuggestionTargets(team: string, actor: string | null): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/training_suggestion_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _team: team, _actor: actor }),
+  })
+  if (!response.ok) {
+    throw new Error(`training_suggestion_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
 interface Subscription {
   id: string
   endpoint: string
@@ -689,6 +719,7 @@ Deno.serve(async (request) => {
   let documentId = ''
   let squad: Record<string, string> | null = null
   let nudge: Record<string, string> | null = null
+  let training: Record<string, string> | null = null
   try {
     const payload = await request.json()
     feedbackId = String(payload?.feedback_id ?? '')
@@ -699,6 +730,7 @@ Deno.serve(async (request) => {
     documentId = String(payload?.document_id ?? '')
     squad = payload?.squad_push ?? null
     nudge = payload?.availability_nudge ?? null
+    training = payload?.training_suggestion_push ?? null
   } catch {
     return new Response('bad request', { status: 400 })
   }
@@ -707,7 +739,7 @@ Deno.serve(async (request) => {
   // notified.
   if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0)
       + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) + (messageId ? 1 : 0)
-      + (documentId ? 1 : 0) + (accessRequestId ? 1 : 0) !== 1) {
+      + (documentId ? 1 : 0) + (accessRequestId ? 1 : 0) + (training ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
@@ -741,6 +773,28 @@ Deno.serve(async (request) => {
         url: `${APP_URL}/my-reports`,
         tag: `feedback-${feedbackId}`,
         subscriptions,
+      }
+    } else if (training) {
+      // ⚠️ THE SAME OUTBOX RULE AS squad_push BELOW: the request carries only
+      // an id, the strings were rendered by the SECURITY DEFINER sender, and
+      // the row is deleted before sending. What differs is the AUDIENCE —
+      // the squad's STAFF, never the families, never the director who pressed
+      // it — which public.training_suggestion_push_subscriptions decides
+      // beside the policy it narrows (20260902_training_suggestion_push.sql).
+      const outboxId = String(training.outbox_id ?? '')
+      if (!outboxId) return new Response('bad request', { status: 400 })
+      const rows = await db(
+        `push_outbox?id=eq.${encodeURIComponent(outboxId)}&select=id,club_id,team_id,actor_id,category,title,body,path,tag`,
+      )
+      const out = rows?.[0]
+      if (!out) return new Response('not found', { status: 404 })
+      await deleteOutboxRow(out.id)
+      job = {
+        title: escapeHtmlFree(out.title),
+        body: escapeHtmlFree(out.body).slice(0, 200),
+        url: `${APP_URL}${out.path && out.path.startsWith('/') ? out.path : '/'}`,
+        tag: escapeHtmlFree(out.tag ?? '') || `training-suggest-${out.team_id}`,
+        subscriptions: await trainingSuggestionTargets(out.team_id, out.actor_id ?? null),
       }
     } else if (squad) {
       // ⚠️ THE COPY COMES FROM THE OUTBOX, NEVER THE BODY (Grok item 11,

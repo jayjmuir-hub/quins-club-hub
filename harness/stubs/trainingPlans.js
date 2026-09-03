@@ -103,3 +103,4 @@ export function publish() { return { ...SESSION } }
 export async function getSuggestion() { return null }
 export async function listPendingSuggestions() { return [] }
 export async function decideSuggestion() { return null }
+export async function listSuggestionUptake() { return [] }

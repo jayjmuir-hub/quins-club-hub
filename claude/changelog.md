@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
-- **fix(ui): "Take attendance" opens the register instead of bouncing back to
+- `6639963` — **fix(ui): "Take attendance" opens the register instead of bouncing back to
   the event.** Reported by an age-group manager on the U18B Tuesday session and
   reproduced by Jay as admin, so not a rights problem. Since `cc550dc` (#652,
   Back closes the sheet) a sheet pops its own history entry in its effect
@@ -25,6 +25,25 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
+- **feat(training): THE COACHES ARE TOLD, AND THE DIRECTOR SEES THE UPTAKE.**
+  The two follow-ups Part 1 of
+  `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md` left
+  open. **Push:** `db/migrations/20260902_training_suggestion_push.sql` —
+  one push per squad per publish, from inside `suggest_training`, to the
+  squad's coaches, managers and medics, never the families and never the
+  director who pressed it, with a new `training` opt-out category; the
+  outbox pattern, payload key `training_suggestion_push`, a new branch in
+  `supabase/functions/push-send/index.ts` and
+  `tests/push-training-suggestion-link.test.js` pinning the three sources to
+  each other. `db/tests/training-suggestion-push.sql` is ten steps, run in a
+  rolled-back transaction against production, 10/10, and with the role
+  filter removed from the audience function the parent step went red.
+  **Uptake:** an Uptake card on the Publish tab — for the dates in the
+  boxes, per squad: accepted (and how many were adjusted after accepting),
+  declined with the coaches' reasons word for word, unanswered — asked for
+  on a button, never on every keystroke (`listSuggestionUptake`,
+  `summariseUptake`, `describeUptake`). ⚠️ **The migration is applied and
+  push-send redeployed only on Jay's yes; the changelog says when.**
 - `ab54bc4` — **fix(ux): the last Low batch from the full review.** Share on the team
   sheet and the match sheet now says what happened — "Downloaded — the
   picture is in your Downloads folder." on a desktop, "Share cancelled.

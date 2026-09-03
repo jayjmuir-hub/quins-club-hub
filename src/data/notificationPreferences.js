@@ -96,6 +96,11 @@ export const NOTIFICATION_CATEGORIES = [
     label: 'New documents',
     hint: 'When the club or your coaches share a document with your squad.',
   },
+  {
+    key: 'training',
+    label: 'Training suggestions',
+    hint: 'For coaches: when the performance director suggests sessions for your squad.',
+  },
 ]
 
 /**

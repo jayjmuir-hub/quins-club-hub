@@ -32,6 +32,7 @@ const publishMock = vi.fn()
 const listFocusMock = vi.fn()
 const upsertFocusMock = vi.fn()
 const deleteFocusMock = vi.fn()
+const listSuggestionUptakeMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
@@ -50,6 +51,7 @@ vi.mock('../src/data/trainingPlans.js', () => ({
   listFocus: (...args) => listFocusMock(...args),
   upsertFocus: (...args) => upsertFocusMock(...args),
   deleteFocus: (...args) => deleteFocusMock(...args),
+  listSuggestionUptake: (...args) => listSuggestionUptakeMock(...args),
 }))
 
 import TrainingPublish from '../src/screens/TrainingPublish.jsx'
@@ -486,5 +488,48 @@ describe('TrainingPublish', () => {
     expect(deleteFocusMock).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Yes, remove Breakdown block' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Remove Breakdown block' })).toBeInTheDocument()
+  })
+})
+
+describe('uptake', () => {
+  // ⚠️ UPTAKE, NOT A WRITE COUNT. Since 2 Sep 2026 a publish is a
+  // suggestion; this card is the director's honest measure. Pinned: it asks
+  // only on the button, for the dates in the boxes; a squad line says
+  // accepted (adjusted), declined, unanswered; the coaches' reasons are shown
+  // word for word; and "nothing" is drawn as an answer, not as silence.
+  const ROWS = [
+    { id: 'sg-1', status: 'accepted', decided_at: '2026-09-01T10:00:00Z', decline_note: null, event: { id: 'e1', team_id: 't-u14b', starts_at: '2026-09-08T16:00:00Z', session: { coach_edited_at: '2026-09-01T18:00:00Z' } } },
+    { id: 'sg-2', status: 'accepted', decided_at: '2026-09-01T10:00:00Z', decline_note: null, event: { id: 'e2', team_id: 't-u14b', starts_at: '2026-09-10T16:00:00Z', session: { coach_edited_at: '2026-09-01T10:00:00Z' } } },
+    { id: 'sg-3', status: 'declined', decided_at: '2026-09-01T11:00:00Z', decline_note: 'we did this last week', event: { id: 'e3', team_id: 't-u14b', starts_at: '2026-09-12T16:00:00Z', session: null } },
+    { id: 'sg-4', status: 'pending', decided_at: null, decline_note: null, event: { id: 'e4', team_id: 't-u12m', starts_at: '2026-09-09T16:00:00Z', session: [] } },
+  ]
+
+  it('asks only on the button, for the dates in the boxes, and draws each squad', async () => {
+    listSuggestionUptakeMock.mockResolvedValue(ROWS)
+    const { user } = renderPublish()
+    await screen.findByLabelText('Template')
+    expect(listSuggestionUptakeMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Show uptake' }))
+    await waitFor(() => expect(listSuggestionUptakeMock).toHaveBeenCalledTimes(1))
+    const args = listSuggestionUptakeMock.mock.calls[0][0]
+    expect(args.from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(args.to).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+
+    const u14 = await screen.findByTestId('uptake-t-u14b')
+    expect(u14).toHaveTextContent('U14B')
+    expect(u14).toHaveTextContent('2 accepted (1 adjusted) · 1 declined')
+    expect(u14).toHaveTextContent('“we did this last week”')
+    const u12 = screen.getByTestId('uptake-t-u12m')
+    expect(u12).toHaveTextContent('1 unanswered')
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled()
+  })
+
+  it('says so when nothing was suggested for those dates', async () => {
+    listSuggestionUptakeMock.mockResolvedValue([])
+    const { user } = renderPublish()
+    await screen.findByLabelText('Template')
+    await user.click(screen.getByRole('button', { name: 'Show uptake' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Nothing suggested for those dates.')
   })
 })
