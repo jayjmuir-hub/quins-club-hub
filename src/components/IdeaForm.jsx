@@ -4,6 +4,8 @@ import { Sheet } from './Sheet.jsx'
 import { submitIdea } from '../data/socialIdeas.js'
 import { useAuth } from '../lib/auth.jsx'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import useDiscardGuard from '../lib/useDiscardGuard.js'
+import DiscardConfirm from './DiscardConfirm.jsx'
 
 // "Send the club a post idea" — the member-facing half of Social Media
 // Management. Ruling: claude/decisions/2026-08-12-social-media-management.md.
@@ -30,6 +32,13 @@ export default function IdeaForm({ open, onClose, event = null, onSubmitted }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [sent, setSent] = useState(false)
+  // A mis-tap on the backdrop must not throw a half-written idea away (Jay,
+  // 3 Sep 2026). Once it is sent there is nothing left to lose.
+  const guard = useDiscardGuard({
+    dirty: !sent && (body.trim() !== '' || file != null),
+    saving,
+    onClose: () => { reset(); onClose?.() },
+  })
 
   function reset() {
     setBody('')
@@ -63,9 +72,10 @@ export default function IdeaForm({ open, onClose, event = null, onSubmitted }) {
   return (
     <Sheet
       open={open}
-      onClose={() => { reset(); onClose?.() }}
+      onClose={guard.requestClose}
       title="Send a post idea"
     >
+      {guard.confirming && <DiscardConfirm id="idea-discard" onDiscard={guard.discard} onKeep={guard.keep} />}
       {sent ? (
         <div className="p-1">
           <p className="text-sm leading-relaxed text-ink">
@@ -123,7 +133,7 @@ export default function IdeaForm({ open, onClose, event = null, onSubmitted }) {
             <Button type="submit" disabled={saving || !body.trim()}>
               {saving ? 'Sending…' : 'Send idea'}
             </Button>
-            <Button type="button" variant="secondary" onClick={() => { reset(); onClose?.() }}>
+            <Button type="button" variant="secondary" onClick={guard.requestClose}>
               Cancel
             </Button>
           </div>

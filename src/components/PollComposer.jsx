@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Sheet } from './Sheet.jsx'
 import Button from './Button.jsx'
+import useDiscardGuard from '../lib/useDiscardGuard.js'
+import DiscardConfirm from './DiscardConfirm.jsx'
 
 // The create-poll sheet — WhatsApp's shape: a question, 2–12 options that grow
 // as you fill the last one, and an "allow multiple answers" toggle. Validation
@@ -13,6 +15,12 @@ export default function PollComposer({ open, onClose, onSubmit, busy = false }) 
   const [question, setQuestion] = useState('')
   const [options, setOptions] = useState(['', ''])
   const [multiple, setMultiple] = useState(false)
+  // A mis-tap on the backdrop must not throw a half-written poll away (Jay, 3 Sep 2026).
+  const guard = useDiscardGuard({
+    dirty: question.trim() !== '' || options.some((option) => option.trim() !== ''),
+    saving: busy,
+    onClose,
+  })
 
   // Each open is a fresh poll. Sheet renders nothing when closed but this
   // component instance stays mounted in the parent, so reset on the open edge.
@@ -50,7 +58,8 @@ export default function PollComposer({ open, onClose, onSubmit, busy = false }) 
     'w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-[14px] text-ink placeholder:text-ink-faint outline-none focus-visible:border-brand focus-visible:ring-1 focus-visible:ring-brand'
 
   return (
-    <Sheet open={open} onClose={onClose} title="New poll">
+    <Sheet open={open} onClose={guard.requestClose} title="New poll">
+      {guard.confirming && <DiscardConfirm id="poll-discard" onDiscard={guard.discard} onKeep={guard.keep} />}
       <div className="flex flex-col gap-3" data-testid="poll-composer">
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink-muted">Question</span>

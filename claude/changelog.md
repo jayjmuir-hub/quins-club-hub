@@ -10,7 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
-- 🪑 **Channel seats and a Committee channel.** Jay, 3 Sep 2026
+- `c0d28df` — 🪑 **Channel seats and a Committee channel.** Jay, 3 Sep 2026
   (`claude/plans/2026-09-03-channel-seats-and-committee.md`, both parts).
   `db/migrations/20260904_channel_seats_and_committee.sql`: a sixth role
   channel, `committee`, derived from `club_officers` — titles only, supers
@@ -29,6 +29,22 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   against production via the MCP): nine asserts green, each with its
   control; afterwards no seat tables, no probe rows.
   ⚠️ **Applied to production only on Jay's yes; the changelog says when.**
+- **fix(forms): A MIS-TAP OUTSIDE A SHEET NO LONGER THROWS THE TYPING AWAY —
+  every sheet with a form in it now asks "Discard your changes?"** Jay, 3 Sep
+  2026: "if I mis-click outside the event box while adding something it
+  just disappears and I have to start all over." The event form got this in
+  #631; every other sheet still closed on a backdrop tap, Escape or Cancel
+  with no question. Now one hook (`src/lib/useDiscardGuard.js`) and one
+  component (`src/components/DiscardConfirm.jsx`) carry the event form's
+  two-step to the add-game form, the player form, the parent's own player
+  form, the invite form, the notice and poll composers, the document upload
+  sheet, the idea form and the Club tab's add-squad sheet. Clean closes at
+  once; dirty asks, Keep editing keeps the typing, Discard is the only thing
+  that then closes; a save in flight never arms it; the browser's reload
+  guard rides along. Not changed on purpose: the Accounts edit sheet already
+  keeps its draft across a close, and the pitch-assign sheet is a single
+  pick. `tests/discard-guard.test.jsx` pins the hook, the component and two
+  real sheets.
 - `84e4edf` — 🔒 **THE ADMIN SPLIT — an admin row reaches no squad by itself.** Jay, 3 Sep
   2026, all four rulings confirmed (`claude/plans/2026-09-03-admin-team-reach.md`).
   `db/migrations/20260904_admin_team_reach.sql`: one default-deny helper,

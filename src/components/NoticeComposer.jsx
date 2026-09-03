@@ -3,6 +3,8 @@ import Button from './Button.jsx'
 import { Sheet } from './Sheet.jsx'
 import { createNotice } from '../data/announcements.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import useDiscardGuard from '../lib/useDiscardGuard.js'
+import DiscardConfirm from './DiscardConfirm.jsx'
 
 // The "post a notice" composer, as a sheet.
 //
@@ -72,6 +74,9 @@ export default function NoticeComposer({ open, onClose, teams, clubWide, onPoste
   const [expiry, setExpiry] = useState('none')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  // A mis-tap on the backdrop must not throw a half-written notice away (Jay,
+  // 3 Sep 2026). Title or body typed = dirty; the toggles alone are not.
+  const guard = useDiscardGuard({ dirty: title.trim() !== '' || body.trim() !== '', saving, onClose })
 
   const chosenTeams = teams.filter((team) => picked.has(team.id))
   // ⚠️ NOTHING CHOSEN IS NOT THE SAME AS THE WHOLE CLUB. An empty set must
@@ -129,7 +134,8 @@ export default function NoticeComposer({ open, onClose, teams, clubWide, onPoste
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Post a notice">
+    <Sheet open={open} onClose={guard.requestClose} title="Post a notice">
+      {guard.confirming && <DiscardConfirm id="notice-discard" onDiscard={guard.discard} onKeep={guard.keep} />}
       <form onSubmit={handleSubmit}>
         {error && (
           <p
@@ -258,7 +264,7 @@ export default function NoticeComposer({ open, onClose, teams, clubWide, onPoste
             {saving ? 'Posting…' : 'Post'}
           </Button>
           {!saving && (
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={guard.requestClose}>
               Cancel
             </Button>
           )}

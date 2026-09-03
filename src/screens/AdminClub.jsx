@@ -28,6 +28,8 @@ import { isMinisTeam } from '../lib/minis.js'
 import InviteForm from './InviteForm.jsx'
 import Sheet from '../components/Sheet.jsx'
 import StorageCard from '../components/StorageCard.jsx'
+import useDiscardGuard from '../lib/useDiscardGuard.js'
+import DiscardConfirm from '../components/DiscardConfirm.jsx'
 
 // The Club tab of /admin (admin-dashboard plan, 2026-08-05). Assembled from
 // the parts of the old Admin.jsx worth keeping — age groups with player
@@ -500,6 +502,13 @@ export default function AdminClub() {
     setAddSquadOpen(false)
     setAddSquadError(null)
   }
+  // A mis-tap on the backdrop must not throw a typed squad name away (Jay,
+  // 3 Sep 2026). The three switches alone are not typing.
+  const addSquadGuard = useDiscardGuard({
+    dirty: addSquadOpen && draftSquadName.trim() !== '',
+    saving: addSquadSaving,
+    onClose: closeAddSquad,
+  })
 
   /**
    * Creates the squad via the create_team RPC (src/data/teams.js), then
@@ -963,7 +972,8 @@ export default function AdminClub() {
       {inviteOpen && <InviteForm onClose={() => setInviteOpen(false)} />}
 
       {addSquadOpen && (
-        <Sheet open onClose={closeAddSquad} title="Add a squad">
+        <Sheet open onClose={addSquadGuard.requestClose} title="Add a squad">
+          {addSquadGuard.confirming && <DiscardConfirm id="squad-discard" onDiscard={addSquadGuard.discard} onKeep={addSquadGuard.keep} />}
           <label className="mb-3.5 block">
             <span className="mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted">
               Name
@@ -1049,7 +1059,7 @@ export default function AdminClub() {
             <Button disabled={addSquadSaving} onClick={saveNewSquad}>
               {addSquadSaving ? 'Saving…' : 'Save'}
             </Button>
-            <Button variant="ghost" disabled={addSquadSaving} onClick={closeAddSquad}>
+            <Button variant="ghost" disabled={addSquadSaving} onClick={addSquadGuard.requestClose}>
               Cancel
             </Button>
           </div>

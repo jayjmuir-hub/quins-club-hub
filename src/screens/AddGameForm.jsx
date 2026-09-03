@@ -5,6 +5,8 @@ import TimePicker from '../components/TimePicker.jsx'
 import { upsertEvent } from '../data/events.js'
 import { clubDateTimeInputs, clubWallTimeToUtc, eventDate } from '../lib/eventFormat.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import useDiscardGuard from '../lib/useDiscardGuard.js'
+import DiscardConfirm from '../components/DiscardConfirm.jsx'
 
 // One GAME inside a tournament — a fixture that hangs off the container by
 // tournament_id, sharing its date, squad, venue, competition and tier so none
@@ -51,6 +53,9 @@ export default function AddGameForm({ tournament, game = null, onClose, onSaved 
   const [invalid, setInvalid] = useState({})
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
+  // A mis-tap on the backdrop must not throw the typing away (Jay, 3 Sep 2026).
+  const [initialSnapshot] = useState(() => JSON.stringify(values))
+  const guard = useDiscardGuard({ dirty: JSON.stringify(values) !== initialSnapshot, saving, onClose })
   const inFlight = useRef(false)
 
   const set = (key) => (event) => setValues((v) => ({ ...v, [key]: event.target.value }))
@@ -134,7 +139,8 @@ export default function AddGameForm({ tournament, game = null, onClose, onSaved 
   }
 
   return (
-    <Sheet open onClose={onClose} title={editing ? 'Edit game' : 'Add game'}>
+    <Sheet open onClose={guard.requestClose} title={editing ? 'Edit game' : 'Add game'}>
+      {guard.confirming && <DiscardConfirm id="game-discard" onDiscard={guard.discard} onKeep={guard.keep} />}
       <form onSubmit={handleSubmit} noValidate>
         {error && (
           <p role="alert" className="mb-3.5 rounded-[9px] bg-danger-bg px-3 py-2 text-sm font-semibold text-danger-ink">

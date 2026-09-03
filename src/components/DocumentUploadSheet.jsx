@@ -8,6 +8,8 @@ import {
 } from '../lib/documents.js'
 import { adminTeamReach, isAdmin } from '../lib/scope.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import useDiscardGuard from '../lib/useDiscardGuard.js'
+import DiscardConfirm from './DiscardConfirm.jsx'
 
 // Upload a document, as a sheet — the same Sheet-with-checkbox-grid shape as
 // NoticeComposer, and this file copies its field markup/classes deliberately
@@ -72,6 +74,9 @@ export default function DocumentUploadSheet({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [dragOver, setDragOver] = useState(false)
+  // A mis-tap on the backdrop must not throw a chosen file and its title away
+  // (Jay, 3 Sep 2026).
+  const guard = useDiscardGuard({ dirty: file != null || title.trim() !== '', saving, onClose })
   const fileInputRef = useRef(null)
 
   // ⚠️ TAKES A FILE OBJECT DIRECTLY, not an event — so both the hidden
@@ -136,7 +141,8 @@ export default function DocumentUploadSheet({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Add document">
+    <Sheet open={open} onClose={guard.requestClose} title="Add document">
+      {guard.confirming && <DiscardConfirm id="document-discard" onDiscard={guard.discard} onKeep={guard.keep} />}
       <form onSubmit={handleSubmit}>
         {error && (
           <p
@@ -311,7 +317,7 @@ export default function DocumentUploadSheet({
             {saving ? 'Adding…' : 'Add document'}
           </Button>
           {!saving && (
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={guard.requestClose}>
               Cancel
             </Button>
           )}

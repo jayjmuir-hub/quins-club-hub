@@ -30,6 +30,8 @@ import useOwnContactGate from '../lib/useOwnContactGate.js'
 import { joinPhone, splitPhone } from '../lib/phone.js'
 import { parentNameProblem, toEditorRows, toSaveRows } from '../lib/parentRows.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import useDiscardGuard from '../lib/useDiscardGuard.js'
+import DiscardConfirm from '../components/DiscardConfirm.jsx'
 
 // Today's date, for the birthday cap — nobody is born in the future. The
 // database (player_private_dob_sane) is the real guard; this only saves a
@@ -134,6 +136,19 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
   // untouched field. Held separately rather than compared against `player`,
   // which does not carry the birthday at all — it lives in player_private.
   const [dobOnFile, setDobOnFile] = useState('')
+  // A mis-tap on the backdrop must not throw the typing away (Jay, 3 Sep 2026).
+  // The fields are seeded by the load effect, so the snapshot is taken when
+  // loading finishes, not at mount — before that nothing can be dirty.
+  const [loadedSnapshot, setLoadedSnapshot] = useState(null)
+  const snapshot = JSON.stringify({ phoneCountry, phoneNational, email, parents, gender, dob })
+  useEffect(() => {
+    if (!loading && loadedSnapshot === null) setLoadedSnapshot(snapshot)
+  }, [loading, loadedSnapshot, snapshot])
+  const guard = useDiscardGuard({
+    dirty: loadedSnapshot !== null && (snapshot !== loadedSnapshot || photoFile != null || photoRemoved),
+    saving,
+    onClose,
+  })
 
   useEffect(() => {
     let mounted = true
@@ -303,7 +318,8 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
   }
 
   return (
-    <Sheet open onClose={onClose} title={`Update ${player.full_name}`}>
+    <Sheet open onClose={guard.requestClose} title={`Update ${player.full_name}`}>
+      {guard.confirming && <DiscardConfirm id="my-player-discard" onDiscard={guard.discard} onKeep={guard.keep} />}
       {loading ? (
         <div className="py-10">
           <Spinner label="Loading details…" />
@@ -466,7 +482,7 @@ export default function MyPlayerForm({ player, team, onClose, onSaved }) {
           </div>
 
           <div className="mt-6 flex gap-2.5">
-            <Button variant="secondary" onClick={onClose} disabled={saving} className="flex-1">
+            <Button variant="secondary" onClick={guard.requestClose} disabled={saving} className="flex-1">
               Cancel
             </Button>
             <Button type="submit" disabled={saving} className="flex-1">

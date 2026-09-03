@@ -31,6 +31,8 @@ import {
   squadRequiresGender,
 } from '../lib/gender.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import useDiscardGuard from '../lib/useDiscardGuard.js'
+import DiscardConfirm from '../components/DiscardConfirm.jsx'
 
 // The player add/edit form (design-system.md §5.8), opened in the shared
 // Sheet from Roster's "Add player" button and from PlayerDetail's "Edit".
@@ -246,6 +248,14 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   // child in the bucket.
   const [photoFile, setPhotoFile] = useState(null)
   const [photoRemoved, setPhotoRemoved] = useState(false)
+  // A mis-tap on the backdrop must not throw the typing away (Jay, 3 Sep 2026).
+  // The snapshot is taken at mount; photo changes count as typing too.
+  const [initialSnapshot] = useState(() => JSON.stringify(values))
+  const guard = useDiscardGuard({
+    dirty: JSON.stringify(values) !== initialSnapshot || photoFile != null || photoRemoved,
+    saving,
+    onClose,
+  })
   // ⚠️ SEEDED FROM THE PLAYER, AND A NEW FILE RESETS IT. Keeping a point chosen
   // for a different picture is worse than the centre, because it looks
   // deliberate rather than unset.
@@ -769,7 +779,8 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
   const minisPlayer = isMinisTeam(selectedTeam?.name)
 
   return (
-    <Sheet open onClose={onClose} title={editing ? 'Edit player' : 'Add player'}>
+    <Sheet open onClose={guard.requestClose} title={editing ? 'Edit player' : 'Add player'}>
+      {guard.confirming && <DiscardConfirm id="player-discard" onDiscard={guard.discard} onKeep={guard.keep} />}
       {/* noValidate: this form does its own validation and reports it in a
           role="alert" region, which a screen reader announces — the native
           bubble is neither announced reliably nor visible to the browser
