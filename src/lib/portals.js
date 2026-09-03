@@ -100,8 +100,14 @@ export const PORTALS = [
   {
     key: 'youth',
     right: 'youth',
-    blurb: 'RCM result sheets for every match.',
-    tabs: [{ to: '/admin/youth', label: 'Match sheets' }],
+    blurb: 'RCM result sheets for every match, and the league tables.',
+    tabs: [
+      { to: '/admin/youth', label: 'Match sheets' },
+      // Divisions, points rules, the season import (3 Sep 2026). Sits with
+      // the match sheets because both are the union's paperwork; the
+      // screen itself is admin-gated whatever portal shows the tab.
+      { to: '/admin/competitions', label: 'Leagues' },
+    ],
   },
   {
     key: 'media',

@@ -10,6 +10,27 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #684 — 🏆 **League tables from confirmed results, and the season import
+  that fills the grid.** Step 1 of `claude/plans/2026-09-02-standings-and-results.md`
+  plus the import route. `db/migrations/20260905_competitions_and_standings.sql`:
+  `competitions` (points rules as columns), `competition_sides`,
+  `competition_fixtures` (ours linked to the squad's event),
+  `competition_results` (source, confirmed_by, a supersedes chain, no
+  delete), `competition_keepers`; `competition_standings(uuid)` computed on
+  every read; a trigger writing our score from the match sheet as a `sheet`
+  row; `import_season(uuid, jsonb, jsonb)` — sides and fixtures by name and
+  round, our events linked or created in ONE insert. `src/lib/rcmGrid.js`
+  reads the RCM grid's PDF text (rows kept, columns lost — placed by round
+  labels, continuity and each division's closed set of sides) and
+  `tests/rcm-grid.test.js` reproduces all 34 of our 2026–27 fixtures from the
+  real grid. Screens `src/screens/Standings.jsx` (`/standings/:id`) and
+  `src/screens/AdminCompetitions.jsx` (`/admin/competitions`, in the youth
+  portal beside Match sheets); Squad Hub links to the table. Dry-run on
+  production in a rolled-back block; `db/tests/standings.sql`. ⚠️ `position`
+  is a reserved word in a RETURNS TABLE column list — the column is `pos`.
+  Keepers are a join table, not a scoped admin right (deviation noted in the
+  migration header). Not built: routes 2 and 3 (the reader and the fetch),
+  the keeper UI, the Monday nudge.
 - #683 — 📋 **Standings plan: RCM publishes the fixture list per division.**
   Jay, 3 Sep 2026, closing `claude/plans/2026-09-02-standings-and-results.md`'s
   one open question: the seniors' grid is already loaded (#678) and the
