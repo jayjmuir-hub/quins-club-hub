@@ -27,6 +27,7 @@ import {
 import { shareElementAsImage } from '../lib/shareImage.js'
 import { shareOutcomeNote } from '../lib/shareOutcome.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { useToast } from '../components/Toast.jsx'
 
 // Picking a team, and sharing it — three VIEWS over one lineup since 25 Aug
 // 2026 (claude/plans/2026-08-25-roster-builder-three-views.md): Quick is the
@@ -215,6 +216,7 @@ function clearDraft(eventId) {
 }
 
 export default function Lineup() {
+  const toast = useToast()
   const { eventId } = useParams()
   const navigate = useNavigate()
   const { memberships, teams } = useMemberships()
@@ -617,6 +619,7 @@ export default function Lineup() {
       await saveLineupPlayers(id, rows)
       clearDraft(eventId)
       setSaved(true)
+      toast('Team sheet saved.')
       setDirty(false)
     } catch (failure) {
       setError(failure)
@@ -1263,11 +1266,6 @@ export default function Lineup() {
         <Button variant="secondary" onClick={share} disabled={sharing || picked.length === 0}>
           {sharing ? 'Preparing…' : 'Share to WhatsApp'}
         </Button>
-        {saved && !saving && (
-          <span role="status" className="self-center text-[13px] font-semibold text-ink-muted">
-            Saved
-          </span>
-        )}
       </div>
       {shareNote && !sharing && (
         <p role="status" className="mt-2 text-[13px] font-semibold text-ink-muted" data-testid="share-note">

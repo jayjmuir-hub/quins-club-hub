@@ -37,6 +37,7 @@ import {
   totalFor,
 } from '../lib/scoring.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { useToast } from '../components/Toast.jsx'
 
 // The RCM Official Match Result Sheet — Project 2.
 //
@@ -381,6 +382,7 @@ function emptyCards() {
 }
 
 export default function MatchSheet() {
+  const toast = useToast()
   const { eventId } = useParams()
   const navigate = useNavigate()
   const { memberships } = useMemberships()
@@ -771,6 +773,7 @@ export default function MatchSheet() {
         const fresh = status ? await setMatchSheetStatus(row.id, status) : row
         setSheet((current) => ({ ...current, ...fresh, id: row.id }))
         setSaved(true)
+        toast(status ? 'Marked ready to send.' : 'Saved.')
         setDirty(false)
         setRestored(false)
         clearDraft(eventId)
@@ -975,9 +978,6 @@ export default function MatchSheet() {
             played — {squadName || 'the squad'} is our own name for the squad, not the name RCM
             knows them by.
           </p>
-        )}
-        {saved && !saveError && (
-          <p role="status" className="mt-2.5 text-[12.5px] font-semibold text-ink-muted">Saved.</p>
         )}
         {shareNote && !sharing && (
           <p role="status" className="mt-2.5 text-[12.5px] font-semibold text-ink-muted" data-testid="share-note">

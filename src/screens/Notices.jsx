@@ -31,6 +31,7 @@ import {
   postableTeams,
 } from '../lib/notices.js'
 import { visibleTeams } from '../lib/scope.js'
+import { useToast } from '../components/Toast.jsx'
 
 // The noticeboard — /notices. Phase 1 of claude/plans/2026-08-14-notices.md.
 //
@@ -184,6 +185,7 @@ function Receipts({ notice, onClose }) {
    ══════════════════════════════════════════════════════════════════════════ */
 
 export default function Notices() {
+  const toast = useToast()
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
 
@@ -407,7 +409,10 @@ export default function Notices() {
           onClose={() => setComposerOpen(false)}
           teams={composerTeams}
           clubWide={(memberships ?? []).some((m) => m.role === 'admin' && m.status === 'active')}
-          onPosted={load}
+          onPosted={() => {
+            load()
+            toast('Notice posted.')
+          }}
         />
       )}
 

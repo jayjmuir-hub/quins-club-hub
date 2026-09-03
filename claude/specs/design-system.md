@@ -613,6 +613,7 @@ Top banner inside the Event/Player Detail sheet: same plum→maroon gradient, ne
 Segmented horizontal bar: `height:12px;border-radius:20px;overflow:hidden;background:#eee`, three `<i>` segments sized by percentage of In/Maybe/Out RSVP counts (denominator guards against divide-by-zero with `||1`). Legend row below: 3 labelled dots. Only rendered for events without a result (i.e., not yet played).
 
 ### 4.24 Toast (`.toast`)
+✅ **Built 3 Sep 2026: `src/components/Toast.jsx` (`ToastProvider`, `useToast`).** The React version adds a `role="status"` live region (the note in §8 about no live-region describes the prototype), an optional action such as Undo that holds it for six seconds, and a Dismiss control; a new toast still replaces rather than stacks.
 Fixed, bottom-center, `background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px`, appears via `.show` class (`opacity 0→1`, `translateY(20px)→0`, `transition:.25s`), auto-hides after `2200ms` (`setTimeout`, debounced/cleared on rapid successive toasts via `clearTimeout`). Used as the confirmation channel for every create/update/delete action ("Player added", "Event updated", "Reset to sample data", etc.) and for inline validation errors ("Add a name", "Set a date and time").
 
 ### 4.25 Scope note (`.scope-note`)
