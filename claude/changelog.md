@@ -318,6 +318,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   comma after the weekday and varies by build. `AdminRightsLog`'s two date
   FILTERS stay native on purpose: they are a range on an admin log, not a
   field a swipe can commit.
+- #659 — **fix(lineup): the row actions get their weight and colour back.** The item-5
+  codemod (`5b38132`) glued `font-bold` to the colour class on ten Bench / Remove /
+  Start / Shirt buttons in `src/screens/Lineup.jsx` — `font-boldtext-ink` is a
+  class Tailwind silently drops, so they shipped plain and grey. Ten strings
+  fixed; `tests/tap-targets.test.js` now refuses any glued utility in that file,
+  run red against the shipped file first.
 - `938f2b6` — **fix(ux): the Low findings from the full review, first two batches.**
   Sign-in: "session expired" is now plain words; the email and password
   fields freeze while "Please wait…" shows; the sign-in / create-account
