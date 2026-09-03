@@ -1260,7 +1260,7 @@ export default function EventForm({
         // safe answer is not "probably nobody" — it is to refuse and say why.
         setError(
           new Error(
-            `We couldn't check whether anybody has replied to this, so it hasn't been changed. ${err.message ?? ''}`.trim(),
+            `We couldn't check whether anybody has replied to this, so it hasn't been changed. ${friendlyMessage(err, '')}`.trim(),
           ),
         )
         return

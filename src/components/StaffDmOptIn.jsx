@@ -37,7 +37,7 @@ export default function StaffDmOptIn({ player, teamName, isGuardian }) {
       .maybeSingle()
       .then(({ data, error: err }) => {
         if (!mounted) return
-        if (err) setError(err.message)
+        if (err) setError(friendlyMessage(err, "We couldn't load this setting."))
         setState({ optIn: Boolean(data?.staff_dm_opt_in), at: data?.staff_dm_opt_in_at ?? null })
       })
     return () => {

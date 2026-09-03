@@ -8,6 +8,7 @@ import { listParentsForPlayers } from '../data/parents.js'
 import { missingForPlayer } from '../lib/completeness.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import FeedbackTriage from '../components/FeedbackTriage.jsx'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // /admin/needs-attention — the THIRD and last surface of the completeness rule
 // (item 6 of claude/plans/2026-08-16-account-creation-redesign.md).
@@ -178,7 +179,7 @@ export default function AdminNeedsAttention() {
           .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)),
       )
     } catch (err) {
-      setError(err.message)
+      setError(friendlyMessage(err, "We couldn't load who needs attention. Try again."))
     }
   }, [teamsById])
 

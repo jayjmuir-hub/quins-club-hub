@@ -34,6 +34,19 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 2 Sep 2026
 
+- **fix(ux): the player-import double tap, and the last raw errors on a screen.**
+  Two of the 2 Sep 2026 review's extra findings. Player import: after the
+  players-in-but-positions-failed case the sheet stays open to show the
+  message, and Add stayed live while the roster refetched — a fast second tap
+  re-parsed against the stale `existingPlayers` and inserted the squad twice.
+  Once anything is inserted the sheet only closes ("Done"). Errors: the seven
+  remaining `setError(err.message)` sites (Needs attention, Rights log, Staff
+  ×4, the staff DM opt-in), AccessBuilder's bare render, the event form's
+  reply-check tail and the player form's contact note all go through
+  `friendlyMessage` with a fallback; the request-timeout copy drops the
+  millisecond count. The DATA-LAYER half — `new Error(error.message ||
+  REFUSED)` wrappers that lose the code and so bypass the mapper — is handed
+  to the Training Sessions session, with the sweep-test patterns for both.
 - `b780840` — **feat(training): THE COACHES ARE TOLD, AND THE DIRECTOR SEES THE UPTAKE.**
   The two follow-ups Part 1 of
   `claude/plans/2026-09-02-training-suggestions-and-age-guidance.md` left

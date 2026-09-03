@@ -77,7 +77,9 @@ export const READ_RPCS = new Set([
 
 export class RequestTimeoutError extends Error {
   constructor(ms) {
-    super(`This is taking longer than usual — the request passed ${ms} ms with no reply.`)
+    // Plain words (2 Sep 2026 UX review): a parent does not need the millisecond
+    // count; `ms` stays on the instance for logs.
+    super('This is taking longer than usual. Check your signal and try again.')
     // ⚠️ NOT 'AbortError'. postgrest-js skips retry on an AbortError; a plain
     // name is what lets it retry a timed-out GET.
     this.name = 'RequestTimeoutError'

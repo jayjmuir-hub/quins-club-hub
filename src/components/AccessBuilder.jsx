@@ -3,6 +3,7 @@ import PlayerPicker from './PlayerPicker.jsx'
 import Button from './Button.jsx'
 import { isSquadStaffRole } from '../lib/scope.js'
 import { upsertPlayer } from '../data/players.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Builds a SET of access rows for one person, ready for grantMemberships().
 //
@@ -498,7 +499,7 @@ export default function AccessBuilder({
 
       {shownError && (
         <span role="alert" className="basis-full text-[12.5px] font-semibold text-danger-ink">
-          {shownError.message || shownError}
+          {typeof shownError === 'string' ? shownError : friendlyMessage(shownError, "That didn't work. Try again.")}
         </span>
       )}
     </div>

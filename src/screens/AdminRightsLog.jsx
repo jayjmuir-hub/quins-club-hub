@@ -8,6 +8,7 @@ import { listAuditProfiles, listMembershipAudit } from '../data/audit.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isSuperAdmin } from '../lib/scope.js'
+import { friendlyMessage } from '../lib/friendlyError.js'
 import {
   actorName,
   auditDetails,
@@ -191,7 +192,7 @@ export default function AdminRightsLog() {
       setNames(byId)
       setRows(entries)
     } catch (err) {
-      setError(err.message)
+      setError(friendlyMessage(err, "We couldn't load the log. Try again."))
     }
   }, [])
 
