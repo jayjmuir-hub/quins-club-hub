@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- **docs(plan): the admin split — an admin row reaches no squad by itself.**
+  `claude/plans/2026-09-03-admin-team-reach.md` — Jay, 3 Sep 2026, after the
+  audit of what a plain admin sees: three helper bodies (`can_edit_team`,
+  `can_see_team`, `is_attached_to_team`) route every squad policy, so their
+  admin arm becomes a default-deny allowlist of rights and a zero-rights admin
+  reaches no squad. Rulings in §3 needed before code. Plan only.
 - `c6c0e39` — **db(training): publish_training DROPPED — nothing has called it since
   `d98b593`.** `db/migrations/20260903_drop_publish_training.sql`, proven in
   a rolled-back transaction against production (gone, `suggest_training`
@@ -36,7 +42,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   the second pattern is the parallel `ux-errors` branch. `tests/db-error.test.js`
   pins the round trip: raw PostgREST hidden, a hand-written 42501 refusal
   shown, and the OLD shape leaking as the control.
-- **docs(plan): channel seats and a Committee channel.**
+- `2e4679d` — **docs(plan): channel seats and a Committee channel.**
   `claude/plans/2026-09-03-channel-seats-and-committee.md` — Jay, 3 Sep 2026:
   role-channel membership stays derived, but a super may SEAT a person in a
   channel with a reason (audited, additive, never an exclusion), and a sixth
