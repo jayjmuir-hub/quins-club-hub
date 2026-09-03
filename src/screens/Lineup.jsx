@@ -25,6 +25,7 @@ import {
   venueLine,
 } from '../lib/eventFormat.js'
 import { shareElementAsImage } from '../lib/shareImage.js'
+import { shareOutcomeNote } from '../lib/shareOutcome.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
 
 // Picking a team, and sharing it — three VIEWS over one lineup since 25 Aug
@@ -265,6 +266,7 @@ export default function Lineup() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [shareNote, setShareNote] = useState(null)
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(false)
   // ── Unsaved work ────────────────────────────────────────────────────────
@@ -626,11 +628,13 @@ export default function Lineup() {
   async function share() {
     setSharing(true)
     setError(null)
+    setShareNote(null)
     try {
-      await shareElementAsImage(shareRef.current, {
+      const outcome = await shareElementAsImage(shareRef.current, {
         filename: `lineup-${eventId}.png`,
         title: 'Team sheet',
       })
+      setShareNote(shareOutcomeNote(outcome))
     } catch (failure) {
       setError(failure)
     } finally {
@@ -710,7 +714,7 @@ export default function Lineup() {
                 key={group.key}
                 type="button"
                 onClick={() => setShowOut(true)}
-                className="my-2 text-[13px] font-bold text-brand-ink"
+                className="my-1 min-h-[44px] px-2 text-[13px] font-bold text-brand-ink"
               >
                 Show {list.length} who said no
               </button>
@@ -1265,6 +1269,11 @@ export default function Lineup() {
           </span>
         )}
       </div>
+      {shareNote && !sharing && (
+        <p role="status" className="mt-2 text-[13px] font-semibold text-ink-muted" data-testid="share-note">
+          {shareNote}
+        </p>
+      )}
 
       <p className="mt-2 text-[12.5px] leading-relaxed text-ink-muted">
         Sharing makes a picture of the team sheet and hands it to your phone&apos;s share

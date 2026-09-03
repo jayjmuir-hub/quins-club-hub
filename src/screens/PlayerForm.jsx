@@ -944,7 +944,7 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
                   />
                   <span
                     className={[
-                      'block cursor-pointer select-none rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
+                      'flex min-h-[44px] cursor-pointer select-none items-center rounded-[9px] border-[1.5px] px-2.5 py-1.5 text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2',
                       on
                         ? 'border-brand bg-surface-mute font-bold text-danger-ink'
                         : 'border-line font-semibold text-ink',
@@ -1212,6 +1212,13 @@ export default function PlayerForm({ player = null, onClose, onSaved }) {
           </p>
         )}
 
+        {/* Say why Save is greyed (2 Sep 2026 UX review, Low): it used to
+            sit disabled with no spinner or reason while the rows loaded. */}
+        {!saving && (contactLoading || parentsLoading) && (
+          <p role="status" className="mb-2 text-[12.5px] text-ink-muted" data-testid="save-hint">
+            Loading the saved contact details — Save unlocks in a moment.
+          </p>
+        )}
         <Button
           type="submit"
           size="lg"

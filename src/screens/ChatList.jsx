@@ -602,7 +602,7 @@ function ChatRow({ row, selfId, pref = null, onPref = null, presence = null }) {
             aria-expanded={menuOpen}
             aria-haspopup="menu"
             onClick={() => setMenuOpen((v) => !v)}
-            className="grid h-8 w-8 place-items-center rounded-full text-ink-faint hover:bg-surface hover:text-ink"
+            className="relative grid h-8 w-8 place-items-center rounded-full text-ink-faint before:absolute before:-inset-1.5 before:content-[''] hover:bg-surface hover:text-ink"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />

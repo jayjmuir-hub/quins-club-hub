@@ -8,6 +8,7 @@ import { Sheet } from '../components/Sheet.jsx'
 import { SquadHubPickerSkeleton, SquadHubSkeleton } from '../components/Skeleton.jsx'
 import Spinner from '../components/Spinner.jsx'
 import SquadDocumentsCard from '../components/SquadDocumentsCard.jsx'
+import { TeamFilter } from '../components/TeamFilter.jsx'
 import { listAttendanceForEvents } from '../data/attendance.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
@@ -388,22 +389,22 @@ export default function SquadHub() {
             clip") reintroduced by the hand that had just read it. The
             harness overflow gate now runs the admin squad hub so this
             class of regression fails a build instead of a coach. */}
+        {/* ⚠️ THE SAME DROPDOWN AS SCHEDULE AND ROSTER, NOT A PILL PER SQUAD
+            (2 Sep 2026 UX review, Low): an admin with fifteen squads got
+            three or four rows of pills before the calendar. The min-w-0
+            lesson above still holds — the trigger truncates, it never
+            widens the document. */}
         {myHubTeams.length > 1 && (
-          <div className="flex min-w-0 flex-wrap justify-end gap-1.5">
-            {myHubTeams.map((candidate) => (
-              <Link
-                key={candidate.id}
-                to={`/squad/${candidate.id}`}
-                aria-current={candidate.id === teamId ? 'page' : undefined}
-                className={`rounded-full border-[1.5px] px-2.5 py-1 text-[12.5px] font-bold ${
-                  candidate.id === teamId
-                    ? 'border-brand bg-surface-mute text-danger-ink'
-                    : 'border-line text-ink hover:bg-surface-mute'
-                }`}
-              >
-                {candidate.name}
-              </Link>
-            ))}
+          <div className="flex min-w-0 justify-end">
+            <TeamFilter
+              teams={myHubTeams}
+              selected={teamId}
+              includeAll={false}
+              label="Squad"
+              onChange={(id) => {
+                if (id !== teamId) navigate(`/squad/${id}`)
+              }}
+            />
           </div>
         )}
       </div>

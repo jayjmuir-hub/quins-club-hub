@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { shareElementAsImage } from '../src/lib/shareImage.js'
 
 // The eligibility warning in the lineup picker —
 // claude/plans/2026-08-17-lineup-eligibility-warning.md.
@@ -302,5 +304,16 @@ describe('it warns and never blocks', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Share to WhatsApp' })).toBeEnabled()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('says what the share sheet did — a desktop download is not silence', async () => {
+    await renderScreen({ tier: 'C', lineups: lineupWithEveryone() })
+    vi.mocked(shareElementAsImage).mockResolvedValueOnce('downloaded')
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Share to WhatsApp' }))
+    expect(await screen.findByTestId('share-note')).toHaveTextContent(/Downloads folder/)
+
+    vi.mocked(shareElementAsImage).mockResolvedValueOnce('cancelled')
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Share to WhatsApp' }))
+    expect(await screen.findByTestId('share-note')).toHaveTextContent(/Nothing was sent/)
   })
 })
