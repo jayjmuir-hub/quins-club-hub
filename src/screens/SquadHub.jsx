@@ -334,7 +334,17 @@ export default function SquadHub() {
     return date && date.getTime() < now
   })
 
-  const filteredPast = past.filter((event) => (filter === 'all' ? true : event.type === filter))
+  // ⚠️ THE SQUAD'S OWN TRAINING AND MATCHES, NOTHING ELSE — Jay, 3 Sep 2026,
+  // from the U16B hub: "why are there multiple dates for the same session?
+  // why is it showing a session yesterday?" listEvents returns club-wide
+  // events (team_id null — the adult tag night, the kit-shop notice) beside
+  // the squad's own, and the upcoming list is right to show them. The
+  // register is not: a club social has no roll call, so every one of them
+  // was a column of "no reply / not recorded" and a divisor in the %.
+  const trackable = past.filter(
+    (event) => event.team_id === teamId && (event.type === 'training' || event.type === 'match'),
+  )
+  const filteredPast = trackable.filter((event) => (filter === 'all' ? true : event.type === filter))
   // The WHOLE season's past events — the fetch window (12 months back, see
   // src/lib/eventWindow.js) always covers the season, and the availability
   // and attendance rows were fetched for every one of them all along. The
@@ -347,7 +357,11 @@ export default function SquadHub() {
     availabilityRows: availability,
     attendanceRows: attendance,
   })
-  const shownEvents = gridEvents.slice(0, GRID_EVENT_LIMIT)
+  // The LATEST 15, drawn oldest → newest so the most recent session sits at
+  // the right edge, beside % and no-shows (Jay, 3 Sep 2026: "why isn't the
+  // most current date to the far right?"). buildTracking still hands them
+  // newest-first, which is what the phone's per-player sheet wants.
+  const shownEvents = gridEvents.slice(0, GRID_EVENT_LIMIT).reverse()
   const summary = squadSummary(rows)
   const selectedEvent = selectedEventId ? events.find((event) => event.id === selectedEventId) : null
 
@@ -533,7 +547,11 @@ export default function SquadHub() {
               <>
                 <p className="mb-2 text-[12.5px] font-semibold text-ink-muted">
                   Squad: {summary.percent ?? '—'}% attendance across {gridEvents.length}{' '}
-                  {filter === 'all' ? 'events' : filter === 'match' ? 'matches' : 'training sessions'} this season
+                  {filter === 'all'
+                    ? (gridEvents.length === 1 ? 'event' : 'events')
+                    : filter === 'match'
+                      ? (gridEvents.length === 1 ? 'match' : 'matches')
+                      : (gridEvents.length === 1 ? 'training session' : 'training sessions')} this season
                   {summary.noShows > 0 && (
                     <span className="text-danger-ink"> · {summary.noShows} said-in-but-absent</span>
                   )}
@@ -620,8 +638,8 @@ export default function SquadHub() {
                   Left mark: RSVP (In / ? / Out, · no reply). Right mark: register (P present, A absent,
                   E excused, · not taken). Shaded cell = said in, didn&apos;t show.
                   {gridEvents.length > shownEvents.length
-                    ? ` Columns show the newest ${shownEvents.length} of ${gridEvents.length} events; % and no-shows count all ${gridEvents.length}.`
-                    : ' Newest first.'}
+                    ? ` Columns show the latest ${shownEvents.length} of ${gridEvents.length} events, oldest to newest; % and no-shows count all ${gridEvents.length}.`
+                    : ' Oldest to newest.'}
                 </p>
                 <p className="mt-2 text-[11.5px] font-medium text-ink-muted desktop:hidden">
                   Tap a player for their event-by-event history.

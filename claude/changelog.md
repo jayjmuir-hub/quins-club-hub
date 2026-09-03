@@ -10,6 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #677 — **fix(squad-hub): the register grid shows the squad's own sessions,
+  newest at the right.** Jay, from the U16B hub: "why are there multiple
+  dates for the same session? why is it showing a session yesterday?"
+  Measured in production: `listEvents` returns club-wide events (team_id
+  null) beside the squad's own, correctly for the upcoming list, and the
+  "Who said, who showed" grid took all of them — the 02/09 column was the
+  adult tag night, the second 01/09 the kit-shop notice, each a column of
+  "no reply / not recorded" and a divisor in the %, on every squad. Now only
+  the squad's own training and matches feed the grid and the season %, the
+  latest fifteen columns run oldest → newest so the most recent session
+  sits beside % and no-shows, and "1 events" reads "1 event".
 - #676 — **chore(docs-check): a changelog entry may cite its pull request
   number.** `- #123 — …` covers the commit whose subject ends in "(#123)",
   the squash `main` produces; the number is known at `gh pr create`, before
