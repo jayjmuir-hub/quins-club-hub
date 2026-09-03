@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { upsertById } from './upsertById.js'
+import { wrapDbError } from '../lib/dbError.js'
 
 // The club's LEAGUE TEAMS — the entities that play in a division, as distinct
 // from the SQUADS they are drawn from.
@@ -112,7 +113,7 @@ export async function upsertLeagueTeam(leagueTeam) {
       // ⚠️ THE REAL MESSAGE FOR ANYTHING ELSE, rather than a third guess: an
       // unrecognised failure that says what the database said is debuggable,
       // one that says "something went wrong" is not.
-      return new Error(error.message || REFUSED_PERMISSION)
+      return wrapDbError(error, REFUSED_PERMISSION)
     },
   })
 }

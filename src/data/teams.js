@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { isFormat } from '../lib/fixtureFormat.js'
+import { wrapDbError } from '../lib/dbError.js'
 
 // Writes against public.teams. Reads live in src/lib/memberships.jsx, which
 // loads the club's squads once per session with `select('*')` and hands them to
@@ -43,7 +44,7 @@ export async function setTeamScoringKinds(teamId, kinds) {
     .select()
     .maybeSingle()
 
-  if (error) throw new Error(error.message || REFUSED)
+  if (error) throw wrapDbError(error, REFUSED)
   if (!data) throw new Error(REFUSED)
   return data
 }
@@ -88,7 +89,7 @@ export async function setTeamRequiresContact(teamId, value) {
     .select()
     .maybeSingle()
 
-  if (error) throw new Error(error.message || REFUSED_CONTACT)
+  if (error) throw wrapDbError(error, REFUSED_CONTACT)
   if (!data) throw new Error(REFUSED_CONTACT)
   return data
 }
@@ -120,7 +121,7 @@ export async function setTeamDefaultFormat(teamId, format) {
     .select()
     .maybeSingle()
 
-  if (error) throw new Error(error.message || REFUSED_FORMAT)
+  if (error) throw wrapDbError(error, REFUSED_FORMAT)
   if (!data) throw new Error(REFUSED_FORMAT)
   return data
 }
@@ -151,7 +152,7 @@ export async function setTeamUsesJerseyNumbers(teamId, value) {
     .select()
     .maybeSingle()
 
-  if (error) throw new Error(error.message || REFUSED_JERSEY)
+  if (error) throw wrapDbError(error, REFUSED_JERSEY)
   if (!data) throw new Error(REFUSED_JERSEY)
   return data
 }
