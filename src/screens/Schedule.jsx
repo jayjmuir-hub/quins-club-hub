@@ -37,6 +37,7 @@ import {
 } from '../lib/scheduleMonthGroups.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
 import { ListSkeleton } from '../components/Skeleton.jsx'
+import { useToast } from '../components/Toast.jsx'
 
 // Same reasoning as Roster's: the filter has to outlive a reload, or a coach
 // who runs one age group re-filters on every visit. Separate key from the
@@ -699,12 +700,7 @@ export default function Schedule() {
   // "Added 14 events", for a few seconds after a multi-row save. The Toast
   // the design system specifies (§4.24) does not exist yet; this is the
   // one-line status the review asked for in its place.
-  const [savedNotice, setSavedNotice] = useState(null)
-  useEffect(() => {
-    if (!savedNotice) return undefined
-    const timer = setTimeout(() => setSavedNotice(null), 5000)
-    return () => clearTimeout(timer)
-  }, [savedNotice])
+  const toast = useToast()
 
   const persistFilter = (next) => {
     setTeamFilter(next)
@@ -1011,15 +1007,9 @@ export default function Schedule() {
           }}
           onSaved={(saved, meta) => {
             refresh()
-            if (meta?.count > 1) setSavedNotice(`Added ${meta.count} events.`)
+            toast(meta?.count > 1 ? `Added ${meta.count} events.` : 'Saved.')
           }}
         />
-      )}
-
-      {savedNotice && (
-        <p role="status" data-testid="saved-notice" className="mb-3 rounded-[10px] bg-surface-sunk px-3 py-2 text-[13px] font-semibold text-ink-muted">
-          {savedNotice}
-        </p>
       )}
 
       {/* The RSVP/team-sheet sheet (Task 16). Unlike the form above, closing

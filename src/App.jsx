@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { ToastProvider } from './components/Toast.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import { MembershipProvider } from './lib/memberships.jsx'
 import { useNotificationRouting } from './lib/notificationRouting.js'
@@ -159,6 +160,10 @@ export default function App() {
           to live INSIDE BrowserRouter because it uses useNavigate. */}
       <NotificationRouting />
       <ScreenChrome />
+      {/* The one confirmation channel (design-system.md §4.24, 3 Sep 2026).
+          Outside ErrorBoundary so a toast fired as a screen crashes still
+          shows; inside BrowserRouter so nothing above needs to change. */}
+      <ToastProvider>
       <ErrorBoundary>
       <Routes>
         {/* PUBLIC — no session required, and no MembershipProvider either.
@@ -411,6 +416,7 @@ export default function App() {
         </Route>
       </Routes>
       </ErrorBoundary>
+      </ToastProvider>
     </BrowserRouter>
   )
 }

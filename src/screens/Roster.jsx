@@ -29,6 +29,7 @@ import { useMediaQuery, DESKTOP_QUERY } from '../lib/useMediaQuery.js'
 import { sortByJersey } from '../lib/jersey.js'
 import { ListSkeleton } from '../components/Skeleton.jsx'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { useToast } from '../components/Toast.jsx'
 
 // The team filter survives a reload. Without this, choosing club-wide as the
 // desktop default (desktop-spec.md §10 decision 2) would make a coach who
@@ -263,6 +264,7 @@ function RosterGroup({
 }
 
 export default function Roster() {
+  const toast = useToast()
   const { memberships, teams, loading: membershipsLoading } = useMemberships()
 
   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
@@ -1206,7 +1208,10 @@ export default function Roster() {
       {importing && (
         <PlayerImport
           onClose={() => setImporting(false)}
-          onImported={refresh}
+          onImported={(count) => {
+            refresh()
+            toast(`Added ${count} ${count === 1 ? 'player' : 'players'}.`)
+          }}
           // The loaded roster, so a re-pasted sheet skips the players it
           // already holds instead of doubling the squad.
           existingPlayers={players}

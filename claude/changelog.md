@@ -38,6 +38,23 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   `can_see_team`, `is_attached_to_team`) route every squad policy, so their
   admin arm becomes a default-deny allowlist of rights and a zero-rights admin
   reaches no squad. Rulings in §3 needed before code. Plan only.
+- **feat(ui): THE TOAST EXISTS — design-system.md §4.24, two years of
+  screens improvising "it worked" replaced by one channel.**
+  `src/components/Toast.jsx`: `ToastProvider` at the app root (inside the
+  router, outside ErrorBoundary), `useToast()` returns `toast(message,
+  { action })`. Fixed bottom-centre, ink fill, 12px radius, the spec's
+  0.25s rise; ~2.2s then gone, six seconds when it carries an action
+  (Undo needs reading time); a NEW toast REPLACES the current one, never
+  stacks; an always-mounted `role="status"` live region so it is announced
+  (the prototype had none); Dismiss on tap; portalled to `body` at z-[60],
+  above sheets, and parked above the mobile dock. `useToast()` is a no-op
+  with no provider, so the three hundred suites that render screens bare
+  keep passing. Converted: match sheet "Saved." / "Marked ready to send.",
+  team sheet "Team sheet saved." (the header's unsaved chip stays — that is
+  state, not confirmation), Schedule's five-second "Added N events." line,
+  the player import's silent success ("Added N players."), and "Notice
+  posted.". Not converted: the hand-rolled two-step confirms — they are
+  guards, not confirmations — and Allocation's own Undo, which works.
 - `c6c0e39` — **db(training): publish_training DROPPED — nothing has called it since
   `d98b593`.** `db/migrations/20260903_drop_publish_training.sql`, proven in
   a rolled-back transaction against production (gone, `suggest_training`

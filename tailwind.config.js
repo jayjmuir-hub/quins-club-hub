@@ -329,6 +329,11 @@ export default {
           from: { transform: 'translateY(100%)' },
           to: { transform: 'translateY(0)' },
         },
+        // design-system.md §4.24's toast entrance, exactly.
+        toastIn: {
+          from: { opacity: '0', transform: 'translateY(20px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
         // Ports design-system.md §4.16's desktop entrance exactly:
         // `translate(-50%,-46%) scale(.98) opacity:0` -> `translate(-50%,
         // -50%) scale(1) opacity:1` — a fade + scale-up + slight vertical
@@ -378,6 +383,7 @@ export default {
         'sheet-slide-up': 'sheetSlideUp .28s cubic-bezier(.32,.72,0,1)',
         'sheet-scale-in': 'sheetScaleIn .2s ease-out',
         'scrim-fade-in': 'scrimFadeIn .2s ease',
+        'toast-in': 'toastIn .25s ease',
         // ⚠️ `both` MATTERS ON THE STAGGERED ONE. Rows carry a delay, and
         // without `backwards` they paint at full opacity for that delay and
         // THEN jump to opacity 0 to start — a visible flicker that gets worse

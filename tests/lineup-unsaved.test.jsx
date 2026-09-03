@@ -45,6 +45,7 @@ vi.mock('../src/data/playerTiers.js', () => ({
 }))
 
 import Lineup from '../src/screens/Lineup.jsx'
+import { ToastProvider } from '../src/components/Toast.jsx'
 
 const TEAM = { id: 't-u16b', club_id: 'c-1', name: 'U16B Contact' }
 const EVENT = {
@@ -69,7 +70,7 @@ function renderScreen() {
     { player_id: 'p-maybe', status: 'maybe' },
   ])
   listLineupsMock.mockResolvedValue([])
-  render(<Lineup />)
+  render(<ToastProvider><Lineup /></ToastProvider>)
   return userEvent.setup()
 }
 
@@ -115,7 +116,7 @@ describe('Lineup — unsaved changes', () => {
     await user.click(screen.getAllByRole('button', { name: /^start$/i })[0])
     expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /^save$/i }))
-    await screen.findByText('Saved')
+    await screen.findByText('Team sheet saved.') // the toast (design-system §4.24), since 3 Sep 2026
     expect(screen.queryByText(/unsaved changes/i)).toBeNull()
   })
 })
@@ -158,7 +159,7 @@ describe('Lineup — the draft', () => {
       id: 'l-1', players_per_side: 15, squad_size: null, notes: '',
       lineup_players: [{ player_id: 'p-in', role: 'starter', position: null, sort_order: 0 }],
     }])
-    render(<Lineup />)
+    render(<ToastProvider><Lineup /></ToastProvider>)
     await screen.findAllByText('Rory Aldenbrook')
     expect(screen.queryByText(/unsaved changes/i)).toBeNull()
     expect(window.sessionStorage.getItem('lineup-draft:e-1')).toBeNull()
@@ -172,7 +173,7 @@ describe('Lineup — the draft', () => {
     await user.click(screen.getAllByRole('button', { name: /^start$/i })[0])
     expect(window.sessionStorage.getItem('lineup-draft:e-1')).not.toBeNull()
     await user.click(screen.getByRole('button', { name: /^save$/i }))
-    await screen.findByText('Saved')
+    await screen.findByText('Team sheet saved.') // the toast (design-system §4.24), since 3 Sep 2026
     expect(window.sessionStorage.getItem('lineup-draft:e-1')).toBeNull()
   })
 })
