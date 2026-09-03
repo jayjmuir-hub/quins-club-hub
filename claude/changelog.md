@@ -10,6 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 3 Sep 2026
 
+- #680 — 🔕 **The app closes its tray notifications when it comes to the
+  front.** Jay, 3 Sep 2026: "30 notifications on my app icon, i open it
+  and there is nothing for me to check". The database said zero unread for
+  him; the 30 was the phone's notification shade, which nothing ever
+  cleared except tapping a notification, and Android launchers paint the
+  number of notifications in the shade on the icon independently of the
+  Badging API count `src/lib/useDockBadges.js` sets.
+  `src/lib/useClearNotificationTray.js` closes the service worker's open
+  notifications on mount and on every return to the foreground; never
+  throws, no-op without the API. Chat pushes were already tagged per
+  conversation in `supabase/functions/push-send/index.ts`.
 - #679 — 📱 **The register's attendance buttons sit under the name on a
   phone.** Jay, 3 Sep 2026: on an Android the names could not be read
   unless the phone was turned to landscape, while an iPhone was fine. Not
