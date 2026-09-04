@@ -10,6 +10,14 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #701 — 🔧 **CI hygiene: the audit step survives a registry 503, and docs-check
+  compares full SHAs.** The npm-audit step already retried and warned-through an
+  outage (landed unannounced in #697); proved it still does with three injected
+  faults. `checkChangelog()` compared changelog-cited SHAs against `git log
+  --format=%h` as literal strings — git now auto-abbreviates to 8 characters
+  here while every entry cites 7, so all 748 commits since the baseline read as
+  missing. Both sides now resolve to the full 40-char SHA before comparing,
+  batched into one `git rev-parse` call rather than one process per entry.
 - #698 — 🏉 **Senior Session Plan pickers hide junior drills.** `teams.is_senior`
   overlaps as adults (band 18): any-age and adult-open packs stay; junior-capped
   `max_age` rows are omitted, not greyed out. Youth still see the mismatch with
