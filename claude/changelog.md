@@ -10,6 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #710 — 🏠 **Home Club juniors W–D–L rollup.** When Home shows more than one junior scoring squad, one thin StatBand labelled `Club juniors` sums all-matches wins, draws and losses. A lone junior and every senior stay per-squad; Squad Hub and `/seniors` are unchanged; U6–U7 still skip the record row. Rot detectors: `tests/match-record.test.js`, `tests/dashboard.test.jsx`.
 - #709 — 📎 **Chat file attachments (Excel, Word, PDF)** on `chat-media`. One allowlisted file per send (≤ 25 MB); FileCard on every chat surface; push preview is generic `📄 File` (never the original filename). Photo albums and voice unchanged. Migration `db/migrations/20260912_chat_file_attachments.sql` not applied to live from this PR. Ruling: `claude/decisions/2026-09-04-chat-file-attachments.md`.
 - `5439b34` — 📎 Chat file attachments implementation (Excel, Word, PDF on `chat-media`).
 - #708 — 🏠 **Home thin 3-across ops + W–D–L bands.** Two `grid-cols-3` rows (Registered players / Fixtures to play / Tournaments, then Won / Drawn / Lost) for everyone, including parents. Drops Needs a score and the phone 2×2 stack. Shared `StatBand`/`StatTile`; Squad Hub and `/seniors` All-matches W–D–L match the thin band. U6–U7 still skip the record row. Rot detectors: `tests/dashboard.test.jsx`, `tests/season-record-band.test.jsx`, `tests/squad-hub.test.jsx`, `tests/senior-section.test.jsx`.
