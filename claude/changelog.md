@@ -10,6 +10,15 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #690 — ✉️ **Call-up email, the same-day clash note, and the seed guard.**
+  `supabase/functions/notify-callup/index.ts` mails the family on an ask
+  (the notify-approval shape; `callup_notify_url` derived in the vault;
+  `request_callup` posts `{ request_id }`, wrapped, silenced by
+  `app.harness`). `public.event_clashes(uuid)` joins a fixture's lineups to
+  other same-day match lineups; `src/components/ClashNote.jsx` shows "also
+  selected the same day" on the event detail. Dry-run on production. The
+  senior fixtures seed carries its run-once guard. Rot detector:
+  `tests/notify-callup-link.test.js`.
 - #689 — 🏉 **U18 call-ups.** Senior-squads Part 3
   (`claude/plans/2026-09-02-senior-squads.md`), Jay's rulings: the senior side
   decides, inform only, floor 17 today, full membership on a yes.
