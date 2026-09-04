@@ -164,6 +164,9 @@ $$;
 
 revoke execute on function public.senior_season_stats(uuid, text) from public;
 grant execute on function public.senior_season_stats(uuid, text) to authenticated;
+-- ⚠️ BOTH revokes. `from public` does not touch Supabase's NAMED grant to anon,
+-- and db/tests/grants.sql caught exactly that on the first live run, 4 Sep 2026.
+revoke execute on function public.senior_season_stats(uuid, text) from anon;
 
 -- ── the gap ────────────────────────────────────────────────────────────────
 -- Played games with a sheet, and how many of those have MORE tries recorded
@@ -212,3 +215,4 @@ $$;
 
 revoke execute on function public.senior_season_stats_gaps(uuid, text) from public;
 grant execute on function public.senior_season_stats_gaps(uuid, text) to authenticated;
+revoke execute on function public.senior_season_stats_gaps(uuid, text) from anon;
