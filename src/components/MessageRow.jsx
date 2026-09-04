@@ -103,7 +103,9 @@ function Reply({ reply, selfId, canModerate, onRemove, onEdit, onAuthor, onReply
  * @param unread       true when the viewer has not read it yet
  * @param tally        { in, maybe, out } for a fixture thread, if loaded
  * @param mentionables people the reply composer may @mention
- * @param forceOpen    open the thread on mount (the ?thread= deep link)
+ * @param forceOpen    open the reply COMPOSER on mount (the ?thread= deep link).
+ *                     Since 4 Sep 2026 the replies themselves are always on
+ *                     screen — see the note above `composing` below.
  * @param onReply(id, body, { mentions }), onRemove(id), onPin(id, pinned)
  * @param onReport(id, reason)  report a message to the club
  */
@@ -142,7 +144,15 @@ export default function MessageRow({
   announceOnly = false,
 }) {
   const iconFor = useProfileIcons()
-  const [open, setOpen] = useState(forceOpen)
+  // ⚠️ 4 Sep 2026: this used to be `open`, and it gated the REPLIES as well
+  // as the composer — a thread sat folded behind an 11px "N replies" toggle
+  // (from the first squad-chat build, 23 Aug, #326). A reply to the
+  // second-to-last post in the Age Group Managers channel was promised by the
+  // chat list's preview and invisible in the chat, and Jay's ruling was
+  // "people shouldn't have to click the 1 reply or whatever number to see it".
+  // Replies now render unconditionally; only the inline reply composer opens
+  // on demand (Reply in the menu, the announce-only affordance, ?thread=).
+  const [composing, setComposing] = useState(forceOpen)
   const [editing, setEditing] = useState(false)
   const [reporting, setReporting] = useState(false)
   const [reason, setReason] = useState('')
@@ -152,7 +162,7 @@ export default function MessageRow({
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (forceOpen) setOpen(true)
+    if (forceOpen) setComposing(true)
   }, [forceOpen])
 
   const staff = isStaffRole(message.author_role)
@@ -185,7 +195,7 @@ export default function MessageRow({
         ...(mine && onEdit && canStillEdit(message)
           ? [{ label: 'Edit', onClick: () => setEditing(true) }]
           : []),
-        ...(onReply ? [{ label: 'Reply', onClick: () => setOpen((v) => !v) }] : []),
+        ...(onReply ? [{ label: 'Reply', onClick: () => setComposing((v) => !v) }] : []),
         ...(!mine && onReplyPrivately
           ? [{ label: 'Reply privately', onClick: () => onReplyPrivately(message) }]
           : []),
@@ -255,23 +265,20 @@ export default function MessageRow({
                 Read by {readStat.reads} of {readStat.audience}
               </span>
             )}
-            {replies.length > 0 && !message.deleted_at && (
-              <button
-                type="button"
-                onClick={() => setOpen((v) => !v)}
-                className={`mt-0.5 block text-[11px] font-semibold ${mine ? 'text-white/70' : 'text-ink-faint'}`}
-                aria-expanded={open}
-              >
-                {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
-              </button>
-            )}
-            {announceOnly && onReply && replies.length === 0 && !open && !message.deleted_at && (
+            {/* The "N replies" toggle that stood here until 4 Sep 2026 is gone
+                on purpose — the replies are below, always. Do not bring it
+                back as a fold; see the note above `composing`. */}
+            {/* Announce-only: the thread is a parent's ONLY door, so the
+                affordance shows under every post whose composer is closed —
+                answered or not (until 4 Sep 2026 it hid once a reply existed,
+                which made sense only while the fold was the way in). */}
+            {announceOnly && onReply && !composing && !message.deleted_at && (
               <button
                 type="button"
                 data-testid="reply-affordance"
-                onClick={() => setOpen(true)}
+                onClick={() => setComposing(true)}
                 className={`mt-0.5 block min-h-[44px] text-[12px] font-semibold ${mine ? 'text-white/80' : 'text-brand-ink'}`}
-                aria-expanded={open}
+                aria-expanded={composing}
               >
                 Reply
               </button>
@@ -324,18 +331,21 @@ export default function MessageRow({
           </div>
         </form>
       )}
-      {error && !open && (
+      {error && !composing && (
         <p role="alert" className="mt-1 text-[12.5px] font-semibold text-danger-ink">
           {error}
         </p>
       )}
 
-      {open && (
+      {/* The thread: every reply, always visible, under the post it answers.
+          A deleted post takes its thread with it, as before. The composer
+          inside is the only part that waits to be asked for. */}
+      {(replies.length > 0 || composing) && !message.deleted_at && (
         <div className={`mt-1 w-full max-w-[88%] border-l-2 border-line pl-3 ${mine ? 'ml-auto' : ''}`}>
           {replies.map((reply) => (
             <Reply key={reply.id} reply={reply} selfId={selfId} canModerate={canModerate} onRemove={onRemove} onEdit={onEdit} onAuthor={onAuthor} onReplyPrivately={onReplyPrivately} />
           ))}
-          {onReply && (
+          {composing && onReply && (
             <form onSubmit={submitReply} className="mt-1.5 flex items-end gap-2">
               <MentionPicker
                 people={mentionables}
@@ -361,7 +371,7 @@ export default function MessageRow({
               </Button>
             </form>
           )}
-          {error && (
+          {error && composing && (
             <p role="alert" className="mt-1.5 text-[12.5px] font-semibold text-danger-ink">
               {error}
             </p>

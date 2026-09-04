@@ -125,19 +125,14 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
         <div data-testid="chat-wallpaper" className="sticky top-0 h-dvh w-full" style={backgroundStyle(background) ?? undefined} />
       </div>
       {messages?.map((m, index) => {
-        // 4 Sep 2026: a post whose thread holds a reply the reader has NOT
-        // seen opens on arrival. The chat list's preview and unread badge
-        // come from my_chats, which takes the newest message whether or not
-        // it is a reply — so a Reply to an older post was promised by the
-        // list and then hidden here behind a folded "1 reply" link under a
-        // bubble that was not even the last one (Jay, live, Age Group
-        // Managers: "entering that chat group and the message isn't there").
-        // Read against the reads-on-arrival snapshot, like `unread` below, so
-        // the mark-read effect a moment later cannot fold it back shut.
-        const arrivalReads = openReadsRef.current ?? reads
-        const holdsUnreadReply = (m.replies ?? []).some(
-          (r) => !r.deleted_at && r.author_id !== selfId && !arrivalReads.has(r.id),
-        )
+        // ⚠️ TOMBSTONE, 4 Sep 2026. For a few hours (#692) this block computed
+        // `holdsUnreadReply` and force-opened a post whose thread held a
+        // reply the reader had not seen — the chat list promised a reply the
+        // thread then hid behind a folded "1 reply" toggle. Jay's ruling the
+        // same day made it moot: replies are ALWAYS on screen now
+        // (MessageRow.jsx, the note above `composing`), and forceOpen opens
+        // the reply COMPOSER, which an unread reply must not do. Do not
+        // re-add a fold and then re-add this to compensate for it.
         return (
         <Fragment key={m.id}>
         {daysDiffer(messages[index - 1]?.created_at, m.created_at) && (
@@ -164,7 +159,7 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           unread={!(openReadsRef.current ?? reads).has(m.id)}
           tally={m.event_id ? tallies.get(m.event_id) : undefined}
           mentionables={mentionables}
-          forceOpen={openThreadId === m.id || holdsUnreadReply}
+          forceOpen={openThreadId === m.id}
           onReply={thread.onReply}
           announceOnly={Boolean(announceOnly && !mayPost)}
           onRemove={thread.onRemove}
