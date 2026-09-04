@@ -225,13 +225,23 @@ export default function SquadHub() {
       return undefined
     }
     let mounted = true
+    // Reset before the fetch starts: a squad switch that does not unmount
+    // the component (the multi-squad staff switcher) must not leave the
+    // PREVIOUS squad's gap sentence on screen while the new squad's fetch
+    // is in flight or fails.
+    setStats(null)
+    setGaps({ played: 0, unnamed: 0 })
     Promise.all([seasonStats(team.id, season), seasonStatsGaps(team.id, season)])
       .then(([rows, gap]) => {
         if (!mounted) return
         setStats(rows)
         setGaps(gap)
       })
-      .catch(() => mounted && setStats([]))
+      .catch(() => {
+        if (!mounted) return
+        setStats([])
+        setGaps({ played: 0, unnamed: 0 })
+      })
     return () => {
       mounted = false
     }

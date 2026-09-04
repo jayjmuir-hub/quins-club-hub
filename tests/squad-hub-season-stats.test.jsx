@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
 
 // The season stats card on a senior squad's Squad Hub page — Task 7 of
 // claude/plans/2026-09-04-senior-season-stats.md. Consumes seasonStats /
@@ -38,6 +39,7 @@ import SquadHub from '../src/screens/SquadHub.jsx'
 const CLUB = '00000000-0000-0000-0000-0000000000ad'
 const TEAMS = [
   { id: 't-men1', club_id: CLUB, name: 'Senior Men - 1st XV', sort_order: 16, section: 'senior_men', is_senior: true },
+  { id: 't-men2', club_id: CLUB, name: 'Senior Men - 2nd XV', sort_order: 17, section: 'senior_men', is_senior: true },
   { id: 't-u12', club_id: CLUB, name: 'U12 Mixed', sort_order: 3, section: null, is_senior: false },
 ]
 // Invented name — this repo is public and its members are mostly children.
@@ -79,5 +81,44 @@ describe('the squad page — season stats', () => {
     await screen.findByRole('heading', { name: /U12 Mixed/ })
     expect(screen.queryByTestId('season-stats-card')).not.toBeInTheDocument()
     expect(seasonStatsMock).not.toHaveBeenCalled()
+  })
+
+  // Review finding on Task 7: the effect reset nothing when a senior squad's
+  // fetch begins, so a same-mount switch (the multi-squad staff switcher,
+  // not an unmount/remount) into a squad whose fetch FAILS left the PREVIOUS
+  // squad's gap sentence on screen, attributed to the new squad's card.
+  it('drops the previous squad\'s gap sentence when a same-mount switch fails', async () => {
+    seasonStatsMock.mockImplementation((teamId) =>
+      teamId === 't-men1' ? Promise.resolve(ROWS) : Promise.reject(new Error('boom')),
+    )
+    seasonStatsGapsMock.mockImplementation((teamId) =>
+      teamId === 't-men1' ? Promise.resolve({ played: 7, unnamed: 2 }) : Promise.reject(new Error('boom')),
+    )
+    useMembershipsMock.mockReturnValue({
+      memberships: [
+        { id: 'm1', role: 'coach', status: 'active', team_id: 't-men1', club_id: CLUB },
+        { id: 'm2', role: 'coach', status: 'active', team_id: 't-men2', club_id: CLUB },
+      ],
+      teams: TEAMS,
+      loading: false,
+    })
+    render(
+      <MemoryRouter initialEntries={['/squad/t-men1']}>
+        <Routes>
+          <Route path="/squad/:teamId" element={<SquadHub />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('2 of 7 played games have no scorers named.')).toBeInTheDocument()
+
+    const user = userEvent.setup()
+    const switcher = screen.getByRole('combobox', { name: 'Squad' })
+    await user.click(switcher)
+    await user.click(screen.getByRole('option', { name: 'Senior Men - 2nd XV' }))
+
+    await waitFor(() =>
+      expect(screen.queryByText(/played games have no scorers named/)).not.toBeInTheDocument(),
+    )
+    expect(await screen.findByText('No games on a sheet yet.')).toBeInTheDocument()
   })
 })
