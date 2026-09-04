@@ -759,7 +759,7 @@ Deno.serve(async (request) => {
   // notified.
   if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0)
       + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) + (messageId ? 1 : 0)
-      + (documentId ? 1 : 0) + (accessRequestId ? 1 : 0) + (training ? 1 : 0) + (results ? 1 : 0) !== 1) {
+      + (documentId ? 1 : 0) + (accessRequestId ? 1 : 0) + (results ? 1 : 0) + (training ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
