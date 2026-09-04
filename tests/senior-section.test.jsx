@@ -147,6 +147,61 @@ describe('the senior section — a 2nd XV player', () => {
     expect(standingsMock).toHaveBeenCalledTimes(1)
   })
 
+  it('puts an All matches W–D–L row above the league table cards', async () => {
+    const at = Date.parse('2026-10-15T08:00:00Z')
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(at)
+    listEventsMock.mockResolvedValue([
+      ...EVENTS,
+      {
+        id: 'played',
+        team_id: 'men1',
+        type: 'match',
+        starts_at: '2026-10-03T13:00:00Z',
+        opponent: 'Harts',
+        competition_type: 'league',
+        result_us: 31,
+        result_them: 17,
+      },
+      {
+        id: 'friendly',
+        team_id: 'men1',
+        type: 'match',
+        starts_at: '2026-10-05T13:00:00Z',
+        opponent: 'Exiles',
+        competition_type: null,
+        result_us: 14,
+        result_them: 14,
+      },
+    ])
+    try {
+      renderAs(MEN2_PLAYER)
+      const all = await screen.findByTestId('all-matches-record')
+      const league = screen.getByTestId('season-record')
+      expect(all.compareDocumentPosition(league) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(all).toHaveTextContent(/all matches/i)
+      expect(all).toHaveTextContent(/league · tournaments · friendlies/)
+      const cards = within(all).getAllByTestId('season-record-card')
+      expect(cards[0]).toHaveTextContent('1st XV')
+      expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('1–1–0')
+      expect(cards[0]).toHaveTextContent('from scores on Hub · 2026-27')
+      expect(within(league).getAllByTestId('record-card')[0]).toHaveTextContent('2-1-1')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('widens the events fetch to the club season so past scores are not dropped', async () => {
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-15T08:00:00Z'))
+    try {
+      renderAs(MEN2_PLAYER)
+      await screen.findByTestId('season-record')
+      const { from } = listEventsMock.mock.calls[0][0]
+      expect(Date.parse(from)).toBeLessThanOrEqual(Date.parse('2026-08-31T20:00:00.000Z'))
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('⚠️ the women’s section is fixtures only for him: no pool, no counts, and it says why', async () => {
     const user = renderAs(MEN2_PLAYER)
     await screen.findByRole('heading', { name: 'Senior men' })

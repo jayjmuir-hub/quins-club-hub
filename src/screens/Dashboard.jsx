@@ -33,7 +33,9 @@ import { pinnedNotices,
   collapseGroups,
   scopeNotices,
 } from '../lib/notices.js'
+import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
 import { defaultEventWindow } from '../lib/eventWindow.js'
+import { scoringSquadRecords, windowCoveringSeason } from '../lib/matchRecord.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditEvent, canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
@@ -562,7 +564,9 @@ export default function Dashboard() {
   // Anchored once on mount, like `now` directly above and for the same reason:
   // recomputing it each render would mint a new object and refetch forever
   // through the effect's dependencies.
-  const [eventWindow] = useState(() => defaultEventWindow(clubToday()))
+  const [eventWindow] = useState(() =>
+    windowCoveringSeason(defaultEventWindow(clubToday()), new Date(Date.now())),
+  )
 
   // Both reads go out together and land together: the stat tiles mix counts
   // from each, so settling them independently would show a half-filled grid.
@@ -825,6 +829,11 @@ export default function Dashboard() {
 
   const upcoming = toPlay.slice(0, 5)
 
+  const seasonRecordRows = useMemo(
+    () => scoringSquadRecords(events, scopedTeams, { at: new Date(now) }),
+    [events, scopedTeams, now],
+  )
+
   // Derive the open event from the live list rather than storing the row
   // itself, so a realtime update keeps the sheet's contents fresh and a
   // deleted fixture closes it instead of stranding a stale copy on screen.
@@ -946,6 +955,12 @@ export default function Dashboard() {
           }}
         />
       </Card>
+
+      {seasonRecordRows.length > 0 && (
+        <div className="mt-[18px]">
+          <SeasonRecordBand rows={seasonRecordRows} />
+        </div>
+      )}
 
       {/* STAFF ONLY (Jay, 6 Aug 2026). Hidden from anyone who cannot edit —
           in practice parents and players.

@@ -15,13 +15,15 @@ import { listEvents } from '../data/events.js'
 import { listMatchSheetsFor } from '../data/matchSheets.js'
 import { listLeagueTeams } from '../data/leagueTeams.js'
 import CallupCard from '../components/CallupCard.jsx'
+import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
 import SeasonStatsTable from '../components/SeasonStatsTable.jsx'
 import { listPlayers } from '../data/players.js'
 import { seasonStats, seasonStatsGaps } from '../data/seasonStats.js'
 import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
+import { squadMatchRecord, windowCoveringSeason } from '../lib/matchRecord.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isMinisTeam } from '../lib/minis.js'
+import { isMinisTeam, recordsScores } from '../lib/minis.js'
 import { matchSheetApplies } from '../lib/matchSheetDeadline.js'
 import { canEditTeam } from '../lib/scope.js'
 import { seasonLabelFor } from '../lib/season.js'
@@ -289,7 +291,7 @@ export default function SquadHub() {
       // One rolling window for everything: upcoming comes from its future
       // half, the tracking grid from its past half. Same window the Dashboard
       // and calendar already use, so nothing here invents a second calendar.
-      const { from, to } = defaultEventWindow(clubToday())
+      const { from, to } = windowCoveringSeason(defaultEventWindow(clubToday()), new Date(Date.now()))
       const [eventRows, playerRows] = await Promise.all([
         listEvents({ teamIds: [teamId], from, to }),
         listPlayers({ teamIds: [teamId] }),
@@ -512,6 +514,18 @@ export default function SquadHub() {
           {/* U18 players this senior squad may call up — renders nothing for a
               junior squad or for anyone the database refuses. */}
           <CallupCard team={team} />
+          {recordsScores(team?.name) && (
+            <div className="mb-3">
+              <SeasonRecordBand
+                rows={[
+                  {
+                    team,
+                    record: squadMatchRecord(events, { teamId: team.id, at: new Date(Date.now()) }),
+                  },
+                ]}
+              />
+            </div>
+          )}
           {team?.section && (
             <p data-testid="senior-section-link" className="mb-3 text-sm text-ink-muted">
               <Link to={`/seniors?section=${team.section}`} className="font-bold text-brand-ink underline-offset-2 hover:underline">
