@@ -36,7 +36,7 @@ import { pinnedNotices,
 import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
 import { StatBand, StatTile } from '../components/StatBand.jsx'
 import { defaultEventWindow } from '../lib/eventWindow.js'
-import { clubJuniorsHomeRows, scoringSquadRecords } from '../lib/matchRecord.js'
+import { clubJuniorsHomeRows, clubSeniorsHomeRows, scoringSquadRecords } from '../lib/matchRecord.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditEvent, canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
@@ -732,7 +732,9 @@ export default function Dashboard() {
 
   const seasonRecordRows = useMemo(
     () =>
-      clubJuniorsHomeRows(scoringSquadRecords(events, scopedTeams, { at: new Date(now) })),
+      clubJuniorsHomeRows(
+        clubSeniorsHomeRows(scoringSquadRecords(events, scopedTeams, { at: new Date(now) })),
+      ),
     [events, scopedTeams, now],
   )
 
@@ -872,7 +874,9 @@ export default function Dashboard() {
           when the W–D–L helpers have a scoring squad; U6–U7 skip the record
           row via scoringSquadRecords / recordsScores. More than one junior
           scoring squad collapses to one Club juniors band (Jay, 4 Sep 2026);
-          a lone junior and every senior stay per-squad. Always grid-cols-3 —
+          more than one senior scoring squad collapses to one Club seniors
+          band (Jay, 5 Sep 2026). A lone junior or lone senior keeps its own
+          name. The two rollups do not fold into each other. Always grid-cols-3 —
           never the 28 Aug 2×2 stack. */}
       <div data-testid="home-stat-pair" className="mt-[18px] flex flex-col gap-1">
         <StatBand>

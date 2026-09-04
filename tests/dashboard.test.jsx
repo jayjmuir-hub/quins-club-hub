@@ -1145,8 +1145,10 @@ describe('Dashboard — all-matches season record', () => {
     expect(within(cards[0]).getByTestId('stat-lost')).toHaveTextContent('1')
     expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('0–0–1')
     expect(cards[1]).toHaveTextContent('Senior Men 1st XV')
+    expect(cards[1]).not.toHaveTextContent('Club seniors')
     expect(within(cards[1]).getByTestId('stat-won')).toHaveTextContent('1')
     expect(within(cards[1]).getByTestId('season-record-wdl')).toHaveTextContent('1–0–0')
+    expect(band).not.toHaveTextContent('Club seniors')
   })
 
   it('combines several junior scoring squads into one Club juniors band', async () => {
@@ -1204,6 +1206,79 @@ describe('Dashboard — all-matches season record', () => {
     expect(band).not.toHaveTextContent('U6 Tag')
     // A lone U10 label would mean the rollup did not fire.
     expect(within(cards[0]).queryByText(/^U10$/)).not.toBeInTheDocument()
+    expect(band).not.toHaveTextContent('Club seniors')
+  })
+
+  it('combines several senior scoring squads into one Club seniors band', async () => {
+    const women = { id: 'team-wxv', name: "Women's XV", sort_order: 14 }
+    useMembershipsMock.mockReturnValue(
+      membershipValue(ADMIN, [TEAM_U10, TEAM_FIRST_XV, women]),
+    )
+    listEventsMock.mockResolvedValue([
+      ...EVENTS,
+      {
+        id: 'e-w-draw',
+        team_id: 'team-wxv',
+        type: 'match',
+        opponent: 'Dubai Tigers',
+        starts_at: '2026-07-08T13:00:00Z',
+        result_us: 17,
+        result_them: 17,
+      },
+    ])
+    renderDashboard()
+    const band = await screen.findByTestId('season-record-band')
+    const cards = within(band).getAllByTestId('season-record-card')
+    expect(cards).toHaveLength(2)
+    expect(cards[0]).toHaveTextContent('U10')
+    expect(cards[0]).not.toHaveTextContent('Club juniors')
+    expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('0–0–1')
+    expect(cards[1]).toHaveTextContent('Club seniors')
+    expect(cards[1]).not.toHaveTextContent('All seniors')
+    expect(cards[1]).not.toHaveTextContent('Club-wide')
+    expect(within(cards[1]).getByTestId('stat-won')).toHaveTextContent('1')
+    expect(within(cards[1]).getByTestId('stat-drawn')).toHaveTextContent('1')
+    expect(within(cards[1]).getByTestId('stat-lost')).toHaveTextContent('0')
+    expect(within(cards[1]).getByTestId('season-record-wdl')).toHaveTextContent('1–1–0')
+    expect(band).not.toHaveTextContent('Senior Men 1st XV')
+    expect(band).not.toHaveTextContent("Women's XV")
+  })
+
+  it('can show Club juniors and Club seniors together on admin Home', async () => {
+    const u8 = { id: 'team-u8', name: 'U8 Tag', sort_order: 3 }
+    const women = { id: 'team-wxv', name: "Women's XV", sort_order: 14 }
+    useMembershipsMock.mockReturnValue(
+      membershipValue(ADMIN, [u8, TEAM_U10, TEAM_FIRST_XV, women]),
+    )
+    listEventsMock.mockResolvedValue([
+      ...EVENTS,
+      {
+        id: 'e-u8-win',
+        team_id: 'team-u8',
+        type: 'match',
+        opponent: 'Harlequins Abu Dhabi',
+        starts_at: '2026-07-02T13:00:00Z',
+        result_us: 18,
+        result_them: 6,
+      },
+      {
+        id: 'e-w-loss',
+        team_id: 'team-wxv',
+        type: 'match',
+        opponent: 'Abu Dhabi Saracens',
+        starts_at: '2026-07-08T13:00:00Z',
+        result_us: 7,
+        result_them: 21,
+      },
+    ])
+    renderDashboard()
+    const band = await screen.findByTestId('season-record-band')
+    const cards = within(band).getAllByTestId('season-record-card')
+    expect(cards).toHaveLength(2)
+    expect(cards[0]).toHaveTextContent('Club juniors')
+    expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('1–0–1')
+    expect(cards[1]).toHaveTextContent('Club seniors')
+    expect(within(cards[1]).getByTestId('season-record-wdl')).toHaveTextContent('1–0–1')
   })
 
   it('hides W–D–L when every visible squad is U6/U7, but still shows the ops row', async () => {
