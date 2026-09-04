@@ -10,6 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #706 — 🏉 **The `seniors` right — a named person reads BOTH senior sections.** Jay's ruling, 4 Sep: the club captain and others hold a `seniors` right that reads both senior sections' rosters and availability; the club-wide switch stays as the fallback. Seniors only. Plan updated; nothing built.
 - `e44fef6` — **keep defaultEventWindow shared; changelog for #704 and #703.**
 - `bb2eaea` — **all-matches W–D–L season record on Home, Squad Hub, and /seniors.**
 - #704 — 🏉 **All-matches W–D–L season record** on Home, Squad Hub, and `/seniors` (a separate row above the league table cards). Plain win/draw/loss from scored matches in the club season (1 Sep–31 Aug Asia/Dubai): league, tournament games, and friendlies. Tournament containers and U6–U7 are excluded. Not league standings. Rot detectors: `tests/match-record.test.js`, `tests/season-record-band.test.jsx`, `tests/dashboard.test.jsx`, `tests/squad-hub.test.jsx`, `tests/senior-section.test.jsx`.
