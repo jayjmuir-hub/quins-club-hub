@@ -309,11 +309,12 @@ export default function FloatingChatDock({ badge = false }) {
                     const unread = Number(row.unread) > 0
                     return (
                       <li key={`${row.kind}-${row.team_id ?? row.conversation_id ?? 'club'}`} className="border-b border-line last:border-b-0">
-                        <button type="button" data-testid="dock-row" onClick={() => { setActive(row); pendingQuoteRef.current = null }} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-surface-mute">
+                        {/* Same unread bar as the full list (4 Sep 2026) — one look, two surfaces. */}
+                        <button type="button" data-testid="dock-row" data-unread={unread ? 'true' : undefined} onClick={() => { setActive(row); pendingQuoteRef.current = null }} className={`flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-surface-mute ${unread ? 'border-l-[3px] border-brand bg-brand/[.04]' : 'border-l-[3px] border-transparent'}`}>
                           <RowAvatar row={row} presence={presenceFor(row)} />
                           <span className="min-w-0 flex-1">
                             <span className={`block truncate text-[14px] ${unread ? 'font-extrabold' : 'font-bold'} text-ink`}>{row.label}</span>
-                            <span className={`block truncate text-[12.5px] ${unread ? 'font-semibold text-ink' : 'text-ink-muted'}`}>{previewLine(row, selfId)}</span>
+                            <span className={`block truncate text-[12.5px] ${unread ? 'font-bold text-ink' : 'text-ink-muted'}`}>{previewLine(row, selfId)}</span>
                           </span>
                           {unread && (
                             <span className="shrink-0 rounded-full bg-brand px-1.5 py-px text-[10.5px] font-extrabold text-ink-invert" aria-label={`${row.unread} unread`}>

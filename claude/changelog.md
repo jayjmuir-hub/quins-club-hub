@@ -11,6 +11,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 ## 4 Sep 2026
 
 - #695 — 📊 **Senior season stats.** Scorers on SENIOR match sheets (`match_sheet_scores`, the cards table's twin — the player resolved through the slot, never stored), and a per-player season line — games, starts, bench, tries, conversions, penalties, drop goals, cards — on the squad page, the `/seniors` overview and the player sheet. `senior_season_stats(team, season)` and `_gaps`, security definer, gated on the section INSIDE the function; season 1 Sep–31 Aug in Asia/Dubai. Migration applied to live before the merge. Harness `db/tests/season-stats.sql`, 15 assertions, three injected faults, and it raises on any FAIL row. Jay's ruling: a called-up under-18's record shows to the section. Spec `claude/plans/2026-09-04-senior-season-stats.md`.
+- #696 — 🔴 **Unread chats are hard to miss.** A brand bar down the row's left edge, a
+  faint ground and a bold preview on an unread row (`src/screens/ChatList.jsx`, and the
+  dock's list); the "N unread in M chats" strip is a button to the Unread filter; the
+  Chat dot's counter counts replies (the flat stream). A sidebar COUNT was left out on
+  purpose against the 23 Aug dot-not-a-number ruling in `src/lib/useDockBadges.js`.
+  Rot detector: `tests/chat-list.test.jsx`.
 - #694 — 🏷️ **The staff pill names the squad in club-wide channels, and never wraps mid-word.**
   `db/migrations/20260908_message_author_team.sql` adds `messages.author_team_id`, stamped by
   the provenance trigger from the membership behind the role (staff only, backfilled);

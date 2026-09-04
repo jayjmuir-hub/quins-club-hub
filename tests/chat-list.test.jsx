@@ -219,3 +219,39 @@ describe('ChatList — presence dots use the real my_conversations shape', () =>
     expect(screen.queryByRole('img', { name: 'Online' })).toBeNull()
   })
 })
+
+describe('unread rows are hard to miss (4 Sep 2026)', () => {
+  // Jay, from a screenshot of the list: "we need a more prominent way to flag
+  // new chats that have new messages". An unread row wears a brand bar down
+  // its left edge and a bold dark preview; a read row is untouched. The
+  // "N unread in M chats" strip is a button to the Unread filter, and hides
+  // while that filter is on. CONTROLS: the read row's wrapper carries no bar
+  // and no data-unread; the strip is absent under the filter it would open.
+  it('an unread row wears the left bar and a bold preview; a read row does not', async () => {
+    renderList()
+    const rows = await screen.findAllByTestId('chat-row')
+    const unreadWrap = rows[1].parentElement
+    const readWrap = rows[0].parentElement
+    expect(unreadWrap).toHaveAttribute('data-unread', 'true')
+    expect(unreadWrap.className.split(/\s+/)).toContain('border-brand')
+    expect(within(rows[1]).getByText('Zz Coach Probe: Kick-off moved to 10:30').className.split(/\s+/)).toContain('font-bold')
+    expect(readWrap).not.toHaveAttribute('data-unread')
+    expect(readWrap.className.split(/\s+/)).not.toContain('border-brand')
+    expect(within(rows[0]).getByText('You: Two seats held').className.split(/\s+/)).not.toContain('font-bold')
+  })
+
+  it('the unread strip is a button that opens the Unread filter, and is gone once there', async () => {
+    const user = userEvent.setup()
+    renderList()
+    await screen.findAllByTestId('chat-row')
+    const strip = screen.getByTestId('unread-strip')
+    expect(strip.tagName).toBe('BUTTON')
+    expect(strip).toHaveTextContent('3')
+    expect(strip).toHaveTextContent('unread in 1 chat')
+    await user.click(strip)
+    expect(screen.getByRole('button', { name: 'Unread · 1' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByTestId('unread-strip')).toBeNull()
+    // Only the unread row survives the filter.
+    expect(screen.getAllByTestId('chat-row')).toHaveLength(1)
+  })
+})
