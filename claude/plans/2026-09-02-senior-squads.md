@@ -1,6 +1,9 @@
 # Senior squads: adults, jersey numbers, several squads per player, and U18 call-ups
 
-**Status: NOT SHIPPED — spec only, no code written.** Dated 2026-09-02.
+**Status: MOSTLY SHIPPED.** Fixtures and squads #678; U18 call-ups #689 and
+#690 (3–4 Sep 2026). Step 8, season stats, has its own spec:
+`claude/plans/2026-09-04-senior-season-stats.md`. Step 7, union registration
+numbers, is still NOT built. Dated 2026-09-02; status updated 4 Sep 2026.
 
 Pieces 2 and 3 of 3 in the senior-squads work. Depends on piece 1,
 `claude/plans/2026-09-02-fixture-format.md`, which ships first. Written from a
@@ -270,7 +273,14 @@ for seniors."* Per player per season, from what the match sheet already
 records: games, starts, appearances off the bench, tries, conversions,
 penalties, drop goals, yellow and red cards. Every one of these is on the
 RCM sheet today (`match_sheets` slots, scoring components and the cards
-rows), so this is a view over sheets, not new data entry. Shown on the
+rows), so this is a view over sheets, not new data entry.
+
+⚠️ **The sentence above is WRONG, measured 4 Sep 2026.** The sheet holds the
+22 names, the cards, and the score as TEAM totals on the fixture. Nobody
+records who scored. Jay's ruling that day: add scorers to the sheet. The
+corrected design is `claude/plans/2026-09-04-senior-season-stats.md`.
+
+The original text continues. Shown on the
 player's detail sheet and as a sortable table on the squad page and the
 Senior Section overview. **Seniors only** — a junior sheet keeps its
 "no league below U11" and everyone-plays rules, and a leaderboard of
