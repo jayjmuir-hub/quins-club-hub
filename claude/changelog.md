@@ -10,6 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #689 — 🏉 **U18 call-ups.** Senior-squads Part 3
+  (`claude/plans/2026-09-02-senior-squads.md`), Jay's rulings: the senior side
+  decides, inform only, floor 17 today, full membership on a yes.
+  `db/migrations/20260906_callups.sql`: `club_settings` (the floor, Club tab,
+  enforced in the database), `player_private.senior_callup_consent_at`,
+  `callup_requests` with a read policy only — `request_callup`,
+  `answer_callup`, `end_callup` are the writers; `callup_candidates` is the
+  privacy gate (name, home squad, state; no birthday, nobody under the floor).
+  A yes twins the family's home-squad memberships into the senior squad;
+  ending removes only those. Pushes to named profiles via push-send's new
+  `profile_push` (`profiles_push_subscriptions`), silenced in a harness by
+  `app.harness`. Screens: `/callups`, the Squad Hub card, the Home banner,
+  the Club-tab floor. Dry-run on production; `db/tests/callups.sql` (13
+  checks); `tests/push-profile-push-link.test.js`. Not built: email, the
+  clash note, season stats.
 - #688 — 📣 **Results keepers, and the Monday results nudge.** Piece 2 of
   the day: the Leagues edit sheet names a division's keepers from the club's
   active people (`competition_keepers` had no screen until now).
