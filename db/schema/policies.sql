@@ -2070,3 +2070,31 @@ CREATE POLICY "seats delete super" ON public.channel_seats
 CREATE POLICY "seat audit read super" ON public.channel_seat_audit
   FOR SELECT TO authenticated
   USING (private.is_super_admin());
+
+
+-- ---------------------------------------------------------------------
+-- public.competitions / competition_sides / competition_fixtures /
+-- competition_results / competition_keepers — the six policies
+-- 20260905_competitions_and_standings.sql created, captured 4 Sep 2026
+-- AFTER 20260906_rls_initplan_competitions.sql wrapped their auth.uid()
+-- calls. They were not captured here before; the table grants are in
+-- grants.sql. Every other policy on these tables (keeper manage, admin
+-- manage) resolves through private.* helpers and needed no wrap.
+-- ---------------------------------------------------------------------
+CREATE POLICY "competition read" ON public.competitions
+  FOR SELECT TO authenticated USING (((SELECT auth.uid()) IS NOT NULL));
+CREATE POLICY "competition side read" ON public.competition_sides
+  FOR SELECT TO authenticated USING (((SELECT auth.uid()) IS NOT NULL));
+CREATE POLICY "competition fixture read" ON public.competition_fixtures
+  FOR SELECT TO authenticated USING (((SELECT auth.uid()) IS NOT NULL));
+CREATE POLICY "competition result read" ON public.competition_results
+  FOR SELECT TO authenticated USING (((SELECT auth.uid()) IS NOT NULL));
+CREATE POLICY "competition keeper read" ON public.competition_keepers
+  FOR SELECT TO authenticated USING (((SELECT auth.uid()) IS NOT NULL));
+CREATE POLICY "competition result confirm" ON public.competition_results
+  FOR INSERT TO authenticated
+  WITH CHECK (private.is_keeper(competition_id)
+    AND confirmed_by = (SELECT auth.uid())
+    AND created_by = (SELECT auth.uid())
+    AND confirmed_at IS NOT NULL
+    AND source = ANY (ARRAY['typed'::text, 'read'::text, 'fetched'::text]));
