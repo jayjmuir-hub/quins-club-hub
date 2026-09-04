@@ -35,13 +35,15 @@ on the three divisions are a default Jay has not confirmed.
 and a per-player season line on the squad page, `/seniors` and the player
 sheet; `claude/plans/2026-09-04-senior-season-stats.md`. The migration is
 APPLIED to live. Still unbuilt from the senior work, in order: standings
-routes 2 and 3, the cross-section roster setting and the all-seniors channel,
-union registration numbers. ⚠️ Found while running every harness on 4 Sep and
-chipped rather than fixed: nine functions from #684/#688/#689 still grant
-EXECUTE to anon; four harnesses fail on live for pre-existing reasons; two
-harnesses cannot fail and the runner refuses the whole-suite run because of
-them; `docs:check`'s changelog rule compares 7-char SHAs against git's
-8-char output and fails locally on every commit.
+routes 2 and 3 (⚠️ DEFERRED by Jay, 4 Sep 2026 — no AI reader for now and no paste-and-parse either; route 1 stands), the cross-section roster setting and the all-seniors channel,
+union registration numbers. ✅ **The whole database suite is green on live
+and `npm run db:check` runs it end to end** — the hygiene of 4 Sep (#701,
+#702): anon EXECUTE revoked by name on nine functions, seven bare
+`auth.uid()` calls wrapped, a real `end_callup` bug fixed, harnesses that
+could not fail now can, four stale harnesses repointed, one stray staff
+photo deleted, and `docs:check` compares full SHAs. A new function's
+migration still needs `revoke … from anon` BY NAME; `db/tests/grants.sql`
+catches it if forgotten.
 
 📄 **THE DOCUMENTS REPO IS LIVE.** Club distro to age groups plus squad
 self-serve uploads, two visibility tiers, multi-squad targeting, push on new
