@@ -152,9 +152,14 @@ describe('the rights vocabulary', () => {
     // The chat-* rights (30 Aug 2026) seat a ticked admin in one role channel
     // (db/migrations/20260830_role_channels.sql). No chat-welfare on purpose:
     // the Welfare channel rides the existing welfare grant.
+    // `seniors` (4 Sep 2026): reads both senior sections' rosters,
+    // availability, fixtures and stats — the club captain "but might be
+    // others". A DATA reach, enforced by db/migrations/20260911_seniors_right.sql,
+    // and deliberately outside ADMIN_TEAM_REACH so it never opens a chat.
     expect(ADMIN_RIGHTS).toEqual([
       'youth', 'media', 'pitches', 'training', 'welfare', 'clubadmin',
       'chat-headcoaches', 'chat-managers', 'chat-medics',
+      'seniors',
     ])
     expect(ADMIN_RIGHTS.map(adminRightLabel)).toEqual([
       'Club Youth Manager',
@@ -166,6 +171,7 @@ describe('the rights vocabulary', () => {
       'Chat: Club Head Coaches',
       'Chat: Club Age Group Managers',
       'Chat: Club Medics',
+      'Senior Sections',
     ])
   })
 })

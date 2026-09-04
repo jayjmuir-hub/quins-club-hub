@@ -351,6 +351,9 @@ CREATE POLICY "avail read" ON public.availability
   WHERE (e.id = availability.event_id))) OR private.can_edit_team(( SELECT e.team_id
    FROM events e
   WHERE (e.id = availability.event_id))) OR private.is_own_player(player_id)));
+-- ⚠️ TWO ARMS SINCE, NOT RE-CAPTURED ABOVE, each on the event's team:
+-- `OR private.same_section_member(...)` (20260905_senior_section) and
+-- `OR private.seniors_right_reach(...)` (20260911_seniors_right).
 
 CREATE POLICY "avail write insert" ON public.availability
   AS PERMISSIVE FOR INSERT TO public
@@ -445,6 +448,9 @@ CREATE POLICY "club settings manage" ON public.club_settings
 CREATE POLICY "event read" ON public.events
   AS PERMISSIVE FOR SELECT TO public
   USING (private.is_attached_to_team(team_id));
+-- ⚠️ TWO ARMS SINCE, NOT RE-CAPTURED ABOVE: `OR private.senior_section_fixture_reach(team_id)`
+-- (20260905_senior_section — any senior reads every senior squad's fixtures) and
+-- `OR private.seniors_right_reach(team_id)` (20260911_seniors_right).
 
 -- ⚠️ RE-CAPTURED 3 Sep 2026 (20260904_admin_team_reach). The club-wide arm
 -- (team_id null → any admin) dates from 30 Aug and was missing from this
@@ -730,6 +736,10 @@ CREATE POLICY "parent delete" ON public.player_parents
 CREATE POLICY "player read" ON public.players
   AS PERMISSIVE FOR SELECT TO public
   USING ((private.can_see_player(id) OR private.is_own_player(id)));
+-- ⚠️ TWO ARMS SINCE, NOT RE-CAPTURED ABOVE: `OR private.same_section_member(team_id)`
+-- (20260905_senior_section — an adult reads their own senior section's roster)
+-- and `OR private.seniors_right_reach(team_id)` (20260911_seniors_right — an
+-- admin row carrying `seniors` reads BOTH senior sections). Read the migrations.
 
 -- ⚠️ RE-CAPTURED FROM LIVE 30 Aug 2026 (Grok item 14). The 28 Aug S1 write
 -- allowlist (20260828_child_write_allowlist) replaced can_edit_team with

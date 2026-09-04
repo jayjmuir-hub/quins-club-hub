@@ -8398,7 +8398,7 @@ AS $function$
       from public.teams t
      where t.id = _team
        and t.section is not null
-       and (private.same_section_member(_team) or private.can_edit_team(_team))
+       and (private.same_section_member(_team) or private.can_edit_team(_team) or private.seniors_right_reach(_team))
   ),
   win as (
     -- '2026-27' → 2026-09-01 .. 2027-08-31. Anything else → no row → no rows.
@@ -8522,3 +8522,32 @@ $function$;
 revoke execute on function public.senior_season_stats_gaps(uuid, text) from public;
 grant execute on function public.senior_season_stats_gaps(uuid, text) to authenticated;
 revoke execute on function public.senior_season_stats_gaps(uuid, text) from anon;
+
+-- Added 2026-09-11 (seniors_right). The `seniors` admin right reads BOTH senior
+-- sections' rosters, availability, fixtures and season stats — Jay, 4 Sep 2026,
+-- "the club captain for example, but might be others". Called by the `player
+-- read`, `event read` and `avail read` policies and by both season-stats RPCs
+-- (whose gates above gained the same arm — the gaps RPC's gate is the same
+-- line and is not repeated here). NOT in admin_team_reach on purpose: 'see'
+-- opens chat. Spec: claude/plans/2026-09-03-senior-section.md.
+CREATE OR REPLACE FUNCTION private.seniors_right_reach(_team uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (
+    select 1
+      from public.teams t
+      join public.memberships m on m.club_id = t.club_id
+     where t.id = _team
+       and t.section is not null
+       and m.profile_id = (select auth.uid())
+       and m.status = 'active'
+       and m.role = 'admin'
+       and 'seniors' = any(m.admin_rights)
+  );
+$function$;
+
+revoke execute on function private.seniors_right_reach(uuid) from public, anon;
+grant execute on function private.seniors_right_reach(uuid) to authenticated;

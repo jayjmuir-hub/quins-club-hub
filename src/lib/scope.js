@@ -275,6 +275,10 @@ export function parentPreviewTeamIds(memberships) {
 export const ADMIN_RIGHTS = [
   'youth', 'media', 'pitches', 'training', 'welfare', 'clubadmin',
   'chat-headcoaches', 'chat-managers', 'chat-medics',
+  // Reads BOTH senior sections' rosters, availability, fixtures and season
+  // stats — the club captain and others (Jay, 4 Sep 2026). Enforced in the
+  // database (db/migrations/20260911_seniors_right.sql); see SENIORS_RIGHT.
+  'seniors',
 ]
 
 // Job titles for squad staff — what `memberships.title` is usually set to.
@@ -343,6 +347,9 @@ const ADMIN_RIGHT_LABELS = {
   'chat-headcoaches': 'Chat: Club Head Coaches',
   'chat-managers': 'Chat: Club Age Group Managers',
   'chat-medics': 'Chat: Club Medics',
+  // A job, not a person — "Club Captain" was the example and was not the
+  // rule ("but might be others"), so the label names what the right reads.
+  seniors: 'Senior Sections',
 }
 
 /** The human label for a right, or the raw value if it is one we do not know. */
@@ -419,6 +426,22 @@ export function adminTeamReach(memberships, mode) {
   if (isSuperAdmin(memberships)) return true
   const allowed = ADMIN_TEAM_REACH[mode] ?? []
   return adminRights(memberships).some((right) => allowed.includes(right))
+}
+
+// ══ THE SENIORS RIGHT (4 Sep 2026) ═════════════════════════════════════════
+//
+// ⚠️ NOT IN ADMIN_TEAM_REACH ON PURPOSE. 'see' is can_see_team, which opens
+// chat, notices and documents; Jay's ruling was rosters and availability
+// across the two senior sections, held by a named person — the club captain
+// "but might be others". So it is its own reach, mirroring
+// private.seniors_right_reach: an active admin row carrying `seniors`, on a
+// squad whose `section` is set. Junior squads have no section and are never
+// reached. The SQL is the boundary; this decides what the UI offers.
+export const SENIORS_RIGHT = 'seniors'
+
+/** Does this person's ADMIN hat read both senior sections? (super holds it implicitly.) */
+export function canReadSeniorSections(memberships) {
+  return hasAdminRight(memberships, SENIORS_RIGHT)
 }
 
 // ══ CHILD-CONTACT ALLOWLIST (S2, Phase 1 — 28 Aug 2026) ═══════════════════
@@ -609,7 +632,12 @@ export function visibleTeams(memberships, allTeams) {
       .map((m) => m.team_id)
       .filter((id) => id != null),
   )
-  return sorted(allTeams.filter((team) => teamIds.has(team.id)))
+  // The seniors right (4 Sep 2026): every squad with a section joins the
+  // person's own squads, so the Roster and Schedule filters offer them. A
+  // section-mate PLAYER does not get this — their section reading lives on
+  // /seniors, and their own squad is what the Roster is for.
+  const seniors = canReadSeniorSections(memberships)
+  return sorted(allTeams.filter((team) => teamIds.has(team.id) || (seniors && team.section != null)))
 }
 
 /**

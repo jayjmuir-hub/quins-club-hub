@@ -1267,3 +1267,35 @@ a plain admin in the managers channel still reads admin; a backfill with its
 channel list broken restores nothing; an admin-manager who is a club officer
 reads the officer title with no squad in the managers channel, old post
 backfilled, and the officer title in her squad chat too.
+
+## 20260911_seniors_right — a named person reads both senior sections (4 Sep 2026)
+
+**Why.** 20260905 opened a senior section to its own adults and kept men's
+and women's rosters apart, with "a club setting can open them" as the only
+route written down. Jay, the same evening: *"the option to give certain
+people rights to see both men and women, like the club captain for example,
+but might be others."* A person, not a section.
+
+**What it changes.** One helper, `private.seniors_right_reach(team)`: the
+caller holds an ACTIVE ADMIN row carrying `seniors`, and the squad's
+`section` is set. It is added as a fourth arm to `player read`, `event read`
+and `avail read`, and to the gate of both season-stats RPCs. Nothing else.
+The club captain gets an admin membership with that one right — the same
+shape as every other right, and the shape the admin split of 3 Sep made
+safe: an admin row reaches no squad by itself, so a `seniors`-only admin
+reads exactly these four things.
+
+**Why it is not in `admin_team_reach`.** The 'see' list IS `can_see_team`,
+read by twenty-nine policies including chat, notices and documents. The
+ruling was rosters and availability. `tests/scope.test.js` pins its absence.
+
+**Seniors only, and the child line holds.** Every arm demands
+`t.section is not null`, so a junior squad is unreachable. A 17-year-old in
+the 2nd XV keeps his private row, photo and DM rules — they key on the
+person. `db/tests/senior-section.sql` steps 13–19: both rosters, the men's
+availability, the women's fixtures, NO junior roster, NO private row, and a
+zero-rights admin as the control reading nothing senior. All green on the
+rolled-back run of 4 Sep 2026 before the file was committed.
+
+**Not built.** The club-wide switch stays as the coarser fallback in the
+plan, unasked-for.
