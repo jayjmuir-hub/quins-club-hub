@@ -17,6 +17,7 @@ import SquadStaffCard from '../components/SquadStaffCard.jsx'
 import PersonCard from '../components/PersonCard.jsx'
 import NoticeBoard from '../components/NoticeBoard.jsx'
 import NotificationsNudge from '../components/NotificationsNudge.jsx'
+import CallupBanner from '../components/CallupBanner.jsx'
 import PostNoticeAction from '../components/PostNoticeAction.jsx'
 import { listEvents, subscribeEvents } from '../data/events.js'
 import { listPlayers } from '../data/players.js'
@@ -904,6 +905,9 @@ export default function Dashboard() {
           ⚠️ IT MUST NOT MOVE ABOVE THE NOTICEBOARD. A notice somebody posted
           for the squad this week outranks a prompt about a feature. */}
       <NotificationsNudge />
+      {/* A call-up waiting for THIS family's answer (4 Sep 2026). Null for
+          everyone else, so it costs the page nothing. */}
+      <CallupBanner />
 
       {/* The Squad Hub card that sat here (21-22 Aug 2026) is gone entirely:
           it became desktop:hidden when the sidebar took the desktop entry,

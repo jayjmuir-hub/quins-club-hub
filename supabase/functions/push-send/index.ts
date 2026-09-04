@@ -539,6 +539,23 @@ async function availabilityTargets(eventId: string, batchId: string): Promise<Su
  * row is still pending. db/migrations/20260819_approval_push.sql owns it, and
  * its header explains why that rule is currently written twice.
  */
+/** The subscriptions of NAMED profiles, minus a category's opt-outs — public.profiles_push_subscriptions. */
+async function profilesTargets(profileIds: string[], category: string): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/profiles_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _profiles: profileIds, _category: category }),
+  })
+  if (!response.ok) {
+    throw new Error(`profiles_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
 /** The subscriptions a RESULTS NUDGE goes to — public.results_push_subscriptions. */
 async function resultsTargets(competitionId: string): Promise<Subscription[]> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/results_push_subscriptions`, {
@@ -739,6 +756,9 @@ Deno.serve(async (request) => {
   let training: Record<string, string> | null = null
   // Monday results nudge (4 Sep 2026) — db/migrations/20260906_results_nudge.sql.
   let results: Record<string, string> | null = null
+  // A push to NAMED profiles (4 Sep 2026, call-ups) — db/migrations/20260906_callups.sql
+  // private.push_to_profiles. The category names the opt-out that applies.
+  let profilePush: Record<string, unknown> | null = null
   try {
     const payload = await request.json()
     feedbackId = String(payload?.feedback_id ?? '')
@@ -751,6 +771,7 @@ Deno.serve(async (request) => {
     nudge = payload?.availability_nudge ?? null
     training = payload?.training_suggestion_push ?? null
     results = payload?.results_nudge ?? null
+    profilePush = payload?.profile_push ?? null
   } catch {
     return new Response('bad request', { status: 400 })
   }
@@ -759,7 +780,7 @@ Deno.serve(async (request) => {
   // notified.
   if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0)
       + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) + (messageId ? 1 : 0)
-      + (documentId ? 1 : 0) + (accessRequestId ? 1 : 0) + (results ? 1 : 0) + (training ? 1 : 0) !== 1) {
+      + (documentId ? 1 : 0) + (accessRequestId ? 1 : 0) + (results ? 1 : 0) + (profilePush ? 1 : 0) + (training ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
@@ -840,6 +861,18 @@ Deno.serve(async (request) => {
         subscriptions: await squadTargets(
           out.club_id, out.team_id, out.actor_id ?? null, out.category || 'fixture',
         ),
+      }
+    } else if (profilePush) {
+      const ids = Array.isArray(profilePush.profile_ids) ? profilePush.profile_ids.map(String) : []
+      const category = String(profilePush.category || 'approval')
+      const path = String(profilePush.path || '/')
+      if (ids.length === 0) return new Response('ok (nobody to tell)', { status: 200 })
+      job = {
+        title: escapeHtmlFree(profilePush.title).slice(0, 80) || 'Quins Club Hub',
+        body: escapeHtmlFree(profilePush.body).slice(0, 200),
+        url: `${APP_URL}${path.startsWith('/') ? path : '/'}`,
+        tag: escapeHtmlFree(profilePush.tag) || `profile-push-${Date.now()}`,
+        subscriptions: await profilesTargets(ids, category),
       }
     } else if (results) {
       // The division's keepers and the super admins, minus `results`
