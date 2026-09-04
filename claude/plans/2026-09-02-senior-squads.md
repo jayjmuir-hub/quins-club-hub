@@ -1,7 +1,7 @@
 # Senior squads: adults, jersey numbers, several squads per player, and U18 call-ups
 
 **Status: MOSTLY SHIPPED.** Fixtures and squads #678; U18 call-ups #689 and
-#690 (3–4 Sep 2026). Step 8, season stats, has its own spec:
+#690 (3–4 Sep 2026); step 8, season stats, #695 (4 Sep 2026) via its own spec
 `claude/plans/2026-09-04-senior-season-stats.md`. Step 7, union registration
 numbers, is still NOT built. Dated 2026-09-02; status updated 4 Sep 2026.
 

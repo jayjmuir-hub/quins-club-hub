@@ -1,6 +1,6 @@
 # Senior Season Stats Implementation Plan
 
-**Status: NOT SHIPPED — plan only, written 4 Sep 2026.** The spec it
+**Status: SHIPPED — #695, 4 Sep 2026, all ten tasks; executed subagent-driven with a review per task and a final whole-branch review.** The spec it
 implements is `claude/plans/2026-09-04-senior-season-stats.md`; where the two
 disagree, the spec's *intent* wins and this file says where it deviates.
 

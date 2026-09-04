@@ -1,6 +1,8 @@
 # Senior season stats: scorers on the match sheet, a count per player per season
 
-**Status: NOT SHIPPED — spec only, no code written.** Dated 2026-09-04.
+**Status: SHIPPED — #695, 4 Sep 2026.** Migration applied to live the same
+day. Two deliberate deviations, recorded in the implementation plan: `qty`
+not `count`, and the plural kind words. Dated 2026-09-04.
 
 Step 8 of `claude/plans/2026-09-02-senior-squads.md` ("Season stats for
 seniors"), pulled into its own spec because the design conversation on
