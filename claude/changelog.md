@@ -10,6 +10,17 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #688 — 📣 **Results keepers, and the Monday results nudge.** Piece 2 of
+  the day: the Leagues edit sheet names a division's keepers from the club's
+  active people (`competition_keepers` had no screen until now).
+  `db/migrations/20260906_results_nudge.sql`: `results_push_subscriptions`
+  (keepers + super admins, minus `results` opt-outs),
+  `private.send_results_nudges()` on pg_cron Monday 05:30 Dubai, one push
+  per division with last week's results still to enter, tagged per
+  division; `results` joins the notification categories;
+  `supabase/functions/push-send/index.ts` gains `results_nudge` (deployed
+  after merge). Dry-run on production; `db/tests/results-nudge.sql`;
+  `tests/push-results-nudge-link.test.js` as the rot detector.
 - #687 — 🔎 **"Senior men" and "Senior women" on the Roster and Schedule
   filters.** Phase 2 of `claude/plans/2026-09-03-senior-section.md`.
   `src/lib/section.js` `sectionGroups` / `teamIdsForFilter`;
