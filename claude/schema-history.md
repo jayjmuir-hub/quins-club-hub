@@ -1242,12 +1242,26 @@ whose author holds the channel's role, with `messages_touch` off for the
 statement (20260908's lesson). `clubstaff`, `welfare` and `committee` are not
 role-specific and are left alone.
 
+**And a club officer outranks both, club-wide.** Same day, Jay: "why is [the
+junior manager] not tagged as the Club Junior Manager?" Her admin row has no
+title; the title lives in `club_officers`, which the pill never read. In any
+club-wide channel (`team_id` null, not a DM) a staff author who is a club
+officer wears the officer title and no squad — oldest officer row wins for the
+rare person with two. In a squad's own chat nothing changes: there she is
+whoever her membership on that squad says. Backfilled the same way.
+
 **Argument against, recorded.** A person's pill now differs between channels.
 That is the point — the pill answers "why are you in this room" — but a
-reader who notices will ask, and this is where the answer is.
+reader who notices will ask, and this is where the answer is. The officer
+rule also means a squad manager who is Treasurer reads "Treasurer" in Age
+Group Managers; if the club ever wants the channel's role to win over an
+officer title, the two rules are adjacent in the trigger and the harness's
+steps 6 to 8 are the ones to flip.
 
 **Proof.** `db/tests/role-channel-pill.sql`: baseline reproduces the bug
 before the migration; a new managers-channel post reads manager/Team
 Manager/U11; the old one is backfilled; her squad-chat post still reads admin;
 a plain admin in the managers channel still reads admin; a backfill with its
-channel list broken restores nothing.
+channel list broken restores nothing; an admin-manager who is a club officer
+reads the officer title with no squad in the managers channel, old post
+backfilled, and plain admin in her squad chat (control).

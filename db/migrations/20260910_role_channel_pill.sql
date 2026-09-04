@@ -14,6 +14,14 @@
 -- admin still posts to a squad as Admin. Backfilled for the role-channel
 -- messages already stamped 'admin' whose author holds the channel's role.
 --
+-- AND A CLUB OFFICER OUTRANKS BOTH, IN ANY CLUB-WIDE CHANNEL (Jay, same day:
+-- "why is [the junior manager] not tagged as the Club Junior Manager?"). Her
+-- admin row has no title and her title lives in club_officers, which the
+-- pill never read. In a club-wide channel (team_id null, not a DM) an
+-- officer wears their officer title and no squad. In a squad's own chat
+-- nothing changes — there she is that squad's Team Manager, which is the
+-- right answer in that room. Backfilled the same way.
+--
 -- Reasoning and proof: claude/schema-history.md, "20260910_role_channel_pill".
 -- Harness: db/tests/role-channel-pill.sql (rolled back against production).
 begin;
@@ -30,6 +38,7 @@ declare
   parent public.messages;
   ev public.events;
   conv public.conversations;
+  officer_title text;
 begin
   new.author_id := auth.uid();
   if new.author_id is null then
@@ -140,6 +149,20 @@ begin
     raise exception 'no club for this message' using errcode = '23502';
   end if;
 
+  -- 20260910: a club officer, in any club-wide channel, wears the officer
+  -- title (Club officers tab) and no squad. Needs club_id, so it sits here.
+  -- Oldest officer row wins for the rare person with two titles.
+  if new.team_id is null and new.channel <> 'dm' and new.author_role in ('admin','coach','manager','medic') then
+    select o.title into officer_title
+      from club_officers o
+     where o.profile_id = new.author_id and o.club_id = new.club_id
+     order by o.created_at limit 1;
+    if officer_title is not null then
+      new.author_title := officer_title;
+      new.author_team_id := null;
+    end if;
+  end if;
+
   if coalesce(array_length(new.mentions, 1), 0) > 0 then
     select coalesce(array_agg(distinct m), '{}') into new.mentions
       from unnest(new.mentions) as m
@@ -186,6 +209,16 @@ update public.messages x
                   and ((x.channel = 'managers'    and m.role = 'manager')
                     or (x.channel = 'headcoaches' and m.role = 'coach' and m.is_head_coach)
                     or (x.channel = 'medics'      and m.role = 'medic')));
+-- Officers: every club-wide, non-DM staff message by a club officer wears
+-- the officer title and no squad. Same trigger caveat, same transaction.
+update public.messages x
+   set author_title = o.title, author_team_id = null
+  from (select distinct on (profile_id, club_id) profile_id, club_id, title
+          from public.club_officers order by profile_id, club_id, created_at) o
+ where o.profile_id = x.author_id and o.club_id = x.club_id
+   and x.team_id is null and x.channel <> 'dm'
+   and x.author_role in ('admin','coach','manager','medic')
+   and (x.author_title is distinct from o.title or x.author_team_id is not null);
 alter table public.messages enable trigger messages_touch;
 
 commit;

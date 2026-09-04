@@ -18,6 +18,12 @@
 --  4. CONTROL: a plain admin (no manager row) in the managers channel stays
 --     'admin' — nothing to prefer
 --  5. FAULT: a backfill whose channel list is broken restores nothing
+--  6. OFFICER: an admin-manager who is also a club officer posts to the
+--     managers channel as her officer title with NO squad — the officer
+--     title outranks the channel's role
+--  7. her pre-migration managers post is backfilled the same way
+--  8. CONTROL: in the squad chat the officer rule does not apply and the
+--     order is untouched — she reads plain admin there, as before
 begin;
 
 create temporary table _log(seq serial, line text) on commit drop;
@@ -30,16 +36,21 @@ insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at, r
 select ('f0000000-0000-4000-8000-0000000005' || lpad(n::text, 2, '0'))::uuid,
        '00000000-0000-0000-0000-000000000000','authenticated','authenticated',
        'zz-chanpill-' || n || '@example.invalid', now(), '{}'::jsonb, now(), now()
-  from generate_series(10, 11) n;
+  from generate_series(10, 12) n;
 
 insert into teams (id, club_id, name, sort_order) values
  ('f0000000-0000-4000-8000-000000000501','f0000000-0000-4000-8000-000000000500','U11 ZZ Chanpill', 1101);
 
 -- personas: 10 admin AND manager of U11 (with the chat-managers right) · 11 plain admin with the right
+--           · 12 admin (NO title) AND manager of U11 AND club officer "Rugby Junior Manager"
 insert into memberships (profile_id, club_id, team_id, role, title, status, is_super, admin_rights) values
  ('f0000000-0000-4000-8000-000000000510','f0000000-0000-4000-8000-000000000500', null, 'admin', 'Club Secretary','active', false, array['chat-managers']),
  ('f0000000-0000-4000-8000-000000000510','f0000000-0000-4000-8000-000000000500','f0000000-0000-4000-8000-000000000501','manager','Team Manager','active', false, array[]::text[]),
- ('f0000000-0000-4000-8000-000000000511','f0000000-0000-4000-8000-000000000500', null, 'admin', 'Treasurer','active', false, array['chat-managers']);
+ ('f0000000-0000-4000-8000-000000000511','f0000000-0000-4000-8000-000000000500', null, 'admin', 'Treasurer','active', false, array['chat-managers']),
+ ('f0000000-0000-4000-8000-000000000512','f0000000-0000-4000-8000-000000000500', null, 'admin', null,'active', false, array['chat-managers']),
+ ('f0000000-0000-4000-8000-000000000512','f0000000-0000-4000-8000-000000000500','f0000000-0000-4000-8000-000000000501','manager','Team Manager','active', false, array[]::text[]);
+insert into club_officers (club_id, profile_id, title) values
+ ('f0000000-0000-4000-8000-000000000500','f0000000-0000-4000-8000-000000000512','Rugby Junior Manager');
 
 create function pg_temp.as_user(_id text) returns void language plpgsql as $$
 begin
@@ -63,6 +74,10 @@ begin
   end if;
   insert into _log(line) values ('0 baseline: before the migration the admin-manager''s managers post reads admin/Club Secretary/no squad');
 end $a$;
+-- the officer's pre-migration post, for step 7
+select pg_temp.as_user('f0000000-0000-4000-8000-000000000512');
+insert into messages (club_id, channel, body) values ('f0000000-0000-4000-8000-000000000500','managers','zz chanpill officer before');
+reset role;
 
 -- ── migration under test: db/migrations/20260910_role_channel_pill.sql,
 --    verbatim (begin/commit stripped) ────────────────────────────────────────
@@ -79,6 +94,7 @@ declare
   parent public.messages;
   ev public.events;
   conv public.conversations;
+  officer_title text;
 begin
   new.author_id := auth.uid();
   if new.author_id is null then
@@ -189,6 +205,20 @@ begin
     raise exception 'no club for this message' using errcode = '23502';
   end if;
 
+  -- 20260910: a club officer, in any club-wide channel, wears the officer
+  -- title (Club officers tab) and no squad. Needs club_id, so it sits here.
+  -- Oldest officer row wins for the rare person with two titles.
+  if new.team_id is null and new.channel <> 'dm' and new.author_role in ('admin','coach','manager','medic') then
+    select o.title into officer_title
+      from club_officers o
+     where o.profile_id = new.author_id and o.club_id = new.club_id
+     order by o.created_at limit 1;
+    if officer_title is not null then
+      new.author_title := officer_title;
+      new.author_team_id := null;
+    end if;
+  end if;
+
   if coalesce(array_length(new.mentions, 1), 0) > 0 then
     select coalesce(array_agg(distinct m), '{}') into new.mentions
       from unnest(new.mentions) as m
@@ -235,6 +265,16 @@ update public.messages x
                   and ((x.channel = 'managers'    and m.role = 'manager')
                     or (x.channel = 'headcoaches' and m.role = 'coach' and m.is_head_coach)
                     or (x.channel = 'medics'      and m.role = 'medic')));
+-- Officers: every club-wide, non-DM staff message by a club officer wears
+-- the officer title and no squad. Same trigger caveat, same transaction.
+update public.messages x
+   set author_title = o.title, author_team_id = null
+  from (select distinct on (profile_id, club_id) profile_id, club_id, title
+          from public.club_officers order by profile_id, club_id, created_at) o
+ where o.profile_id = x.author_id and o.club_id = x.club_id
+   and x.team_id is null and x.channel <> 'dm'
+   and x.author_role in ('admin','coach','manager','medic')
+   and (x.author_title is distinct from o.title or x.author_team_id is not null);
 alter table public.messages enable trigger messages_touch;
 
 -- ── end of migration ─────────────────────────────────────────────────────────
@@ -299,6 +339,39 @@ begin
     raise exception 'ASSERT 5 FAILED: the broken backfill should have restored nothing, got %', pg_temp.pill('zz chanpill before');
   end if;
   insert into _log(line) values ('5 fault: a backfill with its channel list broken restores nothing (the real one, above, restored it)');
+end $a$;
+
+-- ── 6: an officer wears the officer title in a club-wide channel ─────────────
+select pg_temp.as_user('f0000000-0000-4000-8000-000000000512');
+insert into messages (club_id, channel, body) values ('f0000000-0000-4000-8000-000000000500','managers','zz chanpill officer after');
+reset role;
+do $a$
+begin
+  if pg_temp.pill('zz chanpill officer after') <> 'manager/Rugby Junior Manager/-' then
+    raise exception 'ASSERT 6 FAILED: expected the officer title and no squad, got %', pg_temp.pill('zz chanpill officer after');
+  end if;
+  insert into _log(line) values ('6 officer: a new managers-channel post reads Rugby Junior Manager with no squad — the officer title outranks the channel''s role');
+end $a$;
+
+-- ── 7: her old post was backfilled ───────────────────────────────────────────
+do $a$
+begin
+  if pg_temp.pill('zz chanpill officer before') <> 'manager/Rugby Junior Manager/-' then
+    raise exception 'ASSERT 7 FAILED: the officer''s pre-migration post should be backfilled, got %', pg_temp.pill('zz chanpill officer before');
+  end if;
+  insert into _log(line) values ('7 backfill: the officer''s pre-migration post now reads Rugby Junior Manager with no squad');
+end $a$;
+
+-- ── 8: CONTROL — the officer rule stays out of a squad chat ─────────────────
+select pg_temp.as_user('f0000000-0000-4000-8000-000000000512');
+insert into messages (club_id, team_id, channel, body) values ('f0000000-0000-4000-8000-000000000500','f0000000-0000-4000-8000-000000000501','squad','zz chanpill officer squad');
+reset role;
+do $a$
+begin
+  if pg_temp.pill('zz chanpill officer squad') <> 'admin/-/-' then
+    raise exception 'ASSERT 8 FAILED: in the squad chat the officer title must not apply (admin row, no title), got %', pg_temp.pill('zz chanpill officer squad');
+  end if;
+  insert into _log(line) values ('8 control: in the squad chat the officer reads admin with no title — the officer rule is club-wide only');
 end $a$;
 
 select line from _log order by seq;
