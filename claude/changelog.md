@@ -10,6 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #692 — 💬 **A channel post holding an unread reply opens its thread on arrival.**
+  `my_chats()` previews the newest message reply or not; the thread folded
+  replies behind "1 reply", so a Reply to an older post was promised by the
+  list and invisible in the chat (live, 4 Sep). `src/components/ChannelThread.jsx`
+  force-opens the thread; rot detector `tests/channel-thread-unread-reply-opens.test.jsx`.
 - #691 — 📝 **Handoff: the senior build.** `claude/handoffs/2026-09-04-senior-build.md` and a seniors paragraph in `claude/state-of-play.md`. Docs only.
 - #690 — ✉️ **Call-up email, the same-day clash note, and the seed guard.**
   `supabase/functions/notify-callup/index.ts` mails the family on an ask
