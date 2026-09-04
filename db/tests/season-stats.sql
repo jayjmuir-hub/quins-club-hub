@@ -162,6 +162,18 @@ begin
   insert into _r values ('15 CONTROL: staff read the score rows (the RLS mirror of cards)', case when n = 2 then 'PASS' else 'FAIL ' || n end);
 
   perform set_config('role', 'postgres', true);
+
+  -- ⚠️ A FAIL ROW MUST STOP THE RUN. scripts/db-check.mjs reports `ok` for
+  -- any harness whose SQL executes without error, so a 'FAIL …' outcome in
+  -- _r is otherwise visible only to a human reading the output — measured
+  -- 4 Sep 2026 on this file's own first live run. Proven against an injected
+  -- fault (row 3's expected bench changed to 2 → the runner printed FAIL and
+  -- this message named the row).
+  if exists (select 1 from _r where outcome not like 'PASS%') then
+    raise exception 'season-stats: assertion(s) FAILED — %',
+      (select string_agg(step || ' → ' || outcome, ' | ' order by (regexp_match(step, '^\d+'))[1]::int)
+         from _r where outcome not like 'PASS%');
+  end if;
 end $$;
 
 select * from _r order by (regexp_match(step, '^\d+'))[1]::int;
