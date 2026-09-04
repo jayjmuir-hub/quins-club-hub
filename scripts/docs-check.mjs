@@ -149,8 +149,18 @@ const SUBJECT_PR = /\(#(\d+)\)\s*$/
 function checkChangelog() {
   if (!existsSync(join(ROOT, CHANGELOG))) return
   const text = readFileSync(join(ROOT, CHANGELOG), 'utf8')
-  const listed = new Set()
+  // ⚠️ FULL 40-CHAR SHAs, NOT WHATEVER LENGTH THE CHANGELOG HAPPENS TO CITE.
+  // git's short-SHA abbreviation length is not fixed at 7 - it auto-widens as
+  // the object count grows, and this repo's `git log --format=%h` started
+  // producing 8-char SHAs while every changelog entry still cited 7 (measured
+  // 4 Sep 2026: `git rev-parse --short HEAD` -> 8 chars, `3bad675` cited vs
+  // `3bad6755` produced). Comparing those strings directly flagged all 765
+  // commits since the baseline as "missing", correctly-cited ones included.
+  // Resolving BOTH sides to the full SHA before comparing makes the check
+  // independent of whatever abbreviation length git chooses on the day.
+  const listedFull = new Set()
   const listedPrs = new Set()
+  const validCited = []
 
   text.split('\n').forEach((line, i) => {
     const pr = line.match(PR_REF)
@@ -161,11 +171,26 @@ function checkChangelog() {
     const m = line.match(/^-\s+`([0-9a-f]{7,40})`/)
     if (!m) return
     const sha = m[1]
-    listed.add(sha)
     if (!isCommit(sha)) {
       fail(CHANGELOG, i + 1, `changelog cites a SHA that is not a commit: ${sha}`)
+    } else {
+      validCited.push(sha)
     }
   })
+
+  // Resolve every validated citation to its full 40-char SHA in ONE `git
+  // rev-parse` call rather than one process per line. A changelog this size
+  // cites several hundred SHAs, and on Windows each execSync is a process
+  // spawn costing hundreds of ms - one at a time that made this check take
+  // minutes. `git rev-parse <a> <b> <c> ...` accepts any unambiguous prefix
+  // per argument and prints one resolved full SHA per line, in the same
+  // order - no `^{commit}` suffix needed, so no caret for cmd.exe to eat.
+  if (validCited.length) {
+    const resolved = execSync(`git rev-parse ${validCited.join(' ')}`, { encoding: 'utf8' })
+      .trim()
+      .split('\n')
+    for (const full of resolved) listedFull.add(full)
+  }
 
   // Coverage: no commit after the baseline may be missing.
   // NOTE the ~1: a commit cannot cite its own SHA, because the SHA does not
@@ -175,7 +200,9 @@ function checkChangelog() {
   let range
   try {
     if (!isCommit(CHANGELOG_BASELINE)) throw new Error('baseline missing')
-    range = execSync(`git log --format=%h ${CHANGELOG_BASELINE}..HEAD~1`, { encoding: 'utf8' })
+    // %H, not %h: the full SHA, so this side of the comparison is never at
+    // the mercy of git's abbreviation length either. See listedFull above.
+    range = execSync(`git log --format=%H ${CHANGELOG_BASELINE}..HEAD~1`, { encoding: 'utf8' })
   } catch {
     // A shallow clone cannot see the baseline. Say so rather than pass silently -
     // a check that quietly does nothing is worse than no check.
@@ -186,7 +213,7 @@ function checkChangelog() {
     return
   }
   for (const sha of range.split('\n').filter(Boolean)) {
-    if (listed.has(sha)) continue
+    if (listedFull.has(sha)) continue
     const subject = execSync(`git log --format=%s -1 ${sha}`, { encoding: 'utf8' }).trim()
     const pr = subject.match(SUBJECT_PR)
     if (pr && listedPrs.has(pr[1])) continue
