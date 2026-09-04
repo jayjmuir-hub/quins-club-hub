@@ -7,6 +7,7 @@ import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import RosterTable from '../components/RosterTable.jsx'
 import TeamFilter, { ALL_TEAMS_ID } from '../components/TeamFilter.jsx'
+import { sectionGroups, teamIdsForFilter } from '../lib/section.js'
 import { positionGroup, POSITION_GROUP_ORDER } from '../lib/rosterUnit.js'
 import { buildRosterGroups, constantColumns, GROUP_BY } from '../lib/rosterGrouping.js'
 import { isMinisTeam } from '../lib/minis.js'
@@ -524,7 +525,14 @@ export default function Roster() {
   // a single team the pill row is hidden entirely, so there would be no
   // "All" pill left to click and the list would stay empty until the user
   // navigated away and back. Schedule.jsx does the same, for the same reason.
-  const activeFilter = teamIds.includes(teamFilter) ? teamFilter : ALL_TEAMS_ID
+  // A section choice ("Senior men") is valid while any of its squads is in
+  // scope — src/lib/section.js, phase 2 of the senior section.
+  const filterGroups = sectionGroups(scopedTeams)
+  const activeFilter =
+    teamIds.includes(teamFilter) || filterGroups.some((group) => group.id === teamFilter)
+      ? teamFilter
+      : ALL_TEAMS_ID
+  const filterTeamIds = teamIdsForFilter(activeFilter, scopedTeams, ALL_TEAMS_ID)
 
   // The search-only set. The pill counts have to answer "how many matches are
   // in each squad", which is a question about the search — not about whichever
@@ -605,12 +613,15 @@ export default function Roster() {
         ).length
 
   const visible =
-    activeFilter === ALL_TEAMS_ID
+    filterTeamIds == null
       ? matchingSearch
-      : matchingSearch.filter((player) => player.team_id === activeFilter)
+      : matchingSearch.filter((player) => filterTeamIds.includes(player.team_id))
 
   const pillCounts = new Map(scopedTeams.map((team) => [team.id, 0]))
   pillCounts.set(ALL_TEAMS_ID, matchingSearch.length)
+  filterGroups.forEach((group) => {
+    pillCounts.set(group.id, matchingSearch.filter((player) => group.teamIds.includes(player.team_id)).length)
+  })
   matchingSearch.forEach((player) => {
     if (pillCounts.has(player.team_id)) {
       pillCounts.set(player.team_id, pillCounts.get(player.team_id) + 1)
@@ -638,9 +649,9 @@ export default function Roster() {
   // is true, which would quietly strip the roster's controls at the exact moment
   // somebody is wondering why the list is empty.
   const shownTeams =
-    activeFilter === ALL_TEAMS_ID
+    filterTeamIds == null
       ? scopedTeams
-      : scopedTeams.filter((team) => team.id === activeFilter)
+      : scopedTeams.filter((team) => filterTeamIds.includes(team.id))
   const minisOnly = shownTeams.length > 0 && shownTeams.every((team) => isMinisTeam(team.name))
 
   // The grouping rule (design-system.md §5.3): one team in view — because a
@@ -919,6 +930,7 @@ export default function Roster() {
               matches land" whichever pill is selected. */}
           <TeamFilter
             teams={scopedTeams}
+            groups={filterGroups}
             counts={pillCounts}
             selected={activeFilter}
             onChange={persistFilter}

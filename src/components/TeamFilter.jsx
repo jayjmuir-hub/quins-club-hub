@@ -88,6 +88,10 @@ export function TeamFilter({
   // false for a SWITCHER rather than a filter (the squad hub): there is no
   // "all squads" page to go to, so the option would be a dead end.
   includeAll = true,
+  // Section choices (src/lib/section.js sectionGroups), listed between
+  // "All" and the squads: `{ id, text, teamIds }`. Phase 2 of the senior
+  // section, 4 Sep 2026. Empty for a scope with no senior squads.
+  groups = [],
 }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef(null)
@@ -124,11 +128,14 @@ export function TeamFilter({
   }
 
   const selectedTeam = teams.find((team) => team.id === selected)
-  const selectedText = selected === ALL_TEAMS_ID || !selectedTeam ? allLabel : selectedTeam.name
-  const filtered = selected !== ALL_TEAMS_ID && Boolean(selectedTeam)
+  const selectedGroup = groups.find((group) => group.id === selected)
+  const selectedText =
+    selected === ALL_TEAMS_ID ? allLabel : selectedGroup?.text ?? selectedTeam?.name ?? allLabel
+  const filtered = selected !== ALL_TEAMS_ID && Boolean(selectedTeam || selectedGroup)
 
   const options = [
     ...(includeAll ? [{ id: ALL_TEAMS_ID, text: allLabel }] : []),
+    ...groups.map((group) => ({ id: group.id, text: group.text })),
     ...teams.map((team) => ({ id: team.id, text: team.name })),
   ]
 

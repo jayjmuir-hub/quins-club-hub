@@ -16,6 +16,38 @@ export const SECTIONS = [
 
 export const SECTION_CODES = SECTIONS.map((s) => s.code)
 
+// A section as a FILTER choice on the Roster and Schedule (phase 2, 4 Sep
+// 2026): the id a TeamFilter option carries, distinct from any team id.
+const FILTER_PREFIX = 'section:'
+
+export function isSectionFilter(id) {
+  return typeof id === 'string' && id.startsWith(FILTER_PREFIX)
+}
+
+/**
+ * The section choices to offer beside the squads: one per section that has
+ * at least one squad in `teams` (the person's visible scope), with the ids
+ * of those squads. A section with none of its squads in scope is not
+ * offered — an empty filter is a dead end.
+ */
+export function sectionGroups(teams) {
+  return SECTIONS.map((s) => ({
+    id: FILTER_PREFIX + s.code,
+    text: s.long,
+    teamIds: (teams ?? []).filter((team) => team.section === s.code).map((team) => team.id),
+  })).filter((group) => group.teamIds.length > 0)
+}
+
+/** The team ids a filter choice stands for: a squad's own id, or a section's squads. Null for "all". */
+export function teamIdsForFilter(selected, teams, allId) {
+  if (selected == null || selected === allId) return null
+  if (isSectionFilter(selected)) {
+    const group = sectionGroups(teams).find((g) => g.id === selected)
+    return group ? group.teamIds : null
+  }
+  return [selected]
+}
+
 export function sectionLabel(code) {
   return SECTIONS.find((s) => s.code === code)?.label ?? ''
 }
