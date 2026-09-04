@@ -137,5 +137,19 @@ begin
 end $$;
 reset role;
 
+-- ⚠️ A FAIL ROW MUST STOP THE RUN. scripts/db-check.mjs reports `ok` for
+-- any harness whose SQL executes without error, so a 'FAIL …' outcome in
+-- _r is otherwise visible only to a human reading the output — measured
+-- 4 Sep 2026, when this file had no `raise exception` anywhere and the
+-- runner refused the whole suite ("cannot FAIL").
+do $$
+begin
+  if exists (select 1 from _r where outcome not like 'PASS%') then
+    raise exception 'standings: assertion(s) FAILED — %',
+      (select string_agg(step || ' → ' || outcome, ' | ' order by (regexp_match(step, '^\d+'))[1]::int)
+         from _r where outcome not like 'PASS%');
+  end if;
+end $$;
+
 select * from _r order by step;
 rollback;
