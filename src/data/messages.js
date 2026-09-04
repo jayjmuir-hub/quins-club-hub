@@ -35,9 +35,9 @@ const SELECT = `
   mentions, edited_at, deleted_at, created_at, quoted_id, forwarded, attachment_path, attachments,
   author:profiles!messages_author_id_fkey(full_name),
   author_team:teams!messages_author_team_id_fkey(name),
-  quoted:quoted_id(id, body, deleted_at, attachment_path, author_id, author:profiles!messages_author_id_fkey(full_name)),
+  quoted:quoted_id(id, body, deleted_at, attachment_path, attachments, author_id, author:profiles!messages_author_id_fkey(full_name)),
   event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, ends_at, time_tbd, venue, pitch, team_id),
-  parent:parent_id(id, body, deleted_at, attachment_path, author_id, event_id, author:profiles!messages_author_id_fkey(full_name), event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, time_tbd))
+  parent:parent_id(id, body, deleted_at, attachment_path, attachments, author_id, event_id, author:profiles!messages_author_id_fkey(full_name), event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, time_tbd))
 `
 // `parent` (4 Sep 2026): the post a channel reply answers, embedded so the
 // reply can draw its quote — the same shape `quoted` gives a DM reply. A
@@ -739,7 +739,7 @@ export async function listOpenReports() {
     .from('message_reports')
     .select(
       'id, message_id, reporter_id, reason, created_at, ' +
-        'message:messages!message_reports_message_id_fkey(id, body, channel, team_id, conversation_id, author_id, deleted_at, author:profiles!messages_author_id_fkey(full_name)), ' +
+        'message:messages!message_reports_message_id_fkey(id, body, channel, team_id, conversation_id, author_id, deleted_at, attachment_path, attachments, author:profiles!messages_author_id_fkey(full_name)), ' +
         'reporter:profiles!message_reports_reporter_id_fkey(full_name)',
     )
     .is('resolved_at', null)

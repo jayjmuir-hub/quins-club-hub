@@ -1,21 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
-// PASTE INTO A CHAT — plan 2 of the chat-albums series
-// (claude/plans/2026-09-01-chat-albums-plan-2-composer.md), task 2.
-//
-// ⚠️ PASTING TEXT IS A HUNDRED TIMES COMMONER THAN PASTING A PHOTO. Every
-// test here that looks redundant is guarding the ordinary case: a handler
-// that calls preventDefault on a text paste breaks typing into the message
-// box, which is a far worse bug than the one being fixed.
-//
-// Old header follows.
-// Round 2 in the DM/group thread (claude/plans/2026-08-24-chat-round-2.md):
-// reply-with-quote, multi-select forwarding, photo attachments. Who may do
-// any of it is the database's (db/tests/chat-round-2.sql); this proves the
-// screen drives the data layer with the right shapes.
+// Chat file composer: a separate door beside the photo tray. A PDF must not
+// enter useAttachmentTray; send writes attachments jsonb only.
 
 const useMembershipsMock = vi.fn()
 const useAuthMock = vi.fn()
@@ -42,31 +32,24 @@ const m = {
 }
 const media = {
   uploadChatPhoto: vi.fn(),
+  uploadChatFile: vi.fn(),
   removeChatPhoto: vi.fn(),
   signChatPhotoUrl: vi.fn(),
 }
-// The DM header identity line fetches the person card (26 Aug 2026);
-// null here keeps this file about its own subject and network-free.
-// The DM identity badges fetch member_identity (26 Aug 2026); empty here
-// keeps this file about its own subject and network-free.
 vi.mock('../src/data/identity.js', () => ({ getMemberIdentity: async () => [] }))
 vi.mock('../src/data/personCard.js', () => ({ getPersonCard: async () => null }))
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/lib/auth.jsx', () => ({ useAuth: () => useAuthMock() }))
-// The wallpaper rides chat_prefs since 26 Aug 2026 — quiet defaults keep
-// this file about its own subject and network-free.
 vi.mock('../src/data/chatPrefs.js', () => ({
   getMyChatPref: async () => null,
   setChatPref: async () => {},
   listMyChatPrefs: async () => new Map(),
 }))
-// Presence is a live websocket; tests get a quiet empty room.
 vi.mock('../src/lib/presence.js', () => ({
   usePresence: () => new Map(),
   dotState: (map, id) => (id && map?.get?.(id)) || 'offline',
 }))
 vi.mock('../src/data/messages.js', () => ({
-  // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
   listMessageReceipts: async () => new Map(),
   receiptState: () => null,
   markMessagesDelivered: async () => {},
@@ -95,14 +78,31 @@ vi.mock('../src/data/messages.js', () => ({
 }))
 vi.mock('../src/data/chatMedia.js', () => ({
   uploadChatPhoto: (...a) => media.uploadChatPhoto(...a),
+  uploadChatFile: (...a) => media.uploadChatFile(...a),
   removeChatPhoto: (...a) => media.removeChatPhoto(...a),
+  removeChatAttachments: vi.fn(),
   signChatPhotoUrl: (...a) => media.signChatPhotoUrl(...a),
   isAudioAttachment: (p) => /\.(webm|m4a|mp4|aac|mp3|ogg)$/i.test(p || ''),
   isFileAttachment: (p) => /\.(pdf|doc|docx|xls|xlsx|csv)$/i.test(p || ''),
-  messageAttachmentLabel: () => '📷 Photo',
-  chatFileAccept: () => 'application/pdf',
-  uploadChatFile: vi.fn(),
+  messageAttachmentLabel: (msg) => (msg?.attachments?.[0]?.name ? `📄 ${msg.attachments[0].name}` : '📄 File'),
+  chatFileAccept: () =>
+    'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/csv',
   attachmentPreviewLabel: () => '📷 Photo',
+  validateChatFile: (file) => {
+    if (!file) return 'Choose a file first.'
+    const ok = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'application/csv',
+    ])
+    if (!ok.has(file.type)) return 'That file type is not supported. Use a PDF, Word, Excel or CSV file.'
+    if (file.size > 26214400) return 'That file is over the 25 MB limit.'
+    return null
+  },
 }))
 vi.mock('../src/screens/ChatList.jsx', () => ({
   RowAvatar: () => <span data-testid="row-avatar" />,
@@ -126,9 +126,10 @@ const dm = (id, author, body, extra = {}) => ({
   created_at: '2026-08-23T08:00:00Z',
   deleted_at: null,
   quoted_id: null,
-  quoted: null,
+  quoted: extra.quoted ?? null,
   forwarded: false,
-  attachment_path: null,
+  attachment_path: extra.attachment_path ?? null,
+  attachments: extra.attachments ?? [],
   author: { full_name: author === ME ? 'Me' : 'Zz Manager Probe' },
   ...extra,
 })
@@ -161,86 +162,67 @@ beforeEach(() => {
   m.removeMessage.mockResolvedValue(undefined)
   m.forwardMessagesTo.mockResolvedValue(undefined)
   m.listChats.mockResolvedValue([])
-  media.uploadChatPhoto.mockResolvedValue(`${ME}/uploaded.jpg`)
+  media.uploadChatFile.mockResolvedValue({
+    file: `${ME}/uuid.xlsx`,
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    size: 1,
+    name: 'grid.xlsx',
+  })
   media.signChatPhotoUrl.mockResolvedValue('blob:signed')
   globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview')
   globalThis.URL.revokeObjectURL = vi.fn()
 })
 
-import { pasteImages } from '../src/lib/chatComposer.js'
-
-const img = (name, type = 'image/jpeg') => new File(['x'], name, { type })
-
-/** A clipboard event as the DOM hands one over. */
-function clipboard({ files = [], text = '' } = {}) {
-  const ev = new Event('paste', { bubbles: true, cancelable: true })
-  ev.clipboardData = { files, getData: () => text, types: files.length ? ['Files'] : ['text/plain'] }
-  return ev
-}
-
-describe('pasteImages — the gate itself', () => {
-  it('⚠️ leaves a TEXT paste completely alone', () => {
-    const add = vi.fn()
-    const ev = clipboard({ text: 'see you Saturday' })
-    expect(pasteImages(ev, add)).toBe(false)
-    // Both halves matter. Not preventing the default is what lets the words
-    // actually land in the box; not calling add is what stops a phantom
-    // attachment appearing when somebody pastes an address.
-    expect(ev.defaultPrevented).toBe(false)
-    expect(add).not.toHaveBeenCalled()
+const xlsx = () =>
+  new File(['x'], 'grid.xlsx', {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
+const ppt = () => new File(['x'], 'slides.ppt', { type: 'application/vnd.ms-powerpoint' })
 
-  it('takes over only when the clipboard carries image FILES', () => {
-    const add = vi.fn()
-    const ev = clipboard({ files: [img('image.png', 'image/png')] })
-    expect(pasteImages(ev, add)).toBe(true)
-    expect(ev.defaultPrevented).toBe(true)
-    expect(add).toHaveBeenCalledWith([expect.any(File)])
-  })
-
-  it('⚠️ a pasted PDF is left to the browser, not swallowed silently', () => {
-    // Copying a file in Explorer puts it on the clipboard as a File. If the
-    // handler claimed every paste with files in it, a pasted PDF would
-    // vanish: preventDefault fires, nothing is added, nothing is said.
-    const add = vi.fn()
-    const ev = clipboard({ files: [new File(['x'], 'notes.pdf', { type: 'application/pdf' })] })
-    expect(pasteImages(ev, add)).toBe(false)
-    expect(ev.defaultPrevented).toBe(false)
-    expect(add).not.toHaveBeenCalled()
-  })
-
-  it('survives a clipboard with no clipboardData at all', () => {
-    const add = vi.fn()
-    const bare = new Event('paste', { bubbles: true, cancelable: true })
-    expect(() => pasteImages(bare, add)).not.toThrow()
-    expect(bare.defaultPrevented).toBe(false)
-  })
-
-  it('takes several images from one paste', () => {
-    const add = vi.fn()
-    pasteImages(clipboard({ files: [img('a.jpg'), img('b.jpg')] }), add)
-    expect(add.mock.calls[0][0]).toHaveLength(2)
-  })
-})
-
-describe('paste is actually WIRED to the DM composer', () => {
-  // The unit tests above prove the gate. These prove the handler is on the
-  // textarea at all — the failure a pure test cannot see.
-  it('a pasted screenshot lands in the tray', async () => {
+describe('chat file composer', () => {
+  it('has a file control beside the photo tray, not multiple', async () => {
     renderThread()
     await screen.findAllByTestId('dm-bubble')
-    const box = screen.getByLabelText('Message')
-    fireEvent(box, clipboard({ files: [img('image.png', 'image/png')] }))
-    expect(await screen.findAllByTestId('tray-thumb')).toHaveLength(1)
+    expect(screen.getByTestId('file-input')).not.toHaveAttribute('multiple')
+    expect(screen.getByTestId('photo-input')).toHaveAttribute('multiple')
+    expect(screen.getByRole('button', { name: 'Attach a file' })).toBeTruthy()
   })
 
-  it('⚠️ typing-paste still works: nothing prevented, nothing attached', async () => {
+  it('refuses ppt and does not put it in the photo tray', async () => {
+    const user = userEvent.setup()
     renderThread()
     await screen.findAllByTestId('dm-bubble')
-    const box = screen.getByLabelText('Message')
-    const ev = clipboard({ text: 'see you Saturday' })
-    fireEvent(box, ev)
-    expect(ev.defaultPrevented).toBe(false)
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [ppt()] } })
+    expect(screen.getByTestId('file-error')).toHaveTextContent(/not supported/i)
+    expect(screen.queryByTestId('pending-file')).toBeNull()
     expect(screen.queryAllByTestId('tray-thumb')).toHaveLength(0)
+  })
+
+  it('sends attachments jsonb only — one file, no photo mix', async () => {
+    const user = userEvent.setup()
+    renderThread()
+    await screen.findAllByTestId('dm-bubble')
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [xlsx()] } })
+    expect(screen.getByTestId('pending-file')).toHaveTextContent('grid.xlsx')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(m.sendDirectMessage).toHaveBeenCalledTimes(1))
+    expect(media.uploadChatFile).toHaveBeenCalledTimes(1)
+    expect(media.uploadChatPhoto).not.toHaveBeenCalled()
+    const [, body, opts] = m.sendDirectMessage.mock.calls[0]
+    expect(body).toBe('')
+    expect(opts).toEqual({
+      quotedId: null,
+      mentions: [],
+      attachments: [
+        {
+          file: `${ME}/uuid.xlsx`,
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          size: 1,
+          name: 'grid.xlsx',
+        },
+      ],
+    })
+    expect(opts).not.toHaveProperty('attachment_path')
+    expect(opts).not.toHaveProperty('attachment_paths')
   })
 })

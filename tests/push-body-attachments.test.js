@@ -72,6 +72,11 @@ describe('push-send message body (rot detector)', () => {
     expect(MESSAGE_BODY).toMatch(/isAudioKey\(only\)/)
   })
 
+  it('a document is named as a file, not called a photo', () => {
+    expect(MESSAGE_BODY).toContain('📄 File')
+    expect(MESSAGE_BODY).toMatch(/isFileKey\(only\)/)
+  })
+
   it('⚠️ falls back to attachment_path for a phone on a cached bundle', () => {
     // Such a phone writes only the old column and cannot be forced to update.
     // Without this arm its photo pushes an empty body exactly as before.
@@ -98,7 +103,7 @@ describe('push-send message body (rot detector)', () => {
       resolve(import.meta.dirname, '../src/data/chatMedia.js'),
       'utf8',
     )
-    for (const phrase of ['Voice message', 'Photo']) {
+    for (const phrase of ['Voice message', 'Photo', '📄 File']) {
       expect(MESSAGE_BODY).toContain(phrase)
       expect(app).toContain(phrase)
     }

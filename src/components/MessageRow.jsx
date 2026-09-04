@@ -9,7 +9,7 @@ import ProfileIcon from './ProfileIcon.jsx'
 import { labelForRole } from '../lib/scope.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
 import { eventTitle } from '../lib/eventFormat.js'
-import { attachmentPreviewLabel } from '../data/chatMedia.js'
+import { messageAttachmentLabel } from '../data/chatMedia.js'
 
 // One message in a channel, as a BUBBLE. The bubble itself is ChatBubble —
 // the same shell the DM thread and the floating dock use — so this file
@@ -90,7 +90,7 @@ export function ReplyQuote({ parent, selfId, mine, onFocus }) {
     ? eventTitle(parent.event)
     : parent.body?.trim()
       ? parent.body
-      : attachmentPreviewLabel(parent.attachment_path, parent.attachments?.length)
+      : messageAttachmentLabel(parent)
   return (
     <button
       type="button"

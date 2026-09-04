@@ -168,6 +168,7 @@ describe('ChatList', () => {
     expect(previewLine({ kind: 'dm', last_body: '', last_author_id: 'x', last_attachment_path: 'u/pic.jpg' }, ME)).toBe('📷 Photo')
     expect(previewLine({ kind: 'dm', last_body: '', last_author_id: ME, last_attachment_path: 'u/pic.jpg' }, ME)).toBe('You: 📷 Photo')
     expect(previewLine({ kind: 'dm', last_body: '', last_author_id: 'x', last_attachment_path: 'u/note.m4a' }, ME)).toBe('🎤 Voice message')
+    expect(previewLine({ kind: 'dm', last_body: '', last_author_id: 'x', last_attachment_path: 'u/uuid.xlsx' }, ME)).toBe('📄 File')
     expect(previewLine({ kind: 'group', last_body: '', last_author_id: 'x', last_author_name: 'Alex', last_attachment_path: 'u/pic.jpg' }, ME)).toBe('Alex: 📷 Photo')
     // a genuinely empty thread has no last message, so no author — still says so
     expect(previewLine({ kind: 'dm', last_body: '', last_author_id: null, last_attachment_path: null }, ME)).toBe('No messages yet')

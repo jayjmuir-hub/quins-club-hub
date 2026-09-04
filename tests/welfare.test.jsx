@@ -9,6 +9,13 @@ import { MemoryRouter } from 'react-router-dom'
 const useMembershipsMock = vi.fn()
 const m = { welfareOverview: vi.fn(), listWelfareAccessLog: vi.fn(), listOpenReports: vi.fn(), removeMessage: vi.fn(), resolveReport: vi.fn() }
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
+vi.mock('../src/data/chatMedia.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    signChatPhotoUrl: vi.fn(async (path) => `signed:${path}`),
+  }
+})
 vi.mock('../src/data/messages.js', () => ({
   // Ticks (26 Aug 2026): receipts empty, state null — no ticks drawn.
   listMessageReceipts: async () => new Map(),
@@ -83,5 +90,31 @@ describe('Welfare — reports', () => {
     await user.click(within(row).getByRole('button', { name: 'Leave it, resolve' }))
     expect(m.removeMessage).not.toHaveBeenCalled()
     expect(m.resolveReport).toHaveBeenCalledWith('r1')
+  })
+
+  it('a reported file is openable, not a broken image', async () => {
+    m.listOpenReports.mockResolvedValue([
+      {
+        id: 'r2',
+        message_id: 'x2',
+        reason: 'Wrong file',
+        created_at: '2026-09-04T07:10:00Z',
+        reporter: { full_name: 'Zz Reporter' },
+        message: {
+          id: 'x2',
+          body: '',
+          channel: 'dm',
+          conversation_id: 'c1',
+          deleted_at: null,
+          attachment_path: 'p1/uuid.pdf',
+          attachments: [{ file: 'p1/uuid.pdf', type: 'application/pdf', size: 4096, name: 'notes.pdf' }],
+          author: { full_name: 'Zz Author' },
+        },
+      },
+    ])
+    render(<MemoryRouter><WelfareReports /></MemoryRouter>)
+    const row = await screen.findByTestId('report-row')
+    expect(await within(row).findByTestId('chat-file')).toHaveTextContent('notes.pdf')
+    expect(within(row).queryByRole('img')).toBeNull()
   })
 })

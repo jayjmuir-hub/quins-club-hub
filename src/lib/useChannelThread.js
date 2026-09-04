@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listAvailabilityForEvents } from '../data/availability.js'
-import { removeChatPhoto, uploadChatVoice } from '../data/chatMedia.js'
+import { removeChatAttachments, uploadChatFile, uploadChatVoice } from '../data/chatMedia.js'
 import { listEvents } from '../data/events.js'
 import { useAttachmentTray } from './useAttachmentTray.js'
+import { usePendingChatFile } from './usePendingChatFile.js'
 import { uploadAlbum } from './uploadAlbum.js'
 import {
   channelMembers,
@@ -112,6 +113,7 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
   // single `photo` state it replaces was byte-identical in BOTH thread
   // hooks (plan 2, task 1).
   const tray = useAttachmentTray()
+  const pendingFile = usePendingChatFile()
   // What the Send button says while an album climbs the wire. Null when idle.
   const [progress, setProgress] = useState(null)
   const [background, setBackground] = useState(DEFAULT_BACKGROUND)
@@ -138,6 +140,7 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
   }, [threadParam])
   const draftRef = useRef(null)
   const fileRef = useRef(null)
+  const docFileRef = useRef(null)
 
   // A squad the reader is not on: the screen redirects; do not fetch for it.
   const unknownTeam = !isClub && !roleKey && myTeams.length > 0 && !team
@@ -321,12 +324,20 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
     // Reset FIRST: without this, picking the same file twice in a row fires
     // no change event the second time.
     domEvent.target.value = ''
+    pendingFile.clear()
     tray.add(files)
+  }
+
+  function pickFile(domEvent) {
+    const files = Array.from(domEvent.target.files ?? [])
+    domEvent.target.value = ''
+    tray.clear()
+    pendingFile.pick(files)
   }
 
   async function send(domEvent) {
     domEvent.preventDefault()
-    if ((!draft.trim() && tray.items.length === 0) || sending) return
+    if ((!draft.trim() && tray.items.length === 0 && !pendingFile.file) || sending) return
     setSending(true)
     setSendError(null)
     try {
@@ -334,7 +345,10 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
       // Photos first, message second — WhatsApp order, same as the DM thread.
       // ⚠️ uploadAlbum is all-or-nothing: a failure has already taken back
       // anything it managed to upload, so the throw leaves nothing behind.
-      const attachments = await uploadAlbum(selfId, tray.items, setProgress)
+      // A document is a separate door: one file, `attachments` jsonb only.
+      const attachments = pendingFile.file
+        ? [await uploadChatFile(selfId, pendingFile.file)]
+        : await uploadAlbum(selfId, tray.items, setProgress)
       // A reply is a message answering `replyTo` — the parent link is what
       // draws the quote and what the event screen counts.
       if (replyTo) await replyToMessage(replyTo.id, draft, { mentions: kept, attachments })
@@ -346,6 +360,7 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
       setAttachEventId('')
       setReplyTo(null)
       tray.clear()
+      pendingFile.clear()
       await load()
     } catch (err) {
       // ⚠️ The draft and the tray SURVIVE a failure — the retry costs one
@@ -444,7 +459,7 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
       // Own-folder-only storage policy: only the author's delete reaches the
       // object (src/data/chatMedia.js); a moderator's remove orphans it,
       // readable by nobody but its owner.
-      if (gone?.attachment_path && gone.author_id === selfId) await removeChatPhoto(gone.attachment_path)
+      if (gone && gone.author_id === selfId) await removeChatAttachments(gone)
       await load()
     } catch (err) {
       setError(friendlyMessage(err, 'Could not remove that.'))
@@ -540,10 +555,13 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
     background,
     pickBackground,
     tray,
+    pendingFile,
     progress,
     pickPhoto,
+    pickFile,
     draftRef,
     fileRef,
+    docFileRef,
     send,
     onReply,
     onEdit,

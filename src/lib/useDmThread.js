@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { removeChatPhoto, uploadChatVoice } from '../data/chatMedia.js'
+import { removeChatAttachments, uploadChatFile, uploadChatVoice } from '../data/chatMedia.js'
 import { listMyNicknames } from '../data/nicknames.js'
 import { useAttachmentTray } from './useAttachmentTray.js'
+import { usePendingChatFile } from './usePendingChatFile.js'
 import { uploadAlbum } from './uploadAlbum.js'
 import {
   forwardMessagesTo,
@@ -96,6 +97,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   // single `photo` state it replaces was byte-identical in BOTH thread
   // hooks (plan 2, task 1).
   const tray = useAttachmentTray()
+  const pendingFile = usePendingChatFile()
   // What the Send button says while an album climbs the wire. Null when idle.
   const [progress, setProgress] = useState(null)
   const [selecting, setSelecting] = useState(false)
@@ -118,6 +120,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
   const newFromRef = useRef(undefined)
   const draftRef = useRef(null)
   const fileRef = useRef(null)
+  const docFileRef = useRef(null)
 
   // The surface's door to another DM. Default: the full screen's routes.
   const goToDm = useCallback(
@@ -296,12 +299,20 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     // Reset FIRST: without this, picking the same file twice in a row fires
     // no change event the second time.
     domEvent.target.value = ''
+    pendingFile.clear()
     tray.add(files)
+  }
+
+  function pickFile(domEvent) {
+    const files = Array.from(domEvent.target.files ?? [])
+    domEvent.target.value = ''
+    tray.clear()
+    pendingFile.pick(files)
   }
 
   async function send(domEvent) {
     domEvent.preventDefault()
-    if ((!draft.trim() && tray.items.length === 0) || sending) return
+    if ((!draft.trim() && tray.items.length === 0 && !pendingFile.file) || sending) return
     setSending(true)
     setError(null)
     try {
@@ -309,7 +320,11 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       // meets a message whose images have not arrived yet. ⚠️ uploadAlbum is
       // all-or-nothing: a failure here has already taken back anything it
       // managed to upload, so the throw below leaves nothing behind.
-      const attachments = await uploadAlbum(selfId, tray.items, setProgress)
+      // A document is a separate door (Jay, 4 Sep 2026): one file, written
+      // as `attachments` jsonb, never mixed into a photo album.
+      const attachments = pendingFile.file
+        ? [await uploadChatFile(selfId, pendingFile.file)]
+        : await uploadAlbum(selfId, tray.items, setProgress)
       // A deleted @name un-mentions — only ids whose name survives are sent.
       const mentions = draftMentions.filter((p) => draft.includes(`@${p.full_name}`)).map((p) => p.profile_id)
       await sendDirectMessage(conversationId, draft, { quotedId: replyTo?.id ?? null, attachments, mentions })
@@ -317,6 +332,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       setDraftMentions([])
       setReplyTo(null)
       tray.clear()
+      pendingFile.clear()
       await load()
     } catch (err) {
       // ⚠️ The draft and the tray SURVIVE a failure. Everything the member
@@ -395,7 +411,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       // The storage policy is own-folder-only, so only the author's delete
       // can reach the object; anybody else's remove leaves an orphan nobody
       // but its owner can read (src/data/chatMedia.js).
-      if (gone?.attachment_path && gone.author_id === selfId) await removeChatPhoto(gone.attachment_path)
+      if (gone && gone.author_id === selfId) await removeChatAttachments(gone)
       await load()
     } catch (err) {
       setError(friendlyMessage(err, 'Could not remove that.'))
@@ -544,11 +560,14 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     replyTo,
     setReplyTo,
     tray,
+    pendingFile,
     progress,
     pickPhoto,
+    pickFile,
     send,
     draftRef,
     fileRef,
+    docFileRef,
     react,
     polls,
     vote,

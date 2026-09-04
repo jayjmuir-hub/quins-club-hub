@@ -28,6 +28,7 @@ describe('attachmentPreviewLabel', () => {
   it('names a voice note and a photo', () => {
     expect(attachmentPreviewLabel('p1/x.webm')).toBe('🎤 Voice message')
     expect(attachmentPreviewLabel('p1/x.jpg')).toBe('📷 Photo')
+    expect(attachmentPreviewLabel('p1/x.pdf')).toBe('📄 File')
   })
 })
 

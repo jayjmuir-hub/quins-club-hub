@@ -34,6 +34,21 @@ const EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'web
 // bubble and the chat-list preview need to tell them apart.
 const AUDIO_EXTENSIONS = new Set(['webm', 'm4a', 'mp4', 'aac', 'mp3', 'ogg'])
 
+// Documents (claude/plans/2026-09-04-chat-file-attachments.md) ride the SAME
+// bucket. v1 is pdf/doc/docx/xls/xlsx/csv — not ppt, zip, or images-as-files.
+// 25 MB is the storage ceiling and the client gate, matching Documents repo.
+export const CHAT_FILE_TYPES = {
+  'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'text/csv': 'csv',
+  'application/csv': 'csv',
+}
+export const MAX_CHAT_FILE_BYTES = 26214400
+const FILE_EXTENSIONS = new Set(Object.values(CHAT_FILE_TYPES))
+
 /** True when an attachment_path is a voice note rather than a photo. */
 export function isAudioAttachment(path) {
   if (!path) return false
@@ -41,11 +56,41 @@ export function isAudioAttachment(path) {
   return AUDIO_EXTENSIONS.has(ext)
 }
 
+/** True when an attachment_path is a v1 document rather than a photo or voice. */
+export function isFileAttachment(path) {
+  if (!path) return false
+  const ext = path.split('.').pop()?.toLowerCase()
+  return FILE_EXTENSIONS.has(ext)
+}
+
+export function chatFileAccept() {
+  return Object.keys(CHAT_FILE_TYPES).join(',')
+}
+
+/** Client-side gate for the file picker. Same words as uploadChatFile. */
+export function validateChatFile(file) {
+  if (!file) return 'Choose a file first.'
+  if (!CHAT_FILE_TYPES[file.type]) {
+    return 'That file type is not supported. Use a PDF, Word, Excel or CSV file.'
+  }
+  if (file.size > MAX_CHAT_FILE_BYTES) {
+    return 'That file is over the 25 MB limit.'
+  }
+  return null
+}
+
 /**
  * The one-line stand-in shown for a message with an attachment and no words —
  * in pins, quotes and reply previews. WhatsApp's "🎤 Voice message" / "📷 Photo".
+ *
+ * `fileName` is the ORIGINAL filename from `attachments[].name`. The chat list
+ * only has `last_attachment_path`, so a file there reads "📄 File".
+ *
+ * ⚠️ PUSH NEVER GETS THE FILENAME. messageBody() in push-send mirrors the
+ * generic "📄 File" / "🎤 Voice message" / "📷 Photo" arm, not `fileName` —
+ * a document named after the child it concerns must not land on lock screens.
  */
-export function attachmentPreviewLabel(path, count = 0) {
+export function attachmentPreviewLabel(path, count = 0, fileName = null) {
   // ⚠️ `count` IS OPTIONAL ON PURPOSE. Eleven test files and four screens call
   // this with a path alone; a required second argument would have been a
   // sweeping edit for no gain, and a caller that does not know the count still
@@ -55,9 +100,21 @@ export function attachmentPreviewLabel(path, count = 0) {
   // Vite bundle and a Deno function share no build — the standing arrangement
   // locationFor() has with venueLine() in the calendar function. A parent
   // reading "10 photos" here and "Photo" on their lock screen is the drift
-  // both comments exist to prevent. Change both or neither.
+  // both comments exist to prevent. Change both or neither. Push uses the
+  // generic "📄 File" wording, never `fileName`.
   if (count > 1) return `📷 ${count} photos`
-  return isAudioAttachment(path) ? '🎤 Voice message' : '📷 Photo'
+  if (isAudioAttachment(path)) return '🎤 Voice message'
+  if (isFileAttachment(path)) return fileName ? `📄 ${fileName}` : '📄 File'
+  return '📷 Photo'
+}
+
+/** Preview copy when the caller has the whole message, not just a path. */
+export function messageAttachmentLabel(message) {
+  return attachmentPreviewLabel(
+    message?.attachment_path,
+    message?.attachments?.length,
+    message?.attachments?.[0]?.name ?? null,
+  )
 }
 
 /**
@@ -122,6 +179,35 @@ export async function uploadChatVoice(profileId, blob, ext) {
     .upload(key, blob, { contentType: blob.type || undefined, upsert: false })
   if (error) throw error
   return key
+}
+
+/**
+ * Uploads one allowlisted document into the caller's own folder and returns
+ * the `{ file, type, size, name }` row to write on `messages.attachments`.
+ * No resize — Office and PDF must be stored as-is. The original filename
+ * lives only in `name`; the storage key is `<profileId>/<uuid>.<ext>`.
+ */
+export async function uploadChatFile(profileId, file) {
+  if (!profileId) throw new Error('uploadChatFile needs a profile id.')
+  const problem = validateChatFile(file)
+  if (problem) throw new Error(problem)
+  const extension = CHAT_FILE_TYPES[file.type]
+  const key = `${profileId}/${crypto.randomUUID()}.${extension}`
+  const { error } = await supabase.storage
+    .from(CHAT_MEDIA_BUCKET)
+    .upload(key, file, { contentType: file.type, upsert: false })
+  if (error) throw error
+  return { file: key, type: file.type, size: file.size, name: file.name }
+}
+
+/** Best-effort removal of every object a message pointed at. */
+export async function removeChatAttachments(message) {
+  const keys = new Set()
+  if (message?.attachment_path) keys.add(message.attachment_path)
+  for (const row of message?.attachments ?? []) {
+    if (row?.file) keys.add(row.file)
+  }
+  await Promise.allSettled([...keys].map((path) => removeChatPhoto(path)))
 }
 
 // A voice note lives in the same private bucket, so signing and removal are the

@@ -1,7 +1,8 @@
 import ChatAudio from './ChatAudio.jsx'
 import ChatPhoto from './ChatPhoto.jsx'
 import ChatAlbum from './ChatAlbum.jsx'
-import { isAudioAttachment } from '../data/chatMedia.js'
+import FileCard from './FileCard.jsx'
+import { isAudioAttachment, isFileAttachment } from '../data/chatMedia.js'
 import MessageMenu from './MessageMenu.jsx'
 import PollBubble from './PollBubble.jsx'
 import ReactionBar, { ReactionTrigger } from './ReactionBar.jsx'
@@ -217,13 +218,17 @@ export default function ChatBubble({
           <>
             {album.length > 1 ? (
               <ChatAlbum attachments={album} compact={photoCompact} />
+            ) : photoPath && isAudioAttachment(photoPath) ? (
+              <ChatAudio path={photoPath} messageId={messageId} mine={mine} />
+            ) : photoPath && isFileAttachment(photoPath) ? (
+              <FileCard
+                path={photoPath}
+                name={album[0]?.name}
+                size={album[0]?.size}
+                compact={photoCompact}
+              />
             ) : (
-              photoPath &&
-              (isAudioAttachment(photoPath) ? (
-                <ChatAudio path={photoPath} messageId={messageId} mine={mine} />
-              ) : (
-                <ChatPhoto path={photoPath} compact={photoCompact} />
-              ))
+              photoPath && <ChatPhoto path={photoPath} compact={photoCompact} />
             )}
             {body?.trim() ? (
               (() => {
