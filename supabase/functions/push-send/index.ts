@@ -539,6 +539,23 @@ async function availabilityTargets(eventId: string, batchId: string): Promise<Su
  * row is still pending. db/migrations/20260819_approval_push.sql owns it, and
  * its header explains why that rule is currently written twice.
  */
+/** The subscriptions a RESULTS NUDGE goes to — public.results_push_subscriptions. */
+async function resultsTargets(competitionId: string): Promise<Subscription[]> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/results_push_subscriptions`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ _competition: competitionId }),
+  })
+  if (!response.ok) {
+    throw new Error(`results_push_subscriptions failed (${response.status}): ${await response.text()}`)
+  }
+  return await response.json()
+}
+
 async function approvalTargets(membershipId: string): Promise<Subscription[]> {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/approval_push_subscriptions`, {
     method: 'POST',
@@ -720,6 +737,8 @@ Deno.serve(async (request) => {
   let squad: Record<string, string> | null = null
   let nudge: Record<string, string> | null = null
   let training: Record<string, string> | null = null
+  // Monday results nudge (4 Sep 2026) — db/migrations/20260906_results_nudge.sql.
+  let results: Record<string, string> | null = null
   try {
     const payload = await request.json()
     feedbackId = String(payload?.feedback_id ?? '')
@@ -731,6 +750,7 @@ Deno.serve(async (request) => {
     squad = payload?.squad_push ?? null
     nudge = payload?.availability_nudge ?? null
     training = payload?.training_suggestion_push ?? null
+    results = payload?.results_nudge ?? null
   } catch {
     return new Response('bad request', { status: 400 })
   }
@@ -739,7 +759,7 @@ Deno.serve(async (request) => {
   // notified.
   if ((feedbackId ? 1 : 0) + (announcementId ? 1 : 0) + (squad ? 1 : 0)
       + (approvalMembershipId ? 1 : 0) + (nudge ? 1 : 0) + (messageId ? 1 : 0)
-      + (documentId ? 1 : 0) + (accessRequestId ? 1 : 0) + (training ? 1 : 0) !== 1) {
+      + (documentId ? 1 : 0) + (accessRequestId ? 1 : 0) + (training ? 1 : 0) + (results ? 1 : 0) !== 1) {
     return new Response('bad request', { status: 400 })
   }
 
@@ -820,6 +840,19 @@ Deno.serve(async (request) => {
         subscriptions: await squadTargets(
           out.club_id, out.team_id, out.actor_id ?? null, out.category || 'fixture',
         ),
+      }
+    } else if (results) {
+      // The division's keepers and the super admins, minus `results`
+      // opt-outs — public.results_push_subscriptions holds the rule. The
+      // title, body and path are the database's; only the tag is pinned
+      // here so a second Monday replaces the first in the tray.
+      if (!results.competition_id) return new Response('bad request', { status: 400 })
+      job = {
+        title: escapeHtmlFree(results.title).slice(0, 80) || 'Results missing',
+        body: escapeHtmlFree(results.body).slice(0, 200),
+        url: `${APP_URL}${String(results.path || '/').startsWith('/') ? results.path || '/' : '/'}`,
+        tag: `results-${results.competition_id}`,
+        subscriptions: await resultsTargets(results.competition_id),
       }
     } else if (nudge) {
       // ⚠️ DERIVED FROM THE DATABASE, NOT THE BODY (Grok item 11). The event

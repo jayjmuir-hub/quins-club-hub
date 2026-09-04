@@ -11,6 +11,8 @@ const useMembershipsMock = vi.fn()
 const importSeasonMock = vi.fn()
 const setLeagueTeamCompetitionMock = vi.fn()
 const upsertCompetitionMock = vi.fn()
+const listKeepersMock = vi.fn()
+const setKeeperMock = vi.fn()
 
 vi.mock('../src/lib/memberships.jsx', () => ({ useMemberships: () => useMembershipsMock() }))
 vi.mock('../src/data/competitions.js', () => ({
@@ -18,6 +20,16 @@ vi.mock('../src/data/competitions.js', () => ({
   importSeason: (...args) => importSeasonMock(...args),
   setLeagueTeamCompetition: (...args) => setLeagueTeamCompetitionMock(...args),
   upsertCompetition: (...args) => upsertCompetitionMock(...args),
+  listKeepers: (...args) => listKeepersMock(...args),
+  setKeeper: (...args) => setKeeperMock(...args),
+}))
+vi.mock('../src/data/members.js', () => ({
+  listClubMembers: async () => [
+    { profile_id: 'pr-1', status: 'active', profiles: { full_name: 'Harriet Okonkwo-Lane' } },
+    { profile_id: 'pr-1', status: 'active', profiles: { full_name: 'Harriet Okonkwo-Lane' } },
+    { profile_id: 'pr-2', status: 'pending', profiles: { full_name: 'Pending Person' } },
+    { profile_id: 'pr-3', status: 'active', profiles: { full_name: 'Benedikt Aroyo' } },
+  ],
 }))
 vi.mock('../src/data/leagueTeams.js', () => ({
   listAllLeagueTeams: async () => LEAGUE_TEAMS,
@@ -73,6 +85,8 @@ beforeEach(() => {
   importSeasonMock.mockResolvedValue({ sides_added: 4, fixtures_added: 4, events_linked: 2, events_created: 0 })
   setLeagueTeamCompetitionMock.mockResolvedValue(undefined)
   upsertCompetitionMock.mockResolvedValue({ id: 'c-new' })
+  listKeepersMock.mockResolvedValue([])
+  setKeeperMock.mockResolvedValue(undefined)
 })
 
 describe('Leagues — the season import', () => {
@@ -170,5 +184,29 @@ describe('Leagues — division setup', () => {
       bonus_losing_margin: null,
       results_url: null,
     })
+  })
+})
+
+describe('Leagues — results keepers (4 Sep 2026)', () => {
+  it("names a keeper from the club's active people, one entry per person, and removes one", async () => {
+    listKeepersMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ competition_id: 'c-wap', profile_id: 'pr-3', profiles: { full_name: 'Benedikt Aroyo' } }])
+      .mockResolvedValue([])
+    const user = renderScreen()
+    await screen.findAllByTestId('competition-row')
+    await user.click(screen.getAllByRole('button', { name: 'Edit' })[0])
+    const box = await screen.findByTestId('keepers')
+    expect(box).toHaveTextContent('Nobody named yet.')
+    const pick = within(box).getByLabelText('Add a keeper')
+    // Active people only, once each, sorted by name.
+    const names = [...pick.options].map((o) => o.textContent).slice(1)
+    expect(names).toEqual(['Benedikt Aroyo', 'Harriet Okonkwo-Lane'])
+    await user.selectOptions(pick, 'pr-3')
+    await user.click(within(box).getByRole('button', { name: 'Add' }))
+    await waitFor(() => expect(setKeeperMock).toHaveBeenCalledWith('c-wap', 'pr-3', true))
+    expect(await within(box).findByText('Benedikt Aroyo')).toBeInTheDocument()
+    await user.click(within(box).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(setKeeperMock).toHaveBeenCalledWith('c-wap', 'pr-3', false))
   })
 })
