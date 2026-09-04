@@ -1,0 +1,51 @@
+-- 6 Sep 2026 — wrap the one policy 20260906_callups.sql shipped bare.
+--
+-- ══ WHAT THIS IS ══════════════════════════════════════════════════════════
+--
+-- 20260814_rls_initplan_wrap_auth_calls.sql wrapped every bare `auth.uid()` /
+-- `auth.jwt()` call in `public` at the time — 19 calls across 18 policies —
+-- so Postgres evaluates each once per query (an InitPlan) instead of once per
+-- row. `db/tests/rls-initplan.sql` is what keeps that true, and it caught a
+-- twentieth: `club_settings / club settings read`, created afterwards by
+-- `db/migrations/20260906_callups.sql` (the U18 call-ups feature) with the
+-- ordinary, everybody-writes-it-this-way bare form:
+--
+--     using (auth.uid() is not null)
+--
+-- Same fix, same reasoning, one policy.
+--
+-- ══ WHY `alter policy` RATHER THAN drop + create ═════════════════════════
+--
+-- `alter policy` changes only the expressions. The name, the table, the
+-- command and the roles all carry over untouched, because they are never
+-- restated — see 20260814's header for the general argument and the RESTRICTIVE
+-- policy that makes it a live concern elsewhere in this schema. Not a risk
+-- here specifically (this policy is a plain PERMISSIVE SELECT with no WITH
+-- CHECK), but there is no reason to take the drop+create risk for a one-line
+-- change either.
+
+alter policy "club settings read" on public.club_settings
+  using (((select auth.uid()) is not null));
+
+-- ══ ✅ HOW EQUIVALENCE WAS PROVED ═════════════════════════════════════════
+--
+-- Run in a rolled-back transaction on production before this file was
+-- committed (mirrors 20260814's method exactly):
+--
+--   1. capture "club settings read"'s `qual` from pg_policies:
+--        (auth.uid() IS NOT NULL)
+--   2. apply the `alter policy` above;
+--   3. capture `qual` again:
+--        (( SELECT auth.uid() AS uid) IS NOT NULL)
+--   4. assert that the NEW text, with `( SELECT auth.uid() AS uid)` replaced
+--      by `auth.uid()`, is CHARACTER-IDENTICAL to the OLD text — it is.
+--
+-- Postgres re-prints the expression from its own parse tree rather than
+-- storing the submitted text, so step 4 compares what the DATABASE
+-- understands, not what was typed.
+--
+-- ══ HOW TO VERIFY AFTER APPLYING ══════════════════════════════════════════
+--
+--   npm run db:check -- rls-initplan
+--
+-- Expected: `RLS INITPLAN: all checks passed.` with no offending policy named.

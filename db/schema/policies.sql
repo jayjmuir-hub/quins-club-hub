@@ -399,6 +399,27 @@ CREATE POLICY "club read" ON public.clubs
 
 
 -- ---------------------------------------------------------------------
+-- club_settings  (2 policies — added by db/migrations/20260906_callups.sql,
+--                 captured here 6 Sep 2026 having never been captured before)
+--
+-- "club settings read" is shown WRAPPED, per
+-- db/migrations/20260906_rls_initplan_club_settings.sql — the callups
+-- migration shipped it bare (`auth.uid() IS NOT NULL`), which
+-- db/tests/rls-initplan.sql caught the same day. Once that migration is
+-- applied this is what pg_policies prints; the bare form was never correct
+-- and is not worth recording here.
+-- ---------------------------------------------------------------------
+CREATE POLICY "club settings read" ON public.club_settings
+  AS PERMISSIVE FOR SELECT TO authenticated
+  USING ((( SELECT auth.uid() AS uid) IS NOT NULL));
+
+CREATE POLICY "club settings manage" ON public.club_settings
+  AS PERMISSIVE FOR ALL TO authenticated
+  USING (private.is_admin(club_id))
+  WITH CHECK (private.is_admin(club_id));
+
+
+-- ---------------------------------------------------------------------
 -- events  (2 policies)
 --
 -- ⚠️ CHANGED 2026-08-08 (membership_pending_status): "event read" was
