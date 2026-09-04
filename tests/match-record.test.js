@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   clubJuniorsHomeRows,
+  clubSeniorsHomeRows,
   competitionBucket,
   formatWdl,
   isTournamentContainer,
@@ -286,5 +287,68 @@ describe('clubJuniorsHomeRows', () => {
     expect(rows.map((r) => r.team.name)).not.toContain('Club juniors')
     expect(formatWdl(rows[0].record)).toBe('0–0–1')
     expect(formatWdl(rows[1].record)).toBe('1–0–0')
+  })
+})
+
+describe('clubSeniorsHomeRows', () => {
+  it('rolls more than one senior scoring squad into one Club seniors row', () => {
+    const teams = [
+      { id: 't-u10', name: 'U10 Mixed' },
+      { id: 't-1xv', name: 'Senior Men 1st XV', is_senior: true, section: 'senior_men' },
+      { id: 't-wxv', name: "Women's XV", is_senior: true, section: 'senior_women' },
+      { id: 't-vets', name: 'Vets XV', is_senior: true },
+    ]
+    const events = [
+      match({ id: 'e-u10', team_id: 't-u10', result_us: 10, result_them: 20 }),
+      match({ id: 'e-xv', team_id: 't-1xv', result_us: 31, result_them: 19 }),
+      match({ id: 'e-w', team_id: 't-wxv', result_us: 12, result_them: 12 }),
+      match({ id: 'e-v', team_id: 't-vets', result_us: 5, result_them: 17 }),
+    ]
+    const rows = clubSeniorsHomeRows(scoringSquadRecords(events, teams, { at: SEASON_NOW }))
+    expect(rows).toHaveLength(2)
+    expect(rows[0].team.name).toBe('U10 Mixed')
+    expect(formatWdl(rows[0].record)).toBe('0–0–1')
+    expect(rows[1].team.name).toBe('Club seniors')
+    expect(formatWdl(rows[1].record)).toBe('1–1–1')
+    expect(rows.map((r) => r.team.name)).not.toContain('Senior Men 1st XV')
+    expect(rows.map((r) => r.team.name)).not.toContain("Women's XV")
+    expect(rows.map((r) => r.team.name)).not.toContain('Vets XV')
+  })
+
+  it('leaves a single senior scoring squad labelled as that squad', () => {
+    const teams = [
+      { id: 't-u10', name: 'U10 Mixed' },
+      { id: 't-1xv', name: 'Senior Men 1st XV' },
+    ]
+    const events = [
+      match({ id: 'e-u10', team_id: 't-u10', result_us: 10, result_them: 20 }),
+      match({ id: 'e-xv', team_id: 't-1xv', result_us: 31, result_them: 19 }),
+    ]
+    const rows = clubSeniorsHomeRows(scoringSquadRecords(events, teams, { at: SEASON_NOW }))
+    expect(rows.map((r) => r.team.name)).toEqual(['U10 Mixed', 'Senior Men 1st XV'])
+    expect(rows.map((r) => r.team.name)).not.toContain('Club seniors')
+    expect(formatWdl(rows[0].record)).toBe('0–0–1')
+    expect(formatWdl(rows[1].record)).toBe('1–0–0')
+  })
+
+  it('does not fold juniors into Club seniors, and Club juniors still rolls', () => {
+    const teams = [
+      { id: 't-u8', name: 'U8 Tag' },
+      { id: 't-u9', name: 'U9 Mixed' },
+      { id: 't-1xv', name: 'Senior Men 1st XV' },
+      { id: 't-wxv', name: "Women's XV" },
+    ]
+    const events = [
+      match({ id: 'e-u8', team_id: 't-u8', result_us: 20, result_them: 0 }),
+      match({ id: 'e-u9', team_id: 't-u9', result_us: 8, result_them: 12 }),
+      match({ id: 'e-xv', team_id: 't-1xv', result_us: 31, result_them: 19 }),
+      match({ id: 'e-w', team_id: 't-wxv', result_us: 14, result_them: 21 }),
+    ]
+    const rows = clubJuniorsHomeRows(
+      clubSeniorsHomeRows(scoringSquadRecords(events, teams, { at: SEASON_NOW })),
+    )
+    expect(rows.map((r) => r.team.name)).toEqual(['Club juniors', 'Club seniors'])
+    expect(formatWdl(rows[0].record)).toBe('1–0–1')
+    expect(formatWdl(rows[1].record)).toBe('1–0–1')
   })
 })

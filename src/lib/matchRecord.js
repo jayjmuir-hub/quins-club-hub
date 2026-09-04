@@ -14,6 +14,10 @@ import { recordsScores } from './minis.js'
 import { seasonLabelFor } from './season.js'
 
 export const CLUB_JUNIORS_LABEL = 'Club juniors'
+export const CLUB_SENIORS_LABEL = 'Club seniors'
+
+const CLUB_JUNIORS_ROW_ID = 'club-juniors'
+const CLUB_SENIORS_ROW_ID = 'club-seniors'
 
 export function emptyLine() {
   return { wins: 0, draws: 0, losses: 0, played: 0 }
@@ -87,10 +91,17 @@ function addLine(into, from) {
 
 /** Youth age-group name (U8…), not seniors. U6–U7 never reach here. */
 function isJuniorScoringRow(row) {
+  if (row?.team?.id === CLUB_SENIORS_ROW_ID) return false
   return ageBandFromTeamName(row?.team?.name) != null
 }
 
-/** Sum all-matches W–D–L lines. Home uses this for the Club juniors band. */
+/** Scoring row with no youth band — 1st XV, Women's, Vets. Not Club juniors. */
+function isSeniorScoringRow(row) {
+  if (row?.team?.id === CLUB_JUNIORS_ROW_ID) return false
+  return ageBandFromTeamName(row?.team?.name) == null
+}
+
+/** Sum all-matches W–D–L lines. Home uses this for the Club juniors / Club seniors bands. */
 export function sumMatchRecords(records) {
   const list = Array.isArray(records) ? records : []
   const out = emptyRecord(list[0]?.season ?? '')
@@ -105,8 +116,9 @@ export function sumMatchRecords(records) {
 
 /**
  * Home-only: when more than one junior scoring squad is in view, one
- * "Club juniors" row instead of N thin bands. Seniors stay per-squad.
- * A lone junior keeps its own name. scoringSquadRecords is still per-squad.
+ * "Club juniors" row instead of N thin bands. A lone junior keeps its own
+ * name. scoringSquadRecords is still per-squad. Compose with
+ * clubSeniorsHomeRows so the two rollups never swallow each other.
  */
 export function clubJuniorsHomeRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return rows ?? []
@@ -115,10 +127,33 @@ export function clubJuniorsHomeRows(rows) {
   const rest = rows.filter((row) => !isJuniorScoringRow(row))
   return [
     {
-      team: { id: 'club-juniors', name: CLUB_JUNIORS_LABEL },
+      team: { id: CLUB_JUNIORS_ROW_ID, name: CLUB_JUNIORS_LABEL },
       record: sumMatchRecords(juniors.map((row) => row.record)),
     },
     ...rest,
+  ]
+}
+
+/**
+ * Home-only: when more than one senior scoring squad is in view, one
+ * "Club seniors" row instead of N thin bands. A lone senior keeps its own
+ * name. Juniors are not folded in. scoringSquadRecords is still per-squad.
+ *
+ * Appends the rollup so it sits after juniors (Club juniors, then Club seniors).
+ * recordsScores fails open for any name without an age band, so a Vets side
+ * in view is a senior scoring row and joins this sum.
+ */
+export function clubSeniorsHomeRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows ?? []
+  const seniors = rows.filter(isSeniorScoringRow)
+  if (seniors.length <= 1) return rows
+  const rest = rows.filter((row) => !isSeniorScoringRow(row))
+  return [
+    ...rest,
+    {
+      team: { id: CLUB_SENIORS_ROW_ID, name: CLUB_SENIORS_LABEL },
+      record: sumMatchRecords(seniors.map((row) => row.record)),
+    },
   ]
 }
 
@@ -150,7 +185,8 @@ export function squadMatchRecord(events, { teamId, at = new Date() } = {}) {
 
 /**
  * One row per squad that records scores. Still per-squad — Home collapses
- * juniors via clubJuniorsHomeRows. U6–U7 are omitted (recordsScores).
+ * juniors via clubJuniorsHomeRows and seniors via clubSeniorsHomeRows.
+ * U6–U7 are omitted (recordsScores).
  */
 export function scoringSquadRecords(events, teams, { at = new Date() } = {}) {
   if (!Array.isArray(teams)) return []
