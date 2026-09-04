@@ -34,8 +34,12 @@ on the three divisions are a default Jay has not confirmed.
 **Season stats are built (#695, 4 Sep 2026)** — scorers on senior sheets,
 and a per-player season line on the squad page, `/seniors` and the player
 sheet; `claude/plans/2026-09-04-senior-season-stats.md`. The migration is
-APPLIED to live. Still unbuilt from the senior work, in order: standings
-routes 2 and 3 (⚠️ DEFERRED by Jay, 4 Sep 2026 — no AI reader for now and no paste-and-parse either; route 1 stands), the cross-section roster setting and the all-seniors channel,
+APPLIED to live. **The `seniors` right is built (#706)** — an admin row
+carrying it (the club captain, "but might be others") reads both senior
+sections' rosters, availability, fixtures and stats, and no junior squad;
+⚠️ check `claude/changelog.md` for whether `20260911_seniors_right` is APPLIED.
+Still unbuilt from the senior work, in order: standings
+routes 2 and 3 (⚠️ DEFERRED by Jay, 4 Sep 2026 — no AI reader for now and no paste-and-parse either; route 1 stands), the club-wide cross-section switch (the fallback) and the all-seniors channel,
 union registration numbers. ✅ **The whole database suite is green on live
 and `npm run db:check` runs it end to end** — the hygiene of 4 Sep (#701,
 #702): anon EXECUTE revoked by name on nine functions, seven bare

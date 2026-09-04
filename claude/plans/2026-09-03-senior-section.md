@@ -3,8 +3,9 @@
 **Status: PHASE 1 BUILT (#685, 3 Sep 2026); the filter half of phase 2 BUILT
 (#687, 4 Sep 2026).** The section column, the three read arms, the Club-tab
 selector, the overview screen, the nav entry, and "Senior men" / "Senior
-women" on the Roster and Schedule filters. Still NOT built: the `seniors` right and club setting for
-cross-section rosters (ruling added 4 Sep), and the all-seniors channel and notice. Dated 2026-09-03.
+women" on the Roster and Schedule filters. The `seniors` right is BUILT (#706, `db/migrations/20260911_seniors_right.sql`,
+4 Sep 2026). Still NOT built: the club-wide switch (the fallback nobody has
+asked for), and the all-seniors channel and notice. Dated 2026-09-03.
 
 Grows out of `claude/plans/2026-09-02-senior-squads.md` ("Senior Section
 overview", step 9 of its order of work), pulled forward because the pieces
@@ -59,6 +60,7 @@ player in the 1st XV's chat.
 ## Phase 2, not built
 
 - "Senior men" / "Senior women" as choices on the Roster and Schedule filters.
-- A club setting to open rosters across sections, AND the `seniors` right that opens both sections to a named person (club captain and others) — see the ruling above. The right is the one to build first; the switch is the fallback.
+- ✅ The `seniors` right that opens both sections to a named person (club captain and others) — BUILT 4 Sep 2026 (#706), `db/migrations/20260911_seniors_right.sql`; ticked on `/admin/staff` like any right, and the Roster and Schedule filters offer the senior squads to its holder.
+- A club setting to open rosters across sections — the coarser fallback; not asked for.
 - The all-seniors notice and chat channel (senior-squads step 9).
 - U18 call-ups (senior-squads step 6), which the pool's "U18 call-up" tag waits for.
