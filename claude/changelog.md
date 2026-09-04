@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #697 — 🏅 **An icon for a whole role.** `db/migrations/20260909_role_group_icons.sql`:
+  `profile_icons.role` (coach, headcoach, manager, medic, admin) as a third target under
+  the same exactly-one check; dynamic like a squad grant via `private.icon_role_matches`;
+  both read paths gain a third arm. "A role across the club" on `/admin/icons`.
+  Reasoning: `claude/schema-history.md`. Rot detectors: `db/tests/role-group-icons.sql`,
+  `tests/admin-icons.test.jsx`.
 - #696 — 🔴 **Unread chats are hard to miss.** A brand bar down the row's left edge, a
   faint ground and a bold preview on an unread row (`src/screens/ChatList.jsx`, and the
   dock's list); the "N unread in M chats" strip is a button to the Unread filter; the
