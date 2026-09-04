@@ -17,7 +17,8 @@ import { autoGrow, composerKeyDown, insertAtCursor, pasteImages } from '../lib/c
 import { PICKER_ACCEPT } from '../lib/imageResize.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { eventTitle } from '../lib/eventFormat.js'
-import { attachmentPreviewLabel } from '../data/chatMedia.js'
+import { chatFileAccept, messageAttachmentLabel } from '../data/chatMedia.js'
+import { PendingFileChip } from './FileCard.jsx'
 
 // A channel's RENDERING — pinned block, stream of MessageRows (inline
 // threads included), and the composer with its fixture attach and
@@ -269,7 +270,7 @@ export default function ChannelThread({ thread, compact = false }) {
                       ? eventTitle(thread.replyTo.event)
                       : thread.replyTo.body?.trim()
                         ? thread.replyTo.body
-                        : attachmentPreviewLabel(thread.replyTo.attachment_path, thread.replyTo.attachments?.length)}
+                        : messageAttachmentLabel(thread.replyTo)}
                   </p>
                 </div>
                 <button
@@ -283,6 +284,7 @@ export default function ChannelThread({ thread, compact = false }) {
               </div>
             )}
             <AttachmentTray items={thread.tray.items} onRemove={thread.tray.remove} error={thread.tray.error} />
+            <PendingFileChip file={thread.pendingFile?.file} error={thread.pendingFile?.error} onRemove={thread.pendingFile?.clear} />
             <form onSubmit={thread.send} className="relative flex items-end gap-2" data-testid="composer">
               <MentionPicker
                 people={mentionables}
@@ -292,6 +294,7 @@ export default function ChannelThread({ thread, compact = false }) {
                 }}
               />
               <input ref={thread.fileRef} type="file" multiple accept={PICKER_ACCEPT} className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
+              <input ref={thread.docFileRef} type="file" accept={chatFileAccept()} className="hidden" onChange={thread.pickFile} data-testid="file-input" />
               <button
                 type="button"
                 aria-label="Attach a photo"
@@ -303,6 +306,18 @@ export default function ChannelThread({ thread, compact = false }) {
                   <rect x="3" y="5" width="18" height="14" rx="2" />
                   <circle cx="9" cy="10" r="1.6" />
                   <path d="m21 15-4.5-4.5L7 20" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Attach a file"
+                onClick={() => thread.docFileRef?.current?.click?.()}
+                className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
+                data-testid="file-button"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 3v5h5" />
                 </svg>
               </button>
               {mayPost && thread.allowPolls !== false && (
@@ -337,10 +352,10 @@ export default function ChannelThread({ thread, compact = false }) {
                 className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
               />
               <EmojiPicker onPick={(emoji) => thread.setDraft(insertAtCursor(thread.draftRef.current, emoji))} />
-              {mayPost && !thread.draft.trim() && thread.tray.items.length === 0 && !attachedEvent ? (
+              {mayPost && !thread.draft.trim() && thread.tray.items.length === 0 && !thread.pendingFile?.file && !attachedEvent ? (
                 <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} onError={thread.setSendError} />
               ) : (
-                <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && thread.tray.items.length === 0)}>
+                <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && thread.tray.items.length === 0 && !thread.pendingFile?.file)}>
                   {/* Counts rather than spinning — see DmThread. */}
                   {thread.progress
                     ? <span data-testid="send-progress">{thread.progress}</span>

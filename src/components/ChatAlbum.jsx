@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { signChatPhotoUrl, isAudioAttachment } from '../data/chatMedia.js'
+import { signChatPhotoUrl, isAudioAttachment, isFileAttachment } from '../data/chatMedia.js'
 
 // Several photos in one bubble — plan 3 of the chat photo albums work
 // (claude/plans/2026-08-31-chat-photo-albums.md). The composer has been able
@@ -27,7 +27,7 @@ export default function ChatAlbum({ attachments = [], compact = false }) {
   // photos, so this cannot happen today — but `attachments` is the shape a
   // DOCUMENT will arrive in too (the 1 Sep metadata reshape exists for that),
   // and a voice note laid out as an image tile would render as a blank square.
-  const photos = attachments.filter((a) => a?.file && !isAudioAttachment(a.file))
+  const photos = attachments.filter((a) => a?.file && !isAudioAttachment(a.file) && !isFileAttachment(a.file))
   const [urls, setUrls] = useState([])
   const [openAt, setOpenAt] = useState(null)
 

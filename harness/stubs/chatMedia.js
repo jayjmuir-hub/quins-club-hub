@@ -35,8 +35,35 @@ export function isAudioAttachment(path) {
   return AUDIO_EXTENSIONS.has(path.split('.').pop()?.toLowerCase())
 }
 
-export function attachmentPreviewLabel(path) {
-  return isAudioAttachment(path) ? '🎤 Voice message' : '📷 Photo'
+const FILE_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'])
+
+export function isFileAttachment(path) {
+  if (!path) return false
+  return FILE_EXTENSIONS.has(path.split('.').pop()?.toLowerCase())
+}
+
+export function attachmentPreviewLabel(path, count = 0, fileName = null) {
+  if (count > 1) return `📷 ${count} photos`
+  if (isAudioAttachment(path)) return '🎤 Voice message'
+  if (isFileAttachment(path)) return fileName ? `📄 ${fileName}` : '📄 File'
+  return '📷 Photo'
+}
+
+export function messageAttachmentLabel(message) {
+  return attachmentPreviewLabel(
+    message?.attachment_path,
+    message?.attachments?.length,
+    message?.attachments?.[0]?.name ?? null,
+  )
+}
+
+export const CHAT_FILE_TYPES = {}
+export const MAX_CHAT_FILE_BYTES = 26214400
+export function chatFileAccept() {
+  return ''
+}
+export function validateChatFile() {
+  return 'harness: validateChatFile is not stubbed'
 }
 
 export const signChatVoiceUrl = signChatPhotoUrl
@@ -44,5 +71,11 @@ export const signChatVoiceUrl = signChatPhotoUrl
 export async function uploadChatVoice() {
   throw new Error('harness: uploadChatVoice is not stubbed')
 }
+
+export async function uploadChatFile() {
+  throw new Error('harness: uploadChatFile is not stubbed')
+}
+
+export async function removeChatAttachments() {}
 
 export async function removeChatVoice() {}

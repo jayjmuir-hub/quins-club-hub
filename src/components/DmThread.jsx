@@ -14,7 +14,8 @@ import MentionPicker, { appendMention } from './MentionPicker.jsx'
 import ProfileIcon from './ProfileIcon.jsx'
 import useProfileIcons from '../lib/useProfileIcons.js'
 import MessageEditor from './MessageEditor.jsx'
-import { attachmentPreviewLabel } from '../data/chatMedia.js'
+import { chatFileAccept, messageAttachmentLabel } from '../data/chatMedia.js'
+import { PendingFileChip } from './FileCard.jsx'
 import { PICKER_ACCEPT } from '../lib/imageResize.js'
 import { canStillEdit } from '../lib/messageEdit.js'
 import { receiptState } from '../data/messages.js'
@@ -109,7 +110,7 @@ export default function DmThread({ thread, compact = false }) {
               <span aria-hidden="true" className="text-[12px]">📌</span>
               <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-muted">
                 <span className="font-bold text-ink">{m.author_id === selfId ? 'You' : nameFor(m.author_id, m.author?.full_name ?? 'Member')}: </span>
-                {m.body?.trim() ? m.body : attachmentPreviewLabel(m.attachment_path, m.attachments?.length)}
+                {m.body?.trim() ? m.body : messageAttachmentLabel(m)}
               </span>
             </button>
           ))}
@@ -204,7 +205,7 @@ export default function DmThread({ thread, compact = false }) {
                     {m.quoted.author_id === selfId ? 'You' : nameFor(m.quoted.author_id, m.quoted.author?.full_name ?? 'Member')}
                   </span>
                   <span className={`block truncate text-[12px] ${mine ? 'text-white/70' : 'text-ink-muted'}`}>
-                    {m.quoted.body?.trim() ? m.quoted.body : attachmentPreviewLabel(m.quoted.attachment_path, m.quoted.attachments?.length)}
+                    {m.quoted.body?.trim() ? m.quoted.body : messageAttachmentLabel(m.quoted)}
                   </span>
                 </button>
               ))
@@ -363,7 +364,7 @@ export default function DmThread({ thread, compact = false }) {
                     <p className="text-[11px] font-extrabold text-brand-ink">
                       Replying to {thread.replyTo.author_id === selfId ? 'yourself' : nameFor(thread.replyTo.author_id, thread.replyTo.author?.full_name ?? 'Member')}
                     </p>
-                    <p className="truncate text-[12px] text-ink-muted">{thread.replyTo.body?.trim() ? thread.replyTo.body : attachmentPreviewLabel(thread.replyTo.attachment_path, thread.replyTo.attachments?.length)}</p>
+                    <p className="truncate text-[12px] text-ink-muted">{thread.replyTo.body?.trim() ? thread.replyTo.body : messageAttachmentLabel(thread.replyTo)}</p>
                   </div>
                   <button
                     type="button"
@@ -376,6 +377,7 @@ export default function DmThread({ thread, compact = false }) {
                 </div>
               )}
               <AttachmentTray items={thread.tray.items} onRemove={thread.tray.remove} error={thread.tray.error} />
+              <PendingFileChip file={thread.pendingFile.file} error={thread.pendingFile.error} onRemove={thread.pendingFile.clear} />
               <form onSubmit={thread.send} className="relative flex items-end gap-2" data-testid="dm-composer">
                 {/* Group @ mentions — the channels' button-not-typeahead
                     picker, fed from the loaded members. mentionables is []
@@ -388,6 +390,7 @@ export default function DmThread({ thread, compact = false }) {
                   }}
                 />
                 <input ref={thread.fileRef} type="file" multiple accept={PICKER_ACCEPT} className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
+                <input ref={thread.docFileRef} type="file" accept={chatFileAccept()} className="hidden" onChange={thread.pickFile} data-testid="file-input" />
                 <button
                   type="button"
                   aria-label="Attach a photo"
@@ -399,6 +402,18 @@ export default function DmThread({ thread, compact = false }) {
                     <rect x="3" y="5" width="18" height="14" rx="2" />
                     <circle cx="9" cy="10" r="1.6" />
                     <path d="m21 15-4.5-4.5L7 20" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Attach a file"
+                  onClick={() => thread.docFileRef.current?.click?.()}
+                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
+                  data-testid="file-button"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+                    <path d="M14 3v5h5" />
                   </svg>
                 </button>
                 <button
@@ -433,10 +448,10 @@ export default function DmThread({ thread, compact = false }) {
                   className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
                 />
                 <EmojiPicker onPick={(emoji) => thread.setDraft(insertAtCursor(thread.draftRef.current, emoji))} />
-                {!thread.draft.trim() && thread.tray.items.length === 0 ? (
+                {!thread.draft.trim() && thread.tray.items.length === 0 && !thread.pendingFile.file ? (
                   <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} onError={thread.setError} />
                 ) : (
-                  <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && thread.tray.items.length === 0)}>
+                  <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && thread.tray.items.length === 0 && !thread.pendingFile.file)}>
                     {/* ⚠️ Counts rather than spinning: ten uploads over the
                         UAE-to-Tokyo route (28 Aug incident) is a long wait,
                         and a blank spinner there reads as a hang. */}

@@ -19,8 +19,12 @@ vi.mock('../src/data/personCard.js', () => ({ getPersonCard: async () => null })
 vi.mock('../src/data/chatMedia.js', () => ({
   signChatPhotoUrl: async () => 'blob:signed',
   isAudioAttachment: () => false,
+  isFileAttachment: () => false,
+  messageAttachmentLabel: () => '📷 Photo',
+  chatFileAccept: () => 'application/pdf',
   attachmentPreviewLabel: () => '📷 Photo',
   uploadChatPhoto: vi.fn(),
+  uploadChatFile: vi.fn(),
   removeChatPhoto: vi.fn(),
 }))
 

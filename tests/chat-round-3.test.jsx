@@ -53,6 +53,10 @@ vi.mock('../src/data/chatMedia.js', () => ({
   removeChatPhoto: vi.fn(),
   signChatPhotoUrl: vi.fn(async () => null),
   isAudioAttachment: (p) => /\.(webm|m4a|mp4|aac|mp3|ogg)$/i.test(p || ''),
+  isFileAttachment: (p) => /\.(pdf|doc|docx|xls|xlsx|csv)$/i.test(p || ''),
+  messageAttachmentLabel: () => '📷 Photo',
+  chatFileAccept: () => 'application/pdf',
+  uploadChatFile: vi.fn(),
   attachmentPreviewLabel: () => '📷 Photo',
 }))
 // Presence is a live websocket; tests get a quiet empty room.

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import Card from '../components/Card.jsx'
 import { Empty } from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { attachmentPreviewLabel } from '../data/chatMedia.js'
+import { messageAttachmentLabel } from '../data/chatMedia.js'
 import { chatPath, listMyStarredMessages } from '../data/messages.js'
 import { listMyNicknames } from '../data/nicknames.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -87,7 +87,7 @@ export default function StarredMessages() {
                     <span className="shrink-0 text-[11px] font-semibold text-ink-faint">{postedLabel(m.created_at)}</span>
                   </span>
                   <span className="mt-0.5 block truncate text-[13px] text-ink-muted">
-                    {m.deleted_at ? 'Message removed' : m.body?.trim() ? m.body : attachmentPreviewLabel(m.attachment_path, m.attachments?.length)}
+                    {m.deleted_at ? 'Message removed' : m.body?.trim() ? m.body : messageAttachmentLabel(m)}
                   </span>
                 </Link>
               </li>

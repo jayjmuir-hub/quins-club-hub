@@ -34,6 +34,7 @@ const m = {
 const media = {
   uploadChatPhoto: vi.fn(),
   removeChatPhoto: vi.fn(),
+  removeChatAttachments: vi.fn(),
   signChatPhotoUrl: vi.fn(),
 }
 // The DM header identity line fetches the person card (26 Aug 2026);
@@ -87,9 +88,15 @@ vi.mock('../src/data/messages.js', () => ({
 vi.mock('../src/data/chatMedia.js', () => ({
   uploadChatPhoto: (...a) => media.uploadChatPhoto(...a),
   removeChatPhoto: (...a) => media.removeChatPhoto(...a),
+  removeChatAttachments: (...a) => media.removeChatAttachments(...a),
   signChatPhotoUrl: (...a) => media.signChatPhotoUrl(...a),
   isAudioAttachment: (p) => /\.(webm|m4a|mp4|aac|mp3|ogg)$/i.test(p || ''),
+  isFileAttachment: (p) => /\.(pdf|doc|docx|xls|xlsx|csv)$/i.test(p || ''),
+  messageAttachmentLabel: () => '📷 Photo',
+  chatFileAccept: () => 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/csv',
+  uploadChatFile: vi.fn(),
   attachmentPreviewLabel: () => '📷 Photo',
+  validateChatFile: () => null,
 }))
 vi.mock('../src/screens/ChatList.jsx', () => ({
   RowAvatar: () => <span data-testid="row-avatar" />,
@@ -287,6 +294,6 @@ describe('photo attachments', () => {
     await user.click(within(bubble).getByRole('button', { name: 'Message options' }))
     await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
     await waitFor(() => expect(m.removeMessage).toHaveBeenCalledWith('d2'))
-    expect(media.removeChatPhoto).toHaveBeenCalledWith(`${ME}/pic.jpg`)
+    expect(media.removeChatAttachments).toHaveBeenCalledWith(expect.objectContaining({ attachment_path: `${ME}/pic.jpg` }))
   })
 })

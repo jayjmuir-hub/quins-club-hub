@@ -50,8 +50,17 @@ vi.mock('../src/data/messages.js', () => ({
 }))
 vi.mock('../src/data/chatMedia.js', () => ({
   removeChatPhoto: vi.fn(),
+  removeChatAttachments: vi.fn(),
   uploadChatPhoto: vi.fn(),
+  uploadChatFile: vi.fn(),
   uploadChatVoice: vi.fn(),
+  isAudioAttachment: () => false,
+  isFileAttachment: () => false,
+  messageAttachmentLabel: () => '📷 Photo',
+  chatFileAccept: () => 'application/pdf',
+  attachmentPreviewLabel: () => '📷 Photo',
+  signChatPhotoUrl: vi.fn(),
+  validateChatFile: () => null,
 }))
 vi.mock('../src/data/nicknames.js', () => ({ listMyNicknames: vi.fn(async () => new Map()) }))
 vi.mock('../src/data/chatPrefs.js', () => ({

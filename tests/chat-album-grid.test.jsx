@@ -335,4 +335,9 @@ describe('attachmentPreviewLabel', () => {
     expect(attachmentPreviewLabel('p1/x.jpg', 1)).toBe('📷 Photo')
     expect(attachmentPreviewLabel('p1/x.jpg', 0)).toBe('📷 Photo')
   })
+
+  it('a file is never called a photo', () => {
+    expect(attachmentPreviewLabel('p1/x.pdf')).toBe('📄 File')
+    expect(attachmentPreviewLabel('p1/x.xlsx', 1, 'name.xlsx')).toBe('📄 name.xlsx')
+  })
 })

@@ -8,6 +8,8 @@ import { Empty } from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listOpenReports, removeMessage, resolveReport } from '../data/messages.js'
 import { postedLabel } from '../lib/notices.js'
+import { isFileAttachment } from '../data/chatMedia.js'
+import FileCard from '../components/FileCard.jsx'
 import { WelfareGate } from './Welfare.jsx'
 
 // Reported messages — the Welfare portal's queue. Each report shows the
@@ -89,7 +91,20 @@ function Queue() {
           </p>
           <p className="mt-1 text-[13.5px] font-bold text-ink">“{r.reason}”</p>
           <blockquote className="mt-2 rounded-[10px] border-l-[3px] border-line bg-surface-mute px-3 py-2 text-[13.5px] text-ink">
-            {r.message?.deleted_at ? <em className="text-ink-faint">Already removed</em> : r.message?.body}
+            {r.message?.deleted_at ? (
+              <em className="text-ink-faint">Already removed</em>
+            ) : (
+              <>
+                {r.message?.body}
+                {isFileAttachment(r.message?.attachment_path) && (
+                  <FileCard
+                    path={r.message.attachment_path}
+                    name={r.message.attachments?.[0]?.name}
+                    size={r.message.attachments?.[0]?.size}
+                  />
+                )}
+              </>
+            )}
             <span className="mt-1 block text-[11.5px] font-semibold text-ink-faint">— {r.message?.author?.full_name ?? 'unknown'}</span>
           </blockquote>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">

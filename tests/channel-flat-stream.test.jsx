@@ -23,8 +23,12 @@ vi.mock('../src/data/personCard.js', () => ({ getPersonCard: async () => null })
 vi.mock('../src/data/chatMedia.js', () => ({
   signChatPhotoUrl: async () => 'blob:signed',
   isAudioAttachment: () => false,
+  isFileAttachment: () => false,
+  messageAttachmentLabel: () => '📷 Photo',
+  chatFileAccept: () => 'application/pdf',
   attachmentPreviewLabel: () => '📷 Photo',
   uploadChatPhoto: vi.fn(),
+  uploadChatFile: vi.fn(),
   removeChatPhoto: vi.fn(),
 }))
 vi.mock('../src/components/VoiceComposer.jsx', () => ({ default: () => null }))
@@ -189,6 +193,9 @@ function stubThread(overrides = {}) {
     setDraftMentions: vi.fn(),
     draftRef: { current: null },
     fileRef: { current: null },
+    docFileRef: { current: null },
+    pendingFile: { file: null, error: null, pick: vi.fn(), clear: vi.fn() },
+    pickFile: vi.fn(),
     composerOpen: true,
     sending: false,
     progress: null,

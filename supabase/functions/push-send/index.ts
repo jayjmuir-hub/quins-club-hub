@@ -408,10 +408,16 @@ function escapeHtmlFree(value: unknown): string {
  * messageBody() below for why the copy is unavoidable.
  */
 const AUDIO_EXTENSIONS = new Set(['webm', 'm4a', 'mp4', 'aac', 'mp3', 'ogg'])
+const FILE_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'])
 
 function isAudioKey(key: unknown): boolean {
   const ext = String(key ?? '').split('.').pop()?.toLowerCase()
   return ext ? AUDIO_EXTENSIONS.has(ext) : false
+}
+
+function isFileKey(key: unknown): boolean {
+  const ext = String(key ?? '').split('.').pop()?.toLowerCase()
+  return ext ? FILE_EXTENSIONS.has(ext) : false
 }
 
 /**
@@ -455,7 +461,9 @@ function messageBody(message: {
     ? (list[0] as { file?: unknown })?.file
     : message.attachment_path
   if (!only) return caption
-  return isAudioKey(only) ? '🎤 Voice message' : '📷 Photo'
+  if (isAudioKey(only)) return '🎤 Voice message'
+  if (isFileKey(only)) return '📄 File'
+  return '📷 Photo'
 }
 
 /** `QCH-0041`. Must match feedbackRef() in src/data/feedback.js. */
