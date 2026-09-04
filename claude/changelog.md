@@ -10,6 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #691 — 📝 **Handoff: the senior build.** `claude/handoffs/2026-09-04-senior-build.md` and a seniors paragraph in `claude/state-of-play.md`. Docs only.
 - #690 — ✉️ **Call-up email, the same-day clash note, and the seed guard.**
   `supabase/functions/notify-callup/index.ts` mails the family on an ask
   (the notify-approval shape; `callup_notify_url` derived in the vault;
