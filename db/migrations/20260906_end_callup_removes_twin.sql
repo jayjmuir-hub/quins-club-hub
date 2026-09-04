@@ -62,3 +62,7 @@ begin
     raise exception 'end_callup was not re-selected after the update';
   end if;
 end $$;
+-- Applied to live 4 Sep 2026 with this extra line: create or replace keeps the
+-- existing ACL, and anon was revoked by name earlier the same day; restated so
+-- the file says what live has.
+revoke execute on function public.end_callup(uuid) from anon;
