@@ -5,7 +5,7 @@ sides, fixtures, results with a supersedes chain, the standings function, the
 sheet trigger, division setup, route 1 (type it) and the grid import
 (`db/migrations/20260905_competitions_and_standings.sql`, `src/lib/rcmGrid.js`,
 `src/screens/Standings.jsx`, `src/screens/AdminCompetitions.jsx`). The keeper UI and the
-Monday nudge followed in #688 (4 Sep 2026). Routes 2 and 3 are NOT built. Keepers are a join table rather
+Monday nudge followed in #688 (4 Sep 2026). ⚠️ **Routes 2 and 3 are DEFERRED — Jay, 4 Sep 2026: "no AI reader for now, maybe later", and on the paste-and-parse fallback, "let's not do this right now, maybe later." Route 1 (type it) is the results route until he says otherwise; do not start 2 or 3 without a new ask.** Keepers are a join table rather
 than a scoped admin right — see the migration header. Dated 2026-09-02.
 
 Piece 4 of the senior-squads work, split out of
