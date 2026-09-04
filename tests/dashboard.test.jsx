@@ -95,6 +95,8 @@ vi.mock('../src/data/availability.js', () => ({
 
 // Import after vi.mock so this binds to the mocked modules.
 import Dashboard from '../src/screens/Dashboard.jsx'
+import { clubToday } from '../src/lib/eventFormat.js'
+import { defaultEventWindow } from '../src/lib/eventWindow.js'
 import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
 // 2026-07-20T09:00 Abu Dhabi — the prototype's own demo "now"
@@ -727,6 +729,11 @@ describe('Dashboard — stats', () => {
       renderDashboard()
       expect(await screen.findByTestId('upcoming-list')).toBeInTheDocument()
       expect(screen.getByTestId('quick-actions')).toBeInTheDocument()
+      expect(screen.getByTestId('next-fixture')).toBeInTheDocument()
+      expect(screen.getByTestId('upcoming-strip')).toBeInTheDocument()
+      expect(screen.getByTestId('last-result')).toBeInTheDocument()
+      expect(screen.getByTestId('squad-staff-block')).toBeInTheDocument()
+      expect(screen.queryByTestId('stat-players')).not.toBeInTheDocument()
     })
   })
 })
@@ -1204,11 +1211,11 @@ describe('Dashboard — all-matches season record', () => {
     expect(screen.queryByTestId('season-record-band')).not.toBeInTheDocument()
   })
 
-  it('asks listEvents for a window that covers the club season, not a short lookback', async () => {
+  it('asks listEvents for the same defaultEventWindow Home already shared with Schedule', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
     renderDashboard()
     await screen.findByTestId('season-record-band')
-    const { from } = listEventsMock.mock.calls[0][0]
-    expect(Date.parse(from)).toBeLessThanOrEqual(Date.parse('2025-08-31T20:00:00.000Z'))
+    const { from, to } = listEventsMock.mock.calls[0][0]
+    expect({ from, to }).toEqual(defaultEventWindow(clubToday()))
   })
 })

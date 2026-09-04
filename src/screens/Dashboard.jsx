@@ -35,7 +35,7 @@ import { pinnedNotices,
 } from '../lib/notices.js'
 import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
 import { defaultEventWindow } from '../lib/eventWindow.js'
-import { scoringSquadRecords, windowCoveringSeason } from '../lib/matchRecord.js'
+import { scoringSquadRecords } from '../lib/matchRecord.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditEvent, canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
@@ -564,9 +564,7 @@ export default function Dashboard() {
   // Anchored once on mount, like `now` directly above and for the same reason:
   // recomputing it each render would mint a new object and refetch forever
   // through the effect's dependencies.
-  const [eventWindow] = useState(() =>
-    windowCoveringSeason(defaultEventWindow(clubToday()), new Date(Date.now())),
-  )
+  const [eventWindow] = useState(() => defaultEventWindow(clubToday()))
 
   // Both reads go out together and land together: the stat tiles mix counts
   // from each, so settling them independently would show a half-filled grid.

@@ -185,6 +185,11 @@ describe('the senior section — a 2nd XV player', () => {
       expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('1–1–0')
       expect(cards[0]).toHaveTextContent('from scores on Hub · 2026-27')
       expect(within(league).getAllByTestId('record-card')[0]).toHaveTextContent('2-1-1')
+      expect(within(league).getAllByTestId('record-card')[0]).toHaveTextContent('Premiership · 3rd · 11 pts')
+      expect(within(league).getByRole('link', { name: 'Table' })).toHaveAttribute('href', '/standings/c-wap')
+      expect(within(league).getByRole('heading', { name: 'Season record' })).toBeInTheDocument()
+      expect(screen.getByTestId('season-stats')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /Season stats/ })).toBeInTheDocument()
     } finally {
       spy.mockRestore()
     }

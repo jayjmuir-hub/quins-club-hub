@@ -96,6 +96,9 @@ export default function SeniorSection() {
     // as-is; a Date stringifies to "… GMT+0400 (Gulf Standard Time)" and
     // Postgres answers 'time zone "gmt+0400" not recognized' — Jay's
     // screenshot, 3 Sep 2026, the first time the page was opened on a phone.
+    // ⚠️ THIS SCREEN'S LOOKBACK WAS 7 DAYS, not defaultEventWindow (12 months).
+    // Widen only this unique window so all-matches W–D–L cannot silently
+    // under-count; Schedule / Home / Hub keep defaultEventWindow unchanged.
     const lookback = {
       from: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(),
       to: new Date(Date.now() + 200 * 24 * 3600 * 1000).toISOString(),

@@ -21,7 +21,7 @@ import { listPlayers } from '../data/players.js'
 import { seasonStats, seasonStatsGaps } from '../data/seasonStats.js'
 import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
-import { squadMatchRecord, windowCoveringSeason } from '../lib/matchRecord.js'
+import { squadMatchRecord } from '../lib/matchRecord.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isMinisTeam, recordsScores } from '../lib/minis.js'
 import { matchSheetApplies } from '../lib/matchSheetDeadline.js'
@@ -291,7 +291,7 @@ export default function SquadHub() {
       // One rolling window for everything: upcoming comes from its future
       // half, the tracking grid from its past half. Same window the Dashboard
       // and calendar already use, so nothing here invents a second calendar.
-      const { from, to } = windowCoveringSeason(defaultEventWindow(clubToday()), new Date(Date.now()))
+      const { from, to } = defaultEventWindow(clubToday())
       const [eventRows, playerRows] = await Promise.all([
         listEvents({ teamIds: [teamId], from, to }),
         listPlayers({ teamIds: [teamId] }),
