@@ -21,6 +21,10 @@ vi.mock('../src/data/players.js', () => ({ listPlayers: (...a) => listPlayersMoc
 vi.mock('../src/data/availability.js', () => ({ listAvailabilityForEvents: (...a) => listAvailabilityMock(...a) }))
 vi.mock('../src/data/leagueTeams.js', () => ({ listAllLeagueTeams: async () => LEAGUE_TEAMS }))
 vi.mock('../src/data/competitions.js', () => ({ standings: (...a) => standingsMock(...a) }))
+vi.mock('../src/data/seasonStats.js', () => ({
+  seasonStats: async () => [],
+  seasonStatsGaps: async () => ({ played: 0, unnamed: 0 }),
+}))
 
 import SeniorSection, { shortSquadName } from '../src/screens/SeniorSection.jsx'
 

@@ -31,6 +31,17 @@ computed tables and a keeper per division, the `/seniors` overview, and U18
 call-ups with push and email. Where each piece stands and what is still
 unbuilt: `claude/handoffs/2026-09-04-senior-build.md`. ⚠️ The points rules
 on the three divisions are a default Jay has not confirmed.
+**Season stats are built (#695, 4 Sep 2026)** — scorers on senior sheets,
+and a per-player season line on the squad page, `/seniors` and the player
+sheet; `claude/plans/2026-09-04-senior-season-stats.md`. The migration is
+APPLIED to live. Still unbuilt from the senior work, in order: standings
+routes 2 and 3, the cross-section roster setting and the all-seniors channel,
+union registration numbers. ⚠️ Found while running every harness on 4 Sep and
+chipped rather than fixed: nine functions from #684/#688/#689 still grant
+EXECUTE to anon; four harnesses fail on live for pre-existing reasons; two
+harnesses cannot fail and the runner refuses the whole-suite run because of
+them; `docs:check`'s changelog rule compares 7-char SHAs against git's
+8-char output and fails locally on every commit.
 
 📄 **THE DOCUMENTS REPO IS LIVE.** Club distro to age groups plus squad
 self-serve uploads, two visibility tiers, multi-squad targeting, push on new

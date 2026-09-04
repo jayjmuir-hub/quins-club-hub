@@ -4,13 +4,16 @@ import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { BlockTitle } from '../components/Editorial.jsx'
+import SeasonStatsTable from '../components/SeasonStatsTable.jsx'
 import { listEvents } from '../data/events.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listPlayers } from '../data/players.js'
 import { listAllLeagueTeams } from '../data/leagueTeams.js'
 import { standings } from '../data/competitions.js'
+import { seasonStats } from '../data/seasonStats.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin } from '../lib/scope.js'
+import { seasonLabelFor } from '../lib/season.js'
 import { SECTIONS, sectionLong, sectionsFor, teamsInSection } from '../lib/section.js'
 import { clubDateTimeInputs, eventDate, eventTitle } from '../lib/eventFormat.js'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
@@ -67,9 +70,12 @@ export default function SeniorSection() {
   const [players, setPlayers] = useState([])
   const [leagueTeams, setLeagueTeams] = useState([])
   const [records, setRecords] = useState(new Map())
+  const [stats, setStats] = useState(new Map())
+  const [openStats, setOpenStats] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [openSquads, setOpenSquads] = useState({})
+  const season = seasonLabelFor()
 
   const today = clubDateTimeInputs(new Date()).date
 
@@ -81,6 +87,9 @@ export default function SeniorSection() {
     let mounted = true
     setLoading(true)
     setError(null)
+    // A section switch must not leave the previous section's tables on screen
+    // while the new fetch is in flight, or after it fails.
+    setStats(new Map())
     // ⚠️ ISO STRINGS, NOT Date OBJECTS. listEvents hands these to PostgREST
     // as-is; a Date stringifies to "… GMT+0400 (Gulf Standard Time)" and
     // Postgres answers 'time zone "gmt+0400" not recognized' — Jay's
@@ -105,13 +114,19 @@ export default function SeniorSection() {
         if (!mounted) return
         setAvailability(avail)
         setRecords(new Map(tables))
+        // Stats are for the section's OWN members; a foreign section reads none.
+        const statRows = foreign
+          ? []
+          : await Promise.all(teamIds.map((id) => seasonStats(id, season).then((rows) => [id, rows]).catch(() => [id, []])))
+        if (!mounted) return
+        setStats(new Map(statRows))
       })
       .catch((err) => mounted && setError(err))
       .finally(() => mounted && setLoading(false))
     return () => {
       mounted = false
     }
-  }, [section, teamIds, foreign, today])
+  }, [section, teamIds, foreign, today, season])
 
   const teamsById = useMemo(() => new Map(sectionTeams.map((t) => [t.id, t])), [sectionTeams])
   const leagueTeamsById = useMemo(() => new Map(leagueTeams.map((lt) => [lt.id, lt])), [leagueTeams])
@@ -336,6 +351,31 @@ export default function SeniorSection() {
               })}
             </div>
           </section>
+
+          {!foreign && (
+            <section className="mb-5" data-testid="season-stats">
+              <BlockTitle>Season stats · {season}</BlockTitle>
+              {sectionTeams.map((team) => {
+                const rows = stats.get(team.id) ?? []
+                const open = Boolean(openStats[team.id])
+                return (
+                  <Card key={team.id} className="mb-3 p-3" data-testid="season-stats-squad">
+                    <p className="mb-1.5 text-xs font-bold text-ink-muted">{shortSquadName(team.name)}</p>
+                    <SeasonStatsTable rows={rows} limit={open ? undefined : 5} />
+                    {rows.length > 5 && (
+                      <button
+                        type="button"
+                        onClick={() => setOpenStats((c) => ({ ...c, [team.id]: !open }))}
+                        className="mt-2 text-[12.5px] font-bold text-brand-ink underline-offset-2 hover:underline"
+                      >
+                        {open ? 'Show fewer' : `Show all ${rows.length}`}
+                      </button>
+                    )}
+                  </Card>
+                )
+              })}
+            </section>
+          )}
         </div>
       )}
     </div>

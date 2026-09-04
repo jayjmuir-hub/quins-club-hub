@@ -1543,6 +1543,26 @@ CREATE INDEX match_sheet_slots_sheet_idx ON public.match_sheet_slots USING btree
 CREATE INDEX match_sheet_cards_sheet_idx ON public.match_sheet_cards USING btree (match_sheet_id);
 CREATE INDEX match_sheets_status_idx     ON public.match_sheets      USING btree (status, event_id);
 
+-- public.match_sheet_scores
+-- Added 2026-09-06 (migration senior_season_stats). Who scored, on a SENIOR
+-- sheet. The cards table's twin: the slot is the link and full_name is the
+-- name as filed; no player_id of its own. `qty`, not `count`.
+CREATE TABLE public.match_sheet_scores (
+  id             uuid        NOT NULL DEFAULT gen_random_uuid(),
+  match_sheet_id uuid        NOT NULL,
+  kind           text        NOT NULL,
+  slot           smallint,
+  full_name      text,
+  qty            smallint    NOT NULL DEFAULT 1,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT match_sheet_scores_pkey PRIMARY KEY (id),
+  CONSTRAINT match_sheet_scores_match_sheet_id_fkey FOREIGN KEY (match_sheet_id) REFERENCES match_sheets(id) ON DELETE CASCADE,
+  CONSTRAINT match_sheet_scores_kind_check CHECK ((kind = ANY (ARRAY['tries'::text, 'conversions'::text, 'penalties'::text, 'drops'::text]))),
+  CONSTRAINT match_sheet_scores_slot_check CHECK (((slot IS NULL) OR ((slot >= 1) AND (slot <= 22)))),
+  CONSTRAINT match_sheet_scores_qty_check CHECK ((qty > 0))
+);
+ALTER TABLE public.match_sheet_scores ENABLE ROW LEVEL SECURITY;
+CREATE INDEX match_sheet_scores_sheet_idx ON public.match_sheet_scores USING btree (match_sheet_id);
 
 -- ---------------------------------------------------------------------
 -- public.social_ideas  (captured 12 Aug 2026)

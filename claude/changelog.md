@@ -10,6 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #695 — 📊 **Senior season stats.** Scorers on SENIOR match sheets (`match_sheet_scores`, the cards table's twin — the player resolved through the slot, never stored), and a per-player season line — games, starts, bench, tries, conversions, penalties, drop goals, cards — on the squad page, the `/seniors` overview and the player sheet. `senior_season_stats(team, season)` and `_gaps`, security definer, gated on the section INSIDE the function; season 1 Sep–31 Aug in Asia/Dubai. Migration applied to live before the merge. Harness `db/tests/season-stats.sql`, 15 assertions, three injected faults, and it raises on any FAIL row. Jay's ruling: a called-up under-18's record shows to the section. Spec `claude/plans/2026-09-04-senior-season-stats.md`.
 - #697 — 🏅 **An icon for a whole role.** `db/migrations/20260909_role_group_icons.sql`:
   `profile_icons.role` (coach, headcoach, manager, medic, admin) as a third target under
   the same exactly-one check; dynamic like a squad grant via `private.icon_role_matches`;

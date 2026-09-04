@@ -1,4 +1,5 @@
 import Card from './Card.jsx'
+import { SCORE_LABELS } from '../lib/scoring.js'
 
 // Filling in the RCM match sheet on a phone.
 //
@@ -43,6 +44,11 @@ const LEGEND = 'text-[12px] font-extrabold uppercase tracking-[.8px] text-ink-mu
  * @param {(index:number,key:string)=>(e:Event)=>void} props.onCard
  * @param {object} props.fields          captain/manager/medical
  * @param {(key:string)=>(e:Event)=>void} props.onField
+ * @param {boolean} props.showScorers    senior squads only — event.team.section is set
+ * @param {Array} props.scoreRows
+ * @param {(index:number,key:string)=>(e:Event)=>void} props.onScorer
+ * @param {Array} props.scoreKinds       which of tries/conversions/penalties/drops this squad records
+ * @param {Array} props.scorerGaps       soft notes — the fixture's score vs. the names, never a gate
  */
 export default function MatchSheetEntry({
   slots,
@@ -52,6 +58,11 @@ export default function MatchSheetEntry({
   onCard,
   fields,
   onField,
+  showScorers = false,
+  scoreRows = [],
+  onScorer = () => () => {},
+  scoreKinds = [],
+  scorerGaps = [],
 }) {
   // ⚠️ COUNTED, NOT ASSUMED. A coach who has filled eight of 22 wants to know
   // that without scrolling the whole list — and "8 of 22" is the one number on
@@ -237,6 +248,53 @@ export default function MatchSheetEntry({
           </div>
         ))}
       </div>
+
+      {/* ── Scorers. SENIOR SQUADS ONLY, and NOT on the facsimile. ──────────
+          The club's own record beside RCM's form: who scored, picked from the
+          22 above so the slot is the link (match_sheet_scores). A note when the
+          fixture's score and the names disagree — never a gate. Spec:
+          claude/plans/2026-09-04-senior-season-stats.md §1. */}
+      {showScorers && (
+        <div className="mt-4" data-testid="scorers-block">
+          <h4 className="text-[13px] font-bold text-ink">Scorers</h4>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">
+            Who scored, for the season stats. Not part of the RCM sheet. Leave a row blank if there was nothing.
+          </p>
+          {scorerGaps.map((gap) => (
+            <p key={gap.kind} role="status" className="mt-1.5 text-[12.5px] font-semibold text-warn">
+              {gap.text}
+            </p>
+          ))}
+          {scoreRows.map((row, index) => (
+            <div key={index} className="mt-2.5 rounded-[11px] border-[1.5px] border-line p-2.5">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_64px] gap-2">
+                <label className="block">
+                  <span className="mb-1 block text-[11.5px] font-bold text-ink-muted">Kind</span>
+                  <select aria-label={`Scorer ${index + 1} kind`} value={row.kind} onChange={onScorer(index, 'kind')} className={FIELD}>
+                    <option value="">—</option>
+                    {scoreKinds.map((kind) => (
+                      <option key={kind} value={kind}>{SCORE_LABELS[kind]}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11.5px] font-bold text-ink-muted">Player</span>
+                  <select aria-label={`Scorer ${index + 1} player`} value={row.slot} onChange={onScorer(index, 'slot')} className={FIELD}>
+                    <option value="">—</option>
+                    {slots.filter((s) => s.full_name).map((s) => (
+                      <option key={s.slot} value={String(s.slot)}>{s.slot} · {s.full_name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11.5px] font-bold text-ink-muted">How many</span>
+                  <input type="number" min="1" inputMode="numeric" aria-label={`Scorer ${index + 1} how many`} value={row.qty} onChange={onScorer(index, 'qty')} className={FIELD} />
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Medical ────────────────────────────────────────────────────── */}
       <label className="mt-4 block">

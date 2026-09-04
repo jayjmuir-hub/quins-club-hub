@@ -15,13 +15,16 @@ import { listEvents } from '../data/events.js'
 import { listMatchSheetsFor } from '../data/matchSheets.js'
 import { listLeagueTeams } from '../data/leagueTeams.js'
 import CallupCard from '../components/CallupCard.jsx'
+import SeasonStatsTable from '../components/SeasonStatsTable.jsx'
 import { listPlayers } from '../data/players.js'
+import { seasonStats, seasonStatsGaps } from '../data/seasonStats.js'
 import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isMinisTeam } from '../lib/minis.js'
 import { matchSheetApplies } from '../lib/matchSheetDeadline.js'
 import { canEditTeam } from '../lib/scope.js'
+import { seasonLabelFor } from '../lib/season.js'
 import { groupHubTeams, hubTeamLine, squadMark } from '../lib/squadHub.js'
 import { buildTracking, squadSummary } from '../lib/tracking.js'
 import Availability from './Availability.jsx'
@@ -209,6 +212,44 @@ export default function SquadHub() {
 
   const team = teams?.find((candidate) => candidate.id === teamId)
   const mayView = canEditTeam(memberships, teamId)
+
+  // Season stats — SENIOR SQUADS ONLY. Asked for by section, not by is_senior:
+  // the database function refuses a squad with no section anyway, and this
+  // avoids one refused call per junior hub open.
+  const season = seasonLabelFor()
+  const [stats, setStats] = useState(null)
+  const [gaps, setGaps] = useState({ played: 0, unnamed: 0 })
+  useEffect(() => {
+    // ⚠️ mayView TOO, NOT ONLY team?.section — a non-staff visitor to a senior
+    // squad's hub (RLS would refuse the page's own data anyway, canEditTeam
+    // says the same) must not still fire these two RPCs whose result is never
+    // rendered: the !mayView branch below returns before the card does.
+    if (!team?.section || !mayView) {
+      setStats(null)
+      return undefined
+    }
+    let mounted = true
+    // Reset before the fetch starts: a squad switch that does not unmount
+    // the component (the multi-squad staff switcher) must not leave the
+    // PREVIOUS squad's gap sentence on screen while the new squad's fetch
+    // is in flight or fails.
+    setStats(null)
+    setGaps({ played: 0, unnamed: 0 })
+    Promise.all([seasonStats(team.id, season), seasonStatsGaps(team.id, season)])
+      .then(([rows, gap]) => {
+        if (!mounted) return
+        setStats(rows)
+        setGaps(gap)
+      })
+      .catch(() => {
+        if (!mounted) return
+        setStats([])
+        setGaps({ played: 0, unnamed: 0 })
+      })
+    return () => {
+      mounted = false
+    }
+  }, [team?.id, team?.section, mayView, season])
 
   // The squads this person could open a hub FOR — drives the no-:teamId
   // redirect/picker and the switcher shown to multi-squad staff and admins.
@@ -478,6 +519,17 @@ export default function SquadHub() {
               </Link>
               {' '}— every squad's weekend, fixtures and pool.
             </p>
+          )}
+          {team?.section && (
+            <Card className="mb-3 p-3" data-testid="season-stats-card">
+              <BlockTitle>Season stats · {season}</BlockTitle>
+              {stats === null ? <Spinner /> : <SeasonStatsTable rows={stats} />}
+              {gaps.unnamed > 0 && (
+                <p className="mt-2 text-xs text-ink-muted" data-testid="season-stats-gap">
+                  {gaps.unnamed} of {gaps.played} played games have no scorers named.
+                </p>
+              )}
+            </Card>
           )}
           {leagueTables.length > 0 && (
             <p data-testid="league-table-links" className="mb-3 text-sm text-ink-muted">

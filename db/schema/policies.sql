@@ -1081,6 +1081,9 @@ CREATE POLICY "match sheet slot manage" ON public.match_sheet_slots
 CREATE POLICY "match sheet card manage" ON public.match_sheet_cards
   FOR ALL USING (private.can_edit_match_sheet(match_sheet_id))
   WITH CHECK (private.can_edit_match_sheet(match_sheet_id));
+CREATE POLICY "match sheet score manage" ON public.match_sheet_scores
+  FOR ALL USING (private.can_edit_match_sheet(match_sheet_id))
+  WITH CHECK (private.can_edit_match_sheet(match_sheet_id));
 
 
 -- ---------------------------------------------------------------------

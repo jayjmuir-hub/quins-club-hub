@@ -14,6 +14,8 @@ import Button from '../components/Button.jsx'
 import PersonCard from '../components/PersonCard.jsx'
 import PersonName from '../components/PersonName.jsx'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { seasonStats } from '../data/seasonStats.js'
+import { seasonLabelFor } from '../lib/season.js'
 
 // The player detail sheet (design-system.md §5.7): a branded hero carrying
 // the player's initials, a set of key/value rows, and — only when the database
@@ -524,6 +526,53 @@ function FooterActions({ player, canEdit, canEditOwn, canDelete, onEdit, onEditO
   )
 }
 
+const SEASON_LINES = [
+  ['games', 'Games'], ['starts', 'Starts'], ['bench', 'Bench'], ['tries', 'Tries'],
+  ['conversions', 'Conversions'], ['penalties', 'Penalties'], ['drops', 'Drop goals'],
+  ['yellows', 'Yellow cards'], ['reds', 'Red cards'],
+]
+
+/**
+ * This season, for a SENIOR player, for the squad the sheet was opened from.
+ * Renders nothing for a junior squad — no call, no heading — for the reason
+ * ContactBlock gives: never suggest withheld data exists. The database refuses
+ * anyone outside the section, and that refusal arrives as [] and reads as
+ * "no games yet", which is the one honest thing it can say.
+ */
+function SeasonBlock({ playerId, team }) {
+  const season = seasonLabelFor()
+  const [line, setLine] = useState(undefined)
+  useEffect(() => {
+    // Reset on every player/squad change so a component instance reopened
+    // for a different player never shows the previous player's numbers
+    // under the new name while the new fetch is still in flight.
+    setLine(undefined)
+    if (!team?.section) return undefined
+    let mounted = true
+    seasonStats(team.id, season)
+      .then((rows) => mounted && setLine(rows.find((r) => r.player_id === playerId) ?? null))
+      .catch(() => mounted && setLine(null))
+    return () => {
+      mounted = false
+    }
+  }, [playerId, team?.id, team?.section, season])
+  if (!team?.section) return null
+  return (
+    <section className="mb-4" data-testid="season-block">
+      <h4 className="mb-2 text-[13px] font-bold text-ink">This season · {season}</h4>
+      {line === undefined ? null : line === null ? (
+        <p className="text-sm text-ink-faint">No games on a sheet yet.</p>
+      ) : (
+        <dl className="grid grid-cols-3 gap-x-3 gap-y-1.5 tabular-nums">
+          {SEASON_LINES.map(([key, label]) => (
+            <KeyValue key={key} label={label}>{line[key] ?? 0}</KeyValue>
+          ))}
+        </dl>
+      )}
+    </section>
+  )
+}
+
 export default function PlayerDetail({
   player,
   team,
@@ -636,6 +685,8 @@ export default function PlayerDetail({
       <BirthdayBlock playerId={player.id} />
 
       <ParentsBlock playerId={player.id} />
+
+      <SeasonBlock playerId={player.id} team={team} />
 
       {/* A player's OWN email and phone are shown only from U13 up (Jay's
           rule, 3 Aug 2026). Below that the block is not rendered at all
