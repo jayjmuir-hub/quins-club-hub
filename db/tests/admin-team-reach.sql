@@ -16,9 +16,17 @@
 --     squad_msgs — can they read the squad chat?              (can_see_team)
 --     staff_msgs — can they read the staff chat?              (can_edit_team)
 --
---  0. BASELINE, before the migration: the zero-rights admin reads the player
---     and the staff chat — proving the probes can see, and that it is the
---     migration, not the fixture, that closes the door
+--  0. BASELINE — the zero-rights admin reads the teams row: proves the probe
+--     mechanics are alive before anything below is asserted. ⚠️ This used to
+--     read the player and the staff chat, proving it was the migration (not
+--     the fixture) that closed the door — that was true only while the
+--     migration had not yet shipped. It shipped live on 3 Sep 2026, so by the
+--     time this harness runs, the zero-rights admin can no longer read either
+--     row even before the inlined copy below re-applies (measured 4 Sep 2026:
+--     got 0 0, not 1 1). The teams row is unaffected by admin_team_reach in
+--     either world — every persona reaches their own club's teams table by
+--     plain membership — so it is a control that still discriminates a dead
+--     probe from a live one.
 --  1. after the migration, every persona matches the matrix below exactly
 --  2. ⚠️ the zero-rights admin reads 0 players but still reads the TEAMS
 --     table — the control that the session is alive and RLS is on
@@ -127,15 +135,17 @@ create function pg_temp.probe_line(_label text, _pid uuid) returns text language
     from pg_temp.probe(_pid) p;
 $$;
 
--- ── 0: BASELINE, before the migration ────────────────────────────────────────
+-- ── 0: BASELINE — the probe can see something, before anything is asserted ──
 do $b$
-declare r record;
+declare n int;
 begin
-  select * into r from pg_temp.probe('f0000000-0000-4000-8000-000000000217');
-  if r.players <> 1 or r.staff_msgs <> 1 then
-    raise exception 'ASSERT 0 FAILED: before the migration the zero-rights admin should read the player and the staff chat (got % %) — the probe cannot see, so nothing below would prove anything', r.players, r.staff_msgs;
+  perform pg_temp.as_user('f0000000-0000-4000-8000-000000000217');
+  select count(*) into n from public.teams t where t.id = 'f0000000-0000-4000-8000-000000000201';
+  reset role;
+  if n <> 1 then
+    raise exception 'ASSERT 0 FAILED: zero-rights admin should read the teams row (got %) — the probe cannot see, so nothing below would prove anything', n;
   end if;
-  insert into _log(line) values ('0 baseline: zero-rights admin reads player=' || r.players || ' staff_msgs=' || r.staff_msgs || ' BEFORE the migration');
+  insert into _log(line) values ('0 baseline: zero-rights admin reads the teams row (n=' || n || ') — probe is alive');
 end $b$;
 
 -- ── migration under test: db/migrations/20260904_admin_team_reach.sql,
