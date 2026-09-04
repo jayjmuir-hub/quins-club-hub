@@ -10,6 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #699 — 🏷️ **In a role channel the pill wears the channel's own role.** An admin who also
+  manages a squad posts to Age Group Managers as "U11 Mixed · Team Manager", not "Admin".
+  `db/migrations/20260910_role_channel_pill.sql` (one ORDER BY term, backfilled; squad and
+  staff chats unchanged). Reasoning: `claude/schema-history.md`. Rot detector:
+  `db/tests/role-channel-pill.sql`.
 - #700 — 🔢 **The sidebar's Chat item wears the unread count.** Jay's ruling over the 23 Aug
   dot-not-a-number stance (recorded in `src/lib/useDockBadges.js`, which now returns
   `chatCount`); the phone dock keeps its dot. Zero on `/chat`. Rot detectors:
