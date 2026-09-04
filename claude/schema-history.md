@@ -1224,3 +1224,30 @@ not the coach, head coach or parent; a head-coach grant reaches the head coach
 and not the plain coach; `member_icons` lists the grant as "Every manager" with
 its reason; role+team refused; an unknown role refused; a manager who leaves
 loses the icon while the head coach keeps theirs; a parent's grant refused.
+
+## 20260910_role_channel_pill — in a role channel, wear the channel's role (4 Sep 2026)
+
+**Why.** After 20260908 gave the pill its squad, one bubble in Age Group
+Managers still read "Admin" with no squad. Its author is a club admin and a
+squad's manager; the pick ranks admin first, and an admin row has no squad.
+Jay is one of them. Measured: 21 role-channel and staff-channel messages by
+admins who also hold a squad staff row.
+
+**What it changes.** One ORDER BY term ahead of the role rank in
+`set_message_provenance`: in `managers`, `headcoaches` or `medics`, a
+membership that qualifies the author for that channel comes first. Everywhere
+else the order is untouched, so an admin still posts to a squad chat as Admin
+(the harness's control). Backfilled for role-channel messages stamped `admin`
+whose author holds the channel's role, with `messages_touch` off for the
+statement (20260908's lesson). `clubstaff`, `welfare` and `committee` are not
+role-specific and are left alone.
+
+**Argument against, recorded.** A person's pill now differs between channels.
+That is the point — the pill answers "why are you in this room" — but a
+reader who notices will ask, and this is where the answer is.
+
+**Proof.** `db/tests/role-channel-pill.sql`: baseline reproduces the bug
+before the migration; a new managers-channel post reads manager/Team
+Manager/U11; the old one is backfilled; her squad-chat post still reads admin;
+a plain admin in the managers channel still reads admin; a backfill with its
+channel list broken restores nothing.
