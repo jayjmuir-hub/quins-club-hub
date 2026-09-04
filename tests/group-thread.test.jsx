@@ -265,10 +265,9 @@ describe('profile icons in a group thread', () => {
   })
 })
 
-// Group @ mentions (claude/plans/2026-08-31-group-chat-mentions.md): the same
-// button-not-typeahead picker the channels use, fed from the already-loaded
-// member list. The discriminating pair: the id rides in `mentions` only while
-// its @Full Name survives in the draft — a deleted name un-mentions.
+// Group @ mentions: typeahead from a typed @ (Jay, 5 Sep 2026), fed from the
+// already-loaded member list. The discriminating pair: the id rides in
+// `mentions` only while its @Full Name survives in the draft.
 describe('group @ mentions', () => {
   it('the picker lists the members minus me, and a pick sends the id', async () => {
     m.sendDirectMessage.mockResolvedValue({ id: 'sent-1' })
@@ -276,7 +275,7 @@ describe('group @ mentions', () => {
     renderAt('/chat/dm/g1')
     await screen.findByRole('heading', { name: 'Zz Test Group' })
 
-    await user.click(screen.getByRole('button', { name: 'Mention someone' }))
+    await user.type(screen.getByLabelText('Message'), '@')
     const list = screen.getByRole('listbox', { name: 'People in this channel' })
     expect(within(list).getByRole('option', { name: /Mira Vantel/ })).toBeInTheDocument()
     // Never myself — mentioning the author is noise the trigger strips anyway.
@@ -296,7 +295,7 @@ describe('group @ mentions', () => {
     renderAt('/chat/dm/g1')
     await screen.findByRole('heading', { name: 'Zz Test Group' })
 
-    await user.click(screen.getByRole('button', { name: 'Mention someone' }))
+    await user.type(screen.getByLabelText('Message'), '@')
     await user.click(screen.getByRole('option', { name: /Tomas Orrin/ }))
     const draft = screen.getByLabelText('Message')
     await user.clear(draft)
