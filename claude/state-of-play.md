@@ -25,6 +25,13 @@ history was a rotted measurement; the rulings never rotted. Measure it.
 **Live at https://adhquins-clubhub.com with real families on it.** The club went
 live 13 Aug 2026. Assume a real parent is looking at whatever you touch.
 
+**The senior section is live.** Four senior squads with a `section` column,
+the 2026-27 senior fixtures on their schedules, three league divisions with
+computed tables and a keeper per division, the `/seniors` overview, and U18
+call-ups with push and email. Where each piece stands and what is still
+unbuilt: `claude/handoffs/2026-09-04-senior-build.md`. ⚠️ The points rules
+on the three divisions are a default Jay has not confirmed.
+
 📄 **THE DOCUMENTS REPO IS LIVE.** Club distro to age groups plus squad
 self-serve uploads, two visibility tiers, multi-squad targeting, push on new
 documents. Merged as #588 with the document cells following in #599.
