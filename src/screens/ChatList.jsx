@@ -358,16 +358,25 @@ export default function ChatList() {
         ))}
       </div>
 
-      {/* Absent at zero — a "0 unread" line is furniture. */}
-      {unreadTotal > 0 && (
-        <div data-testid="unread-strip" className="mb-2 flex items-center gap-2 px-1">
+      {/* Absent at zero — a "0 unread" line is furniture. Since 4 Sep 2026 it
+          is a BUTTON: one tap lands on the Unread filter, which is what
+          anyone reading "4 unread" wants next. Hidden while that filter is
+          already on — it would be a button to where you are. */}
+      {unreadTotal > 0 && filter !== 'unread' && (
+        <button
+          type="button"
+          data-testid="unread-strip"
+          onClick={() => setSearchParams({ filter: 'unread' }, { replace: true })}
+          className="mb-2 flex min-h-[40px] w-full items-center gap-2 rounded-[10px] border-l-[3px] border-brand bg-brand/[.06] px-3 py-1.5 text-left hover:bg-brand/[.1]"
+        >
           <span className="grid h-[22px] min-w-[22px] place-items-center rounded-full bg-brand px-1.5 text-[12px] font-extrabold text-ink-invert">
             {unreadTotal}
           </span>
-          <span className="text-[13px] font-semibold text-ink-muted">
+          <span className="text-[13px] font-bold text-ink">
             unread in {unreadChats} chat{unreadChats === 1 ? '' : 's'}
           </span>
-        </div>
+          <span className="ml-auto text-[12px] font-bold text-brand-ink">Show unread</span>
+        </button>
       )}
 
       {picking === 'dm' && (
@@ -561,7 +570,16 @@ function ChatRow({ row, selfId, pref = null, onPref = null, presence = null }) {
   }, [menuOpen])
   return (
     <li className="border-b border-line last:border-b-0">
-      <div className="flex items-center hover:bg-surface-mute">
+      {/* 4 Sep 2026, Jay: "a more prominent way to flag chats that have new
+          messages". An unread row wears a 3px brand bar down its left edge —
+          the pinned card's own device — a tinted ground, and the preview line
+          goes dark and bold (WhatsApp's cue); the count pill stays. A read
+          row is untouched, so the contrast does the work. data-unread is
+          what the tests read. */}
+      <div
+        className={`flex items-center hover:bg-surface-mute ${unread ? 'border-l-[3px] border-brand bg-brand/[.04]' : 'border-l-[3px] border-transparent'}`}
+        data-unread={unread ? 'true' : undefined}
+      >
       <Link
         to={chatPath(row)}
         data-testid="chat-row"
@@ -580,7 +598,7 @@ function ChatRow({ row, selfId, pref = null, onPref = null, presence = null }) {
             </span>
           </span>
           <span className="flex items-center justify-between gap-2">
-            <span className={`truncate text-[13px] ${unread ? 'font-semibold text-ink' : 'text-ink-muted'}`}>
+            <span className={`truncate text-[13px] ${unread ? 'font-bold text-ink' : 'text-ink-muted'}`}>
               {previewLine(row, selfId)}
             </span>
             {unread && (

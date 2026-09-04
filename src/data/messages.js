@@ -355,9 +355,12 @@ export async function markMessagesRead(profileId, messageIds) {
 }
 
 /**
- * How many recent posts this person has not read — the dock's Chat dot
- * (23 Aug 2026). Head posts only (replies ride under their head), from the
- * last 14 days, not deleted, not their own, minus their own `message_reads`.
+ * How many recent messages this person has not read — the dock's Chat dot
+ * (23 Aug 2026). From the last 14 days, not deleted, not their own, minus
+ * their own `message_reads`. ⚠️ Replies count since 4 Sep 2026: the stream is
+ * flat (claude/decisions/2026-09-04-channel-threads-flat-stream.md) and the
+ * list's badge (my_chats) has counted them since 24 Aug — a dot that stayed
+ * dark while the list said "1 unread" was the last trace of the fold.
  *
  * ⚠️ BOUNDED ON PURPOSE. At a full club this is fifteen squads' worth of
  * posts, and "everything you have ever not read" is both unbounded and
@@ -372,7 +375,6 @@ export async function countUnreadMessages(profileId) {
     supabase
       .from('messages')
       .select('id')
-      .is('parent_id', null)
       .is('deleted_at', null)
       .neq('author_id', profileId)
       .gte('created_at', since),
