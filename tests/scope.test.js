@@ -201,6 +201,37 @@ describe('visibleTeams', () => {
 // approval saw the routed app with no waiting banner and no explanation, while
 // the database gave them nothing. A 'left' row is not a counter-example to
 // "everything I have is pending" — it is not an access grant at all.
+describe('visibleTeams — the seniors right (4 Sep 2026)', () => {
+  // A `seniors`-only admin is not in ADMIN_TEAM_REACH.see — it must never
+  // open every squad the way clubadmin does. It reaches the squads whose
+  // `section` is set, and nothing junior. Mirrors private.seniors_right_reach.
+  const MEN_2XV = { id: 'team-men-2xv', club_id: 'club-1', name: 'Senior Men 2nd XV', sort_order: 14, section: 'senior_men' }
+  const WOMEN = { id: 'team-women', club_id: 'club-1', name: 'Senior Women', sort_order: 15, section: 'senior_women' }
+  const TEAMS = [WOMEN, U8, MEN_2XV, U16]
+
+  it('offers both senior sections and no junior squad to a seniors-only admin', () => {
+    const rows = [membership({ role: 'admin', admin_rights: ['seniors'], team_id: null })]
+    expect(visibleTeams(rows, TEAMS).map((t) => t.id)).toEqual([MEN_2XV.id, WOMEN.id])
+  })
+
+  it("adds the senior squads to the person's own squads", () => {
+    const rows = [
+      membership({ role: 'parent', team_id: U8.id }),
+      membership({ role: 'admin', admin_rights: ['seniors'], team_id: null }),
+    ]
+    expect(visibleTeams(rows, TEAMS).map((t) => t.id)).toEqual([U8.id, MEN_2XV.id, WOMEN.id])
+  })
+
+  it('grants nothing when the admin row is pending, or the right is missing', () => {
+    expect(visibleTeams([membership({ role: 'admin', admin_rights: ['seniors'], status: 'pending', team_id: null })], TEAMS)).toEqual([])
+    expect(visibleTeams([membership({ role: 'admin', admin_rights: [], team_id: null })], TEAMS)).toEqual([])
+  })
+
+  it('is not a squad-reaching right — ADMIN_TEAM_REACH must not list it', () => {
+    for (const mode of Object.keys(ADMIN_TEAM_REACH)) expect(ADMIN_TEAM_REACH[mode]).not.toContain('seniors')
+  })
+})
+
 describe('isPendingOnly — a left row is not a counter-example', () => {
   const row = (status, extra = {}) => ({ id: `m-${status}`, role: 'parent', team_id: 't-1', status, ...extra })
 

@@ -14,7 +14,7 @@ import { standings } from '../data/competitions.js'
 import { seasonStats } from '../data/seasonStats.js'
 import { scoringSquadRecords, windowCoveringSeason } from '../lib/matchRecord.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { isAdmin } from '../lib/scope.js'
+import { adminTeamReach, canReadSeniorSections, isAdmin } from '../lib/scope.js'
 import { seasonLabelFor } from '../lib/season.js'
 import { SECTIONS, sectionLong, sectionsFor, teamsInSection } from '../lib/section.js'
 import { clubDateTimeInputs, eventDate, eventTitle } from '../lib/eventFormat.js'
@@ -63,7 +63,13 @@ export default function SeniorSection() {
   const { mine, all } = useMemo(() => sectionsFor(memberships, teams, { admin }), [memberships, teams, admin])
   const requested = params.get('section')
   const section = all.includes(requested) ? requested : (mine[0] ?? all[0] ?? null)
-  const foreign = !admin && !mine.includes(section)
+  // A section is "foreign" when RLS will hand back its fixtures and nothing
+  // else: not the person's own section, and no admin hat that reaches it —
+  // the seniors right (4 Sep 2026) or a squad-reaching right. Until 4 Sep any
+  // admin was treated as home, and a Pitch-only admin saw empty tables with
+  // no explanation.
+  const reaches = canReadSeniorSections(memberships) || adminTeamReach(memberships, 'see')
+  const foreign = !reaches && !mine.includes(section)
   const sectionTeams = useMemo(() => teamsInSection(teams, section), [teams, section])
   const teamIds = useMemo(() => sectionTeams.map((t) => t.id), [sectionTeams])
 
