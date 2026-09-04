@@ -66,6 +66,11 @@ begin
   if men1 is null then
     raise exception 'Senior Men - 1st XV is missing — it existed on 3 Sep 2026; stop and look';
   end if;
+  -- ⚠️ THE RUN-ONCE GUARD. The live run on 3 Sep 2026 carried this line and the
+  -- committed file did not; a second run would have doubled every fixture.
+  if exists (select 1 from public.events e join public.teams t on t.id = e.team_id where t.is_senior) then
+    raise exception 'senior events already exist — this seed runs once';
+  end if;
 
   select id into men2 from public.teams where club_id = club and name = 'Senior Men - 2nd XV';
   if men2 is null then

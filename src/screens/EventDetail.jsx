@@ -11,6 +11,7 @@ import SessionPlan from '../components/SessionPlan.jsx'
 import { listAvailability, subscribeAvailability } from '../data/availability.js'
 import { getEventThread } from '../data/messages.js'
 import { countSeriesFrom, deleteEvent, deleteSeriesFrom } from '../data/events.js'
+import ClashNote from '../components/ClashNote.jsx'
 import { fixtureLabel } from '../lib/fixtureLabel.js'
 import { squadFormat } from '../lib/minis.js'
 import { matchSheetApplies } from '../lib/matchSheetDeadline.js'
@@ -741,6 +742,9 @@ export default function EventDetail({
         <div>
           <h4 className="mb-2 text-[13px] font-extrabold uppercase tracking-[.8px] text-ink-faint">Availability</h4>
           <AvailabilitySummary eventId={event.id} />
+          {/* A player picked for two squads on the same day (4 Sep 2026) —
+              null unless the database has something to say. */}
+          {event.type === 'match' && <ClashNote eventId={event.id} />}
           {/* Everyone gets this button, not just canEdit users: a player or
               parent who cannot edit the FIXTURE still needs to set their own
               RSVP, and Task 16's brief calls this out explicitly. The PARENT
