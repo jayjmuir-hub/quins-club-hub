@@ -4694,6 +4694,7 @@ $function$
 -- ---------------------------------------------------------------------
 -- ⚠️ REPLACED by 20260831_group_chat_mentions (a group keeps member mentions; 1:1 DMs still zeroed) — pg_get_functiondef from live, 31 Aug 2026.
 -- re-captured 4 Sep 2026 from db/migrations/20260908_message_author_team.sql
+-- re-captured 4 Sep 2026 from db/migrations/20260910_role_channel_pill.sql
 create or replace function private.set_message_provenance()
  returns trigger
  language plpgsql
@@ -4704,6 +4705,7 @@ declare
   parent public.messages;
   ev public.events;
   conv public.conversations;
+  officer_title text;
 begin
   new.author_id := auth.uid();
   if new.author_id is null then
@@ -4776,8 +4778,10 @@ begin
   -- ROLE CHANNELS: the best role ANYWHERE in the club — a head coach posting in
   -- Club Head Coaches has only a team-scoped coach row, which the
   -- (team_id = new.team_id) arm would miss for a team-less message.
-  -- Deterministic since 20260908: a manager on two squads wears the same one
-  -- every time (squad name, last). Before, the planner chose.
+  -- 20260910: in a role channel the membership that QUALIFIES the author for
+  -- it comes first, so an admin-who-manages posts to Age Group Managers as
+  -- "U11 · Team Manager", not "Admin". Elsewhere the order is unchanged.
+  -- Deterministic since 20260908: role rank, team-scoped first, squad name.
   select m.role, m.title, m.team_id
     into new.author_role, new.author_title, new.author_team_id
     from memberships m
@@ -4785,7 +4789,12 @@ begin
    where m.profile_id = new.author_id and m.status = 'active'
      and (m.team_id = new.team_id or m.team_id is null
           or new.channel in ('headcoaches','managers','medics','welfare','clubstaff','committee'))
-   order by case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
+   order by case
+              when new.channel = 'managers'    and m.role = 'manager' then 0
+              when new.channel = 'headcoaches' and m.role = 'coach' and m.is_head_coach then 0
+              when new.channel = 'medics'      and m.role = 'medic' then 0
+              else 1 end,
+            case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
                         when 'medic' then 3 else 9 end,
             (m.team_id is null),
             t.name
@@ -4805,6 +4814,21 @@ begin
       order by m.created_at limit 1));
   if new.club_id is null then
     raise exception 'no club for this message' using errcode = '23502';
+  end if;
+
+  -- 20260910: a club officer wears the officer title (Club officers tab) and
+  -- no squad, in every channel but a DM — Jay's ruling: "everywhere a tag
+  -- shows". Needs club_id, so it sits here. Oldest officer row wins for the
+  -- rare person with two titles.
+  if new.channel <> 'dm' and new.author_role in ('admin','coach','manager','medic') then
+    select o.title into officer_title
+      from club_officers o
+     where o.profile_id = new.author_id and o.club_id = new.club_id
+     order by o.created_at limit 1;
+    if officer_title is not null then
+      new.author_title := officer_title;
+      new.author_team_id := null;
+    end if;
   end if;
 
   if coalesce(array_length(new.mentions, 1), 0) > 0 then
