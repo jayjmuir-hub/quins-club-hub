@@ -553,9 +553,8 @@ function LibraryBrowse({
   const [category, setCategory] = useState('all')
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState(() => new Set())
-  // Every row this squad may run, in-band first (age is guidance since
-  // 2 Sep 2026; the "Show all ages" toggle that used to live here is gone
-  // because all ages IS the list now).
+  // Every row this squad may run. Youth: in-band first, the rest after
+  // (age is guidance since 2 Sep 2026). Seniors: in-band only — Jay 4 Sep.
   const isHours = kind === 'hours'
   const rows = isHours ? shelfRowsForSquad(templates, team) : shelfRowsForSquad(drills, team)
   const q = query.trim().toLowerCase()

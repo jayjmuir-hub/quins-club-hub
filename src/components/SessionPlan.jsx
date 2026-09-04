@@ -394,10 +394,10 @@ export default function SessionPlan({ event, team, canEdit }) {
 
   const building = editing || creating
   // Club + this squad's rows from the query. Contact refuses at the option
-  // list; age only ORDERS it — in-band first, then the rest with the band said
-  // in the label. Age is guidance, not a gate, since 2 Sep 2026 (a coach, via
-  // Jay: "should not be age group locked"), which supersedes the 27 Aug ruling
-  // that U18 must not see U9 copies.
+  // list. For youth, age only ORDERS it — in-band first, then the rest with
+  // the band said in the label (guidance, not a gate, since 2 Sep 2026). For
+  // `teams.is_senior`, shelfRowsForSquad OMITS the rest (Jay, 4 Sep 2026:
+  // junior cards on a senior picker don't belong there).
   const visibleTemplates = shelfRowsForSquad(templates, team)
   const visibleDrills = shelfRowsForSquad(drills, team)
   const bandNote = (row, subject) => squadFitsTemplate(team, row, subject).guidance
@@ -921,10 +921,11 @@ export default function SessionPlan({ event, team, canEdit }) {
         <div>
           {/* Seed from a template — only when building a NEW plan. Freestyle
               first, then the hours shelfRowsForSquad allows for THIS squad:
-              in-band first, the rest after with their band in the label.
-              Another squad's rows never appear (listTemplates's teamId);
-              a contact hour never reaches a tag squad. The select stays up
-              so Freestyle remains even when every club hour is contact. */}
+              in-band first; youth then see the rest with their band in the
+              label, seniors do not (Jay, 4 Sep 2026). Another squad's rows
+              never appear (listTemplates's teamId); a contact hour never
+              reaches a tag squad. The select stays up so Freestyle remains
+              even when every club hour is contact. */}
           {creating && templates.length > 0 && (
             <label className="mb-2.5 block">
               <span className={LABEL}>Start from a template</span>

@@ -133,6 +133,14 @@ export function drillFitsTemplate(drill, template) {
   return { ok: true, reason: null, guidance: null }
 }
 
+/** Adult overlap for `teams.is_senior`. U18 packs include them; max_age 16 does not. */
+export const SENIOR_SQUAD_BAND = 18
+
+function squadBand(team) {
+  if (team?.is_senior === true) return SENIOR_SQUAD_BAND
+  return ageBandFromTeamName(team?.name)
+}
+
 /**
  * Whether a template may reach a squad — and, separately, whether the club
  * would have suggested it for that age.
@@ -148,9 +156,18 @@ export function drillFitsTemplate(drill, template) {
  * left senior coaches a thinner library than juniors for no reason but a
  * regex. Now: `ok` is true, and `guidance` carries the sentence ("U16 is
  * outside this template's U9–U13") for a picker to show beside the row or
- * sort by. A name with no band is simply never "outside" anything.
- * The 27 Aug 2026 ruling that U18 must not SEE U9 copies is superseded by
- * this one — the plan above records both.
+ * sort by. A name with no band, and without `teams.is_senior`, is still
+ * never "outside" anything — do not guess "senior" from the letters.
+ *
+ * ⚠️ `teams.is_senior` IS ADULTS, since 4 Sep 2026 (Jay: junior cards on a
+ * senior picker "doesn't make any sense"). That column, never the name, is
+ * the senior signal. The squad overlaps as band 18: any-age and adult-open
+ * packs (U16-and-up, U16–U18) fit; a junior-capped `max_age` does not.
+ * `ok` stays true so Publish can still warn without gating. Session Plan
+ * and the shelf OMIT those rows for seniors (`shelfRowsForSquad`); youth
+ * still see them with this sentence. The 27 Aug 2026 ruling that U18 must
+ * not SEE U9 copies is superseded for youth by the 2 Sep guidance ruling,
+ * and restored for seniors by this one.
  *
  * `subject` is the word the sentence calls the thing being fitted.
  */
@@ -163,15 +180,16 @@ export function squadFitsTemplate(team, template, subject = 'template') {
   if (tMin == null && tMax == null) {
     return { ok: true, reason: null, guidance: null }
   }
-  const band = ageBandFromTeamName(team?.name)
+  const band = squadBand(team)
   if (band === null) {
     return { ok: true, reason: null, guidance: null }
   }
   if ((tMin != null && band < tMin) || (tMax != null && band > tMax)) {
+    const who = team?.is_senior === true ? 'Seniors are' : `U${band} is`
     return {
       ok: true,
       reason: null,
-      guidance: `U${band} is outside this ${subject}'s ${bandPhrase(tMin, tMax)}`,
+      guidance: `${who} outside this ${subject}'s ${bandPhrase(tMin, tMax)}`,
     }
   }
   return { ok: true, reason: null, guidance: null }

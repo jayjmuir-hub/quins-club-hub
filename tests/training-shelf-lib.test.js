@@ -122,6 +122,31 @@ describe('shelfRowsForSquad', () => {
     expect(shelfRowsForSquad(u12copies, U12G_QR).map((row) => row.id)).toEqual(['d-tag-u12'])
   })
 
+  // Jay 4 Sep 2026: greyed-out junior cards on a senior picker "doesn't make
+  // any sense". Hide them. Youth still keep the out-of-band rows (test above).
+  it('omits junior-capped drills for an is_senior squad and keeps any-age and adult-open', () => {
+    const senior = { name: 'Senior Men - 1st XV', is_senior: true, requires_contact: true }
+    const rows = [
+      { id: 'd-u9', title: 'U10 passing', min_age: 8, max_age: 10, requires_contact: false },
+      { id: 'd-any', title: 'Grid passing', min_age: null, max_age: null, requires_contact: false },
+      { id: 'd-open', title: 'Adult ruck', min_age: 16, max_age: null, requires_contact: true },
+    ]
+    expect(shelfRowsForSquad(rows, senior).map((row) => row.id)).toEqual(['d-any', 'd-open'])
+  })
+
+})
+
+describe('chipHours for seniors', () => {
+  it('omits a junior-only chip label on an is_senior squad instead of offering the U9 pack', () => {
+    const senior = { name: 'Senior Men - 1st XV', is_senior: true, requires_contact: true }
+    const chips = chipHours(contactPack(9, 10), senior)
+    expect(chips).toEqual([])
+  })
+  it('keeps the in-band adult pack for an is_senior squad', () => {
+    const senior = { name: 'Senior Men - 1st XV', is_senior: true, requires_contact: true }
+    const chips = chipHours([...contactPack(9, 10), ...contactPack(16, 18)], senior)
+    expect(chips.map((row) => row.id)).toEqual(CHIP_LABELS.map((label) => `${label}-16-18`))
+  })
 })
 
 describe('blocksFromTemplate', () => {
