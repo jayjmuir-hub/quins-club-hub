@@ -1195,3 +1195,32 @@ post; the two pre-migration posts are backfilled; a parent's reply is null; a
 manager given a second squad whose name sorts first wears that one; a backfill
 with its role filter broken restores 0 and the real one restores 4; an owner
 update that nulls the column is put back by the trigger.
+
+## 20260909_role_group_icons — an icon for a whole role (4 Sep 2026)
+
+**Why.** Jay, on `/admin/icons`: "i need to be able to give groups like
+managers or coaches, etc icons as a whole". The table had two targets — a
+person, or a squad's staff — so crowning every manager meant one row per
+manager, kept in step by hand as people came and went.
+
+**What it adds.** `profile_icons.role` (`coach`, `headcoach`, `manager`, `medic`,
+`admin`), a third target under the same "exactly one" check, now counted across
+three columns. Like the squad grant it is dynamic: `private.icon_role_matches`
+decides who holds the role today (head coach = a coach with `is_head_coach`),
+and both read paths gain a third arm. `member_icons` returns the group's label
+in `team_name` ("Every manager") so the person card's " · where" line works
+without a new column. No new grants; the existing super-only policies cover
+the column.
+
+**Arguments against, recorded.** A role grant and a squad grant can both land
+on one person, who then wears whichever is primary or newest — the same rule
+the two existing kinds already had between them. And "admin" decorates every
+admin row including the zero-rights kind; if that ever matters, the match
+function is the one place to narrow it.
+
+**Proof.** `db/tests/role-group-icons.sql`, seven steps, rolled back against
+production with the migration inlined: a manager grant reaches the manager and
+not the coach, head coach or parent; a head-coach grant reaches the head coach
+and not the plain coach; `member_icons` lists the grant as "Every manager" with
+its reason; role+team refused; an unknown role refused; a manager who leaves
+loses the icon while the head coach keeps theirs; a parent's grant refused.

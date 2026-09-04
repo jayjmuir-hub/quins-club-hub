@@ -140,8 +140,33 @@ jobs:
       # happened. A permanently red gate teaches people to ignore the gate.
       # The reasoning for why they are not exploitable here is in
       # claude/open-items.md; when react-router 7 lands, drop this to moderate.
+      #
+      # ⚠️ AND THE REGISTRY CAN BE DOWN — 4 Sep 2026, when npm's advisory
+      # endpoint answered 503 for hours and every pull request that day
+      # needed a rerun, two of them twice. Three attempts a minute apart;
+      # then, if the failure is the REGISTRY (npm's own "audit endpoint
+      # returned an error"), say so loudly and let the build through —
+      # nothing about the code changed. A real advisory still fails: its
+      # output carries no such line, and the exit code stands.
       - name: Audit what actually ships
-        run: npm audit --omit=dev --audit-level=high
+        shell: bash
+        run: |
+          # pipefail: without it the `if` reads tee's exit code, never npm's,
+          # and every audit would "pass".
+          set -o pipefail
+          for attempt in 1 2 3; do
+            if npm audit --omit=dev --audit-level=high 2>&1 | tee audit.log; then
+              exit 0
+            fi
+            if ! grep -q "audit endpoint returned an error" audit.log; then
+              echo "::error::npm audit found an advisory at high or above (attempt $attempt) — see above"
+              exit 1
+            fi
+            echo "::warning::npm's advisory endpoint is unavailable (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep 60
+          done
+          echo "::warning::npm audit SKIPPED — the registry's advisory endpoint was unavailable three times. Nothing about the code changed; run 'npm audit --omit=dev --audit-level=high' locally later."
+          exit 0
 
       # The rest of the picture, reported and never gating. Dev advisories are
       # worth SEEING — a compromised test runner still runs on a maintainer's

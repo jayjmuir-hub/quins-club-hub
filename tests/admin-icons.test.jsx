@@ -24,6 +24,16 @@ vi.mock('../src/data/profileIcons.js', () => ({
   setPrimaryIcon: (...a) => m.setPrimaryIcon(...a),
   listClubIconMap: async () => new Map(),
   listMemberIcons: async () => [],
+  // The role groups are data, not network — the real list, so the select's
+  // options are the ones the screen ships.
+  ICON_ROLE_GROUPS: [
+    { key: 'headcoach', label: 'Every head coach' },
+    { key: 'coach', label: 'Every coach' },
+    { key: 'manager', label: 'Every manager' },
+    { key: 'medic', label: 'Every medic' },
+    { key: 'admin', label: 'Every club admin' },
+  ],
+  iconRoleLabel: (k) => ({ headcoach: 'Every head coach', coach: 'Every coach', manager: 'Every manager', medic: 'Every medic', admin: 'Every club admin' })[k] ?? k,
 }))
 const listClubMembersMock = vi.fn()
 vi.mock('../src/data/members.js', () => ({ listClubMembers: (...a) => listClubMembersMock(...a) }))
@@ -76,6 +86,7 @@ describe('AdminIcons', () => {
         clubId: 'club-1',
         teamId: 't-u11',
         profileId: null,
+        role: null,
         icon: 'crown',
         reason: 'Best age group users of Club Hub',
       }),
@@ -94,6 +105,7 @@ describe('AdminIcons', () => {
         clubId: 'club-1',
         teamId: null,
         profileId: 'p-2',
+        role: null,
         icon: 'star',
         reason: '',
       }),
@@ -114,6 +126,41 @@ describe('AdminIcons', () => {
     // the screen must not offer it.
     await user.selectOptions(screen.getByLabelText('A person'), 'p-1')
     expect(grant).toBeDisabled()
+    // Nor a role on top (4 Sep 2026): three targets, still exactly one.
+    await user.selectOptions(screen.getByLabelText('A person'), '')
+    await user.selectOptions(screen.getByLabelText('A role across the club'), 'manager')
+    expect(grant).toBeDisabled()
+    await user.selectOptions(screen.getByLabelText("A squad’s staff"), '')
+    expect(grant).toBeEnabled()
+  })
+
+  it('granting to a role across the club sends role and neither team nor person (4 Sep 2026)', async () => {
+    // Jay: "give groups like managers or coaches, etc icons as a whole".
+    const user = userEvent.setup()
+    mount()
+    await screen.findByLabelText('Icon')
+    await user.selectOptions(screen.getByLabelText('Icon'), 'clipboard')
+    await user.selectOptions(screen.getByLabelText('A role across the club'), 'manager')
+    await user.click(screen.getByRole('button', { name: 'Grant' }))
+    await waitFor(() =>
+      expect(m.grantIcon).toHaveBeenCalledWith({
+        clubId: 'club-1',
+        teamId: null,
+        profileId: null,
+        role: 'manager',
+        icon: 'clipboard',
+        reason: '',
+      }),
+    )
+  })
+
+  it('a role grant lists under its group label', async () => {
+    m.listIconGrants.mockResolvedValue([
+      { id: 'g-r', icon: 'clipboard', reason: null, is_primary: false, profile_id: null, team_id: null, role: 'headcoach', profiles: null, teams: null },
+    ])
+    mount()
+    const row = await screen.findByTestId('icon-grant')
+    expect(within(row).getByText('Every head coach')).toBeInTheDocument()
   })
 
   it('existing grants list with labels; Revoke and Make primary call through', async () => {
