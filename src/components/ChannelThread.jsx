@@ -124,7 +124,21 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-clip rounded-[12px]">
         <div data-testid="chat-wallpaper" className="sticky top-0 h-dvh w-full" style={backgroundStyle(background) ?? undefined} />
       </div>
-      {messages?.map((m, index) => (
+      {messages?.map((m, index) => {
+        // 4 Sep 2026: a post whose thread holds a reply the reader has NOT
+        // seen opens on arrival. The chat list's preview and unread badge
+        // come from my_chats, which takes the newest message whether or not
+        // it is a reply — so a Reply to an older post was promised by the
+        // list and then hidden here behind a folded "1 reply" link under a
+        // bubble that was not even the last one (Jay, live, Age Group
+        // Managers: "entering that chat group and the message isn't there").
+        // Read against the reads-on-arrival snapshot, like `unread` below, so
+        // the mark-read effect a moment later cannot fold it back shut.
+        const arrivalReads = openReadsRef.current ?? reads
+        const holdsUnreadReply = (m.replies ?? []).some(
+          (r) => !r.deleted_at && r.author_id !== selfId && !arrivalReads.has(r.id),
+        )
+        return (
         <Fragment key={m.id}>
         {daysDiffer(messages[index - 1]?.created_at, m.created_at) && (
           <div className="my-1.5 flex justify-center" data-testid="day-divider" role="separator">
@@ -150,7 +164,7 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           unread={!(openReadsRef.current ?? reads).has(m.id)}
           tally={m.event_id ? tallies.get(m.event_id) : undefined}
           mentionables={mentionables}
-          forceOpen={openThreadId === m.id}
+          forceOpen={openThreadId === m.id || holdsUnreadReply}
           onReply={thread.onReply}
           announceOnly={Boolean(announceOnly && !mayPost)}
           onRemove={thread.onRemove}
@@ -164,7 +178,8 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           onViewVotes={() => setVotesFor(thread.polls?.get(m.id) ?? null)}
         />
         </Fragment>
-      ))}
+        )
+      })}
       </div>
 
       {/* ── Composer ────────────────────────────────────────────────── */}
