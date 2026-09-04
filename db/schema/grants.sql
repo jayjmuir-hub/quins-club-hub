@@ -213,6 +213,10 @@
 --                     what keeps anon out: all three policies resolve through
 --                     private.can_edit_team, which tests auth.uid() against
 --                     memberships and cannot match a null uid.
+--   match_sheet_scores authenticated, postgres, service_role         ALL 8 (anon revoked)
+--                     ⚠️ ADDED 6 Sep 2026 (db/migrations/20260906_senior_season_stats.sql).
+--                     Explicit grant to authenticated and service_role; anon
+--                     revoked in the migration. Harness: db/tests/season-stats.sql.
 --   drills            anon, authenticated, postgres, service_role   ALL 8
 --   session_templates anon, authenticated, postgres, service_role   ALL 8
 --   session_template_blocks  anon, authenticated, postgres, service_role   ALL 8
