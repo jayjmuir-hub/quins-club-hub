@@ -26,23 +26,44 @@ export async function listIconGrants() {
     .from('profile_icons')
     // ⚠️ Two FKs point at profiles (profile_id and granted_by) — the embed
     // must name its COLUMN or PostgREST refuses the ambiguity (PGRST201).
-    .select('id, icon, reason, is_primary, profile_id, team_id, created_at, profiles!profile_id(full_name), teams(name)')
+    .select('id, icon, reason, is_primary, profile_id, team_id, role, created_at, profiles!profile_id(full_name), teams(name)')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
 }
 
 /**
- * Grant an icon to a squad's staff (teamId) OR a person (profileId) —
- * exactly one; the table's check refuses both. A blank reason stays absent
- * so the library's default meaning shows.
+ * The role groups a grant can target (4 Sep 2026, Jay: "give groups like
+ * managers or coaches, etc icons as a whole"). Keys are what the database
+ * checks (db/migrations/20260909_role_group_icons.sql); labels are what the
+ * screen shows, and what member_icons returns as team_name.
  */
-export async function grantIcon({ clubId, teamId = null, profileId = null, icon, reason = '' }) {
+export const ICON_ROLE_GROUPS = [
+  { key: 'headcoach', label: 'Every head coach' },
+  { key: 'coach', label: 'Every coach' },
+  { key: 'manager', label: 'Every manager' },
+  { key: 'medic', label: 'Every medic' },
+  { key: 'admin', label: 'Every club admin' },
+]
+
+/** The label for a role-group key, for the grants list. */
+export function iconRoleLabel(key) {
+  return ICON_ROLE_GROUPS.find((g) => g.key === key)?.label ?? key
+}
+
+/**
+ * Grant an icon to a squad's staff (teamId), a person (profileId), OR a
+ * role across the club (role) — exactly one; the table's check refuses any
+ * other shape. A blank reason stays absent so the library's default meaning
+ * shows.
+ */
+export async function grantIcon({ clubId, teamId = null, profileId = null, role = null, icon, reason = '' }) {
   const line = reason?.trim() ?? ''
   const { error } = await supabase.from('profile_icons').insert({
     club_id: clubId,
     ...(teamId ? { team_id: teamId } : {}),
     ...(profileId ? { profile_id: profileId } : {}),
+    ...(role ? { role } : {}),
     icon,
     ...(line ? { reason: line } : {}),
   })

@@ -93,6 +93,13 @@ describe('the grant writes', () => {
     expect(ins.calls.insert[0][0]).toEqual({ club_id: 'c-1', profile_id: 'p-1', icon: 'star' })
   })
 
+  it('a role grant sends role and no team or person (4 Sep 2026)', async () => {
+    const ins = builder({ data: null, error: null })
+    supabase.from.mockReturnValue(ins.b)
+    await grantIcon({ clubId: 'c-1', role: 'manager', icon: 'clipboard' })
+    expect(ins.calls.insert[0][0]).toEqual({ club_id: 'c-1', role: 'manager', icon: 'clipboard' })
+  })
+
   it('revoke deletes by id; primary updates by id', async () => {
     const del = builder({ data: null, error: null })
     supabase.from.mockReturnValue(del.b)

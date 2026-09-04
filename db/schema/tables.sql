@@ -2649,7 +2649,9 @@ CREATE TABLE public.profile_icons (
   is_primary boolean NOT NULL DEFAULT false,
   granted_by uuid NOT NULL DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT profile_icons_one_target CHECK ((profile_id IS NULL) <> (team_id IS NULL))
+  -- 20260909: a third target, a ROLE across the club (dynamic, like team_id).
+  role       text CHECK (role IS NULL OR role IN ('coach','headcoach','manager','medic','admin')),
+  CONSTRAINT profile_icons_one_target CHECK ((profile_id IS NOT NULL)::int + (team_id IS NOT NULL)::int + (role IS NOT NULL)::int = 1)
 );
 
 -- ---------------------------------------------------------------------
