@@ -72,6 +72,41 @@ select 1, 'profiles pointing at a missing file (expect 0)', count(*)::text
    and not exists (select 1 from storage.objects o
                     where o.bucket_id = 'staff-photos' and o.name = pr.photo_path);
 
+-- ⚠️ DIAGNOSTIC, NOT AN ASSERTION. A real stranded object was found in
+-- staff-photos on 4 Sep 2026 (~4 days old at the time) — the "staff-photos
+-- orphaned (expect 0)" row above is correctly reporting it, not vacuous.
+-- Storage cannot be deleted from SQL (`protect_delete`, see the header), so
+-- this harness cannot clear its own drift; it prints what the next person
+-- needs to act on it instead of a bare count.
+do $diag$
+declare
+  cnt int;
+  oldest timestamptz;
+begin
+  select count(*), min(o.created_at) into cnt, oldest
+    from storage.objects o
+   where o.bucket_id = 'staff-photos'
+     and o.created_at < now() - interval '24 hours'
+     and not exists (select 1 from public.profiles pr where pr.photo_path = o.name);
+  if cnt > 0 then
+    raise notice 'DIAGNOSTIC: % real staff-photos orphan(s) on production; oldest was created % (% old) — needs a human deletion decision, SQL cannot delete it (protect_delete)', cnt, oldest, age(now(), oldest);
+  end if;
+end
+$diag$;
+
+-- A snapshot of what is ALREADY orphaned, taken before part 3 injects
+-- anything. Part 3's fault-injection checks compare against this baseline
+-- instead of assuming it is zero — a real stranded object sitting on
+-- production (see the diagnostic above) must not make the fault-injection
+-- assertions pass or fail for the wrong reason.
+create temp table _baseline(staff_orphans int) on commit drop;
+insert into _baseline
+select count(*)
+  from storage.objects o
+ where o.bucket_id = 'staff-photos'
+   and o.created_at < now() - interval '24 hours'
+   and not exists (select 1 from public.profiles pr where pr.photo_path = o.name);
+
 
 -- ── 2. The scheduled scan exists and cannot be reached from a browser ──────
 --
@@ -122,8 +157,14 @@ values ('staff-photos',
         now() - interval '7 days',
         '{"size": 1}'::jsonb);
 
+-- ⚠️ RELATIVE TO _baseline, NOT TO ZERO. A real stranded object already on
+-- production (see the diagnostic above part 2) would otherwise land at 2 here
+-- and make this check fail for the wrong reason — production drift, not a
+-- broken assertion. Subtracting the baseline keeps it discriminating whatever
+-- else is sitting in the bucket.
 insert into _res
-select 3, 'INJECTED orphan is detected (expect 1)', count(*)::text
+select 3, 'INJECTED orphan increases the count by 1 (expect 1)',
+       (count(*) - (select staff_orphans from _baseline))::text
   from storage.objects o
  where o.bucket_id = 'staff-photos'
    and o.created_at < now() - interval '24 hours'
@@ -142,7 +183,8 @@ values ('staff-photos',
         '{"size": 1}'::jsonb);
 
 insert into _res
-select 3, 'a JUST-UPLOADED stranded object is ignored (expect 1, not 2)', count(*)::text
+select 3, 'a JUST-UPLOADED stranded object adds nothing more (expect still +1, not +2)',
+       (count(*) - (select staff_orphans from _baseline))::text
   from storage.objects o
  where o.bucket_id = 'staff-photos'
    and o.created_at < now() - interval '24 hours'
@@ -177,6 +219,10 @@ begin
       or (part = 2 and what like '%policy count%' and got <> '0')
       or (part = 3 and what like '%INJECTED orphan%' and got <> '1')
       or (part = 3 and what like '%JUST-UPLOADED%' and got <> '1')
+      -- ⚠️ the two rows above are already matched by these LIKE patterns
+      -- after the label rename (still contain "INJECTED orphan" and
+      -- "JUST-UPLOADED" respectively) — kept unrenamed here on purpose so
+      -- this block does not silently stop matching them
       or (part = 3 and what like '%INJECTED missing%' and got = '0');
 
   if bad is not null then

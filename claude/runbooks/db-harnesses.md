@@ -192,6 +192,42 @@ credential to code somebody else wrote.
 production drift would block every pull request until somebody fixed the
 database. `test` and `docs-check` are the gates. This one reports.
 
+## ⚠️ A `_r`-style harness must end its DO block with the FAIL-row raise
+
+Twenty-six harnesses in this directory record each assertion's outcome as a
+row in a temporary table — `create temporary table _r(step text, outcome
+text)` — and print it with `select * from _r` for a human to read. **That
+table is not the check.** `scripts/db-check.mjs` throws on a SQL ERROR and on
+nothing else; it never inspects the rows a query returns. So a harness whose
+DO block writes `'FAIL …'` into `_r` and then just falls through to `end $$;`
+reports `ok` to the runner regardless — the FAIL sits there, printed, and the
+run is green. Measured 4 Sep 2026, on the first live runs of `callups.sql`
+and `senior-section.sql`, both of which had exactly this shape.
+
+The fix is the last thing the DO block does, after the final role reset and
+before `end $$;`:
+
+```sql
+  if exists (select 1 from _r where outcome not like 'PASS%') then
+    raise exception '<harness-name>: assertion(s) FAILED — %',
+      (select string_agg(step || ' → ' || outcome, ' | ' order by (regexp_match(step, '^\d+'))[1]::int)
+         from _r where outcome not like 'PASS%');
+  end if;
+```
+
+Adapt the `order by` to how the file numbers its steps (or drop it and order
+by `step` as text) — do not change what any assertion measures. If the file's
+own role reset happens OUTSIDE the last DO block (a bare `reset role;`
+between two `do $$ ... $$;` blocks), add a new trailing `do $$ ... end $$;`
+that only runs this check, after that reset and before the final `select *
+from _r`. Several harnesses in this directory already carry an equivalent
+scan (`_bad text ... from _r where outcome like '%FAIL%'`, or an explicit
+per-step check) — that satisfies the same requirement and does not need this
+exact block added on top of it. What every harness needs is *some* statement
+that turns a FAIL row into a thrown exception; a printed FAIL row that
+nothing compares to anything is not a check, in exactly the sense
+`claude/runbooks/db-harnesses.md`'s own opening rule means it.
+
 ## Writing a new one
 
 Copy the shape of `db/tests/photo-backup.sql`, which is the shortest complete

@@ -7354,10 +7354,13 @@ as $function$
 $function$
 
 -- 20260909: the role-grant rule and label, shared by both read paths above.
+-- ⚠️ Shipped with no search_path pin; db/tests/search-path.sql caught it on
+-- its first live run and 20260906_icon_role_search_path.sql pinned both.
 create or replace function private.icon_role_matches(_role text, _m public.memberships)
 returns boolean
 language sql
 immutable
+set search_path = public
 as $function$
   select _m.status = 'active' and case _role
     when 'coach'     then _m.role = 'coach'
@@ -7372,6 +7375,7 @@ create or replace function private.icon_role_label(_role text)
 returns text
 language sql
 immutable
+set search_path = public
 as $function$
   select case _role
     when 'coach'     then 'Every coach'
