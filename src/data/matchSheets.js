@@ -49,7 +49,7 @@ export async function getMatchSheet(eventId) {
   const { data, error } = await supabase
     .from('match_sheets')
     .select(
-      '*, league_team:league_teams(id, rcm_name, division), slots:match_sheet_slots(*), cards:match_sheet_cards(*)',
+      '*, league_team:league_teams(id, rcm_name, division), slots:match_sheet_slots(*), cards:match_sheet_cards(*), scores:match_sheet_scores(*)',
     )
     .eq('event_id', eventId)
     .maybeSingle()
@@ -65,6 +65,7 @@ export async function getMatchSheet(eventId) {
     cards: [...(data.cards ?? [])].sort(
       (a, b) => (a.half ?? 0) - (b.half ?? 0) || (a.minute ?? 0) - (b.minute ?? 0),
     ),
+    scores: [...(data.scores ?? [])].sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0)),
   }
 }
 
@@ -184,6 +185,43 @@ export async function saveMatchSheetCards(matchSheetId, cards) {
   if (rows.length === 0) return []
 
   const { data, error } = await supabase.from('match_sheet_cards').insert(rows).select()
+  if (error) throw wrapDbError(error, REFUSED)
+  return data ?? []
+}
+
+/**
+ * Replaces the scorer rows for a match sheet — the cards pattern, verbatim.
+ *
+ * A row with no kind or no numeric slot is not a scorer; it is an empty box on
+ * the editor, and is dropped rather than refused. `qty` blank means one.
+ * ⚠️ NO player_id IS WRITTEN. The slot is the link (see match_sheet_scores in
+ * db/schema/tables.sql); full_name is the name as filed, beside it.
+ */
+export async function saveMatchSheetScores(matchSheetId, rows) {
+  if (!matchSheetId) throw new Error(REFUSED)
+
+  const kept = (rows ?? [])
+    .filter((row) => row?.kind && Number.isFinite(Number(row.slot)) && String(row.slot).trim() !== '')
+    .map((row) => {
+      const qty = Number(row.qty)
+      return {
+        match_sheet_id: matchSheetId,
+        kind: row.kind,
+        slot: Number(row.slot),
+        full_name: row.full_name ? String(row.full_name).trim() : null,
+        qty: Number.isFinite(qty) && qty > 0 ? Math.floor(qty) : 1,
+      }
+    })
+
+  const { error: clearError } = await supabase
+    .from('match_sheet_scores')
+    .delete()
+    .eq('match_sheet_id', matchSheetId)
+  if (clearError) throw wrapDbError(clearError, REFUSED)
+
+  if (kept.length === 0) return []
+
+  const { data, error } = await supabase.from('match_sheet_scores').insert(kept).select()
   if (error) throw wrapDbError(error, REFUSED)
   return data ?? []
 }

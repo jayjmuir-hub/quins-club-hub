@@ -117,7 +117,7 @@ export async function getEvent(id) {
     // set of boxes. The embed is a column list rather than `*` on purpose (see
     // above); that is precisely the shape that loses a column by omission.
     .select(
-      '*, league_team:league_teams(id, rcm_name, division), team:teams(id, name, sort_order, scoring_kinds)',
+      '*, league_team:league_teams(id, rcm_name, division), team:teams(id, name, sort_order, scoring_kinds, section)',
     )
     .eq('id', id)
     .maybeSingle()

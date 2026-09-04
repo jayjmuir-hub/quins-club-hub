@@ -39,6 +39,12 @@ export async function saveMatchSheetCards(matchSheetId, cards) {
   return []
 }
 
+export async function saveMatchSheetScores(matchSheetId, rows) {
+  window.__writes = window.__writes || []
+  window.__writes.push({ op: 'match-sheet-scores', payload: rows })
+  return []
+}
+
 export async function setMatchSheetStatus(id, status) {
   window.__writes = window.__writes || []
   window.__writes.push({ op: 'match-sheet-status', payload: { id, status } })
