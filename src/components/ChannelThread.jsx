@@ -17,6 +17,7 @@ import { autoGrow, composerKeyDown, insertAtCursor, pasteImages } from '../lib/c
 import { PICKER_ACCEPT } from '../lib/imageResize.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { eventTitle } from '../lib/eventFormat.js'
+import { attachmentPreviewLabel } from '../data/chatMedia.js'
 
 // A channel's RENDERING — pinned block, stream of MessageRows (inline
 // threads included), and the composer with its fixture attach and
@@ -28,11 +29,17 @@ import { eventTitle } from '../lib/eventFormat.js'
 // capability can only differ between surfaces if a surface passes a
 // different hook — which is the drift this split forbids.
 //
-// `openThreadId` force-opens one post's inline thread (the ?thread= deep
-// link — the SCREEN owns search params; the dock passes nothing).
+// ⚠️ FLAT SINCE 4 Sep 2026 — claude/decisions/2026-09-04-channel-threads-flat-stream.md.
+// `thread.visible` is the stream (every message in time order, a reply
+// wearing a quote), `thread.focusPost` the fixture filter when the reader
+// asked for one, `thread.replyTo` the post the composer is answering, and
+// `thread.liveFixtures` the fixture posts whose kick-off is still ahead
+// (their cards sit at the top until then). The ?thread= deep link is the
+// hook's business now (its `threadParam`), so this component takes no
+// `openThreadId` — the prop that used to force-open a folded thread.
 // `compact` is a DISPLAY hint for the dock: it may tighten spacing, never
 // remove a menu item or capability (spec decision 3).
-export default function ChannelThread({ thread, compact = false, openThreadId = null }) {
+export default function ChannelThread({ thread, compact = false }) {
   const {
     selfId,
     isClub,
@@ -68,6 +75,9 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
     node.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
     setJumpedTo(hash)
   }, [messages, jumpedTo])
+
+  // The stream the reader sees — filtered to one fixture when asked.
+  const stream = thread.visible ?? messages
 
   // Poll create sheet, and the "View votes" sheet (which poll's votes to show).
   const [pollOpen, setPollOpen] = useState(false)
@@ -111,6 +121,45 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           }
         />
       )}
+      {/* ── Live fixtures (idea 4, Jay, 4 Sep 2026) ────────────────────── */}
+      {/* A fixture whose kick-off is still ahead keeps its card here until
+          then, so the thing people are replying to stays in view however
+          far the chat has moved on. One tap filters to its chat. Hidden
+          while a filter is on — the filtered view already leads with the
+          card. */}
+      {!thread.focusPost && (thread.liveFixtures ?? []).length > 0 && (
+        <div className="mb-3" data-testid="live-fixtures">
+          {thread.liveFixtures.map((m) => (
+            <div key={`live-${m.id}`} className="mb-2">
+              <FixtureCard event={m.event} tally={tallies.get(m.event_id)} />
+              <button
+                type="button"
+                data-testid="focus-fixture"
+                onClick={() => thread.setFocusId(m.id)}
+                className="mt-1 min-h-[32px] px-1 text-[12px] font-bold text-brand-ink"
+              >
+                Show only this fixture’s chat
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── The fixture filter bar (idea 2) ───────────────────────────── */}
+      {/* Nothing is hidden unless the reader asked, and the way back is
+          always on screen. This is the whole difference from the fold that
+          confused Jay on 4 Sep. */}
+      {thread.focusPost && (
+        <div className="mb-2 flex items-center gap-2 rounded-[10px] border-l-2 border-brand bg-surface-mute px-2.5 py-1.5" data-testid="focus-bar" role="status">
+          <p className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-ink">
+            Showing {thread.focusPost.event ? eventTitle(thread.focusPost.event) : 'one thread'}
+          </p>
+          <Button size="sm" variant="ghost" onClick={() => thread.setFocusId(null)}>
+            Show everything
+          </Button>
+        </div>
+      )}
+
       {/* Same paint site as the DM thread: the stream wrapper carries
           data-background (what the tests read), and the photo rides the
           sticky viewport-height layer inside it — NOT the wrapper itself,
@@ -124,9 +173,14 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-clip rounded-[12px]">
         <div data-testid="chat-wallpaper" className="sticky top-0 h-dvh w-full" style={backgroundStyle(background) ?? undefined} />
       </div>
-      {messages?.map((m, index) => (
+      {/* ⚠️ TOMBSTONE, 4 Sep 2026. For a few hours (#692) a block here
+          force-opened a post whose folded thread held an unread reply. The
+          fold itself went the same day — see the decision record — so there
+          is nothing to open. `stream` is thread.visible: the whole channel,
+          or one fixture's messages when the reader asked. */}
+      {stream?.map((m, index) => (
         <Fragment key={m.id}>
-        {daysDiffer(messages[index - 1]?.created_at, m.created_at) && (
+        {daysDiffer(stream[index - 1]?.created_at, m.created_at) && (
           <div className="my-1.5 flex justify-center" data-testid="day-divider" role="separator">
             <span className="rounded-pill bg-surface-mute px-2.5 py-0.5 text-[11px] font-bold text-ink-muted shadow-card">
               {dayLabel(m.created_at)}
@@ -149,9 +203,8 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
           readStat={canModerate ? stats.get(m.id) : undefined}
           unread={!(openReadsRef.current ?? reads).has(m.id)}
           tally={m.event_id ? tallies.get(m.event_id) : undefined}
-          mentionables={mentionables}
-          forceOpen={openThreadId === m.id}
           onReply={thread.onReply}
+          onFocus={thread.setFocusId}
           announceOnly={Boolean(announceOnly && !mayPost)}
           onRemove={thread.onRemove}
           onEdit={thread.onEdit}
@@ -202,6 +255,33 @@ export default function ChannelThread({ thread, compact = false, openThreadId = 
         )}
         {thread.composerOpen ? (
           <>
+            {/* Replying: the same quote preview the DM composer shows (4 Sep
+                2026). Cancel drops the quote; under announce-only that also
+                re-locks the composer, since the reply was what opened it. */}
+            {thread.replyTo && (
+              <div className="mb-1.5 flex items-center gap-2 rounded-[10px] border-l-2 border-brand bg-surface-mute px-2.5 py-1.5" data-testid="quote-preview">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-extrabold text-brand-ink">
+                    Replying to {thread.replyTo.author_id === selfId ? 'yourself' : thread.replyTo.author?.full_name ?? 'Member'}
+                  </p>
+                  <p className="truncate text-[12px] text-ink-muted">
+                    {thread.replyTo.event
+                      ? eventTitle(thread.replyTo.event)
+                      : thread.replyTo.body?.trim()
+                        ? thread.replyTo.body
+                        : attachmentPreviewLabel(thread.replyTo.attachment_path, thread.replyTo.attachments?.length)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Cancel reply"
+                  onClick={() => thread.setReplyTo(null)}
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+                </button>
+              </div>
+            )}
             <AttachmentTray items={thread.tray.items} onRemove={thread.tray.remove} error={thread.tray.error} />
             <form onSubmit={thread.send} className="relative flex items-end gap-2" data-testid="composer">
               <MentionPicker

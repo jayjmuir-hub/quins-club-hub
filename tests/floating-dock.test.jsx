@@ -430,11 +430,14 @@ describe('the dock chevron menu — full parity for DMs and groups', () => {
       expect(screen.getByRole('menuitem', { name: label })).toBeInTheDocument()
     }
     expect(screen.queryByRole('menuitem', { name: 'More in full view' })).toBeNull()
-    // Reply opens the INLINE thread with its composer — full-view furniture
-    // no longer: it lives in the dock.
+    // Reply arms the quote above the dock's composer (flat stream, 4 Sep
+    // 2026) and the send goes through replyToMessage with the parent id.
     await user.click(screen.getByRole('menuitem', { name: 'Reply' }))
-    await user.type(screen.getByLabelText('Reply'), 'Zz got it, thanks')
+    expect(screen.getByTestId('quote-preview')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Message'), 'Zz got it, thanks')
     await user.click(screen.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(m.replyToMessage).toHaveBeenCalledWith('s1', 'Zz got it, thanks', { mentions: [] }))
+    await waitFor(() =>
+      expect(m.replyToMessage).toHaveBeenCalledWith('s1', 'Zz got it, thanks', expect.objectContaining({ mentions: [] })),
+    )
   })
 })

@@ -191,10 +191,13 @@ describe('Chat — announce-only', () => {
 
     await user.click(screen.getByRole('button', { name: 'Message options' }))
     await user.click(screen.getByRole('menuitem', { name: 'Reply' }))
-    await user.type(screen.getByLabelText('Reply'), 'Is there a bus?')
+    // Flat stream (4 Sep 2026): Reply arms a quote above the FOOT composer,
+    // and that unlocks it for this one reply even under announce-only.
+    expect(screen.getByTestId('quote-preview')).toHaveTextContent('Zz Coach Probe')
+    await user.type(screen.getByLabelText('Message'), 'Is there a bus?')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(replyToMessageMock).toHaveBeenCalledWith('msg-1', 'Is there a bus?', { mentions: [] })
+    expect(replyToMessageMock).toHaveBeenCalledWith('msg-1', 'Is there a bus?', expect.objectContaining({ mentions: [] }))
   })
 
   it('⚠️ shows a visible Reply under an unanswered post while announce-only is on', async () => {
@@ -209,9 +212,12 @@ describe('Chat — announce-only', () => {
     expect(reply).toHaveTextContent('Reply')
     expect(reply.className.split(/\s+/)).toContain('min-h-[44px]')
     await user.click(reply)
-    expect(screen.getByLabelText('Reply')).toBeInTheDocument()
-    // Once open, the affordance has done its job and goes.
-    expect(screen.queryByTestId('reply-affordance')).toBeNull()
+    // 4 Sep 2026: the affordance arms the quote above the foot composer and
+    // unlocks it. It stays on the post — under announce-only it is the door
+    // to answering ANY post, so it never had a reason to disappear.
+    expect(screen.getByTestId('quote-preview')).toHaveTextContent('Zz Coach Probe')
+    expect(screen.getByLabelText('Message')).toBeInTheDocument()
+    expect(screen.getByTestId('reply-affordance')).toBeInTheDocument()
   })
 
   it('shows no Reply affordance when announce-only is off — the composer is the route', async () => {
@@ -381,10 +387,20 @@ describe('Chat — fixture threads', () => {
     expect(options.some((t) => t.includes('Eagles'))).toBe(false)
   })
 
-  it('?event= opens the existing thread for that fixture', async () => {
-    listMessagesMock.mockResolvedValue([post({ event_id: 'ev-1', event: FIXTURE, replies: [post({ id: 'r1', parent_id: 'msg-1', body: 'Two seats please' })] })])
+  it('?event= opens the existing thread for that fixture — the FILTERED view, with the reply and without the rest', async () => {
+    // Flat stream (4 Sep 2026): the reply is a row of its own wearing a quote,
+    // and "the thread" is a filter — the fixture post and its replies, a bar
+    // saying so, and the unrelated post left out until "Show everything".
+    const fixturePost = post({ event_id: 'ev-1', event: FIXTURE, body: '' })
+    listMessagesMock.mockResolvedValue([
+      fixturePost,
+      post({ id: 'other', body: 'Unrelated chatter', created_at: '2026-08-23T08:30:00Z' }),
+      post({ id: 'r1', parent_id: 'msg-1', parent: fixturePost, body: 'Two seats please', author_id: 'parent-1', created_at: '2026-08-23T09:00:00Z' }),
+    ])
     renderAt('/chat/team-a?event=ev-1')
     expect(await screen.findByText('Two seats please')).toBeInTheDocument()
+    expect(await screen.findByTestId('focus-bar')).toBeInTheDocument()
+    expect(screen.queryByText('Unrelated chatter')).toBeNull()
   })
 
   it('?event= with no thread yet preselects the fixture in the composer', async () => {
@@ -395,10 +411,22 @@ describe('Chat — fixture threads', () => {
     expect(screen.getByRole('button', { name: 'Start thread' })).toBeInTheDocument()
   })
 
-  it('?thread= opens that thread on arrival', async () => {
-    listMessagesMock.mockResolvedValue([post({ replies: [post({ id: 'r1', parent_id: 'msg-1', body: 'Hidden until opened' })] })])
+  it('?thread= filters to that post and its replies on arrival, and Show everything lifts it', async () => {
+    const user = userEvent.setup()
+    const head = post()
+    listMessagesMock.mockResolvedValue([
+      head,
+      post({ id: 'other', body: 'Unrelated chatter', created_at: '2026-08-23T08:30:00Z' }),
+      post({ id: 'r1', parent_id: 'msg-1', parent: head, body: 'The answer', author_id: 'parent-1', created_at: '2026-08-23T09:00:00Z' }),
+    ])
     renderAt('/chat/team-a?thread=msg-1')
-    expect(await screen.findByText('Hidden until opened')).toBeInTheDocument()
+    expect(await screen.findByText('The answer')).toBeInTheDocument()
+    expect(screen.queryByText('Unrelated chatter')).toBeNull()
+    // The reply wears its quote — who and what it answers.
+    expect(screen.getByTestId('quote-block')).toHaveTextContent('Training moves to pitch 3.')
+    await user.click(screen.getByRole('button', { name: 'Show everything' }))
+    expect(screen.getByText('Unrelated chatter')).toBeInTheDocument()
+    expect(screen.queryByTestId('focus-bar')).toBeNull()
   })
 })
 
@@ -417,10 +445,10 @@ describe('Chat — @mentions', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Reply' }))
     await user.click(screen.getByRole('button', { name: 'Mention someone' }))
     await user.click(screen.getByRole('option', { name: /Zz Coach Probe/ }))
-    await user.type(screen.getByLabelText('Reply'), 'can we bring two extra?')
+    await user.type(screen.getByLabelText('Message'), 'can we bring two extra?')
     await user.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(replyToMessageMock).toHaveBeenCalledWith('msg-1', '@Zz Coach Probe can we bring two extra?', { mentions: ['coach-1'] })
+    expect(replyToMessageMock).toHaveBeenCalledWith('msg-1', '@Zz Coach Probe can we bring two extra?', expect.objectContaining({ mentions: ['coach-1'] }))
   })
 
   it('drops the mention if the @Name is deleted from the text', async () => {

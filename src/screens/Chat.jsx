@@ -57,7 +57,9 @@ export default function Chat() {
   const { teamId: param } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const wantStaff = searchParams.get('channel') === 'staff'
-  const thread = useChannelThread({ param, wantStaff })
+  // ?thread=<postId> (the event screen's "Open the thread") is the hook's
+  // fixture FILTER since 4 Sep 2026 — see useChannelThread's focusId.
+  const thread = useChannelThread({ param, wantStaff, threadParam: searchParams.get('thread') })
   const {
     isClub,
     roleKey,
@@ -83,7 +85,6 @@ export default function Chat() {
   const { memberships } = useMemberships()
   const canSeat = isSuperAdmin(memberships)
   const clubId = memberships?.find((m) => m.club_id)?.club_id ?? null
-  const threadParam = searchParams.get('thread')
   const eventParam = searchParams.get('event')
 
   // ?event= — the event screen sent us here. If the fixture already has a
@@ -234,7 +235,7 @@ export default function Chat() {
         </p>
       )}
 
-      <ChannelThread thread={thread} openThreadId={threadParam} />
+      <ChannelThread thread={thread} />
     </section>
   )
 }

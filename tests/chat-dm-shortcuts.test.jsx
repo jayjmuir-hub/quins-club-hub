@@ -82,26 +82,23 @@ describe('the author name opens a chat', () => {
   it('is a button carrying the author id, on message AND reply', async () => {
     const user = userEvent.setup()
     const onAuthor = vi.fn()
+    // Flat stream since 4 Sep 2026: a reply is its own row, wearing a quote.
+    const reply = {
+      ...BASE,
+      id: 'r-1',
+      parent_id: BASE.id,
+      parent: BASE,
+      author_id: 'parent-2',
+      author_role: 'parent',
+      author: { full_name: 'Zz Parent Probe' },
+      body: 'Noted, thanks',
+      created_at: '2026-08-24T08:05:00Z',
+    }
     render(
-      <MessageRow
-        message={{
-          ...BASE,
-          replies: [
-            {
-              id: 'r-1',
-              author_id: 'parent-2',
-              author_role: 'parent',
-              author: { full_name: 'Zz Parent Probe' },
-              body: 'Noted, thanks',
-              created_at: '2026-08-24T08:05:00Z',
-              deleted_at: null,
-            },
-          ],
-        }}
-        selfId="me-1"
-        onAuthor={onAuthor}
-        forceOpen
-      />,
+      <>
+        <MessageRow message={BASE} selfId="me-1" onAuthor={onAuthor} />
+        <MessageRow message={reply} selfId="me-1" onAuthor={onAuthor} />
+      </>,
     )
     const buttons = screen.getAllByTestId('author-chat')
     expect(buttons).toHaveLength(2)

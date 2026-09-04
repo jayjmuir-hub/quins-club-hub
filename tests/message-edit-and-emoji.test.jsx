@@ -184,23 +184,21 @@ describe('MessageRow — Reply privately on a nested reply', () => {
       deleted_at: null,
       created_at: '2026-08-30T10:00:00Z',
       author: { full_name: 'Me' },
-      replies: [theirReply],
     }
     const onReplyPrivately = vi.fn()
+    // Flat stream since 4 Sep 2026: the reply is its own row under the post.
     render(
-      <MessageRow
-        message={message}
-        selfId="me"
-        forceOpen
-        onRemove={vi.fn()}
-        onReplyPrivately={onReplyPrivately}
-      />,
+      <>
+        <MessageRow message={message} selfId="me" onRemove={vi.fn()} onReplyPrivately={onReplyPrivately} />
+        <MessageRow message={{ ...theirReply, parent_id: message.id, parent: message }} selfId="me" onRemove={vi.fn()} onReplyPrivately={onReplyPrivately} />
+      </>,
     )
     // Two chevrons: the post's and the reply's. The reply's is the second.
     const menus = await screen.findAllByRole('button', { name: 'Message options' })
     await userEvent.click(menus[1])
     await userEvent.click(screen.getByRole('menuitem', { name: 'Reply privately' }))
-    expect(onReplyPrivately).toHaveBeenCalledWith(theirReply)
+    // The row hands over the reply as it holds it — with its parent link.
+    expect(onReplyPrivately).toHaveBeenCalledWith(expect.objectContaining({ id: theirReply.id, author_id: theirReply.author_id }))
   })
 
   it('never on my own reply — there is nobody to go private with', async () => {
@@ -222,9 +220,13 @@ describe('MessageRow — Reply privately on a nested reply', () => {
       deleted_at: null,
       created_at: '2026-08-30T10:00:00Z',
       author: { full_name: 'Them' },
-      replies: [mineReply],
     }
-    render(<MessageRow message={message} selfId="me" forceOpen onRemove={vi.fn()} onEdit={vi.fn()} onReplyPrivately={vi.fn()} />)
+    render(
+      <>
+        <MessageRow message={message} selfId="me" onRemove={vi.fn()} onEdit={vi.fn()} onReplyPrivately={vi.fn()} />
+        <MessageRow message={{ ...mineReply, parent_id: message.id, parent: message }} selfId="me" onRemove={vi.fn()} onEdit={vi.fn()} onReplyPrivately={vi.fn()} />
+      </>,
+    )
     const menus = await screen.findAllByRole('button', { name: 'Message options' })
     await userEvent.click(menus[1])
     expect(screen.queryByRole('menuitem', { name: 'Reply privately' })).toBeNull()
