@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #694 — 🏷️ **The staff pill names the squad in club-wide channels, and never wraps mid-word.**
+  `db/migrations/20260908_message_author_team.sql` adds `messages.author_team_id`, stamped by
+  the provenance trigger from the membership behind the role (staff only, backfilled);
+  `MessageRow` reads "U11 Mixed · Team Manager" where `team_id` is null. The harness
+  caught three real bugs in the first draft — `claude/schema-history.md`. Rot detectors:
+  `db/tests/message-author-team.sql`, `tests/role-pill-squad.test.jsx`.
 - #693 — 💬 **Channel chat is a flat stream: a reply is a message with a quote.**
   Jay's ruling after the morning's fold bug: WhatsApp, not threads. The three
   channel loaders in `src/data/messages.js` are one query each, every message

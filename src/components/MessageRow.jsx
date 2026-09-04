@@ -39,10 +39,24 @@ export function isStaffRole(role) {
   return STAFF_ROLES.has(role)
 }
 
-function RolePill({ role, title }) {
+/**
+ * The staff pill. 4 Sep 2026, Jay, from a screenshot of the managers channel:
+ * (1) the pill broke across two lines mid-word — whitespace-nowrap and
+ * inline-block, so it moves to the next line WHOLE when the name is long;
+ * (2) in a club-wide channel it should say which squad — "U11 Mixed · Team
+ * Manager". `squad` is messages.author_team (the squad behind the role, stamped
+ * by the provenance trigger since db/migrations/20260908_message_author_team.sql).
+ * The caller passes it only where it tells the reader something: a squad's own
+ * chat already says U11 in its header, so there the pill stays as it was.
+ */
+export function RolePill({ role, title, squad = null }) {
+  const label = title || labelForRole(role) || role
   return (
-    <span className="ml-1 rounded-[6px] bg-danger-bg px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.4px] text-danger-ink">
-      {title || labelForRole(role) || role}
+    <span
+      data-testid="role-pill"
+      className="ml-1 inline-block whitespace-nowrap rounded-[6px] bg-danger-bg px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.4px] text-danger-ink"
+    >
+      {squad ? `${squad} · ${label}` : label}
     </span>
   )
 }
@@ -223,7 +237,16 @@ export default function MessageRow({
             <ProfileIcon emoji={iconFor(message.author_id)} />
           </>
         }
-        authorExtra={staff ? <RolePill role={message.author_role} title={message.author_title} /> : null}
+        authorExtra={
+          staff ? (
+            <RolePill
+              role={message.author_role}
+              title={message.author_title}
+              // Club-wide channels only (team_id null): a squad chat says its squad already.
+              squad={message.team_id ? null : message.author_team?.name ?? null}
+            />
+          ) : null
+        }
         forwarded={Boolean(message.forwarded)}
         deleted={Boolean(message.deleted_at)}
         createdAt={message.created_at}
