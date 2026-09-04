@@ -4816,10 +4816,11 @@ begin
     raise exception 'no club for this message' using errcode = '23502';
   end if;
 
-  -- 20260910: a club officer, in any club-wide channel, wears the officer
-  -- title (Club officers tab) and no squad. Needs club_id, so it sits here.
-  -- Oldest officer row wins for the rare person with two titles.
-  if new.team_id is null and new.channel <> 'dm' and new.author_role in ('admin','coach','manager','medic') then
+  -- 20260910: a club officer wears the officer title (Club officers tab) and
+  -- no squad, in every channel but a DM — Jay's ruling: "everywhere a tag
+  -- shows". Needs club_id, so it sits here. Oldest officer row wins for the
+  -- rare person with two titles.
+  if new.channel <> 'dm' and new.author_role in ('admin','coach','manager','medic') then
     select o.title into officer_title
       from club_officers o
      where o.profile_id = new.author_id and o.club_id = new.club_id

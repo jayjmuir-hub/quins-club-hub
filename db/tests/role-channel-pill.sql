@@ -22,8 +22,8 @@
 --     managers channel as her officer title with NO squad — the officer
 --     title outranks the channel's role
 --  7. her pre-migration managers post is backfilled the same way
---  8. CONTROL: in the squad chat the officer rule does not apply and the
---     order is untouched — she reads plain admin there, as before
+--  8. and in the SQUAD chat too — "everywhere a tag shows" (Jay): the
+--     officer title, no squad, even where her manager row is for that squad
 begin;
 
 create temporary table _log(seq serial, line text) on commit drop;
@@ -205,10 +205,11 @@ begin
     raise exception 'no club for this message' using errcode = '23502';
   end if;
 
-  -- 20260910: a club officer, in any club-wide channel, wears the officer
-  -- title (Club officers tab) and no squad. Needs club_id, so it sits here.
-  -- Oldest officer row wins for the rare person with two titles.
-  if new.team_id is null and new.channel <> 'dm' and new.author_role in ('admin','coach','manager','medic') then
+  -- 20260910: a club officer wears the officer title (Club officers tab) and
+  -- no squad, in every channel but a DM — Jay's ruling: "everywhere a tag
+  -- shows". Needs club_id, so it sits here. Oldest officer row wins for the
+  -- rare person with two titles.
+  if new.channel <> 'dm' and new.author_role in ('admin','coach','manager','medic') then
     select o.title into officer_title
       from club_officers o
      where o.profile_id = new.author_id and o.club_id = new.club_id
@@ -265,14 +266,14 @@ update public.messages x
                   and ((x.channel = 'managers'    and m.role = 'manager')
                     or (x.channel = 'headcoaches' and m.role = 'coach' and m.is_head_coach)
                     or (x.channel = 'medics'      and m.role = 'medic')));
--- Officers: every club-wide, non-DM staff message by a club officer wears
--- the officer title and no squad. Same trigger caveat, same transaction.
+-- Officers: every non-DM staff message by a club officer wears the officer
+-- title and no squad. Same trigger caveat, same transaction.
 update public.messages x
    set author_title = o.title, author_team_id = null
   from (select distinct on (profile_id, club_id) profile_id, club_id, title
           from public.club_officers order by profile_id, club_id, created_at) o
  where o.profile_id = x.author_id and o.club_id = x.club_id
-   and x.team_id is null and x.channel <> 'dm'
+   and x.channel <> 'dm'
    and x.author_role in ('admin','coach','manager','medic')
    and (x.author_title is distinct from o.title or x.author_team_id is not null);
 alter table public.messages enable trigger messages_touch;
@@ -368,10 +369,10 @@ insert into messages (club_id, team_id, channel, body) values ('f0000000-0000-40
 reset role;
 do $a$
 begin
-  if pg_temp.pill('zz chanpill officer squad') <> 'admin/-/-' then
-    raise exception 'ASSERT 8 FAILED: in the squad chat the officer title must not apply (admin row, no title), got %', pg_temp.pill('zz chanpill officer squad');
+  if pg_temp.pill('zz chanpill officer squad') <> 'admin/Rugby Junior Manager/-' then
+    raise exception 'ASSERT 8 FAILED: in the squad chat the officer title applies too, got %', pg_temp.pill('zz chanpill officer squad');
   end if;
-  insert into _log(line) values ('8 control: in the squad chat the officer reads admin with no title — the officer rule is club-wide only');
+  insert into _log(line) values ('8 squad chat: the officer reads Rugby Junior Manager there too — everywhere a tag shows');
 end $a$;
 
 select line from _log order by seq;

@@ -1244,11 +1244,13 @@ role-specific and are left alone.
 
 **And a club officer outranks both, club-wide.** Same day, Jay: "why is [the
 junior manager] not tagged as the Club Junior Manager?" Her admin row has no
-title; the title lives in `club_officers`, which the pill never read. In any
-club-wide channel (`team_id` null, not a DM) a staff author who is a club
-officer wears the officer title and no squad — oldest officer row wins for the
-rare person with two. In a squad's own chat nothing changes: there she is
-whoever her membership on that squad says. Backfilled the same way.
+title; the title lives in `club_officers`, which the pill never read. Then the
+ruling widened: "[she] should always show her Club Junior Manager tag everywhere
+a tag shows". So in EVERY channel but a DM (which has no pill) — squad and
+staff chats included — a staff author who is a club officer wears the officer
+title and no squad; oldest officer row wins for the rare person with two. The
+person card already led with officer titles (`identityBadges`), so chat was the
+one surface missing. Backfilled the same way.
 
 **Argument against, recorded.** A person's pill now differs between channels.
 That is the point — the pill answers "why are you in this room" — but a
@@ -1264,4 +1266,4 @@ Manager/U11; the old one is backfilled; her squad-chat post still reads admin;
 a plain admin in the managers channel still reads admin; a backfill with its
 channel list broken restores nothing; an admin-manager who is a club officer
 reads the officer title with no squad in the managers channel, old post
-backfilled, and plain admin in her squad chat (control).
+backfilled, and the officer title in her squad chat too.
