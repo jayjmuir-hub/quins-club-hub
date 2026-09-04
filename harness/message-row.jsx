@@ -101,17 +101,21 @@ const ROWS = [
 ]
 
 const TALLIES = new Map([['ev-1', { in: 19, maybe: 3, out: 2 }]])
-const PEOPLE = [
-  { profile_id: 'u-coach', full_name: 'Priya Raghunathan', role: 'manager' },
-  { profile_id: 'u-hc', full_name: 'Tom Achterberg', role: 'coach' },
-  { profile_id: 'u-p2', full_name: 'Leo Marchetti', role: 'parent' },
-]
 
 const STATS = new Map([
   ['m0', { reads: 14, audience: 27 }],
   ['m1', { reads: 22, audience: 27 }],
   ['m4', { reads: 9, audience: 27 }],
 ])
+
+// Flat stream since 4 Sep 2026 (claude/decisions/2026-09-04-channel-threads-
+// flat-stream.md): a reply is a row of its own at its own time, wearing a
+// quote of its parent. The scenario keeps its nested shape above because it
+// reads well; this is the stream the screen actually draws.
+const STREAM = ROWS.flatMap((m) => {
+  const { replies = [], ...post } = m
+  return [post, ...replies.map((r) => ({ ...r, parent: post }))]
+}).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
 
 export default function MessageRowScenario() {
   const noop = async () => {}
@@ -120,7 +124,7 @@ export default function MessageRowScenario() {
   return (
     <MemoryRouter>
     <div className="mx-auto max-w-[640px] px-3 py-4">
-      {ROWS.map((m) => (
+      {STREAM.map((m) => (
         <MessageRow
           key={m.id}
           message={m}
@@ -129,8 +133,7 @@ export default function MessageRowScenario() {
           readStat={STATS.get(m.id)}
           unread={m.id === 'm4'}
           tally={m.event_id ? TALLIES.get(m.event_id) : undefined}
-          mentionables={PEOPLE}
-          forceOpen={m.id === 'm0'}
+          onFocus={noop}
           onReply={noop}
           onRemove={noop}
           onPin={noop}

@@ -46,50 +46,50 @@ beforeEach(() => {
   supabase.channel.mockReset()
 })
 
-describe('listMessages', () => {
-  it('reads the last N posts for a squad, then their replies, and returns oldest-first with replies attached', async () => {
-    const heads = builder({
+describe('listMessages — one flat query since 4 Sep 2026', () => {
+  // claude/decisions/2026-09-04-channel-threads-flat-stream.md: a channel is
+  // one stream, replies included, each reply carrying `parent` for its quote.
+  // Until 4 Sep the loader read the top-level posts and then their replies in
+  // a second query, nested as `replies: [...]` — the fold Jay could not find
+  // a reply behind. The DISCRIMINATING assertions: no parent_id filter, one
+  // query, and a reply row survives at its own place in time order.
+  it('reads the last N messages of the squad channel, replies included, oldest-first', async () => {
+    const q = builder({
       data: [
-        { id: 'p2', created_at: '2026-08-23T09:00:00Z' },
-        { id: 'p1', created_at: '2026-08-23T08:00:00Z' },
+        { id: 'r1', parent_id: 'p1', created_at: '2026-08-23T09:30:00Z', parent: { id: 'p1' } },
+        { id: 'p2', parent_id: null, created_at: '2026-08-23T09:00:00Z' },
+        { id: 'p1', parent_id: null, created_at: '2026-08-23T08:00:00Z' },
       ],
       error: null,
     })
-    const replies = builder({
-      data: [
-        { id: 'r1', parent_id: 'p1', created_at: '2026-08-23T08:10:00Z' },
-        { id: 'r2', parent_id: 'p1', created_at: '2026-08-23T08:20:00Z' },
-      ],
-      error: null,
-    })
-    supabase.from.mockReturnValueOnce(heads.b).mockReturnValueOnce(replies.b)
+    supabase.from.mockReturnValueOnce(q.b)
 
     const rows = await listMessages('team-a', { limit: 20 })
 
-    expect(heads.calls.is[0]).toEqual(['parent_id', null])
-    expect(heads.calls.eq).toEqual([['channel', 'squad'], ['team_id', 'team-a']])
-    expect(heads.calls.order[0]).toEqual(['created_at', { ascending: false }])
-    expect(heads.calls.limit[0]).toEqual([20])
-    expect(replies.calls.in[0]).toEqual(['parent_id', ['p2', 'p1']])
+    expect(q.calls.is ?? []).not.toContainEqual(['parent_id', null])
+    expect(q.calls.eq).toEqual([['channel', 'squad'], ['team_id', 'team-a']])
+    expect(q.calls.order[0]).toEqual(['created_at', { ascending: false }])
+    expect(q.calls.limit[0]).toEqual([20])
+    expect(supabase.from).toHaveBeenCalledTimes(1)
 
-    expect(rows.map((r) => r.id)).toEqual(['p1', 'p2'])
-    expect(rows[0].replies.map((r) => r.id)).toEqual(['r1', 'r2'])
-    expect(rows[1].replies).toEqual([])
+    expect(rows.map((r) => r.id)).toEqual(['p1', 'p2', 'r1'])
+    expect(rows[2].parent).toEqual({ id: 'p1' })
+    expect(rows[0]).not.toHaveProperty('replies')
   })
 
   it('reads the club-wide channel with team_id IS NULL, not eq', async () => {
-    const heads = builder({ data: [], error: null })
-    supabase.from.mockReturnValueOnce(heads.b)
+    const q = builder({ data: [], error: null })
+    supabase.from.mockReturnValueOnce(q.b)
 
     await listMessages(null)
 
-    expect(heads.calls.is).toEqual([['parent_id', null], ['team_id', null]])
+    expect(q.calls.is).toEqual([['team_id', null]])
     // ⚠️ AND ONLY THE SQUAD CHANNEL. A DM also has team_id null; without this
     // filter a member's own DMs appeared in Whole-club chat (23 Aug 2026).
-    expect(heads.calls.eq).toEqual([['channel', 'squad']])
+    expect(q.calls.eq).toEqual([['channel', 'squad']])
   })
 
-  it('skips the reply query when there are no posts', async () => {
+  it('an empty channel is an empty array, from the one query', async () => {
     supabase.from.mockReturnValueOnce(builder({ data: [], error: null }).b)
     expect(await listMessages('team-a')).toEqual([])
     expect(supabase.from).toHaveBeenCalledTimes(1)

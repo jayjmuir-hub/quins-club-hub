@@ -70,7 +70,7 @@ export function tallyByEvent(rows) {
 // `openDm(conversationId, { replyTo })` — the same surface seam as
 // useDmThread: the screen navigates, the dock swaps its own panel.
 // `scrollRef` points pin-to-bottom at the dock's panel instead of the page.
-export default function useChannelThread({ param, wantStaff = false }, { openDm, scrollRef } = {}) {
+export default function useChannelThread({ param, wantStaff = false, threadParam = null }, { openDm, scrollRef } = {}) {
   const navigate = useNavigate()
   const { memberships, teams } = useMemberships()
   const { user } = useAuth()
@@ -121,6 +121,21 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   // thread's newFromRef (24 Aug feedback: "mark for new messages").
   const newFromRef = useRef(undefined)
   const openReadsRef = useRef(null)
+  // 4 Sep 2026 — the flat stream (claude/decisions/2026-09-04-channel-threads-
+  // flat-stream.md). A reply is a message at the foot with a quote, so the
+  // composer needs to know what it is answering: `replyTo` is that post, armed
+  // by Reply in a bubble's menu and shown as the quote preview above the
+  // composer, exactly as the DM thread does it. `focusId` is the fixture
+  // FILTER — tap a fixture card (or a quote of it) and the stream shows only
+  // that post and its replies, with a bar saying so and the way back. It is a
+  // filter, never a fold: nothing is hidden unless the reader asked.
+  const [replyTo, setReplyTo] = useState(null)
+  const [focusId, setFocusId] = useState(null)
+  // The ?thread=<postId> deep link (the event screen's "N replies · Open the
+  // thread") lands in the filtered view of that fixture.
+  useEffect(() => {
+    if (threadParam) setFocusId(threadParam)
+  }, [threadParam])
   const draftRef = useRef(null)
   const fileRef = useRef(null)
 
@@ -168,12 +183,8 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       ])
       if (newFromRef.current === undefined) {
         openReadsRef.current = mine
-        const first = rows.find(
-          (row) =>
-            !row.deleted_at &&
-            ((row.author_id !== selfId && !mine.has(row.id)) ||
-              (row.replies ?? []).some((r) => !r.deleted_at && r.author_id !== selfId && !mine.has(r.id))),
-        )
+        // Flat since 4 Sep 2026: every row is a message in its own right.
+        const first = rows.find((row) => !row.deleted_at && row.author_id !== selfId && !mine.has(row.id))
         newFromRef.current = first?.id ?? null
       }
       setMessages(rows)
@@ -181,14 +192,14 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       setSettings(channel)
       // Reactions are decoration: a stream without them is still a stream.
       try {
-        const ids = rows.flatMap((m) => [m.id, ...(m.replies ?? []).map((r) => r.id)])
+        const ids = rows.map((m) => m.id)
         setReactions(await listReactions(ids))
       } catch {
         setReactions(new Map())
       }
       // Polls, the same way — a failure leaves the question text standing.
       try {
-        const ids = rows.flatMap((m) => [m.id, ...(m.replies ?? []).map((r) => r.id)])
+        const ids = rows.map((m) => m.id)
         setPolls(await listPollsFor(ids))
       } catch {
         setPolls(new Map())
@@ -247,7 +258,6 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   useEffect(() => {
     if (!messages || !selfId) return
     const unseen = messages
-      .flatMap((m) => [m, ...(m.replies ?? [])])
       .filter((m) => !m.deleted_at && !reads.has(m.id) && m.author_id !== selfId)
       .map((m) => m.id)
     if (unseen.length === 0) return
@@ -281,8 +291,21 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
   const attachable = upcoming.filter((e) => !threadedEventIds.has(e.id))
   const attachedEvent = attachEventId ? upcoming.find((e) => e.id === attachEventId) ?? null : null
   // A fixture thread may be opened by anyone in the squad — the composer is
-  // unlocked for it even under announce-only.
-  const composerOpen = mayPost || Boolean(attachEventId)
+  // unlocked for it even under announce-only. So is a REPLY: under announce-
+  // only a parent may answer a post, and since 4 Sep 2026 that answer is
+  // written in this composer, not in a box under the post.
+  const composerOpen = mayPost || Boolean(attachEventId) || Boolean(replyTo)
+  // The fixture filter (4 Sep 2026): the focused post and its replies, or
+  // everything. `focusPost` is what the bar names; a focus on a post that is
+  // not in the stream (a stale link) shows everything and no bar.
+  const focusPost = focusId ? (messages ?? []).find((m) => m.id === focusId) ?? null : null
+  const visible = focusPost ? (messages ?? []).filter((m) => m.id === focusPost.id || m.parent_id === focusPost.id) : messages
+  // Idea 4 (Jay, 4 Sep 2026): a fixture whose kick-off is still ahead keeps
+  // its card at the top of the chat until then, so the thing people are
+  // replying to stays in view. Live posts only; a past fixture scrolls away.
+  const liveFixtures = (messages ?? []).filter(
+    (m) => m.event && !m.deleted_at && !m.parent_id && new Date(m.event.starts_at).getTime() >= Date.now(),
+  )
 
   const onReport = async (id, reason) => {
     await reportMessage(id, reason)
@@ -312,12 +335,16 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
       // ⚠️ uploadAlbum is all-or-nothing: a failure has already taken back
       // anything it managed to upload, so the throw leaves nothing behind.
       const attachments = await uploadAlbum(selfId, tray.items, setProgress)
-      if (roleKey) await postRoleMessage(roleKey, draft, { mentions: kept, attachments })
+      // A reply is a message answering `replyTo` — the parent link is what
+      // draws the quote and what the event screen counts.
+      if (replyTo) await replyToMessage(replyTo.id, draft, { mentions: kept, attachments })
+      else if (roleKey) await postRoleMessage(roleKey, draft, { mentions: kept, attachments })
       else if (staffChannel) await postStaffMessage(teamId, draft, { mentions: kept, attachments })
       else await postMessage(teamId, draft, { eventId: attachEventId || null, mentions: kept, attachments })
       setDraft('')
       setDraftMentions([])
       setAttachEventId('')
+      setReplyTo(null)
       tray.clear()
       await load()
     } catch (err) {
@@ -330,9 +357,13 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     }
   }
 
-  async function onReply(parentId, body, opts) {
-    await replyToMessage(parentId, body, opts)
-    await load()
+  // Reply, from a bubble's menu or the announce-only affordance: arm the
+  // quote and put the cursor in the composer. The send itself is `send`.
+  // (Until 4 Sep 2026 this took (parentId, body, opts) and wrote the reply
+  // from a form under the post; that form is gone with the fold.)
+  function onReply(message) {
+    setReplyTo(message)
+    draftRef.current?.focus?.()
   }
   // Author-only, 15 minutes — the database's rule (private.touch_message).
   // Thrown refusals surface in the editor, in the database's own words.
@@ -408,7 +439,7 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
 
   async function onRemove(id) {
     try {
-      const gone = (messages ?? []).flatMap((m) => [m, ...(m.replies ?? [])]).find((m) => m.id === id)
+      const gone = (messages ?? []).find((m) => m.id === id)
       await removeMessage(id)
       // Own-folder-only storage policy: only the author's delete reaches the
       // object (src/data/chatMedia.js); a moderator's remove orphans it,
@@ -487,6 +518,13 @@ export default function useChannelThread({ param, wantStaff = false }, { openDm,
     attachEventId,
     setAttachEventId,
     composerOpen,
+    replyTo,
+    setReplyTo,
+    focusId,
+    setFocusId,
+    focusPost,
+    visible,
+    liveFixtures,
     error,
     setError,
     sendError,

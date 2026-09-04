@@ -10,11 +10,21 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #693 — 💬 **Channel chat is a flat stream: a reply is a message with a quote.**
+  Jay's ruling after the morning's fold bug: WhatsApp, not threads. The three
+  channel loaders in `src/data/messages.js` are one query each, every message
+  in time order, a reply carrying `parent` for its quote; `MessageRow` draws
+  the quote (a fixture post quotes the fixture) and Reply arms the foot
+  composer; a fixture's thread is a FILTER with a bar and "Show everything",
+  and a live fixture's card stays at the top until kick-off. Supersedes #692.
+  Ruling and the arguments against: `claude/decisions/2026-09-04-channel-threads-flat-stream.md`.
+  Rot detector: `tests/channel-flat-stream.test.jsx`.
 - #692 — 💬 **A channel post holding an unread reply opens its thread on arrival.**
   `my_chats()` previews the newest message reply or not; the thread folded
   replies behind "1 reply", so a Reply to an older post was promised by the
   list and invisible in the chat (live, 4 Sep). `src/components/ChannelThread.jsx`
-  force-opens the thread; rot detector `tests/channel-thread-unread-reply-opens.test.jsx`.
+  force-opens the thread. Superseded the same day by #693, which removed the fold
+  altogether and retired this entry's test; the case now lives in `tests/channel-flat-stream.test.jsx`.
 - #691 — 📝 **Handoff: the senior build.** `claude/handoffs/2026-09-04-senior-build.md` and a seniors paragraph in `claude/state-of-play.md`. Docs only.
 - #690 — ✉️ **Call-up email, the same-day clash note, and the seed guard.**
   `supabase/functions/notify-callup/index.ts` mails the family on an ask
