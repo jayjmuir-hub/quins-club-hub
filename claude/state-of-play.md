@@ -35,7 +35,7 @@ on the three divisions are a default Jay has not confirmed.
 and a per-player season line on the squad page, `/seniors` and the player
 sheet; `claude/plans/2026-09-04-senior-season-stats.md`. The migration is
 APPLIED to live. Still unbuilt from the senior work, in order: standings
-routes 2 and 3, the cross-section roster setting and the all-seniors channel,
+routes 2 and 3 (⚠️ DEFERRED by Jay, 4 Sep 2026 — no AI reader for now and no paste-and-parse either; route 1 stands), the cross-section roster setting and the all-seniors channel,
 union registration numbers. ⚠️ Found while running every harness on 4 Sep and
 chipped rather than fixed: nine functions from #684/#688/#689 still grant
 EXECUTE to anon; four harnesses fail on live for pre-existing reasons; two
