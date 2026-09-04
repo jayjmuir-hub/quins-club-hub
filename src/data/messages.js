@@ -31,9 +31,10 @@ import { subscribeToTable, REALTIME_DEBOUNCE_MS } from './subscribeToTable.js'
 // The embed is read under RLS as the caller — a quote of a message you may
 // not read comes back null, which renders as no quote at all.
 const SELECT = `
-  id, club_id, team_id, channel, parent_id, event_id, author_id, author_role, author_title, body, pinned,
+  id, club_id, team_id, channel, parent_id, event_id, author_id, author_role, author_title, author_team_id, body, pinned,
   mentions, edited_at, deleted_at, created_at, quoted_id, forwarded, attachment_path, attachments,
   author:profiles!messages_author_id_fkey(full_name),
+  author_team:teams!messages_author_team_id_fkey(name),
   quoted:quoted_id(id, body, deleted_at, attachment_path, author_id, author:profiles!messages_author_id_fkey(full_name)),
   event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, ends_at, time_tbd, venue, pitch, team_id),
   parent:parent_id(id, body, deleted_at, attachment_path, author_id, event_id, author:profiles!messages_author_id_fkey(full_name), event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, time_tbd))

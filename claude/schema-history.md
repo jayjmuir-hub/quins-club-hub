@@ -1153,3 +1153,45 @@ membership; unknown name refused 42704; parent claim leaves a parent row and
 the self-claim left NO self-parent row; the wizard intent on an existing name
 claims (+0) while a new name still creates (+1, the control); two live rows with
 one name refused 42710.
+
+## 20260908_message_author_team — the pill says which squad (4 Sep 2026)
+
+**Why.** Jay, from a screenshot of the Age Group Managers channel: a manager's
+bubble wore TEAM MANAGER on two lines and nothing said which squad. In a
+club-wide channel the squad is the one thing the reader wants. The provenance
+trigger already picks the membership whose role and title it stamps; it never
+kept which squad that membership was for.
+
+**What it adds.** `messages.author_team_id`, stamped by `set_message_provenance`
+from the same membership pick — so the squad on the pill is the squad that gave
+the author the role on the pill. Staff roles only; a parent's row is nulled even
+though it has a team. Backfilled from CURRENT memberships (the best the past
+offers). The app embeds it as `author_team` and `MessageRow` shows
+"U11 Mixed · Team Manager" only where `team_id` is null — a squad's own chat
+already says U11 in its header.
+
+**What it changes, and what the harness caught.** Three things a green-looking
+migration would have shipped wrong:
+
+1. **The backfill wrote nothing.** `touch_message` (BEFORE UPDATE) copies every
+   old provenance column over the new row, and it now knows this column, so it
+   reverted the backfill row by row. The migration switches `messages_touch` off
+   for that one statement and on again.
+2. **The membership pick was ordered by the team id's VALUE.** `m.team_id nulls
+   last` sorts by value before the squad-name tie-break ever runs, so a manager
+   on two squads got whichever id was smaller. Now `(m.team_id is null)` — a
+   pre-existing quirk of the trigger, fixed while here. Three staff sit on two or
+   more squads today.
+3. **The column meant two things.** The first draft stamped a parent's squad
+   too. Nulled for non-staff, matching the column comment and the backfill.
+
+Also found: `authenticated` has column-level UPDATE on `messages` (`body`,
+`deleted_at`, `pinned` only), so a client cannot name this column in an update
+at all; table-level SELECT covers reading it.
+
+**Proof.** `db/tests/message-author-team.sql`, seven steps, rolled back against
+production with the migration inlined: trigger stamps a new managers-channel
+post; the two pre-migration posts are backfilled; a parent's reply is null; a
+manager given a second squad whose name sorts first wears that one; a backfill
+with its role filter broken restores 0 and the real one restores 4; an owner
+update that nulls the column is put back by the trigger.

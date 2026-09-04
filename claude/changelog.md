@@ -11,6 +11,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 ## 4 Sep 2026
 
 - #695 — 📊 **Senior season stats.** Scorers on SENIOR match sheets (`match_sheet_scores`, the cards table's twin — the player resolved through the slot, never stored), and a per-player season line — games, starts, bench, tries, conversions, penalties, drop goals, cards — on the squad page, the `/seniors` overview and the player sheet. `senior_season_stats(team, season)` and `_gaps`, security definer, gated on the section INSIDE the function; season 1 Sep–31 Aug in Asia/Dubai. Migration applied to live before the merge. Harness `db/tests/season-stats.sql`, 15 assertions, three injected faults, and it raises on any FAIL row. Jay's ruling: a called-up under-18's record shows to the section. Spec `claude/plans/2026-09-04-senior-season-stats.md`.
+- #694 — 🏷️ **The staff pill names the squad in club-wide channels, and never wraps mid-word.**
+  `db/migrations/20260908_message_author_team.sql` adds `messages.author_team_id`, stamped by
+  the provenance trigger from the membership behind the role (staff only, backfilled);
+  `MessageRow` reads "U11 Mixed · Team Manager" where `team_id` is null. The harness
+  caught three real bugs in the first draft — `claude/schema-history.md`. Rot detectors:
+  `db/tests/message-author-team.sql`, `tests/role-pill-squad.test.jsx`.
 - #693 — 💬 **Channel chat is a flat stream: a reply is a message with a quote.**
   Jay's ruling after the morning's fold bug: WhatsApp, not threads. The three
   channel loaders in `src/data/messages.js` are one query each, every message

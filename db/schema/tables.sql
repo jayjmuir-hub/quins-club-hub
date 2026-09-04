@@ -2127,6 +2127,9 @@ CREATE TABLE public.messages (
   author_id     uuid        NOT NULL,
   author_role   text,
   author_title  text,
+  -- 20260908: the squad behind author_role/author_title (staff only, else
+  -- null), stamped by the same trigger; the pill in a club-wide channel.
+  author_team_id uuid,
   body          text        NOT NULL,
   pinned        boolean     NOT NULL DEFAULT false,
   edited_at     timestamptz,

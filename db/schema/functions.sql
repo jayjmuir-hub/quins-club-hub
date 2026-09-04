@@ -4693,12 +4693,13 @@ $function$
 -- re-verify after the real apply.
 -- ---------------------------------------------------------------------
 -- ⚠️ REPLACED by 20260831_group_chat_mentions (a group keeps member mentions; 1:1 DMs still zeroed) — pg_get_functiondef from live, 31 Aug 2026.
-CREATE OR REPLACE FUNCTION private.set_message_provenance()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
+-- re-captured 4 Sep 2026 from db/migrations/20260908_message_author_team.sql
+create or replace function private.set_message_provenance()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
 declare
   parent public.messages;
   ev public.events;
@@ -4729,9 +4730,6 @@ begin
     new.conversation_id := null;
     new.pinned   := false;
   elsif new.conversation_id is not null then
-    -- The conversation decides everything else. For a DM the pair rule is
-    -- re-checked on EVERY message; for a group, membership is the whole rule
-    -- (24 Aug ruling).
     select * into conv from conversations where id = new.conversation_id;
     if conv.id is null then
       raise exception 'no such conversation' using errcode = 'P0002';
@@ -4754,8 +4752,6 @@ begin
     new.team_id  := null;
     new.event_id := null;
     new.pinned   := false;
-    -- GROUP MENTIONS (31 Aug 2026): a group's mentions survive to the
-    -- keep-filter below; a 1:1 DM's are still zeroed here.
     if conv.kind <> 'group' then
       new.mentions := '{}';
     end if;
@@ -4776,19 +4772,30 @@ begin
     raise exception 'a staff channel belongs to a squad' using errcode = '23514';
   end if;
 
-  -- ROLE CHANNELS: the author's badge comes from their best role ANYWHERE in
-  -- the club — a head coach posting in Club Head Coaches has only a
-  -- team-scoped coach row, which the (team_id = new.team_id) arm below would
-  -- miss for a team-less message.
-  select m.role, m.title into new.author_role, new.author_title
+  -- The author's badge: role, title AND SQUAD (20260908), from one membership.
+  -- ROLE CHANNELS: the best role ANYWHERE in the club — a head coach posting in
+  -- Club Head Coaches has only a team-scoped coach row, which the
+  -- (team_id = new.team_id) arm would miss for a team-less message.
+  -- Deterministic since 20260908: a manager on two squads wears the same one
+  -- every time (squad name, last). Before, the planner chose.
+  select m.role, m.title, m.team_id
+    into new.author_role, new.author_title, new.author_team_id
     from memberships m
+    left join teams t on t.id = m.team_id
    where m.profile_id = new.author_id and m.status = 'active'
      and (m.team_id = new.team_id or m.team_id is null
-          or new.channel in ('headcoaches','managers','medics','welfare','clubstaff'))
+          or new.channel in ('headcoaches','managers','medics','welfare','clubstaff','committee'))
    order by case m.role when 'admin' then 0 when 'coach' then 1 when 'manager' then 2
                         when 'medic' then 3 else 9 end,
-            m.team_id nulls last
+            (m.team_id is null),
+            t.name
    limit 1;
+  -- The squad is for the STAFF pill. A parent's row also has a team, and
+  -- stamping it would make the column mean two things (caught by the
+  -- harness's control, 4 Sep 2026).
+  if new.author_role is null or new.author_role not in ('admin','coach','manager','medic') then
+    new.author_team_id := null;
+  end if;
 
   new.club_id := coalesce(
     conv.club_id,
@@ -4809,11 +4816,9 @@ begin
           where new.channel = 'squad'
          union
          select profile_id from private.staff_audience(new.team_id) where new.channel = 'staff'
-         -- ROLE CHANNELS: the audience is the derived membership.
          union
          select rca.profile_id from private.role_channel_audience(new.channel, new.club_id) rca
-          where new.channel in ('headcoaches','managers','medics','welfare','clubstaff')
-         -- GROUP MENTIONS (31 Aug 2026): a group's audience is its members.
+          where new.channel in ('headcoaches','managers','medics','welfare','clubstaff','committee')
          union
          select gm.profile_id from conversation_members gm
           where new.conversation_id is not null
@@ -4838,12 +4843,13 @@ $function$
 -- ---------------------------------------------------------------------
 -- ⚠️ REPLACED by 20260824_chat_list (the Chats list; delete a message / a chat).
 -- md5 85583086af08f80c49622213bc5baf0c from a rolled-back apply; re-verify after the real one.
-CREATE OR REPLACE FUNCTION private.touch_message()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
+-- re-captured 4 Sep 2026 from db/migrations/20260908_message_author_team.sql
+create or replace function private.touch_message()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
 begin
   new.club_id    := old.club_id;
   new.team_id    := old.team_id;
@@ -4854,6 +4860,7 @@ begin
   new.author_id  := old.author_id;
   new.author_role  := old.author_role;
   new.author_title := old.author_title;
+  new.author_team_id := old.author_team_id;
   new.mentions   := old.mentions;
   new.created_at := old.created_at;
 
