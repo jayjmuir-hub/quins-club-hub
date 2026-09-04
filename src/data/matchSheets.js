@@ -200,8 +200,20 @@ export async function saveMatchSheetCards(matchSheetId, cards) {
 export async function saveMatchSheetScores(matchSheetId, rows) {
   if (!matchSheetId) throw new Error(REFUSED)
 
+  // ⚠️ REJECT NULLISH SLOTS EXPLICITLY, DO NOT `Number.isFinite(Number(row.slot))`.
+  // MatchSheet.jsx's numeric() returns null for a blank picker, and
+  // Number(null) === 0 is FINITE while String(null).trim() is the string
+  // 'null' — so the old filter let a kind-but-no-player row through and it
+  // was inserted as slot 0, failing match_sheet_scores_slot_check (1..22)
+  // AFTER the sheet, slots and cards had already been written. See
+  // tests/season-stats-data.test.js.
   const kept = (rows ?? [])
-    .filter((row) => row?.kind && Number.isFinite(Number(row.slot)) && String(row.slot).trim() !== '')
+    .filter((row) => {
+      if (!row?.kind) return false
+      if (row.slot == null || String(row.slot).trim() === '') return false
+      const slot = Number(row.slot)
+      return Number.isInteger(slot) && slot >= 1 && slot <= 22
+    })
     .map((row) => {
       const qty = Number(row.qty)
       return {

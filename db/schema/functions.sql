@@ -8392,6 +8392,10 @@ AS $function$
    order by p.games desc, coalesce(s.tries, 0) desc, p.full_name;
 $function$;
 
+revoke execute on function public.senior_season_stats(uuid, text) from public;
+grant execute on function public.senior_season_stats(uuid, text) to authenticated;
+revoke execute on function public.senior_season_stats(uuid, text) from anon;
+
 CREATE OR REPLACE FUNCTION public.senior_season_stats_gaps(_team uuid, _season text)
  RETURNS TABLE(played integer, unnamed integer)
  LANGUAGE sql
@@ -8432,3 +8436,7 @@ AS $function$
     from named
   having exists (select 1 from gate);
 $function$;
+
+revoke execute on function public.senior_season_stats_gaps(uuid, text) from public;
+grant execute on function public.senior_season_stats_gaps(uuid, text) to authenticated;
+revoke execute on function public.senior_season_stats_gaps(uuid, text) from anon;

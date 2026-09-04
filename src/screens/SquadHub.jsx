@@ -220,7 +220,11 @@ export default function SquadHub() {
   const [stats, setStats] = useState(null)
   const [gaps, setGaps] = useState({ played: 0, unnamed: 0 })
   useEffect(() => {
-    if (!team?.section) {
+    // ⚠️ mayView TOO, NOT ONLY team?.section — a non-staff visitor to a senior
+    // squad's hub (RLS would refuse the page's own data anyway, canEditTeam
+    // says the same) must not still fire these two RPCs whose result is never
+    // rendered: the !mayView branch below returns before the card does.
+    if (!team?.section || !mayView) {
       setStats(null)
       return undefined
     }
@@ -245,7 +249,7 @@ export default function SquadHub() {
     return () => {
       mounted = false
     }
-  }, [team?.id, team?.section, season])
+  }, [team?.id, team?.section, mayView, season])
 
   // The squads this person could open a hub FOR — drives the no-:teamId
   // redirect/picker and the switcher shown to multi-squad staff and admins.

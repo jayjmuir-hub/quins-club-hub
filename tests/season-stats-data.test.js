@@ -65,4 +65,16 @@ describe('saveMatchSheetScores', () => {
   it('refuses without a sheet id', async () => {
     await expect(saveMatchSheetScores(null, [])).rejects.toThrow()
   })
+
+  it('⚠️ drops a row whose slot is null — what the screen sends for an unpicked player — and one out of range', async () => {
+    await saveMatchSheetScores('ms-1', [
+      { kind: 'tries', slot: null, full_name: '', qty: 1 },
+      { kind: 'tries', slot: 0, full_name: 'Nobody', qty: 1 },
+      { kind: 'tries', slot: 23, full_name: 'Nobody', qty: 1 },
+      { kind: 'penalties', slot: 15, full_name: 'Harness Full Back', qty: 1 },
+    ])
+    expect(insert).toHaveBeenCalledWith([
+      { match_sheet_id: 'ms-1', kind: 'penalties', slot: 15, full_name: 'Harness Full Back', qty: 1 },
+    ])
+  })
 })

@@ -83,6 +83,30 @@ describe('the squad page — season stats', () => {
     expect(seasonStatsMock).not.toHaveBeenCalled()
   })
 
+  // Review finding on Task 7: the effect fired on team?.section alone, before
+  // the mayView guard further down the component — a non-staff visitor to a
+  // senior squad's hub triggered both RPCs even though the !mayView branch
+  // never renders their result. 'player' is not in SQUAD_STAFF_ROLES
+  // (src/lib/scope.js: ['coach', 'manager', 'medic']), so canEditTeam refuses it.
+  it('a non-staff visitor to a senior squad triggers no season-stats RPC', async () => {
+    useMembershipsMock.mockReturnValue({
+      memberships: [{ id: 'm1', role: 'player', status: 'active', team_id: 't-men1', club_id: CLUB }],
+      teams: TEAMS,
+      loading: false,
+    })
+    render(
+      <MemoryRouter initialEntries={['/squad/t-men1']}>
+        <Routes>
+          <Route path="/squad/:teamId" element={<SquadHub />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(/This isn't one of your squads/)).toBeInTheDocument()
+    expect(screen.queryByTestId('season-stats-card')).not.toBeInTheDocument()
+    expect(seasonStatsMock).not.toHaveBeenCalled()
+    expect(seasonStatsGapsMock).not.toHaveBeenCalled()
+  })
+
   // Review finding on Task 7: the effect reset nothing when a senior squad's
   // fetch begins, so a same-mount switch (the multi-squad staff switcher,
   // not an unmount/remount) into a squad whose fetch FAILS left the PREVIOUS
