@@ -5,6 +5,20 @@
 --  SAFE ON PRODUCTION: everything runs inside a transaction that ROLLS BACK.
 -- ══════════════════════════════════════════════════════════════════════════
 --
+-- ⚠️ REPOINTED 4 Sep 2026. `6_admin` used to mean "any active admin", and
+-- `db/migrations/20260904_admin_team_reach.sql` (ruling:
+-- claude/plans/2026-09-03-admin-team-reach.md) ended that — "an admin row
+-- reaches no squad by itself". A BARE admin's `admin_rights` defaults to
+-- `'{}'` (db/schema/tables.sql), so `can_edit_team` now refuses one outright,
+-- lock or no lock: `locked/6_admin` came back `ins=DENIED upd=NO ROWS
+-- del=NO ROWS` — indistinguishable from a correctly-locked parent, which is
+-- not what this row exists to prove. `6_admin` is now given `admin_rights =
+-- {clubadmin}` so it is a *squad-reaching* admin again, the way the ruling
+-- says "clubadmin holders: nothing changes" — and a NEW zero-rights persona,
+-- `8_admin_zero`, is the control that the split itself still holds: refused
+-- on every verb, in the OPEN configuration where a parent would be free, so
+-- the refusal cannot be mistaken for the lock.
+--
 -- ⚠️ REPOINTED 27 Aug 2026. Row 3's DELETE = NO ROWS is NO LONGER the whole
 -- truth: a parent MAY now clear their own child's row (and set/change it), but
 -- only OUTSIDE the self-edit lock window (5 calendar days before a match, 1
@@ -161,7 +175,8 @@ from (values
   ('0a000000-0000-4000-8000-000000000003'::uuid,'m.parent.active@example.invalid','MX Parent Active'),
   ('0a000000-0000-4000-8000-000000000004'::uuid,'m.parent.pending@example.invalid','MX Parent Pending'),
   ('0a000000-0000-4000-8000-000000000005'::uuid,'m.outsider@example.invalid','MX Outsider'),
-  ('0a000000-0000-4000-8000-000000000006'::uuid,'m.admin@example.invalid','MX Admin')
+  ('0a000000-0000-4000-8000-000000000006'::uuid,'m.admin@example.invalid','MX Admin'),
+  ('0a000000-0000-4000-8000-000000000008'::uuid,'m.admin.zero@example.invalid','MX Admin Zero')
 ) as v(id,email,nm);
 
 insert into public.memberships (profile_id, club_id, team_id, role, status)
@@ -174,8 +189,15 @@ insert into public.memberships (profile_id, club_id, team_id, role, player_id, s
 select '0a000000-0000-4000-8000-000000000004', club_id, team_id, 'parent', player_id, 'pending' from fx;
 -- ⚠️ 5_outsider gets NO membership at all, deliberately: the shape of somebody
 -- who has an account and has been approved by nobody.
+-- 6_admin holds 'clubadmin' — a squad-reaching right (private.admin_team_reach
+-- 'edit' arm: clubadmin, youth) — so it stands for "an admin who still edits
+-- this squad", matching the ruling's "clubadmin holders: nothing changes".
+insert into public.memberships (profile_id, club_id, team_id, role, status, admin_rights)
+select '0a000000-0000-4000-8000-000000000006', club_id, null, 'admin','active', array['clubadmin'] from fx;
+-- 8_admin_zero holds NO admin_rights — the default `'{}'` — and is the control
+-- that a bare admin reaches no squad by itself, per the same migration.
 insert into public.memberships (profile_id, club_id, team_id, role, status)
-select '0a000000-0000-4000-8000-000000000006', club_id, null, 'admin','active' from fx;
+select '0a000000-0000-4000-8000-000000000008', club_id, null, 'admin','active' from fx;
 
 -- The row the update and delete arms act on. Created as the OWNER so it exists
 -- regardless of any policy.
@@ -327,6 +349,9 @@ select pg_temp.configure('match', interval '8 days');
 select pg_temp.probe('open/3_parent_active', '0a000000-0000-4000-8000-000000000003');
 select pg_temp.probe('open/1_coach_active',  '0a000000-0000-4000-8000-000000000001');
 select pg_temp.probe('open/6_admin',         '0a000000-0000-4000-8000-000000000006');
+-- ⚠️ Probed in the OPEN configuration on purpose — a parent would be free
+-- here, so a refusal cannot be mistaken for the lock. It has to be the split.
+select pg_temp.probe('open/8_admin_zero',    '0a000000-0000-4000-8000-000000000008');
 
 -- LOCKED: a match 2 days out (locked ~3 days ago).
 select pg_temp.configure('match', interval '2 days');
@@ -384,6 +409,16 @@ begin
   select * into r from _m where caller = 'locked/6_admin';
   if not (r.ins = 'ALLOWED' and r.upd = 'ALLOWED' and r.del = 'ALLOWED') then
     raise exception 'LOCK: admin must never be locked — got ins=% upd=% del=%', r.ins, r.upd, r.del;
+  end if;
+
+  -- ⚠️ THE CONTROL. A bare admin (no admin_rights) reaches no squad by itself
+  -- (20260904_admin_team_reach.sql) and must be refused even in the OPEN
+  -- configuration, where a parent is free — proving the refusal is the split,
+  -- not the lock, and that it does not accidentally read as "never locked"
+  -- the way the un-repointed assertion above once did.
+  select * into r from _m where caller = 'open/8_admin_zero';
+  if not (r.sel = 0 and r.ins <> 'ALLOWED' and r.upd = 'NO ROWS' and r.del = 'NO ROWS') then
+    raise exception 'SPLIT: zero-rights admin should reach no squad, even OPEN — got sel=% ins=% upd=% del=%', r.sel, r.ins, r.upd, r.del;
   end if;
 
   -- Training locks the day before, so 4 hours out is frozen.
