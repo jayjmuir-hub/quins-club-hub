@@ -274,8 +274,10 @@ describe('read receipts', () => {
 })
 
 describe('countUnreadMessages', () => {
-  // The dock's Chat dot: recent head posts by OTHER people, minus my reads.
-  it('counts recent head posts not by me that I have not read', async () => {
+  // The dock's Chat dot: recent messages by OTHER people, minus my reads —
+  // replies included since 4 Sep 2026 (the flat stream; the list's badge
+  // already counted them).
+  it('counts recent messages, replies included, not by me that I have not read', async () => {
     const posts = builder({ data: [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }], error: null })
     const reads = builder({ data: [{ message_id: 'p2' }], error: null })
     const deliveries = builder({ data: null, error: null })
@@ -284,7 +286,7 @@ describe('countUnreadMessages', () => {
 
     expect(await countUnreadMessages('me')).toBe(2)
 
-    expect(posts.calls.is).toEqual([['parent_id', null], ['deleted_at', null]])
+    expect(posts.calls.is).toEqual([['deleted_at', null]])
     expect(posts.calls.neq[0]).toEqual(['author_id', 'me'])
     // Bounded to a recent window, on purpose — see the function's note.
     expect(posts.calls.gte[0][0]).toBe('created_at')

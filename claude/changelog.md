@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #696 — 🔴 **Unread chats are hard to miss.** A brand bar down the row's left edge, a
+  faint ground and a bold preview on an unread row (`src/screens/ChatList.jsx`, and the
+  dock's list); the "N unread in M chats" strip is a button to the Unread filter; the
+  Chat dot's counter counts replies (the flat stream). A sidebar COUNT was left out on
+  purpose against the 23 Aug dot-not-a-number ruling in `src/lib/useDockBadges.js`.
+  Rot detector: `tests/chat-list.test.jsx`.
 - #694 — 🏷️ **The staff pill names the squad in club-wide channels, and never wraps mid-word.**
   `db/migrations/20260908_message_author_team.sql` adds `messages.author_team_id`, stamped by
   the provenance trigger from the membership behind the role (staff only, backfilled);
