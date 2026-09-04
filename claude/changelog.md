@@ -8,6 +8,16 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 4 Sep 2026
+
+- #687 — 🔎 **"Senior men" and "Senior women" on the Roster and Schedule
+  filters.** Phase 2 of `claude/plans/2026-09-03-senior-section.md`.
+  `src/lib/section.js` `sectionGroups` / `teamIdsForFilter`;
+  `src/components/TeamFilter.jsx` takes `groups`, listed between All and the
+  squads; `src/screens/Roster.jsx` and `src/screens/Schedule.jsx` resolve a
+  section choice to its squads, with Roster counts covering the section. A
+  stale section choice reads as "all", never as an empty list.
+
 ## 3 Sep 2026
 
 - #686 — 🐛 **Seniors page: the date window, and a dock that fits.** Jay's
