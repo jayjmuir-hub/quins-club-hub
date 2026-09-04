@@ -10,8 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- 💬 **Chat composer declutter.** One shared `ComposerBar` on DMs, groups, squad/club channels, and the floating dock: WhatsApp-style `+` attach menu (photo, file, poll), icon Send, `@` typeahead in groups only. Rot detectors: `tests/composer-bar.test.jsx`, `tests/mention-picker.test.js`, `tests/floating-dock.test.jsx`.
 - #711 — 🏠 **Home Club seniors W–D–L rollup.** When Home shows more than one senior scoring squad, one thin StatBand labelled `Club seniors` sums all-matches wins, draws and losses. A lone senior keeps its own name; Club juniors is unchanged and can sit beside it; Squad Hub and `/seniors` stay per-squad. A Vets side with no age band is a senior scoring row (`recordsScores` fails open) and joins the sum. Rot detectors: `tests/match-record.test.js`, `tests/dashboard.test.jsx`.
+- `66d6fdc` — Home: combine senior W–D–L into one Club seniors band.
 - #710 — 🏠 **Home Club juniors W–D–L rollup.** When Home shows more than one junior scoring squad, one thin StatBand labelled `Club juniors` sums all-matches wins, draws and losses. A lone junior and every senior stay per-squad; Squad Hub and `/seniors` are unchanged; U6–U7 still skip the record row. Rot detectors: `tests/match-record.test.js`, `tests/dashboard.test.jsx`.
+- `3ad52b0` — Home: combine junior W–D–L into one Club juniors band.
 - #709 — 📎 **Chat file attachments (Excel, Word, PDF)** on `chat-media`. One allowlisted file per send (≤ 25 MB); FileCard on every chat surface; push preview is generic `📄 File` (never the original filename). Photo albums and voice unchanged. Migration `db/migrations/20260912_chat_file_attachments.sql` not applied to live from this PR. Ruling: `claude/decisions/2026-09-04-chat-file-attachments.md`.
 - `9860541` — 📎 Chat file attachments (Excel, Word, PDF).
 - #708 — 🏠 **Home thin 3-across ops + W–D–L bands.** Two `grid-cols-3` rows (Registered players / Fixtures to play / Tournaments, then Won / Drawn / Lost) for everyone, including parents. Drops Needs a score and the phone 2×2 stack. Shared `StatBand`/`StatTile`; Squad Hub and `/seniors` All-matches W–D–L match the thin band. U6–U7 still skip the record row. Rot detectors: `tests/dashboard.test.jsx`, `tests/season-record-band.test.jsx`, `tests/squad-hub.test.jsx`, `tests/senior-section.test.jsx`.

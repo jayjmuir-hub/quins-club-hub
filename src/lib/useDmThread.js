@@ -554,7 +554,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     draftMentions,
     setDraftMentions,
     // Who the @ button offers: the group's members minus me. Empty for a 1:1
-    // (the only other person is already reading) — MentionPicker hides itself.
+    // (the only other person is already reading) — no @ typeahead.
     mentionables: isGroup ? (members ?? []).filter((p) => p.profile_id !== selfId) : [],
     sending,
     replyTo,

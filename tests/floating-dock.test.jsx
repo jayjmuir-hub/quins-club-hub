@@ -441,3 +441,40 @@ describe('the dock chevron menu — full parity for DMs and groups', () => {
     )
   })
 })
+
+describe('the dock composer is the same + menu bar', () => {
+  it('a DM in the dock has attach-menu, not the old photo/poll icons', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[1])
+    await screen.findByTestId('dm-composer')
+    expect(screen.getByTestId('attach-menu')).toBeInTheDocument()
+    expect(screen.queryByTestId('photo-button')).toBeNull()
+    expect(screen.queryByTestId('poll-button')).toBeNull()
+    expect(screen.queryByTestId('file-button')).toBeNull()
+  })
+
+  it('a group in the dock types @ to mention — no always-on @ button', async () => {
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[2])
+    await screen.findByTestId('dm-composer')
+    expect(screen.queryByRole('button', { name: 'Mention someone' })).toBeNull()
+    await user.type(screen.getByLabelText('Message'), '@')
+    expect(screen.getByRole('listbox', { name: 'People in this channel' })).toBeInTheDocument()
+  })
+
+  it('an open squad channel in the dock uses the same ComposerBar', async () => {
+    m.getChannelSettings.mockResolvedValue({ announce_only: false })
+    const user = userEvent.setup()
+    renderAt('/roster')
+    await user.click(screen.getByTestId('dock-bubble-button'))
+    await user.click((await screen.findAllByTestId('dock-row'))[0])
+    const composer = await screen.findByTestId('composer')
+    expect(within(composer).getByTestId('attach-menu')).toBeInTheDocument()
+    expect(screen.queryByTestId('photo-button')).toBeNull()
+    expect(screen.queryByTestId('poll-button')).toBeNull()
+  })
+})

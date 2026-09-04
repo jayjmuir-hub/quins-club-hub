@@ -4,23 +4,19 @@ import AttachmentTray from './AttachmentTray.jsx'
 import ChatDropZone from './ChatDropZone.jsx'
 import Card from './Card.jsx'
 import ChatBubble from './ChatBubble.jsx'
-import EmojiPicker from './EmojiPicker.jsx'
+import ComposerBar from './ComposerBar.jsx'
 import { Empty } from './Empty.jsx'
 import PollComposer from './PollComposer.jsx'
 import PollVotes from './PollVotes.jsx'
 import Spinner from './Spinner.jsx'
-import VoiceComposer from './VoiceComposer.jsx'
-import MentionPicker, { appendMention } from './MentionPicker.jsx'
 import ProfileIcon from './ProfileIcon.jsx'
 import useProfileIcons from '../lib/useProfileIcons.js'
 import MessageEditor from './MessageEditor.jsx'
-import { chatFileAccept, messageAttachmentLabel } from '../data/chatMedia.js'
+import { messageAttachmentLabel } from '../data/chatMedia.js'
 import { PendingFileChip } from './FileCard.jsx'
-import { PICKER_ACCEPT } from '../lib/imageResize.js'
 import { canStillEdit } from '../lib/messageEdit.js'
 import { receiptState } from '../data/messages.js'
 import { backgroundStyle } from '../lib/chatBackgrounds.js'
-import { autoGrow, composerKeyDown, insertAtCursor, pasteImages } from '../lib/chatComposer.js'
 import { dayLabel, daysDiffer } from '../lib/chatDays.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { RowAvatar, scopeChatRows } from '../screens/ChatList.jsx'
@@ -378,87 +374,34 @@ export default function DmThread({ thread, compact = false }) {
               )}
               <AttachmentTray items={thread.tray.items} onRemove={thread.tray.remove} error={thread.tray.error} />
               <PendingFileChip file={thread.pendingFile.file} error={thread.pendingFile.error} onRemove={thread.pendingFile.clear} />
-              <form onSubmit={thread.send} className="relative flex items-end gap-2" data-testid="dm-composer">
-                {/* Group @ mentions — the channels' button-not-typeahead
-                    picker, fed from the loaded members. mentionables is []
-                    in a 1:1, so the picker renders nothing there. */}
-                <MentionPicker
-                  people={thread.mentionables}
-                  onPick={(p) => {
-                    thread.setDraft((d) => appendMention(d, p))
-                    thread.setDraftMentions((ms) => (ms.some((x) => x.profile_id === p.profile_id) ? ms : [...ms, p]))
-                  }}
-                />
-                <input ref={thread.fileRef} type="file" multiple accept={PICKER_ACCEPT} className="hidden" onChange={thread.pickPhoto} data-testid="photo-input" />
-                <input ref={thread.docFileRef} type="file" accept={chatFileAccept()} className="hidden" onChange={thread.pickFile} data-testid="file-input" />
-                <button
-                  type="button"
-                  aria-label="Attach a photo"
-                  onClick={() => thread.fileRef.current?.click?.()}
-                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
-                  data-testid="photo-button"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="3" y="5" width="18" height="14" rx="2" />
-                    <circle cx="9" cy="10" r="1.6" />
-                    <path d="m21 15-4.5-4.5L7 20" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  aria-label="Attach a file"
-                  onClick={() => thread.docFileRef.current?.click?.()}
-                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
-                  data-testid="file-button"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-                    <path d="M14 3v5h5" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  aria-label="Create a poll"
-                  onClick={() => setPollOpen(true)}
-                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-full text-ink-muted hover:bg-surface-mute"
-                  data-testid="poll-button"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M6 20V10M12 20V4M18 20v-6" />
-                  </svg>
-                </button>
-                <label className="sr-only" htmlFor="dm-draft">
-                  Message
-                </label>
-                {/* The greeting is FIRST name only (Jay, 25 Aug 2026) — the
-                    full name is the header's job. Groups keep their title. */}
-                <textarea
-                  id="dm-draft"
-                  ref={thread.draftRef}
-                  value={thread.draft}
-                  onChange={(e) => thread.setDraft(e.target.value)}
-                  onInput={(e) => autoGrow(e.currentTarget)}
-                  onKeyDown={composerKeyDown}
-                  // ⚠️ Ctrl+V a screenshot. Hands off entirely unless the
-                  // clipboard carries images — see pasteImages.
-                  onPaste={(e) => pasteImages(e, thread.tray.add)}
-                  rows={1}
-                  maxLength={2000}
-                  placeholder={`Message ${(isGroup ? conversation?.title : otherName?.split(' ')[0]) ?? ''}`}
-                  className="min-h-[44px] flex-1 resize-none rounded-[12px] border border-line bg-surface-card px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none"
-                />
-                <EmojiPicker onPick={(emoji) => thread.setDraft(insertAtCursor(thread.draftRef.current, emoji))} />
-                {!thread.draft.trim() && thread.tray.items.length === 0 && !thread.pendingFile.file ? (
-                  <VoiceComposer onSend={thread.sendVoice} disabled={thread.sending} onError={thread.setError} />
-                ) : (
-                  <Button type="submit" disabled={thread.sending || (!thread.draft.trim() && thread.tray.items.length === 0 && !thread.pendingFile.file)}>
-                    {/* ⚠️ Counts rather than spinning: ten uploads over the
-                        UAE-to-Tokyo route (28 Aug incident) is a long wait,
-                        and a blank spinner there reads as a hang. */}
-                    {thread.progress ? <span data-testid="send-progress">{thread.progress}</span> : 'Send'}
-                  </Button>
-                )}
-              </form>
+              {/* The greeting is FIRST name only (Jay, 25 Aug 2026) — the
+                  full name is the header's job. Groups keep their title.
+                  Group @ mentions typeahead when the draft has @ at the
+                  caret; mentionables is [] in a 1:1, so nothing opens. */}
+              <ComposerBar
+                testId="dm-composer"
+                textareaId="dm-draft"
+                placeholder={`Message ${(isGroup ? conversation?.title : otherName?.split(' ')[0]) ?? ''}`}
+                draft={thread.draft}
+                setDraft={thread.setDraft}
+                draftRef={thread.draftRef}
+                mentionables={thread.mentionables}
+                setDraftMentions={thread.setDraftMentions}
+                fileRef={thread.fileRef}
+                docFileRef={thread.docFileRef}
+                pickPhoto={thread.pickPhoto}
+                pickFile={thread.pickFile}
+                allowPolls
+                onOpenPoll={() => setPollOpen(true)}
+                trayCount={thread.tray.items.length}
+                hasPendingFile={Boolean(thread.pendingFile.file)}
+                sending={thread.sending}
+                progress={thread.progress}
+                onSendVoice={thread.sendVoice}
+                onVoiceError={thread.setError}
+                onSubmit={thread.send}
+                onPasteFiles={thread.tray.add}
+              />
             </>
           )}
         </div>

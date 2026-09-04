@@ -180,12 +180,15 @@ const xlsx = () =>
 const ppt = () => new File(['x'], 'slides.ppt', { type: 'application/vnd.ms-powerpoint' })
 
 describe('chat file composer', () => {
-  it('has a file control beside the photo tray, not multiple', async () => {
+  it('has a file control in the + menu, not multiple, beside the photo input', async () => {
+    const user = userEvent.setup()
     renderThread()
     await screen.findAllByTestId('dm-bubble')
     expect(screen.getByTestId('file-input')).not.toHaveAttribute('multiple')
     expect(screen.getByTestId('photo-input')).toHaveAttribute('multiple')
-    expect(screen.getByRole('button', { name: 'Attach a file' })).toBeTruthy()
+    expect(screen.queryByTestId('file-button')).toBeNull()
+    await user.click(screen.getByTestId('attach-menu'))
+    expect(screen.getByRole('menuitem', { name: 'Attach a file' })).toBeTruthy()
   })
 
   it('refuses ppt and does not put it in the photo tray', async () => {
