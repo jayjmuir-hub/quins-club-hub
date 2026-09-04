@@ -106,8 +106,10 @@ describe('the league table', () => {
     const user = renderStandings({ userId: 'keeper-1' })
     await screen.findAllByTestId('standings-row')
     // Round 1 is the default: the latest round whose day has passed.
-    expect(screen.getByLabelText('Round')).toHaveValue('1')
-    await user.type(screen.getByLabelText('Bahrain score'), '17')
+    // findBy: the round defaults in an effect after the first paint, and CI
+    // (4 Sep 2026) reached the score boxes before that paint had happened.
+    await waitFor(() => expect(screen.getByLabelText('Round')).toHaveValue('1'))
+    await user.type(await screen.findByLabelText('Bahrain score'), '17')
     await user.type(screen.getByLabelText('Doha score'), '12')
     await user.click(screen.getByRole('button', { name: /save round/i }))
     await waitFor(() => expect(recordResultsMock).toHaveBeenCalledTimes(1))
@@ -127,7 +129,7 @@ describe('the league table', () => {
     expect(ours).toBeTruthy()
     expect(within(ours).queryByRole('button', { name: /correct/i })).not.toBeInTheDocument()
     // Control: a typed correction path exists for the other row's inputs.
-    expect(screen.getByLabelText('Bahrain score')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Bahrain score')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /save round/i }))
     // Nothing typed, nothing saved.
     expect(recordResultsMock).not.toHaveBeenCalled()
