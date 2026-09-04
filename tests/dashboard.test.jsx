@@ -95,6 +95,8 @@ vi.mock('../src/data/availability.js', () => ({
 
 // Import after vi.mock so this binds to the mocked modules.
 import Dashboard from '../src/screens/Dashboard.jsx'
+import { clubToday } from '../src/lib/eventFormat.js'
+import { defaultEventWindow } from '../src/lib/eventWindow.js'
 import { clearMyProfileCache } from '../src/lib/useMyProfile.js'
 
 // 2026-07-20T09:00 Abu Dhabi — the prototype's own demo "now"
@@ -727,6 +729,11 @@ describe('Dashboard — stats', () => {
       renderDashboard()
       expect(await screen.findByTestId('upcoming-list')).toBeInTheDocument()
       expect(screen.getByTestId('quick-actions')).toBeInTheDocument()
+      expect(screen.getByTestId('next-fixture')).toBeInTheDocument()
+      expect(screen.getByTestId('upcoming-strip')).toBeInTheDocument()
+      expect(screen.getByTestId('last-result')).toBeInTheDocument()
+      expect(screen.getByTestId('squad-staff-block')).toBeInTheDocument()
+      expect(screen.queryByTestId('stat-players')).not.toBeInTheDocument()
     })
   })
 })
@@ -1150,5 +1157,65 @@ describe('Dashboard — a refused DM from a squad contact', () => {
     // The page did NOT switch into the load-failure card.
     expect(screen.queryByText(/couldn.t load your dashboard/i)).toBeNull()
     expect(screen.getByRole('button', { name: /chat with/i })).toBeInTheDocument()
+  })
+})
+
+describe('Dashboard — all-matches season record', () => {
+  // NOW is 20 Jul 2026 → club season 2025-26. OLDER_RESULT (U10, 10–20) is in
+  // that window; LAST_RESULT is 1st XV.
+
+  it('puts a Season record band under the fortnight strip for a parent’s scoring squad', async () => {
+    useMembershipsMock.mockReturnValue(membershipValue(PARENT))
+    renderDashboard()
+    const band = await screen.findByTestId('season-record-band')
+    const strip = screen.getByTestId('upcoming-strip')
+    const upcoming = screen.getByTestId('upcoming-list')
+    expect(strip.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(band.compareDocumentPosition(upcoming) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const card = within(band).getByTestId('season-record-card')
+    expect(card).toHaveTextContent('U10')
+    expect(within(card).getByTestId('season-record-wdl')).toHaveTextContent('0–0–1')
+    expect(card).toHaveTextContent('from scores on Hub · 2025-26')
+  })
+
+  it('shows one card per scoring squad for an admin, never a club rollup', async () => {
+    useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
+    renderDashboard()
+    const band = await screen.findByTestId('season-record-band')
+    const cards = within(band).getAllByTestId('season-record-card')
+    expect(cards).toHaveLength(2)
+    // visibleTeams sorts by sort_order: U10 (5) then 1st XV (13).
+    expect(cards[0]).toHaveTextContent('U10')
+    expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('0–0–1')
+    expect(cards[1]).toHaveTextContent('Senior Men 1st XV')
+    expect(within(cards[1]).getByTestId('season-record-wdl')).toHaveTextContent('1–0–0')
+  })
+
+  it('hides the band when every visible squad is U6/U7', async () => {
+    const u6 = { id: 'team-u6', name: 'U6 Tag', sort_order: 1 }
+    useMembershipsMock.mockReturnValue(
+      membershipValue([{ id: 'm-u6', status: 'active', role: 'parent', team_id: 'team-u6', player_id: 'p-u6' }], [u6]),
+    )
+    listEventsMock.mockResolvedValue([
+      {
+        id: 'e-u6',
+        team_id: 'team-u6',
+        type: 'match',
+        starts_at: '2026-07-10T13:00:00Z',
+        result_us: 5,
+        result_them: 0,
+      },
+    ])
+    renderDashboard()
+    await screen.findByTestId('quick-actions')
+    expect(screen.queryByTestId('season-record-band')).not.toBeInTheDocument()
+  })
+
+  it('asks listEvents for the same defaultEventWindow Home already shared with Schedule', async () => {
+    useMembershipsMock.mockReturnValue(membershipValue(PARENT))
+    renderDashboard()
+    await screen.findByTestId('season-record-band')
+    const { from, to } = listEventsMock.mock.calls[0][0]
+    expect({ from, to }).toEqual(defaultEventWindow(clubToday()))
   })
 })

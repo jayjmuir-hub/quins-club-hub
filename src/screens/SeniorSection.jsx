@@ -4,6 +4,7 @@ import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { BlockTitle } from '../components/Editorial.jsx'
+import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
 import SeasonStatsTable from '../components/SeasonStatsTable.jsx'
 import { listEvents } from '../data/events.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
@@ -11,6 +12,7 @@ import { listPlayers } from '../data/players.js'
 import { listAllLeagueTeams } from '../data/leagueTeams.js'
 import { standings } from '../data/competitions.js'
 import { seasonStats } from '../data/seasonStats.js'
+import { scoringSquadRecords, windowCoveringSeason } from '../lib/matchRecord.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isAdmin } from '../lib/scope.js'
 import { seasonLabelFor } from '../lib/season.js'
@@ -94,8 +96,14 @@ export default function SeniorSection() {
     // as-is; a Date stringifies to "… GMT+0400 (Gulf Standard Time)" and
     // Postgres answers 'time zone "gmt+0400" not recognized' — Jay's
     // screenshot, 3 Sep 2026, the first time the page was opened on a phone.
-    const from = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
-    const to = new Date(Date.now() + 200 * 24 * 3600 * 1000).toISOString()
+    // ⚠️ THIS SCREEN'S LOOKBACK WAS 7 DAYS, not defaultEventWindow (12 months).
+    // Widen only this unique window so all-matches W–D–L cannot silently
+    // under-count; Schedule / Home / Hub keep defaultEventWindow unchanged.
+    const lookback = {
+      from: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(),
+      to: new Date(Date.now() + 200 * 24 * 3600 * 1000).toISOString(),
+    }
+    const { from, to } = windowCoveringSeason(lookback, new Date(Date.now()))
     Promise.all([
       listEvents({ teamIds, from, to }),
       foreign ? Promise.resolve([]) : listPlayers({ teamIds }),
@@ -139,6 +147,14 @@ export default function SeniorSection() {
   const matches = useMemo(
     () => events.filter((e) => e.type === 'match' && dayKey(e) && dayKey(e) >= today).sort((a, b) => eventDate(a) - eventDate(b)),
     [events, today],
+  )
+  const allMatchRows = useMemo(
+    () =>
+      scoringSquadRecords(events, sectionTeams, { at: new Date(Date.now()) }).map((row) => ({
+        ...row,
+        team: { ...row.team, name: shortSquadName(row.team.name) },
+      })),
+    [events, sectionTeams],
   )
   // "This weekend": the nearest match day, and every match within three days of it.
   const weekend = useMemo(() => {
@@ -323,6 +339,14 @@ export default function SeniorSection() {
                   )
                 })}
               </Card>
+            </section>
+          )}
+
+          {allMatchRows.length > 0 && (
+            <section className="mb-5" data-testid="all-matches-record">
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-muted">All matches</p>
+              <p className="mb-2.5 text-xs text-ink-muted">league · tournaments · friendlies</p>
+              <SeasonRecordBand rows={allMatchRows} layout="row" />
             </section>
           )}
 

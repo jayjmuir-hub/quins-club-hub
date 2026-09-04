@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
@@ -477,6 +477,48 @@ describe('the phone tracking list', () => {
     expect(sheetRow).toBeTruthy()
     expect(sheetRow).toHaveTextContent('In') // said in...
     expect(sheetRow).toHaveTextContent('A') // ...marked absent
+  })
+})
+
+describe('all-matches season record', () => {
+  let nowSpy
+  afterEach(() => {
+    nowSpy?.mockRestore()
+    nowSpy = undefined
+  })
+
+  it('shows the W–D–L band for a scoring squad from scores on the hub', async () => {
+    nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-15T08:00:00Z'))
+    useMembershipsMock.mockReturnValue(
+      membershipsFor([{ role: 'coach', team_id: 't-u12', status: 'active' }]),
+    )
+    listEventsMock.mockResolvedValue([
+      {
+        ...PAST_MATCH,
+        starts_at: '2026-10-04T13:00:00Z',
+        result_us: 22,
+        result_them: 17,
+      },
+      FUTURE_TRAINING,
+    ])
+    renderAt('/squad/t-u12')
+    const band = await screen.findByTestId('season-record-band')
+    expect(within(band).getByTestId('season-record-wdl')).toHaveTextContent('1–0–0')
+    expect(band).toHaveTextContent('from scores on Hub · 2026-27')
+    expect(band).toHaveTextContent('U12 Mixed')
+  })
+
+  it('hides the band on a U6 hub — that squad does not record scores', async () => {
+    const u6 = { id: 't-u6', name: 'U6 Tag', sort_order: 0 }
+    useMembershipsMock.mockReturnValue({
+      memberships: [{ role: 'coach', team_id: 't-u6', status: 'active' }],
+      teams: [...TEAMS, u6],
+      loading: false,
+    })
+    listEventsMock.mockResolvedValue([])
+    renderAt('/squad/t-u6')
+    await screen.findByText(/on the calendar/i)
+    expect(screen.queryByTestId('season-record-band')).not.toBeInTheDocument()
   })
 })
 

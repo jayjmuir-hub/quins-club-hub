@@ -10,6 +10,10 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- `e44fef6` — **keep defaultEventWindow shared; changelog for #704 and #703.**
+- `bb2eaea` — **all-matches W–D–L season record on Home, Squad Hub, and /seniors.**
+- #704 — 🏉 **All-matches W–D–L season record** on Home, Squad Hub, and `/seniors` (a separate row above the league table cards). Plain win/draw/loss from scored matches in the club season (1 Sep–31 Aug Asia/Dubai): league, tournament games, and friendlies. Tournament containers and U6–U7 are excluded. Not league standings. Rot detectors: `tests/match-record.test.js`, `tests/season-record-band.test.jsx`, `tests/dashboard.test.jsx`, `tests/squad-hub.test.jsx`, `tests/senior-section.test.jsx`.
+- #703 — 📝 **Standings routes 2 and 3 deferred.** Jay, 4 Sep 2026: no AI reader for now and no paste-and-parse either; route 1 stands.
 - #702 — 🧹 **Database hygiene, all applied to live the same day.** Anon EXECUTE revoked BY NAME on nine public functions from #684/#688/#689/#690 (`20260906_revoke_anon_execute_round_2.sql`); seven bare `auth.uid()` calls wrapped as InitPlans with equivalence proved on live (`club_settings`, the six competition policies); **a real bug in `end_callup`** — it returned the pre-update row — fixed; the two #697 functions pinned to `search_path = public`. Harnesses: `callups` and `senior-section` now raise on a FAIL row; `results-nudge` and `standings` gained real assertions so the whole-suite run is no longer refused; `admin-team-reach`, `rls-availability-equivalence` and `role-channel-pill` repointed from a pre-migration world to the 3 Sep admin-split ruling. Whole suite 112 ok; `photo-orphans` red on one real stray object until it is deleted. Jay: "do all the hygiene until they are live."
 - #701 — 🔧 **CI hygiene: the audit step survives a registry 503, and docs-check
   compares full SHAs.** The npm-audit step already retried and warned-through an
