@@ -16,6 +16,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
   both read paths gain a third arm. "A role across the club" on `/admin/icons`.
   Reasoning: `claude/schema-history.md`. Rot detectors: `db/tests/role-group-icons.sql`,
   `tests/admin-icons.test.jsx`.
+  Also in this PR: CI's `npm audit` step retries and, when npm's advisory endpoint itself
+  is down (503 for hours on 4 Sep, two reruns failed), warns and lets the build through — a
+  real advisory still fails.
 - #696 — 🔴 **Unread chats are hard to miss.** A brand bar down the row's left edge, a
   faint ground and a bold preview on an unread row (`src/screens/ChatList.jsx`, and the
   dock's list); the "N unread in M chats" strip is a button to the Unread filter; the
