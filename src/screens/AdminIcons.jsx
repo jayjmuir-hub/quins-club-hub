@@ -3,7 +3,7 @@ import Button from '../components/Button.jsx'
 import Card from '../components/Card.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { listClubMembers } from '../data/members.js'
-import { grantIcon, listIconGrants, revokeIcon, setPrimaryIcon } from '../data/profileIcons.js'
+import { ICON_ROLE_GROUPS, grantIcon, iconRoleLabel, listIconGrants, revokeIcon, setPrimaryIcon } from '../data/profileIcons.js'
 import { ICON_LIBRARY, iconEmoji, iconMeaning } from '../lib/profileIcons.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isSuperAdmin } from '../lib/scope.js'
@@ -42,6 +42,8 @@ export default function AdminIcons() {
   const [icon, setIcon] = useState('')
   const [teamId, setTeamId] = useState('')
   const [profileId, setProfileId] = useState('')
+  // 4 Sep 2026: the third target — a role across the club.
+  const [role, setRole] = useState('')
   const [reason, setReason] = useState('')
 
   const load = useCallback(async () => {
@@ -72,9 +74,9 @@ export default function AdminIcons() {
 
   if (!viewerIsSuper) return <NotForYou />
 
-  // Exactly one target — both picked is the shape the database refuses, so
+  // Exactly one target — two picked is the shape the database refuses, so
   // the button refuses it first.
-  const oneTarget = (teamId !== '') !== (profileId !== '')
+  const oneTarget = [teamId, profileId, role].filter((v) => v !== '').length === 1
   const ready = icon !== '' && oneTarget && !saving
 
   async function grant() {
@@ -86,12 +88,14 @@ export default function AdminIcons() {
         clubId,
         teamId: teamId || null,
         profileId: profileId || null,
+        role: role || null,
         icon,
         reason: reason.trim(),
       })
       setIcon('')
       setTeamId('')
       setProfileId('')
+      setRole('')
       setReason('')
       await load()
     } catch (err) {
@@ -125,9 +129,10 @@ export default function AdminIcons() {
     <div>
       <h3 className="mb-1 text-base font-extrabold text-ink">Profile icons</h3>
       <p className="mb-3 max-w-[64ch] text-sm text-ink-muted">
-        Recognition, not access. Pin an icon to a whole squad&rsquo;s staff —
-        it follows whoever holds the job — or to one person. It shows beside
-        their name in chat, and a tap on their card says why.
+        Recognition, not access. Pin an icon to a whole squad&rsquo;s staff,
+        to everyone holding a role across the club — either follows whoever
+        holds the job — or to one person. It shows beside their name in chat,
+        and a tap on their card says why.
       </p>
 
       {error && (
@@ -170,6 +175,23 @@ export default function AdminIcons() {
             {(teams ?? []).map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
+              </option>
+            ))}
+          </select>
+
+          <label className="text-[13px] font-extrabold text-ink" htmlFor="icon-role">
+            A role across the club
+          </label>
+          <select
+            id="icon-role"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="h-[36px] rounded-[8px] border border-line bg-surface-card px-2 text-[13px] text-ink"
+          >
+            <option value="">Not a role grant</option>
+            {ICON_ROLE_GROUPS.map((g) => (
+              <option key={g.key} value={g.key}>
+                {g.label}
               </option>
             ))}
           </select>
@@ -224,7 +246,7 @@ export default function AdminIcons() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-ink">
-                  {g.team_id ? `${g.teams?.name ?? 'Squad'} staff` : g.profiles?.full_name ?? 'Unknown account'}
+                  {g.role ? iconRoleLabel(g.role) : g.team_id ? `${g.teams?.name ?? 'Squad'} staff` : g.profiles?.full_name ?? 'Unknown account'}
                   {g.is_primary ? ' · primary' : ''}
                 </p>
                 <p className="truncate text-[12.5px] text-ink-muted">{g.reason ?? iconMeaning(g.icon) ?? g.icon}</p>

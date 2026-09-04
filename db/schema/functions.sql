@@ -7255,12 +7255,13 @@ GRANT EXECUTE ON FUNCTION public.channel_members(text, uuid) TO authenticated;
 -- pg_get_functiondef from live, 31 Aug 2026. Read paths for the icon layer:
 -- the club-wide primary map chat shares, and the person card's full list.
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.club_icon_map()
- RETURNS TABLE(profile_id uuid, icon text)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
+-- re-captured 4 Sep 2026 from db/migrations/20260909_role_group_icons.sql
+create or replace function public.club_icon_map()
+returns table (profile_id uuid, icon text)
+language sql
+stable security definer
+set search_path to 'public'
+as $function$
   with my_club as (
     select m.club_id from memberships m
      where m.profile_id = auth.uid() and m.status = 'active'
@@ -7277,6 +7278,13 @@ AS $function$
       join memberships m on m.team_id = i.team_id and m.status = 'active'
        and m.role in ('coach','manager','medic')
      where i.team_id is not null
+    union all
+    -- role grants decorate everyone holding that role in the club TODAY
+    select m.profile_id, i.icon, i.is_primary, i.created_at
+      from profile_icons i
+      join my_club c on c.club_id = i.club_id
+      join memberships m on m.club_id = i.club_id and private.icon_role_matches(i.role, m)
+     where i.role is not null
   )
   select distinct on (w.profile_id) w.profile_id, w.icon
     from worn w
@@ -7285,12 +7293,14 @@ $function$
 
 ;
 
-CREATE OR REPLACE FUNCTION public.member_icons(_profile uuid)
- RETURNS TABLE(id uuid, icon text, reason text, is_primary boolean, team_name text, created_at timestamp with time zone)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
+-- re-captured 4 Sep 2026 from db/migrations/20260909_role_group_icons.sql
+create or replace function public.member_icons(_profile uuid)
+returns table (id uuid, icon text, reason text, is_primary boolean,
+               team_name text, created_at timestamptz)
+language sql
+stable security definer
+set search_path to 'public'
+as $function$
   with my_club as (
     select m.club_id from memberships m
      where m.profile_id = auth.uid() and m.status = 'active'
@@ -7308,7 +7318,44 @@ AS $function$
      and exists (select 1 from memberships m
         where m.profile_id = _profile and m.team_id = i.team_id
           and m.status = 'active' and m.role in ('coach','manager','medic'))
+  union all
+  select i.id, i.icon, i.reason, i.is_primary, private.icon_role_label(i.role), i.created_at
+    from profile_icons i
+    join my_club c on c.club_id = i.club_id
+   where i.role is not null
+     and exists (select 1 from memberships m
+        where m.profile_id = _profile and m.club_id = i.club_id
+          and private.icon_role_matches(i.role, m))
    order by is_primary desc, created_at desc;
+$function$
+
+-- 20260909: the role-grant rule and label, shared by both read paths above.
+create or replace function private.icon_role_matches(_role text, _m public.memberships)
+returns boolean
+language sql
+immutable
+as $function$
+  select _m.status = 'active' and case _role
+    when 'coach'     then _m.role = 'coach'
+    when 'headcoach' then _m.role = 'coach' and _m.is_head_coach
+    when 'manager'   then _m.role = 'manager'
+    when 'medic'     then _m.role = 'medic'
+    when 'admin'     then _m.role = 'admin'
+    else false end;
+$function$
+
+create or replace function private.icon_role_label(_role text)
+returns text
+language sql
+immutable
+as $function$
+  select case _role
+    when 'coach'     then 'Every coach'
+    when 'headcoach' then 'Every head coach'
+    when 'manager'   then 'Every manager'
+    when 'medic'     then 'Every medic'
+    when 'admin'     then 'Every club admin'
+    else _role end;
 $function$
 
 ;
