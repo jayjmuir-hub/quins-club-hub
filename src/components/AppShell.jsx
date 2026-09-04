@@ -360,7 +360,7 @@ export default function AppShell({ children }) {
           focusable element on every screen (the a11y test enforces it), and
           the sidebar is a fixed element whose DOM position does not affect
           its paint. */}
-      <Sidebar showSquadHub={showSquadHub} showSeniors={showSeniors} showAdmin={isAdmin(memberships)} />
+      <Sidebar showSquadHub={showSquadHub} showSeniors={showSeniors} showAdmin={isAdmin(memberships)} chatUnread={dockBadges.chatCount} />
       {/* Diagnostic overlay, flag-gated — see its header. Mounted in the
           shell so it renders on EVERY screen once armed. */}
       <PaintDebug />

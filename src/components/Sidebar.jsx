@@ -81,7 +81,11 @@ function itemClassName({ isActive }) {
 // the same screen mounted for squad staff (src/App.jsx).
 const ACCOUNTS_PATHS = ['/admin/accounts', '/approvals']
 
-export default function Sidebar({ showSquadHub = false, showSeniors = false, showAdmin = false }) {
+// `chatUnread` (4 Sep 2026): the unread-message count for the Chat item's
+// pill — the same number the installed icon wears, from useDockBadges. Zero
+// while on /chat, where the list is clearing itself. Jay's ruling over the
+// 23 Aug dot-not-a-number stance, recorded in src/lib/useDockBadges.js.
+export default function Sidebar({ showSquadHub = false, showSeniors = false, showAdmin = false, chatUnread = 0 }) {
   const { memberships } = useMemberships()
   const location = useLocation()
   const { user } = useAuth()
@@ -233,6 +237,15 @@ export default function Sidebar({ showSquadHub = false, showSeniors = false, sho
                 {/* White pill so it reads on BOTH row states — dark chrome
                     idle and brand-red active. aria-label carries the meaning
                     a bare number does not. */}
+                {to === '/chat' && chatUnread > 0 && (
+                  <span
+                    data-testid="chat-unread-badge"
+                    aria-label={`${chatUnread} unread message${chatUnread === 1 ? '' : 's'}`}
+                    className="ml-auto rounded-full bg-white px-2 py-0.5 text-[11px] font-bold leading-4 text-brand-ink"
+                  >
+                    {chatUnread}
+                  </span>
+                )}
                 {to === '/admin' && adminWaiting > 0 && (
                   <span
                     data-testid="admin-waiting-badge"
