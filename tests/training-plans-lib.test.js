@@ -83,6 +83,28 @@ describe('squadFitsTemplate', () => {
     const anyAge = { min_age: null, max_age: null, requires_contact: true }
     expect(squadFitsTemplate({ name: 'Senior Men', requires_contact: true }, anyAge).ok).toBe(true)
   })
+  // ⚠️ teams.is_senior, never the name. Jay 4 Sep 2026: senior coaches must
+  // not be offered junior-capped packs. Adults overlap any-age and adult-open
+  // (U16-and-up / U16–U18); a max_age below 18 does not. `ok` stays true —
+  // contact is still the only refusal — so Publish can warn without gating.
+  it('marks a junior-capped pack as outside an is_senior squad, without refusing', () => {
+    const senior = { name: 'Senior Men - 1st XV', is_senior: true, requires_contact: true }
+    const r = squadFitsTemplate(senior, T)
+    expect(r.ok).toBe(true)
+    expect(r.reason).toBeNull()
+    expect(r.guidance).toBe("Seniors are outside this template's U9–U13")
+  })
+  it('lets any-age and adult-open packs reach an is_senior squad with no guidance', () => {
+    const senior = { name: 'Senior Men - 1st XV', is_senior: true, requires_contact: true }
+    expect(squadFitsTemplate(senior, { min_age: null, max_age: null, requires_contact: true }).guidance).toBeNull()
+    expect(squadFitsTemplate(senior, { min_age: 16, max_age: null, requires_contact: true }).guidance).toBeNull()
+    expect(squadFitsTemplate(senior, { min_age: 16, max_age: 18, requires_contact: true }).guidance).toBeNull()
+  })
+  it('does not guess senior from the name alone — is_senior is the signal', () => {
+    const r = squadFitsTemplate({ name: 'Senior Men - 1st XV', requires_contact: true }, T)
+    expect(r.ok).toBe(true)
+    expect(r.guidance).toBeNull()
+  })
   it('still refuses a tag squad for that same age-less contact template', () => {
     const anyAge = { min_age: null, max_age: null, requires_contact: true }
     const r = squadFitsTemplate({ name: 'U12 Mixed', requires_contact: false }, anyAge)

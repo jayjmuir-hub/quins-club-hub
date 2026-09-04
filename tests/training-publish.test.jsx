@@ -215,6 +215,30 @@ describe('TrainingPublish', () => {
     expect(screen.getByRole('checkbox', { name: /^U14B$/ })).toBeEnabled()
   })
 
+  it('an is_senior squad stays tickable on a junior-capped template, with a note not a refusal', async () => {
+    // Publish must not re-gate age. Session Plan hides junior drills for
+    // seniors; the director can still suggest a U9–U16 hour to 1st XV
+    // knowingly. The name "Senior Men" is not the signal — is_senior is.
+    const user = userEvent.setup()
+    useMembershipsMock.mockReturnValue({
+      ...memberships(admin()),
+      teams: TEAMS.map((team) => (team.id === 't-senior' ? { ...team, is_senior: true } : team)),
+    })
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <TrainingPublish />
+      </MemoryRouter>,
+    )
+    await user.selectOptions(await screen.findByLabelText('Template'), CONTACT_HOUR.id)
+    const seniors = screen.getByRole('checkbox', {
+      name: "Senior Men, Seniors are outside this template's U9–U16",
+    })
+    expect(seniors).toBeEnabled()
+    const note = screen.getByText("Seniors are outside this template's U9–U16")
+    expect(note.className).toMatch(/text-ink-muted/)
+    expect(note.className).not.toMatch(/danger/)
+  })
+
   it('counts the ticked out-of-band squads in one sentence, and stays a note not a gate', async () => {
     const { user } = renderPublish()
     await user.selectOptions(await screen.findByLabelText('Template'), CONTACT_HOUR.id)

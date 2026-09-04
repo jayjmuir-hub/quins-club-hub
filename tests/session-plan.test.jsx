@@ -73,6 +73,14 @@ const U18_TEAM = { id: 't-u18b', name: 'U18B', requires_contact: true, club_id: 
 const U18_EVENT = { ...EVENT, id: 'e-u18', team_id: 't-u18b' }
 const U12G_TEAM = { id: 't-u12g-qr', name: 'U12G QR', requires_contact: false, club_id: 'club-1' }
 const U12G_EVENT = { ...EVENT, id: 'e-u12g', team_id: 't-u12g-qr' }
+const SENIOR_MEN = {
+  id: 't-men1',
+  name: 'Senior Men - 1st XV',
+  requires_contact: true,
+  club_id: 'club-1',
+  is_senior: true,
+}
+const SENIOR_EVENT = { ...EVENT, id: 'e-men1', team_id: 't-men1' }
 
 const CHIP_LABELS = ['Tackle', 'Passing', 'Ruck', 'Attack', 'Defence']
 function contactPack(min, max) {
@@ -648,6 +656,37 @@ describe('SessionPlan — a coach builds their own plan', () => {
     const rest = options.slice(6).map((el) => el.textContent)
     expect(rest.every((text) => /U18 is outside this template's U(9–U10|11–U14)/.test(text))).toBe(true)
     expect(options.every((el) => !el.disabled)).toBe(true)
+  })
+
+  it('Senior Men Add-a-drill omits a junior-capped drill and keeps any-age and adult-open', async () => {
+    // Jay 4 Sep 2026: greyed-out junior cards "doesn't make any sense" on a
+    // senior picker. Hide them. Youth still see the mismatch (test above).
+    listDrillsMock.mockResolvedValue([
+      {
+        id: 'd-u10-pass',
+        title: 'U10 passing grid',
+        minutes: 10,
+        category: 'skill',
+        min_age: 8,
+        max_age: 10,
+        requires_contact: false,
+        is_active: true,
+      },
+      GRID,
+      SENIORS_ONLY,
+    ])
+    const { user } = show({ canEdit: true, event: SENIOR_EVENT, team: SENIOR_MEN })
+    await user.click(await screen.findByTestId('build-session'))
+
+    const picker = await screen.findByLabelText(/add a drill/i)
+    expect(within(picker).queryByRole('option', { name: /u10 passing grid/i })).not.toBeInTheDocument()
+    const anyAge = within(picker).getByRole('option', { name: /grid passing/i })
+    const adult = within(picker).getByRole('option', { name: /full-contact mauling/i })
+    expect(anyAge).not.toBeDisabled()
+    expect(adult).not.toBeDisabled()
+    expect(anyAge).not.toHaveTextContent(/outside/)
+    expect(adult).not.toHaveTextContent(/outside/)
+    expect(picker.textContent).not.toMatch(/can.t tell this squad/i)
   })
 
   it('U18B ADD A DRILL lists the in-band copy first and the others after, with their band', async () => {

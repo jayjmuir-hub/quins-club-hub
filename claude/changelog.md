@@ -10,6 +10,12 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 4 Sep 2026
 
+- #698 — 🏉 **Senior Session Plan pickers hide junior drills.** `teams.is_senior`
+  overlaps as adults (band 18): any-age and adult-open packs stay; junior-capped
+  `max_age` rows are omitted, not greyed out. Youth still see the mismatch with
+  the reason. Publish still warns, does not gate. Rot detectors:
+  `tests/session-plan.test.jsx`, `tests/training-plans-lib.test.js`,
+  `tests/training-shelf-lib.test.js`.
 - #699 — 🏷️ **In a role channel the pill wears the channel's own role, and a club officer
   wears the officer title club-wide.** An admin who also manages a squad posts to Age Group
   Managers as "U11 Mixed · Team Manager", not "Admin"; a club officer there reads their

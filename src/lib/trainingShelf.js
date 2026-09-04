@@ -35,6 +35,9 @@ function inBand(team, row) {
  * gate, since 2 Sep 2026 — the widest of them, as the least specific); and
  * only when every copy is a contact hour on a tag squad, one of those, so the
  * chip can show the refusal.
+ *
+ * ⚠️ SENIORS (`teams.is_senior`) DO NOT FALL BACK TO A JUNIOR PACK — 4 Sep
+ * 2026. No in-band copy means no chip, not a greyed-out U9 hour.
  */
 function pickChipForSquad(candidates, team) {
   const fitting = candidates.filter((row) => inBand(team, row))
@@ -42,6 +45,7 @@ function pickChipForSquad(candidates, team) {
   if (fitting.length > 1) {
     return [...fitting].sort((a, b) => ageSpan(a) - ageSpan(b))[0]
   }
+  if (team?.is_senior === true) return null
   const allowed = candidates.filter((row) => squadFitsTemplate(team, row).ok)
   if (allowed.length > 0) {
     return [...allowed].sort((a, b) => ageSpan(b) - ageSpan(a))[0]
@@ -51,7 +55,8 @@ function pickChipForSquad(candidates, team) {
 
 /**
  * One chip per `chip_label`. A label that fits this squad uses the tightest
- * matching pack; a label that does not still appears once, disabled.
+ * matching pack; a label that does not still appears once, disabled — except
+ * on `teams.is_senior`, where a junior-only label is omitted (Jay, 4 Sep).
  * Extra age-pack copies are not emitted — that is the picker's job, not CSS.
  */
 export function chipHours(templates, team) {
@@ -64,7 +69,7 @@ export function chipHours(templates, team) {
   }
   const extras = [...byLabel.keys()].filter((label) => !CHIP_ORDER.includes(label))
   const labels = [...CHIP_ORDER.filter((label) => byLabel.has(label)), ...extras]
-  return labels.map((label) => pickChipForSquad(byLabel.get(label), team))
+  return labels.map((label) => pickChipForSquad(byLabel.get(label), team)).filter(Boolean)
 }
 
 /**
@@ -78,16 +83,19 @@ export function chipFit(team, template) {
 
 /**
  * Library rows this squad may run, in-band first. Contact from the column
- * refuses; age from the name only ORDERS — an out-of-band row is still
- * offered, after the ones the club would suggest, carrying its `guidance`.
- * Session Plan's template/drill <select>s and the shelf From-coaches row
- * reuse this. Chips use chipHours instead.
+ * refuses; for youth, age from the name only ORDERS — an out-of-band row is
+ * still offered, after the ones the club would suggest, carrying its
+ * `guidance`. Session Plan's template/drill <select>s and the shelf
+ * From-coaches / browse lists reuse this. Chips use chipHours instead.
  * ⚠️ Until 2 Sep 2026 this FILTERED by age and had a `allAges` escape hatch;
- * age is guidance now and the hatch is gone.
+ * age is guidance now and the hatch is gone — for youth.
+ * ⚠️ SENIORS OMIT THE REST — 4 Sep 2026, Jay. `teams.is_senior` (not the
+ * name) drops junior-capped rows instead of listing them disabled.
  */
 export function shelfRowsForSquad(rows, team) {
   const allowed = (rows ?? []).filter((row) => squadFitsTemplate(team, row).ok)
   const suggested = allowed.filter((row) => inBand(team, row))
+  if (team?.is_senior === true) return suggested
   const other = allowed.filter((row) => !inBand(team, row))
   return [...suggested, ...other]
 }
