@@ -27,6 +27,7 @@ conversions, penalties and drop goals per player exist nowhere.
 | Per-player scoring is not on the sheet. Count only what exists, or add it? | **Add scorers to the sheet.** Chosen over "appearances and cards only" and over "tries only". |
 | Who sees the numbers? | **Everyone in the section.** A senior player or staff member sees every squad in their own section, men or women. The other section sees nothing; parents and juniors see nothing. Matches the section ruling of 3 Sep. |
 | How are scorers entered? | **Rows, like the cards block** (option A below). |
+| A called-up under-18 on a senior sheet — does their record show to the section? (Raised by the final review, 4 Sep 2026: the 3 Sep ruling gives a section-mate the minor's NAME and nothing else, and the spec had not considered stats.) | **Yes, show it.** Games, starts, bench, tries and cards are participation data, not contact data; the private row (birthday, phone) stays protected exactly as before. The player appears by name as they already do on the roster. Considered and declined: excluding junior-squad players, and a staff-only variant. |
 
 Settled without asking, because existing code already answers it:
 
