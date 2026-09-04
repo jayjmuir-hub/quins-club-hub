@@ -95,8 +95,11 @@ export function DashboardSkeleton() {
       <Skeleton className="ml-0.5 mt-[18px] h-4 w-[136px]" />
       <Skeleton className="mt-2.5 h-[79px] rounded-card" />
 
-      {/* Stat band — three cells, one block, because that is how it renders. */}
-      <Skeleton className="mt-[18px] h-[97px] rounded-card desktop:h-[99px]" />
+      {/* Two thin 3-across bands (ops + W–D–L), the loaded Home pair. */}
+      <div className="mt-[18px] flex flex-col gap-1">
+        <Skeleton className="h-14 rounded-card" />
+        <Skeleton className="h-14 rounded-card" />
+      </div>
 
       {/* "Upcoming", then rows. */}
       <Skeleton className="ml-0.5 mt-[18px] h-4 w-[104px]" />

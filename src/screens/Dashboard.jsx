@@ -34,12 +34,13 @@ import { pinnedNotices,
   scopeNotices,
 } from '../lib/notices.js'
 import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
+import { StatBand, StatTile } from '../components/StatBand.jsx'
 import { defaultEventWindow } from '../lib/eventWindow.js'
 import { scoringSquadRecords } from '../lib/matchRecord.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditEvent, canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
-import { recordsScores, squadFormat } from '../lib/minis.js'
+import { squadFormat } from '../lib/minis.js'
 import {
   clubDayParts,
   clubToday,
@@ -147,66 +148,6 @@ function PinIcon(props) {
 // running text. The rule is a flex child rather than a border so it can taper.
 // BlockTitle moved to src/components/Editorial.jsx in phase 3, so Squad Hub
 // and the admin screens write the identical section anatomy. Imported above.
-
-// StatTile is no longer a Card. The three tiles now render as cells of one
-// continuous red->green band — the club website's single strongest signature
-// (its .statband). `tone` is kept in the signature so callers don't change,
-// but it is ignored: every numeral on the band is white, because the band's
-// own colour is what varies across it.
-//
-// See tailwind.config.js `stat-band` for why the green stop is #157f3c rather
-// than the site's #3bd070 (white text hits 2.01:1 on the raw green).
-function StatTile({ testId, value, label, className = '' }) {
-  return (
-    <div
-      data-testid={testId}
-      className={`border-r border-white/25 px-3 py-4 text-center last:border-r-0 ${className}`}
-    >
-      <div className="font-display text-[30px] leading-none text-white desktop:text-[42px]">
-        {value}
-      </div>
-      <div className="mt-1 font-condensed text-[11px] font-bold uppercase leading-tight tracking-[0.04em] text-white/95 desktop:text-[14px] desktop:tracking-[0.1em]">
-        {label}
-      </div>
-    </div>
-  )
-}
-
-// Wraps the tiles in the gradient band plus the vivid brand-rule hairline.
-// The hairline is where the full-saturation #3bd070 lives now — it carries no
-// text, so it is free to be as bright as the website's.
-//
-// ⚠️ mt-[18px] IS LOAD-BEARING, AND IT IS HERE BECAUSE THIS BLOCK HAS NO
-// TITLE. Every other block on this screen gets its top gap from BlockTitle's
-// own mt-[18px]; the stat band is the only one with no heading above it, so
-// nothing was supplying one. It looked fine until 6 Aug only because the band
-// used to sit directly under the fixture hero and was living off the hero's
-// mb-4 — an accident, not a rule. Putting the fortnight strip between them
-// removed that donor and the band ended up flush against the strip's card,
-// with the two touching. The value matches BlockTitle exactly so the band
-// lines up with every other block boundary on the screen.
-// ⚠️ 2×2 ON A PHONE, FOUR ACROSS ON DESKTOP — SINCE 28 Aug 2026. It was a single
-// four-across row for one deploy, and Jay's phone showed why that fails: at
-// ~90px a tile, the LONG single word "TOURNAMENTS" cannot wrap, so it overflowed
-// its cell and collided with "Needs a score". A two-word label wraps and fits;
-// a one-word label of eleven characters does not, and no amount of tracking
-// saved it. 2×2 gives ~180px tiles where the word sits on one line. The known
-// cost is that the horizontal red→green gradient now repeats on each row rather
-// than sweeping once — accepted: legible beats a broken sweep. Desktop keeps the
-// single sweep at four across, where there is room.
-//
-// Borders: StatTile's own `border-r … last:border-r-0` draws the verticals (the
-// top-right tile's right border lands on the container edge and is clipped by
-// overflow-hidden). The horizontal divider between the two phone rows is a
-// `border-b` on the first two tiles, dropped at desktop where there is one row.
-function StatBand({ children }) {
-  return (
-    <div className="mt-[18px] overflow-hidden rounded-card shadow-card">
-      <div className="brand-rule" />
-      <div className="grid grid-cols-2 bg-stat-band desktop:grid-cols-4">{children}</div>
-    </div>
-  )
-}
 
 // design-system.md §4.11. Two-stop plum -> maroon gradient, white text
 // throughout (>= 5.9:1 against the lighter maroon end).
@@ -771,44 +712,6 @@ export default function Dashboard() {
   const results = sortByStart(events.filter(hasResult), 'desc')
   const lastResult = results[0] ?? null
 
-  // ⚠️ REPLACES "AGE GROUPS", WHICH WAS THE WEAKEST NUMBER ON THE SCREEN.
-  // The stat band is the loudest element the dashboard has — a saturated
-  // red-to-green gradient carrying 42px numerals, the club website's strongest
-  // signature — and the third cell was spending all of that on
-  // `scopedTeams.length`. For an admin that read "Age groups 15": a count of
-  // how the club is CONFIGURED, which changes when somebody adds a squad, which
-  // is to say roughly never. It was the one number on the band nobody could act
-  // on, and it was shouting.
-  //
-  // A match that has been played and has no score is the opposite: it moves, it
-  // is somebody's job, and it is invisible everywhere else on this screen. The
-  // rule is already settled and already implemented in Schedule's Upcoming tab
-  // (Task 11): an unscored match stays visible until somebody records it. This
-  // is that same backlog, counted.
-  //
-  // ⚠️ ZERO IS A REAL ANSWER HERE, not a hole in the data — "nothing is waiting
-  // on you" is exactly what a management summary should be able to say. That is
-  // also why it is `<= now` and not `< now`: a match kicking off this second has
-  // not been played yet.
-  //
-  // MATCHES ONLY, for the same reason `fixturesToPlay` is matches only — a
-  // training cannot carry a score, so counting one here would rebuild the
-  // "26 fixtures to play" bug in a new cell.
-  //
-  // ⚠️ AND NOT U6 OR U7, WHICH RECORD NO SCORE AT ALL (Jay, 15 Aug 2026). This
-  // is the same failure the Youth Manager's queue had before the minis were
-  // filtered out of it: a fixture that can never be ticked off sits in the count
-  // for ever, and a number that only goes up teaches the coach it is on to stop
-  // reading it. `recordsScores` fails open, so a squad whose row has not loaded
-  // still counts — an unresolvable squad should look like work, not vanish.
-  const needsScore = events.filter((event) => {
-    if (event.type !== 'match') return false
-    if (hasResult(event)) return false
-    if (!recordsScores(teamsById.get(event.team_id)?.name)) return false
-    const date = eventDate(event)
-    return date != null && date.getTime() <= now
-  })
-
   // The hero is just the head of that list, preferring a match and falling
   // back to the next event of any type (design-system.md §4.11).
   const nextFixture = toPlay.find((event) => event.type === 'match') ?? toPlay[0] ?? null
@@ -933,9 +836,9 @@ export default function Dashboard() {
           sees theirs — the dots follow the same visibility rules as every
           other number on this screen.
 
-          Shown to everyone, not gated like the stat band: "what is on in the
-          next two weeks" is the one question every role opens this app to
-          answer. */}
+          Shown to everyone: "what is on in the next two weeks" is the one
+          question every role opens this app to answer. The ops + W–D–L pair
+          under it is also for everyone now (Jay, 4 Sep 2026). */}
       <BlockTitle>Next two weeks</BlockTitle>
       <Card>
         <UpcomingStrip
@@ -954,70 +857,40 @@ export default function Dashboard() {
         />
       </Card>
 
-      {seasonRecordRows.length > 0 && (
-        <div className="mt-[18px]">
-          <SeasonRecordBand rows={seasonRecordRows} />
-        </div>
-      )}
+      {/* ⚠️ mt-[18px] IS LOAD-BEARING, AND IT IS HERE BECAUSE THIS BLOCK HAS
+          NO TITLE. Every other block on this screen gets its top gap from
+          BlockTitle's own mt-[18px]; the stat pair is the only one with no
+          heading above it. The value matches BlockTitle so the pair lines up
+          with every other block boundary. gap-1 (~4px) between the two rows
+          so they read as a pair, not two BlockTitle-spaced sections.
 
-      {/* STAFF ONLY (Jay, 6 Aug 2026). Hidden from anyone who cannot edit —
-          in practice parents and players.
-          
-          These three numbers are a management summary: how big is the squad,
-          how much is left to play, what is waiting on me. A parent has one
-          child and already knows the answer to all three, so the band was
-          three tiles of noise at the top of the screen they see most. It was
-          never a privacy problem — the values are scoped, and a parent saw
-          "Players in view: 12", not the club's 315 — it was just useless to
-          them.
-
-          ⚠️ THE THIRD NUMBER USED TO BE "AGE GROUPS" and was the weakest thing
-          on the screen: a count of how the club is configured, rendered at
-          42px in the loudest element the dashboard has. See `needsScore`
-          above for why an unscored match replaced it. The band's styling is
-          deliberately UNCHANGED — the complaint was that the loudest element
-          carried the weakest data, and the honest fix for that is better data,
-          not quietening the club website's strongest signature.
-
-          Gated on canEdit rather than on a role name so it follows the
-          permission that already exists: add a role later and it lands on the
-          correct side automatically. Coaches, managers, medics and admins
-          keep it.
-
-          What replaces it for parents is deliberately nothing, for now.
-
-          Four cells since 28 Aug 2026 — Registered players, Fixtures to play,
-          Tournaments, Needs a score. Fixtures and Tournaments are the split of
-          what "Fixtures to play" used to conflate (a tournament is a match, so
-          it was counted as an ordinary fixture). 2×2 on a phone, one row on
-          desktop — see StatBand for why. The first two tiles carry the phone
-          row-divider (border-b), dropped at desktop's single row. */}
-      {canEdit && (
+          Jay 4 Sep 2026 — parents see the first three; Needs a score was the
+          useless staff tile. The canEdit gate that hid this band is gone.
+          Numbers stay scoped to the viewer's visible squads (same listEvents /
+          listPlayers teamIds as the rest of Home). Everyone gets both rows
+          when the W–D–L helpers have a scoring squad; U6–U7 skip the record
+          row via scoringSquadRecords / recordsScores. Always grid-cols-3 —
+          never the 28 Aug 2×2 stack. */}
+      <div data-testid="home-stat-pair" className="mt-[18px] flex flex-col gap-1">
         <StatBand>
           <StatTile
             testId="stat-players"
             value={players.length}
             label={admin ? 'Registered players' : 'Players in view'}
-            className="border-b border-white/25 desktop:border-b-0"
           />
           <StatTile
             testId="stat-fixtures"
             value={fixturesToPlay.length}
             label="Fixtures to play"
-            className="border-b border-white/25 desktop:border-b-0"
           />
           <StatTile
             testId="stat-tournaments"
             value={tournamentsToPlay.length}
             label="Tournaments"
           />
-          <StatTile
-            testId="stat-needs-score"
-            value={needsScore.length}
-            label="Needs a score"
-          />
         </StatBand>
-      )}
+        {seasonRecordRows.length > 0 && <SeasonRecordBand rows={seasonRecordRows} />}
+      </div>
 
       {/* Mobile: one column, stacked in DOM order (upcoming, quick actions,
           last result). Desktop: 1.15fr / .85fr two-column grid
