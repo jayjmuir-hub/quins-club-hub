@@ -9,9 +9,12 @@ import { BlockTitle } from '../components/Editorial.jsx'
 import {
   importSeason,
   listCompetitions,
+  listKeepers,
+  setKeeper,
   setLeagueTeamCompetition,
   upsertCompetition,
 } from '../data/competitions.js'
+import { listClubMembers } from '../data/members.js'
 import { listAllLeagueTeams } from '../data/leagueTeams.js'
 import { DIVISIONS, divisionLong } from '../lib/division.js'
 import { parseRcmGrid } from '../lib/rcmGrid.js'
@@ -85,6 +88,12 @@ export default function AdminCompetitions() {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  // Keepers of the division being edited, and the club's people to pick
+  // from (one row per profile, active memberships only). The keeper is a
+  // job a person holds for one division — claude/plans/2026-09-02-standings-and-results.md.
+  const [keepers, setKeepers] = useState([])
+  const [people, setPeople] = useState([])
+  const [keeperPick, setKeeperPick] = useState('')
 
   const [gridText, setGridText] = useState('')
   const [seasonStartYear, setSeasonStartYear] = useState(String(startYear))
@@ -127,7 +136,42 @@ export default function AdminCompetitions() {
     setEditing({ ...EMPTY, season: thisSeason })
     setSaveError(null)
   }
+  async function loadKeepers(competitionId) {
+    try {
+      const [rows, members] = await Promise.all([listKeepers(competitionId), people.length ? Promise.resolve(null) : listClubMembers()])
+      setKeepers(rows)
+      if (members) {
+        const byProfile = new Map()
+        for (const m of members) {
+          if (m.status !== 'active' || !m.profile_id || !m.profiles?.full_name) continue
+          if (!byProfile.has(m.profile_id)) byProfile.set(m.profile_id, { id: m.profile_id, name: m.profiles.full_name })
+        }
+        setPeople([...byProfile.values()].sort((a, b) => a.name.localeCompare(b.name)))
+      }
+    } catch (err) {
+      setSaveError(err)
+    }
+  }
+
+  async function changeKeeper(profileId, isKeeper) {
+    if (!editing?.id || !profileId) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await setKeeper(editing.id, profileId, isKeeper)
+      setKeepers(await listKeepers(editing.id))
+      setKeeperPick('')
+    } catch (err) {
+      setSaveError(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function openEdit(competition) {
+    setKeepers([])
+    setKeeperPick('')
+    loadKeepers(competition.id)
     setEditing({
       ...competition,
       division: competition.division ?? '',
@@ -417,6 +461,37 @@ export default function AdminCompetitions() {
               <label><span className={LABEL}>Try bonus at</span><input aria-label="Try bonus threshold" className={INPUT} inputMode="numeric" value={editing.bonus_try_threshold} onChange={set('bonus_try_threshold')} placeholder="none" /></label>
               <label><span className={LABEL}>Losing bonus within</span><input aria-label="Losing bonus margin" className={INPUT} inputMode="numeric" value={editing.bonus_losing_margin} onChange={set('bonus_losing_margin')} placeholder="none" /></label>
             </div>
+            {editing.id && (
+              <div data-testid="keepers" className="rounded-[11px] border-[1.5px] border-line p-3">
+                <p className={LABEL}>Results keepers</p>
+                <p className="mb-2 text-xs text-ink-faint">They enter and confirm this division's results and get the Monday reminder. Admins can always do both.</p>
+                {keepers.length === 0 ? (
+                  <p className="mb-2 text-sm text-ink-muted">Nobody named yet.</p>
+                ) : (
+                  <ul className="mb-2 divide-y divide-line">
+                    {keepers.map((k) => (
+                      <li key={k.profile_id} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+                        <span className="font-bold text-ink">{k.profiles?.full_name ?? 'Someone'}</span>
+                        <button type="button" disabled={saving} onClick={() => changeKeeper(k.profile_id, false)} className="text-[12.5px] font-bold text-brand-ink underline-offset-2 hover:underline">
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex gap-2">
+                  <select aria-label="Add a keeper" className={INPUT} value={keeperPick} onChange={(e) => setKeeperPick(e.target.value)}>
+                    <option value="">Choose a person…</option>
+                    {people.filter((p) => !keepers.some((k) => k.profile_id === p.id)).map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <Button variant="secondary" size="sm" disabled={saving || !keeperPick} onClick={() => changeKeeper(keeperPick, true)}>
+                    Add
+                  </Button>
+                </div>
+              </div>
+            )}
             <label>
               <span className={LABEL}>Union results page</span>
               <input aria-label="Results URL" className={INPUT} value={editing.results_url} onChange={set('results_url')} placeholder="https://…" />

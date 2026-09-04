@@ -149,7 +149,8 @@ export async function importSeason(competitionId, { sides, fixtures }) {
 export async function listKeepers(competitionId) {
   const { data, error } = await supabase
     .from('competition_keepers')
-    .select('competition_id, profile_id')
+    // The name rides along for the Leagues screen; an admin can read profiles.
+    .select('competition_id, profile_id, profiles(full_name)')
     .eq('competition_id', competitionId)
   if (error) throw error
   return data ?? []

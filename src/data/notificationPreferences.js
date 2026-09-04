@@ -101,6 +101,14 @@ export const NOTIFICATION_CATEGORIES = [
     label: 'Training suggestions',
     hint: 'For coaches: when the performance director suggests sessions for your squad.',
   },
+  // The Monday results nudge to a division's keepers and the super admins
+  // (4 Sep 2026, db/migrations/20260906_results_nudge.sql). Nobody else is
+  // ever sent one, so the toggle only matters to those people.
+  {
+    key: 'results',
+    label: 'Results missing reminders',
+    hint: 'For results keepers and admins: Monday morning, when a division has results from last week still to enter.',
+  },
 ]
 
 /**
