@@ -558,7 +558,7 @@ describe('Dashboard — next fixture hero', () => {
 })
 
 describe('Dashboard — stats', () => {
-  it('counts players in scope, fixtures still to play, and matches needing a score', async () => {
+  it('counts players in scope, fixtures still to play, and tournaments — never Needs a score', async () => {
     renderDashboard()
     await screen.findByTestId('stat-players')
 
@@ -578,20 +578,10 @@ describe('Dashboard — stats', () => {
     // tournaments tile that counted every match would read '1'.
     expect(screen.getByTestId('stat-tournaments')).toHaveTextContent('0')
 
-    // ⚠️ REPLACED "AGE GROUPS" (which asserted '2') ON 10 Aug 2026. That tile
-    // counted `scopedTeams.length` — how the club is CONFIGURED — at 42px in
-    // the loudest element on the screen, and it was the one number on the band
-    // nobody could act on.
-    //
-    // ONE, and the fixture list is built so that only one thing can produce it:
-    //   PAST_UNSCORED  past match, no score   <- the only one that counts
-    //   PAST_SOCIAL    past, but a social     <- cannot carry a score
-    //   LAST_RESULT    past match, scored
-    //   OLDER_RESULT   past match, scored
-    //   NEXT_MATCH     a match, but not played yet
-    // So a count of 2 means socials are being counted, 3 means scored matches
-    // are, and 4 means it is not filtering at all.
-    expect(screen.getByTestId('stat-needs-score')).toHaveTextContent('1')
+    // Jay 4 Sep 2026: Needs a score was the useless staff tile. Dropped from
+    // Home; W–D–L is the second row now.
+    expect(screen.queryByTestId('stat-needs-score')).not.toBeInTheDocument()
+    expect(screen.queryByText(/needs a score/i)).not.toBeInTheDocument()
   })
 
   it('splits a tournament out of fixtures into its own tile', async () => {
@@ -608,53 +598,40 @@ describe('Dashboard — stats', () => {
     expect(screen.getByTestId('stat-tournaments')).toHaveTextContent('1')
   })
 
-  it('counts nothing when every played match has a score', async () => {
-    // ⚠️ THE INJECTED FAULT FOR THE TEST ABOVE. Without this, a tile hard-coded
-    // to "1" — or one counting any single past event — passes there and is
-    // wrong everywhere. Zero is a real answer on this band: "nothing is waiting
-    // on you" is what a management summary should be able to say.
-    listEventsMock.mockResolvedValue([NEXT_MATCH, SOONER_TRAINING, PAST_SOCIAL, LAST_RESULT])
-
-    renderDashboard()
-    await screen.findByTestId('stat-needs-score')
-
-    expect(screen.getByTestId('stat-needs-score')).toHaveTextContent('0')
-  })
-
-  it('does not count a match that has not kicked off yet', async () => {
-    // The boundary. `<= now` and not `< now`: a match starting this instant has
-    // not been played, so nobody owes a score for it.
-    listEventsMock.mockResolvedValue([NEXT_MATCH])
-
-    renderDashboard()
-    await screen.findByTestId('stat-needs-score')
-
-    expect(screen.getByTestId('stat-needs-score')).toHaveTextContent('0')
-  })
-
   // ⚠️ SPACING, PINNED AS A CLASS TOKEN. jsdom applies no CSS, so nothing
   // here can measure the gap — this asserts the token the gap depends on, the
   // same approach the masthead breakpoint and PhoneInput overlap regressions
   // use.
   //
   // The defect this guards: every other block on the dashboard takes its top
-  // gap from BlockTitle's mt-[18px], and the stat band is the only block with
+  // gap from BlockTitle's mt-[18px], and the stat pair is the only block with
   // no heading. It was silently living off the fixture hero's mb-4 until the
   // fortnight strip was inserted between them, at which point the band sat
   // flush against the strip's card with the two touching. Nothing failed —
   // that is exactly why it needs a token assertion rather than trusting the
   // layout to stay accidentally correct.
-  it('gives the stat band its own top gap, since no BlockTitle supplies one', async () => {
+  //
+  // Jay 4 Sep 2026: two thin 3-across rows (ops + W–D–L) sit in that slot as
+  // a pair. The 18px lives on the pair, not on each band, so the rows stay
+  // gap-1 apart rather than BlockTitle-apart. Each band is always
+  // grid-cols-3 — never the 28 Aug 2×2 phone stack.
+  it('gives the stat pair its own top gap, and keeps both rows 3-across', async () => {
     renderDashboard()
     await screen.findByTestId('stat-players')
 
-    // The band is the tile's grid parent's parent (tile -> grid -> band root).
-    const band = screen.getByTestId('stat-players').parentElement.parentElement
-    expect(band.className).toContain('mt-[18px]')
-    // And it really is the band, not some other ancestor that happens to
-    // carry a margin — without this the assertion above would pass on any
-    // wrapper.
-    expect(band.className).toContain('rounded-card')
+    const pair = screen.getByTestId('home-stat-pair')
+    expect(pair.className).toContain('mt-[18px]')
+    expect(pair.className).toContain('gap-1')
+
+    const opsGrid = screen.getByTestId('stat-players').parentElement
+    expect(opsGrid.className).toContain('grid-cols-3')
+    expect(opsGrid.className).not.toContain('grid-cols-2')
+    expect(opsGrid.className).not.toContain('desktop:grid-cols-4')
+
+    const recordGrid = within(screen.getAllByTestId('season-record-card')[0]).getByTestId('stat-won')
+      .parentElement
+    expect(recordGrid.className).toContain('grid-cols-3')
+    expect(recordGrid.className).not.toContain('grid-cols-2')
   })
 
   it('labels the tiles for the whole club when the user is an admin', async () => {
@@ -664,6 +641,10 @@ describe('Dashboard — stats', () => {
     await screen.findByTestId('stat-players')
 
     expect(screen.getByTestId('stat-players')).toHaveTextContent(/registered players/i)
+    const label = within(screen.getByTestId('stat-players')).getByText(/registered players/i)
+    expect(label.className).toContain('whitespace-nowrap')
+    expect(label.className).toContain('text-[9px]')
+    expect(label.className).toContain('mt-1.5')
   })
 
   it('labels the tiles as the user’s own slice when they are not an admin', async () => {
@@ -674,56 +655,28 @@ describe('Dashboard — stats', () => {
     expect(screen.getByTestId('stat-players')).toHaveTextContent(/players in view/i)
   })
 
-  // ⚠️ THE ONE LABEL THAT DOES NOT VARY BY ROLE, and deliberately so. "Age
-  // groups"/"Your groups" changed wording because a count of the whole club
-  // and a count of your own squads are different facts. A match with no score
-  // is the same fact either way — it is scoped by what the reader can see, not
-  // reworded — so an admin and a coach get the same words.
-  it('labels the score backlog the same for everyone who can see it', async () => {
-    for (const memberships of [ADMIN, COACH]) {
-      useMembershipsMock.mockReturnValue(membershipValue(memberships))
-      const { unmount } = renderDashboard()
-      expect(await screen.findByTestId('stat-needs-score')).toHaveTextContent(/needs a score/i)
-      unmount()
-    }
-  })
-
-  // Staff only, from 6 Aug 2026. Squad size, fixtures left and group count are
-  // a management summary; a parent has one child and knows all three already.
-  describe('is staff-only', () => {
+  // Jay 4 Sep 2026 — parents see the first three; Needs a score was the
+  // useless staff tile. The canEdit gate that hid the ops band is gone.
+  describe('everyone sees both rows', () => {
     it.each([
       ['a parent', PARENT],
       ['a player', PLAYER],
-    ])('hides the whole band from %s', async (_label, memberships) => {
-      useMembershipsMock.mockReturnValue(membershipValue(memberships))
-
-      renderDashboard()
-      // Wait for a sibling that always renders, so this cannot pass simply by
-      // asserting absence before the screen has loaded anything at all.
-      await screen.findByTestId('quick-actions')
-
-      expect(screen.queryByTestId('stat-players')).not.toBeInTheDocument()
-      expect(screen.queryByTestId('stat-fixtures')).not.toBeInTheDocument()
-      expect(screen.queryByTestId('stat-needs-score')).not.toBeInTheDocument()
-    })
-
-    it.each([
       ['a coach', COACH],
       ['an admin', ADMIN],
-    ])('still shows it to %s', async (_label, memberships) => {
-      // ⚠️ The injected fault for the pair above: without these, deleting the
-      // band outright would pass every hiding test.
+    ])('shows the ops row and the W–D–L row to %s', async (_label, memberships) => {
       useMembershipsMock.mockReturnValue(membershipValue(memberships))
 
       renderDashboard()
       expect(await screen.findByTestId('stat-players')).toBeInTheDocument()
       expect(screen.getByTestId('stat-fixtures')).toBeInTheDocument()
-      expect(screen.getByTestId('stat-needs-score')).toBeInTheDocument()
+      expect(screen.getByTestId('stat-tournaments')).toBeInTheDocument()
+      expect(screen.queryByTestId('stat-needs-score')).not.toBeInTheDocument()
+      expect(screen.getAllByTestId('stat-won').length).toBeGreaterThan(0)
+      expect(screen.getAllByTestId('stat-drawn').length).toBeGreaterThan(0)
+      expect(screen.getAllByTestId('stat-lost').length).toBeGreaterThan(0)
     })
 
-    it('leaves the rest of the parent home screen intact', async () => {
-      // Removing the band must not take the fixture hero or the upcoming list
-      // with it — those are the reason a parent opens this screen.
+    it('keeps parent Home numbers scoped and leaves the rest of the screen intact', async () => {
       useMembershipsMock.mockReturnValue(membershipValue(PARENT))
 
       renderDashboard()
@@ -733,7 +686,7 @@ describe('Dashboard — stats', () => {
       expect(screen.getByTestId('upcoming-strip')).toBeInTheDocument()
       expect(screen.getByTestId('last-result')).toBeInTheDocument()
       expect(screen.getByTestId('squad-staff-block')).toBeInTheDocument()
-      expect(screen.queryByTestId('stat-players')).not.toBeInTheDocument()
+      expect(screen.getByTestId('stat-players')).toHaveTextContent(/players in view/i)
     })
   })
 })
@@ -971,12 +924,7 @@ describe('Dashboard — quick actions', () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
 
     renderDashboard()
-    // ⚠️ Waits on quick-actions, NOT stat-players. The stat band is staff-only
-    // from 6 Aug 2026, so for every read-only role in this block it never
-    // appears and a findByTestId('stat-players') just times out. These tests
-    // were using the band as a proxy for "the screen has loaded"; the thing
-    // they actually assert on is the right signal.
-    await screen.findByTestId('quick-actions')
+    await screen.findByTestId('stat-players')
 
     expect(actionNames()).toEqual(['View schedule', 'View roster'])
     expect(screen.getByText(/signed in as a parent/i)).toBeInTheDocument()
@@ -1164,21 +1112,27 @@ describe('Dashboard — all-matches season record', () => {
   // NOW is 20 Jul 2026 → club season 2025-26. OLDER_RESULT (U10, 10–20) is in
   // that window; LAST_RESULT is 1st XV.
 
-  it('puts a Season record band under the fortnight strip for a parent’s scoring squad', async () => {
+  it('puts a thin W–D–L band under the fortnight strip for a parent’s scoring squad', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(PARENT))
     renderDashboard()
     const band = await screen.findByTestId('season-record-band')
     const strip = screen.getByTestId('upcoming-strip')
     const upcoming = screen.getByTestId('upcoming-list')
+    const ops = screen.getByTestId('stat-players')
     expect(strip.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(band.compareDocumentPosition(upcoming) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // Ops row then record row, still in the same slot as today.
+    expect(ops.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const card = within(band).getByTestId('season-record-card')
     expect(card).toHaveTextContent('U10')
+    expect(within(card).getByTestId('stat-won')).toHaveTextContent('0')
+    expect(within(card).getByTestId('stat-drawn')).toHaveTextContent('0')
+    expect(within(card).getByTestId('stat-lost')).toHaveTextContent('1')
     expect(within(card).getByTestId('season-record-wdl')).toHaveTextContent('0–0–1')
     expect(card).toHaveTextContent('from scores on Hub · 2025-26')
   })
 
-  it('shows one card per scoring squad for an admin, never a club rollup', async () => {
+  it('shows one W–D–L band per scoring squad for an admin, never a club rollup', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
     renderDashboard()
     const band = await screen.findByTestId('season-record-band')
@@ -1186,12 +1140,14 @@ describe('Dashboard — all-matches season record', () => {
     expect(cards).toHaveLength(2)
     // visibleTeams sorts by sort_order: U10 (5) then 1st XV (13).
     expect(cards[0]).toHaveTextContent('U10')
+    expect(within(cards[0]).getByTestId('stat-lost')).toHaveTextContent('1')
     expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('0–0–1')
     expect(cards[1]).toHaveTextContent('Senior Men 1st XV')
+    expect(within(cards[1]).getByTestId('stat-won')).toHaveTextContent('1')
     expect(within(cards[1]).getByTestId('season-record-wdl')).toHaveTextContent('1–0–0')
   })
 
-  it('hides the band when every visible squad is U6/U7', async () => {
+  it('hides W–D–L when every visible squad is U6/U7, but still shows the ops row', async () => {
     const u6 = { id: 'team-u6', name: 'U6 Tag', sort_order: 1 }
     useMembershipsMock.mockReturnValue(
       membershipValue([{ id: 'm-u6', status: 'active', role: 'parent', team_id: 'team-u6', player_id: 'p-u6' }], [u6]),
@@ -1207,8 +1163,10 @@ describe('Dashboard — all-matches season record', () => {
       },
     ])
     renderDashboard()
-    await screen.findByTestId('quick-actions')
+    expect(await screen.findByTestId('stat-players')).toBeInTheDocument()
+    expect(screen.getByTestId('stat-fixtures')).toBeInTheDocument()
     expect(screen.queryByTestId('season-record-band')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('stat-won')).not.toBeInTheDocument()
   })
 
   it('asks listEvents for the same defaultEventWindow Home already shared with Schedule', async () => {

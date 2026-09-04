@@ -49,22 +49,27 @@ const events = [
 const record = squadMatchRecord(events, { teamId: 't1', at: AT })
 
 describe('SeasonRecordCard', () => {
-  it('renders the Home band: headline W–D–L, split pills, Hub footnote', () => {
+  it('renders a thin Won / Drawn / Lost band with Hub footnote', () => {
     render(<SeasonRecordCard teamName="U16B Contact" record={record} />)
     const card = screen.getByTestId('season-record-card')
-    expect(card).toHaveTextContent(/season record/i)
     expect(card).toHaveTextContent(/U16B Contact/)
-    expect(card).toHaveTextContent(/All matches/)
-    expect(card).toHaveTextContent(/league · tournaments · friendlies/)
+    expect(within(card).getByTestId('stat-won')).toHaveTextContent('2')
+    expect(within(card).getByTestId('stat-drawn')).toHaveTextContent('1')
+    expect(within(card).getByTestId('stat-lost')).toHaveTextContent('1')
+    expect(within(card).getByTestId('stat-won')).toHaveTextContent(/won/i)
     expect(within(card).getByTestId('season-record-wdl')).toHaveTextContent(formatWdl(record))
     expect(card).toHaveTextContent('from scores on Hub · 2026-27')
-    expect(within(card).getByTestId('season-record-pill-league')).toHaveTextContent(`League ${formatWdl(record.league)}`)
-    expect(within(card).getByTestId('season-record-pill-tournaments')).toHaveTextContent(
-      `Tournaments ${formatWdl(record.tournaments)}`,
-    )
-    expect(within(card).getByTestId('season-record-pill-friendlies')).toHaveTextContent(
-      `Friendlies ${formatWdl(record.friendlies)}`,
-    )
+    const grid = within(card).getByTestId('stat-won').parentElement
+    expect(grid.className).toContain('grid-cols-3')
+    expect(grid.className).toContain('bg-stat-band')
+  })
+
+  it('keeps labels on one line and leaves a gap under the numeral', () => {
+    render(<SeasonRecordCard teamName="U16B Contact" record={record} />)
+    const label = within(screen.getByTestId('stat-won')).getByText(/^won$/i)
+    expect(label.className).toContain('whitespace-nowrap')
+    expect(label.className).toContain('mt-1.5')
+    expect(label.className).toContain('text-[9px]')
   })
 })
 
