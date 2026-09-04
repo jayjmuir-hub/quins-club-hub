@@ -228,3 +228,24 @@ describe('Admin sub-menu', () => {
     expect(screen.queryByTestId('submenu-admin')).toBeNull()
   })
 })
+
+describe('the Chat unread count (4 Sep 2026)', () => {
+  // Jay, asked "dot or number" against the 23 Aug dot-only ruling: number.
+  // The sidebar wears the same count the installed icon does; the phone dock
+  // keeps its dot. Zero renders nothing, like the Admin pill.
+  it('shows the count on the Chat item with a spoken label', () => {
+    renderAt('/', { chatUnread: 4 })
+    const badge = screen.getByTestId('chat-unread-badge')
+    expect(badge).toHaveTextContent('4')
+    expect(badge).toHaveAttribute('aria-label', '4 unread messages')
+    expect(screen.getByRole('link', { name: /^Chat/ })).toContainElement(badge)
+  })
+
+  it('CONTROL: renders nothing at zero, and "1" is singular', () => {
+    const { unmount } = renderAt('/', { chatUnread: 0 })
+    expect(screen.queryByTestId('chat-unread-badge')).not.toBeInTheDocument()
+    unmount()
+    renderAt('/', { chatUnread: 1 })
+    expect(screen.getByTestId('chat-unread-badge')).toHaveAttribute('aria-label', '1 unread message')
+  })
+})

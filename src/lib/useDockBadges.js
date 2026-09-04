@@ -10,10 +10,16 @@ import useAdminWaiting from './useAdminWaiting.js'
 // The same red that marks the active tab, carrying meaning rather than
 // decoration.
 //
-// ⚠️ A DOT, NOT A COUNT. "3 unread" invites a parent to feel they owe the
-// app three reads; a dot says "something new" and goes away when they look.
-// The sidebar's Admin item shows the number because an admin IS the person
-// who owes those reviews.
+// ⚠️ A DOT, NOT A COUNT — ON THE PHONE DOCK. "3 unread" invites a parent to
+// feel they owe the app three reads; a dot says "something new" and goes
+// away when they look. The sidebar's Admin item shows the number because an
+// admin IS the person who owes those reviews.
+// ⚠️ OVERRULED FOR THE DESKTOP SIDEBAR, 4 Sep 2026 — Jay, asked "dot or
+// number" against this ruling with the ruling in front of him: number. The
+// same count already sits on the installed app's icon (round 7), so the
+// sidebar showing it is one more surface for a number the phone's launcher
+// shows anyway. The dock keeps its dot; `chatCount` is what the sidebar
+// reads. Same recount, same number — they cannot disagree.
 //
 // Refresh policy, in order of cheapness:
 //   - chat: realtime on `messages` (already the screen's own subscription
@@ -35,11 +41,12 @@ function onAny(pathname, paths) {
 
 /**
  * @param {{ userId: string|null, admin: boolean, enabled?: boolean }} args
- * @returns {{ '/chat': boolean, '/more': boolean }}
+ * @returns {{ '/chat': boolean, '/more': boolean, chatCount: number }}
  */
 export default function useDockBadges({ userId, admin, enabled = true }) {
   const { pathname } = useLocation()
   const [chat, setChat] = useState(false)
+  const [chatCount, setChatCount] = useState(0)
   const [chatTick, setChatTick] = useState(0)
   const [adminTick, setAdminTick] = useState(0)
 
@@ -59,6 +66,7 @@ export default function useDockBadges({ userId, admin, enabled = true }) {
   useEffect(() => {
     if (!enabled || !userId) {
       setChat(false)
+      setChatCount(0)
       // Signed out: a stale count on the icon is a claim about an account
       // nobody is in.
       setAppBadge(0)
@@ -70,12 +78,17 @@ export default function useDockBadges({ userId, admin, enabled = true }) {
         .then((n) => {
           if (!mounted) return
           setChat(n > 0)
+          setChatCount(n)
           // Round 7, Jay: "add a new chat message count to the app icon".
           // Same number, same recount — the installed icon and the dock dot
           // cannot disagree. A no-op in a plain tab (src/lib/appBadge.js).
           setAppBadge(n)
         })
-        .catch(() => mounted && setChat(false))
+        .catch(() => {
+          if (!mounted) return
+          setChat(false)
+          setChatCount(0)
+        })
     recount()
     const unsubscribe = subscribeMessages(recount)
     return () => {
@@ -88,5 +101,5 @@ export default function useDockBadges({ userId, admin, enabled = true }) {
 
   // While you are ON the screen the dot points at, it is noise — Chat is
   // clearing itself as you read.
-  return { '/chat': chat && !onChat, '/more': more && !onAccounts }
+  return { '/chat': chat && !onChat, '/more': more && !onAccounts, chatCount: onChat ? 0 : chatCount }
 }

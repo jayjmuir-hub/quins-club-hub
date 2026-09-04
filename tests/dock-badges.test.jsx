@@ -45,7 +45,7 @@ describe('useDockBadges', () => {
     countUnreadMessagesMock.mockResolvedValue(2)
     countAdminWaitingMock.mockResolvedValue(1)
     renderAt('/')
-    await waitFor(() => expect(read()).toEqual({ '/chat': true, '/more': true }))
+    await waitFor(() => expect(read()).toEqual({ '/chat': true, '/more': true, chatCount: 2 }))
   })
 
   it('never lights More for a non-admin, and does not even ask', async () => {
@@ -57,11 +57,19 @@ describe('useDockBadges', () => {
   })
 
   // While you are on the screen the dot points at, it is noise.
-  it('suppresses the Chat dot while on /chat', async () => {
+  it('suppresses the Chat dot AND the sidebar count while on /chat', async () => {
     countUnreadMessagesMock.mockResolvedValue(4)
     renderAt('/chat')
     await waitFor(() => expect(countUnreadMessagesMock).toHaveBeenCalled())
     expect(read()['/chat']).toBe(false)
+    expect(read().chatCount).toBe(0)
+  })
+
+  // 4 Sep 2026: the sidebar wears the NUMBER (Jay's ruling over the dot).
+  it('hands the sidebar the unread number off /chat', async () => {
+    countUnreadMessagesMock.mockResolvedValue(4)
+    renderAt('/roster')
+    await waitFor(() => expect(read().chatCount).toBe(4))
   })
 
   // A count that cannot be read must never paint a dot the screen cannot clear.
@@ -70,7 +78,7 @@ describe('useDockBadges', () => {
     countAdminWaitingMock.mockRejectedValue(new Error('offline'))
     renderAt('/')
     await waitFor(() => expect(countUnreadMessagesMock).toHaveBeenCalled())
-    expect(read()).toEqual({ '/chat': false, '/more': false })
+    expect(read()).toEqual({ '/chat': false, '/more': false, chatCount: 0 })
   })
 
   it('subscribes to message changes and recounts on each one', async () => {
@@ -90,6 +98,6 @@ describe('useDockBadges', () => {
     renderAt('/', { enabled: false })
     expect(countUnreadMessagesMock).not.toHaveBeenCalled()
     expect(countAdminWaitingMock).not.toHaveBeenCalled()
-    expect(read()).toEqual({ '/chat': false, '/more': false })
+    expect(read()).toEqual({ '/chat': false, '/more': false, chatCount: 0 })
   })
 })
