@@ -1,10 +1,10 @@
 # The senior section: a section on each squad, section-wide reading, one overview
 
-**Status: PHASE 1 BUILT, 3 Sep 2026 — pull request pending.** The section column,
-the three read arms, the Club-tab selector, the overview screen and the nav
-entry. Phase 2 (section options on the Roster and Schedule filters, a club
-setting for cross-section rosters, the all-seniors channel and notice) is NOT
-built. Dated 2026-09-03.
+**Status: PHASE 1 BUILT (#685, 3 Sep 2026); the filter half of phase 2 BUILT
+(#687, 4 Sep 2026).** The section column, the three read arms, the Club-tab
+selector, the overview screen, the nav entry, and "Senior men" / "Senior
+women" on the Roster and Schedule filters. Still NOT built: a club setting for
+cross-section rosters, and the all-seniors channel and notice. Dated 2026-09-03.
 
 Grows out of `claude/plans/2026-09-02-senior-squads.md` ("Senior Section
 overview", step 9 of its order of work), pulled forward because the pieces

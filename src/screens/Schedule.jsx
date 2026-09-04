@@ -7,6 +7,7 @@ import Empty from '../components/Empty.jsx'
 import DaySheet from '../components/DaySheet.jsx'
 import FixtureRow from '../components/FixtureRow.jsx'
 import TeamFilter, { ALL_TEAMS_ID, PillButton } from '../components/TeamFilter.jsx'
+import { sectionGroups, teamIdsForFilter } from '../lib/section.js'
 import Availability from './Availability.jsx'
 import Register from './Register.jsx'
 import EventDetail from './EventDetail.jsx'
@@ -669,10 +670,17 @@ export default function Schedule() {
   // user navigates away and back. Reconciling against the live scope on every
   // render, rather than trusting the stored value, prevents that.
   // Roster.jsx does the same, for the same reason.
-  const activeFilter = teamIds.includes(teamFilter) ? teamFilter : ALL_TEAMS_ID
+  // A section choice ("Senior men") is valid while any of its squads is in
+  // scope — src/lib/section.js, phase 2 of the senior section.
+  const filterGroups = sectionGroups(scopedTeams)
+  const activeFilter =
+    teamIds.includes(teamFilter) || filterGroups.some((group) => group.id === teamFilter)
+      ? teamFilter
+      : ALL_TEAMS_ID
+  const filterTeamIds = teamIdsForFilter(activeFilter, scopedTeams, ALL_TEAMS_ID)
 
   const visible =
-    activeFilter === ALL_TEAMS_ID ? events : events.filter((event) => event.team_id === activeFilter)
+    filterTeamIds == null ? events : events.filter((event) => filterTeamIds.includes(event.team_id))
   // The type filter applies to Upcoming ONLY, which is what was asked for and
   // is also the only place it means anything: Results is by definition the
   // fixtures that have a score on them, so filtering it to "Training" would
@@ -801,7 +809,7 @@ export default function Schedule() {
               teams there is nothing to filter between, and TeamFilter already
               renders nothing for an empty list. */}
           {tab !== 'calendar' && scopedTeams.length > 1 && (
-            <TeamFilter teams={scopedTeams} selected={activeFilter} onChange={persistFilter} />
+            <TeamFilter teams={scopedTeams} groups={filterGroups} selected={activeFilter} onChange={persistFilter} />
           )}
 
           {/* Event-type filter: Upcoming only, and for EVERYONE — a parent
