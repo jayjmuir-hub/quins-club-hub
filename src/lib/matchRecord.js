@@ -8,9 +8,12 @@
 //
 // Pure. Screens fetch enough of the season window and pass the rows in.
 
+import { ageBandFromTeamName } from './ageGroup.js'
 import { eventDate, hasResult, resultOutcome, clubWallTimeToUtc } from './eventFormat.js'
 import { recordsScores } from './minis.js'
 import { seasonLabelFor } from './season.js'
+
+export const CLUB_JUNIORS_LABEL = 'Club juniors'
 
 export function emptyLine() {
   return { wins: 0, draws: 0, losses: 0, played: 0 }
@@ -74,6 +77,51 @@ function emptyRecord(season) {
   }
 }
 
+function addLine(into, from) {
+  if (!from) return
+  into.wins += from.wins
+  into.draws += from.draws
+  into.losses += from.losses
+  into.played += from.played
+}
+
+/** Youth age-group name (U8…), not seniors. U6–U7 never reach here. */
+function isJuniorScoringRow(row) {
+  return ageBandFromTeamName(row?.team?.name) != null
+}
+
+/** Sum all-matches W–D–L lines. Home uses this for the Club juniors band. */
+export function sumMatchRecords(records) {
+  const list = Array.isArray(records) ? records : []
+  const out = emptyRecord(list[0]?.season ?? '')
+  for (const rec of list) {
+    addLine(out, rec)
+    addLine(out.league, rec?.league)
+    addLine(out.tournaments, rec?.tournaments)
+    addLine(out.friendlies, rec?.friendlies)
+  }
+  return out
+}
+
+/**
+ * Home-only: when more than one junior scoring squad is in view, one
+ * "Club juniors" row instead of N thin bands. Seniors stay per-squad.
+ * A lone junior keeps its own name. scoringSquadRecords is still per-squad.
+ */
+export function clubJuniorsHomeRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows ?? []
+  const juniors = rows.filter(isJuniorScoringRow)
+  if (juniors.length <= 1) return rows
+  const rest = rows.filter((row) => !isJuniorScoringRow(row))
+  return [
+    {
+      team: { id: 'club-juniors', name: CLUB_JUNIORS_LABEL },
+      record: sumMatchRecords(juniors.map((row) => row.record)),
+    },
+    ...rest,
+  ]
+}
+
 /**
  * W–D–L for one squad from already-loaded events.
  * @param {object[]} events
@@ -101,8 +149,8 @@ export function squadMatchRecord(events, { teamId, at = new Date() } = {}) {
 }
 
 /**
- * One row per squad that records scores. Never a club-wide rollup.
- * U6–U7 are omitted (recordsScores).
+ * One row per squad that records scores. Still per-squad — Home collapses
+ * juniors via clubJuniorsHomeRows. U6–U7 are omitted (recordsScores).
  */
 export function scoringSquadRecords(events, teams, { at = new Date() } = {}) {
   if (!Array.isArray(teams)) return []

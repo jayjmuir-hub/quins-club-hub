@@ -1125,6 +1125,7 @@ describe('Dashboard — all-matches season record', () => {
     expect(ops.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const card = within(band).getByTestId('season-record-card')
     expect(card).toHaveTextContent('U10')
+    expect(card).not.toHaveTextContent('Club juniors')
     expect(within(card).getByTestId('stat-won')).toHaveTextContent('0')
     expect(within(card).getByTestId('stat-drawn')).toHaveTextContent('0')
     expect(within(card).getByTestId('stat-lost')).toHaveTextContent('1')
@@ -1132,7 +1133,7 @@ describe('Dashboard — all-matches season record', () => {
     expect(card).toHaveTextContent('from scores on Hub · 2025-26')
   })
 
-  it('shows one W–D–L band per scoring squad for an admin, never a club rollup', async () => {
+  it('shows one W–D–L band per scoring squad when Home has only one junior', async () => {
     useMembershipsMock.mockReturnValue(membershipValue(ADMIN))
     renderDashboard()
     const band = await screen.findByTestId('season-record-band')
@@ -1140,11 +1141,69 @@ describe('Dashboard — all-matches season record', () => {
     expect(cards).toHaveLength(2)
     // visibleTeams sorts by sort_order: U10 (5) then 1st XV (13).
     expect(cards[0]).toHaveTextContent('U10')
+    expect(cards[0]).not.toHaveTextContent('Club juniors')
     expect(within(cards[0]).getByTestId('stat-lost')).toHaveTextContent('1')
     expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('0–0–1')
     expect(cards[1]).toHaveTextContent('Senior Men 1st XV')
     expect(within(cards[1]).getByTestId('stat-won')).toHaveTextContent('1')
     expect(within(cards[1]).getByTestId('season-record-wdl')).toHaveTextContent('1–0–0')
+  })
+
+  it('combines several junior scoring squads into one Club juniors band', async () => {
+    const u6 = { id: 'team-u6', name: 'U6 Tag', sort_order: 1 }
+    const u8 = { id: 'team-u8', name: 'U8 Tag', sort_order: 3 }
+    const u9 = { id: 'team-u9', name: 'U9 Mixed', sort_order: 4 }
+    useMembershipsMock.mockReturnValue(
+      membershipValue(ADMIN, [u6, u8, u9, TEAM_U10, TEAM_FIRST_XV]),
+    )
+    listEventsMock.mockResolvedValue([
+      ...EVENTS,
+      {
+        id: 'e-u8-win',
+        team_id: 'team-u8',
+        type: 'match',
+        opponent: 'Harlequins Abu Dhabi',
+        starts_at: '2026-07-02T13:00:00Z',
+        result_us: 18,
+        result_them: 6,
+      },
+      {
+        id: 'e-u9-draw',
+        team_id: 'team-u9',
+        type: 'match',
+        opponent: 'Jebel Ali Dragons',
+        starts_at: '2026-07-05T13:00:00Z',
+        result_us: 12,
+        result_them: 12,
+      },
+      {
+        id: 'e-u6-scored',
+        team_id: 'team-u6',
+        type: 'match',
+        opponent: 'Sharjah Wanderers',
+        starts_at: '2026-07-06T13:00:00Z',
+        result_us: 5,
+        result_them: 0,
+      },
+    ])
+    renderDashboard()
+    const band = await screen.findByTestId('season-record-band')
+    const cards = within(band).getAllByTestId('season-record-card')
+    expect(cards).toHaveLength(2)
+    expect(cards[0]).toHaveTextContent('Club juniors')
+    expect(cards[0]).not.toHaveTextContent('All juniors')
+    expect(cards[0]).not.toHaveTextContent('Club-wide')
+    expect(within(cards[0]).getByTestId('stat-won')).toHaveTextContent('1')
+    expect(within(cards[0]).getByTestId('stat-drawn')).toHaveTextContent('1')
+    expect(within(cards[0]).getByTestId('stat-lost')).toHaveTextContent('1')
+    expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('1–1–1')
+    expect(cards[1]).toHaveTextContent('Senior Men 1st XV')
+    expect(within(cards[1]).getByTestId('season-record-wdl')).toHaveTextContent('1–0–0')
+    expect(band).not.toHaveTextContent('U8 Tag')
+    expect(band).not.toHaveTextContent('U9 Mixed')
+    expect(band).not.toHaveTextContent('U6 Tag')
+    // A lone U10 label would mean the rollup did not fire.
+    expect(within(cards[0]).queryByText(/^U10$/)).not.toBeInTheDocument()
   })
 
   it('hides W–D–L when every visible squad is U6/U7, but still shows the ops row', async () => {

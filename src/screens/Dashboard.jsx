@@ -36,7 +36,7 @@ import { pinnedNotices,
 import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
 import { StatBand, StatTile } from '../components/StatBand.jsx'
 import { defaultEventWindow } from '../lib/eventWindow.js'
-import { scoringSquadRecords } from '../lib/matchRecord.js'
+import { clubJuniorsHomeRows, scoringSquadRecords } from '../lib/matchRecord.js'
 import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { canEditEvent, canEditTeam, isAdmin, roleLabel, visibleTeams } from '../lib/scope.js'
@@ -731,7 +731,8 @@ export default function Dashboard() {
   const upcoming = toPlay.slice(0, 5)
 
   const seasonRecordRows = useMemo(
-    () => scoringSquadRecords(events, scopedTeams, { at: new Date(now) }),
+    () =>
+      clubJuniorsHomeRows(scoringSquadRecords(events, scopedTeams, { at: new Date(now) })),
     [events, scopedTeams, now],
   )
 
@@ -869,7 +870,9 @@ export default function Dashboard() {
           Numbers stay scoped to the viewer's visible squads (same listEvents /
           listPlayers teamIds as the rest of Home). Everyone gets both rows
           when the W–D–L helpers have a scoring squad; U6–U7 skip the record
-          row via scoringSquadRecords / recordsScores. Always grid-cols-3 —
+          row via scoringSquadRecords / recordsScores. More than one junior
+          scoring squad collapses to one Club juniors band (Jay, 4 Sep 2026);
+          a lone junior and every senior stay per-squad. Always grid-cols-3 —
           never the 28 Aug 2×2 stack. */}
       <div data-testid="home-stat-pair" className="mt-[18px] flex flex-col gap-1">
         <StatBand>

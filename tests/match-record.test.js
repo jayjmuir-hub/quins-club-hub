@@ -1,12 +1,14 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import {
+  clubJuniorsHomeRows,
   competitionBucket,
   formatWdl,
   isTournamentContainer,
   scoringSquadRecords,
   seasonWindowFor,
   squadMatchRecord,
+  sumMatchRecords,
   windowCoveringSeason,
 } from '../src/lib/matchRecord.js'
 
@@ -218,5 +220,71 @@ describe('scoringSquadRecords', () => {
     expect(rows).toHaveLength(2)
     expect(formatWdl(rows[0].record)).toBe('1–0–0')
     expect(formatWdl(rows[1].record)).toBe('0–0–1')
+  })
+})
+
+describe('sumMatchRecords', () => {
+  it('adds wins, draws and losses across squad records', () => {
+    const a = squadMatchRecord(
+      [match({ team_id: 't-u16b', result_us: 20, result_them: 0 })],
+      { teamId: 't-u16b', at: SEASON_NOW },
+    )
+    const b = squadMatchRecord(
+      [
+        match({ id: 'e2', team_id: 't-u14', result_us: 12, result_them: 14 }),
+        match({
+          id: 'e3',
+          team_id: 't-u14',
+          result_us: 10,
+          result_them: 10,
+          competition_type: 'tournament',
+          tournament_id: 'trn',
+        }),
+      ],
+      { teamId: 't-u14', at: SEASON_NOW },
+    )
+    expect(formatWdl(sumMatchRecords([a, b]))).toBe('1–1–1')
+  })
+})
+
+describe('clubJuniorsHomeRows', () => {
+  it('rolls more than one junior scoring squad into one Club juniors row', () => {
+    const teams = [
+      { id: 't-u8', name: 'U8 Tag' },
+      { id: 't-u9', name: 'U9 Mixed' },
+      { id: 't-u6', name: 'U6 Tag' },
+      { id: 't-1xv', name: 'Senior Men 1st XV', is_senior: true, section: 'senior_men' },
+    ]
+    const events = [
+      match({ id: 'e-u8', team_id: 't-u8', result_us: 20, result_them: 0 }),
+      match({ id: 'e-u9', team_id: 't-u9', result_us: 8, result_them: 12 }),
+      match({ id: 'e-u6', team_id: 't-u6', result_us: 5, result_them: 0 }),
+      match({ id: 'e-xv', team_id: 't-1xv', result_us: 31, result_them: 19 }),
+    ]
+    const rows = clubJuniorsHomeRows(scoringSquadRecords(events, teams, { at: SEASON_NOW }))
+    expect(rows).toHaveLength(2)
+    expect(rows[0].team.name).toBe('Club juniors')
+    expect(formatWdl(rows[0].record)).toBe('1–0–1')
+    expect(rows[1].team.name).toBe('Senior Men 1st XV')
+    expect(formatWdl(rows[1].record)).toBe('1–0–0')
+    expect(rows.map((r) => r.team.name)).not.toContain('U8 Tag')
+    expect(rows.map((r) => r.team.name)).not.toContain('U9 Mixed')
+    expect(rows.map((r) => r.team.name)).not.toContain('U6 Tag')
+  })
+
+  it('leaves a single junior scoring squad labelled as that squad', () => {
+    const teams = [
+      { id: 't-u10', name: 'U10 Mixed' },
+      { id: 't-1xv', name: 'Senior Men 1st XV' },
+    ]
+    const events = [
+      match({ id: 'e-u10', team_id: 't-u10', result_us: 10, result_them: 20 }),
+      match({ id: 'e-xv', team_id: 't-1xv', result_us: 31, result_them: 19 }),
+    ]
+    const rows = clubJuniorsHomeRows(scoringSquadRecords(events, teams, { at: SEASON_NOW }))
+    expect(rows.map((r) => r.team.name)).toEqual(['U10 Mixed', 'Senior Men 1st XV'])
+    expect(rows.map((r) => r.team.name)).not.toContain('Club juniors')
+    expect(formatWdl(rows[0].record)).toBe('0–0–1')
+    expect(formatWdl(rows[1].record)).toBe('1–0–0')
   })
 })
