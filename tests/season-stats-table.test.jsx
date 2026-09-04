@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SeasonStatsTable from '../src/components/SeasonStatsTable.jsx'
@@ -37,5 +37,24 @@ describe('SeasonStatsTable', () => {
   it('says so when there is nothing', () => {
     render(<SeasonStatsTable rows={[]} />)
     expect(screen.getByText('No games on a sheet yet.')).toBeInTheDocument()
+  })
+  it('Games, Starts and Bench are shown in full; only the six stat columns are abbreviated', () => {
+    render(<SeasonStatsTable rows={ROWS} />)
+    expect(screen.getByRole('button', { name: 'Games' })).toHaveTextContent(/^Games$/)
+    expect(screen.getByRole('button', { name: 'Starts' })).toHaveTextContent(/^Starts$/)
+    expect(screen.getByRole('button', { name: 'Bench' })).toHaveTextContent(/^Bench$/)
+    expect(screen.getByRole('button', { name: 'Tries' })).toHaveTextContent(/^T$/)
+    expect(screen.getByRole('button', { name: 'Yellow cards' })).toHaveTextContent(/^YC$/)
+  })
+  it('two name-only rows with the same name do not share a React key', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const twins = [
+      { player_id: null, full_name: 'Harness Twin', games: 2, starts: 2, bench: 0, tries: 0, conversions: 0, penalties: 0, drops: 0, yellows: 0, reds: 0 },
+      { player_id: null, full_name: 'Harness Twin', games: 1, starts: 1, bench: 0, tries: 0, conversions: 0, penalties: 0, drops: 0, yellows: 0, reds: 0 },
+    ]
+    render(<SeasonStatsTable rows={twins} />)
+    expect(screen.getAllByTestId('season-stats-row')).toHaveLength(2)
+    expect(spy.mock.calls.some((args) => String(args[0]).includes('same key'))).toBe(false)
+    spy.mockRestore()
   })
 })

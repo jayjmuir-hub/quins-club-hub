@@ -7,9 +7,9 @@
 import { useMemo, useState } from 'react'
 
 const COLUMNS = [
-  { key: 'games', short: 'G', label: 'Games' },
-  { key: 'starts', short: 'St', label: 'Starts' },
-  { key: 'bench', short: 'B', label: 'Bench' },
+  { key: 'games', short: 'Games', label: 'Games' },
+  { key: 'starts', short: 'Starts', label: 'Starts' },
+  { key: 'bench', short: 'Bench', label: 'Bench' },
   { key: 'tries', short: 'T', label: 'Tries' },
   { key: 'conversions', short: 'C', label: 'Conversions' },
   { key: 'penalties', short: 'P', label: 'Penalties' },
@@ -66,8 +66,8 @@ export default function SeasonStatsTable({ rows, limit, testId = 'season-stats-t
           </tr>
         </thead>
         <tbody>
-          {shown.map((row) => (
-            <tr key={row.player_id ?? row.full_name} data-testid="season-stats-row" className="border-t border-line">
+          {shown.map((row, index) => (
+            <tr key={row.player_id ?? `name:${row.full_name}:${index}`} data-testid="season-stats-row" className="border-t border-line">
               <td className="px-1.5 py-1.5 text-left font-semibold text-ink">{row.full_name}</td>
               {COLUMNS.map((col) => (
                 <td key={col.key} className="px-1.5 py-1.5 text-right text-ink">
