@@ -12,6 +12,7 @@ import {
   getMatchSheet,
   saveMatchSheet,
   saveMatchSheetCards,
+  saveMatchSheetScores,
   saveMatchSheetSlots,
   setMatchSheetStatus,
 } from '../data/matchSheets.js'
@@ -85,6 +86,9 @@ function leftColumn(count) {
 
 /** The five blank discipline rows the paper form provides. */
 const CARD_ROWS = 5
+
+/** Scorer rows offered by default. A row with no kind or player is ignored on save. */
+const SCORE_ROWS = 6
 
 // ── The draft ───────────────────────────────────────────────────────────────
 //
@@ -381,6 +385,33 @@ function emptyCards() {
   }))
 }
 
+function emptyScoreRows() {
+  return Array.from({ length: SCORE_ROWS }, () => ({ kind: '', slot: '', full_name: '', qty: '' }))
+}
+
+/**
+ * "3 tries scored, 2 named" — one line per kind where the fixture RECORDS a
+ * number and the named scorers do not add up to it. A blank on the fixture is
+ * not a mismatch: nobody recorded a score, so there is nothing to name.
+ * ⚠️ A NOTE, NEVER A GATE. The RCM sheet is complete without scorers.
+ */
+function scorerGapsFor(score, scoreRows, kinds) {
+  const gaps = []
+  for (const kind of kinds) {
+    const text = String(score?.[`${kind}_us`] ?? '').trim()
+    const recorded = text === '' ? null : Number(text)
+    if (recorded == null || !Number.isFinite(recorded)) continue
+    const named = scoreRows
+      .filter((row) => row.kind === kind && String(row.slot).trim() !== '')
+      .reduce((sum, row) => sum + (Number(row.qty) > 0 ? Math.floor(Number(row.qty)) : 1), 0)
+    if (named === recorded) continue
+    const word = SCORE_LABELS[kind].toLowerCase()
+    const singular = { tries: 'try', conversions: 'conversion', penalties: 'penalty', drops: 'drop goal' }[kind]
+    gaps.push({ kind, text: `${recorded} ${recorded === 1 ? singular : word} scored, ${named} named` })
+  }
+  return gaps
+}
+
 export default function MatchSheet() {
   const toast = useToast()
   const { eventId } = useParams()
@@ -399,6 +430,7 @@ export default function MatchSheet() {
   const [sheet, setSheet] = useState(null)
   const [slots, setSlots] = useState(() => emptySlots(slotCount))
   const [cardRows, setCardRows] = useState(emptyCards)
+  const [scoreRows, setScoreRows] = useState(emptyScoreRows)
   const [fields, setFields] = useState({
     captain_name: '',
     manager_name: '',
@@ -431,8 +463,8 @@ export default function MatchSheet() {
   // who only looked must leave nothing behind.
   useEffect(() => {
     if (!dirty) return
-    writeDraft(eventId, { fields, slots, cardRows, score, savedAt: Date.now() })
-  }, [dirty, fields, slots, cardRows, score, eventId])
+    writeDraft(eventId, { fields, slots, cardRows, scoreRows, score, savedAt: Date.now() })
+  }, [dirty, fields, slots, cardRows, scoreRows, score, eventId])
   const [sharing, setSharing] = useState(false)
   const [shareNote, setShareNote] = useState(null)
   // The id of the lineup whose Refill has been ARMED, or null. Two-step inline
@@ -508,6 +540,16 @@ export default function MatchSheet() {
             while (filled.length < CARD_ROWS) filled.push(emptyCards()[0])
             setCardRows(filled)
           }
+          if (existing.scores?.length) {
+            const filledScores = existing.scores.map((row) => ({
+              kind: row.kind ?? '',
+              slot: row.slot ?? '',
+              full_name: row.full_name ?? '',
+              qty: row.qty ?? '',
+            }))
+            while (filledScores.length < SCORE_ROWS) filledScores.push(emptyScoreRows()[0])
+            setScoreRows(filledScores)
+          }
           setFields({
             captain_name: existing.captain_name ?? '',
             manager_name: existing.manager_name ?? '',
@@ -522,6 +564,7 @@ export default function MatchSheet() {
             if (draft.fields) setFields((current) => ({ ...current, ...draft.fields }))
             if (Array.isArray(draft.slots) && draft.slots.length === rowSlotCount) setSlots(draft.slots)
             if (Array.isArray(draft.cardRows) && draft.cardRows.length) setCardRows(draft.cardRows)
+            if (Array.isArray(draft.scoreRows) && draft.scoreRows.length) setScoreRows(draft.scoreRows)
             if (draft.score) setScore((current) => ({ ...current, ...draft.score }))
             setRestored(true)
             setDirty(true)
@@ -624,6 +667,22 @@ export default function MatchSheet() {
     setCardRows((current) => current.map((row, i) => (i === index ? { ...row, [key]: value } : row)))
   }
 
+  const setScorer = (index, key) => (domEvent) => {
+    const { value } = domEvent.target
+    markEdited()
+    setScoreRows((current) =>
+      current.map((row, i) => {
+        if (i !== index) return row
+        // Picking a player stamps the name as filed, from the slot above.
+        if (key === 'slot') {
+          const slotRow = slots.find((s) => String(s.slot) === String(value))
+          return { ...row, slot: value, full_name: slotRow?.full_name ?? '' }
+        }
+        return { ...row, [key]: value }
+      }),
+    )
+  }
+
   // ── The score, derived from the components ────────────────────────────────
   //
   // ⚠️ WHAT A SQUAD MAY SCORE COMES FROM scoringForTeam, NOT FROM THE SQUAD'S
@@ -637,6 +696,8 @@ export default function MatchSheet() {
   // keeps another, both plausible.
   const kinds = scoringForTeam(event?.team)
   const overridden = Array.isArray(event?.team?.scoring_kinds)
+  const showScorers = Boolean(event?.team?.section)
+  const scorerGaps = showScorers ? scorerGapsFor(score, scoreRows, kinds) : []
 
   const ourParts = partsFor(score, 'us')
   const theirParts = partsFor(score, 'them')
@@ -770,6 +831,13 @@ export default function MatchSheet() {
           })),
         )
 
+        if (event?.team?.section) {
+          await saveMatchSheetScores(
+            row.id,
+            scoreRows.map((r) => ({ ...r, slot: numeric(r.slot), qty: numeric(r.qty) })),
+          )
+        }
+
         const fresh = status ? await setMatchSheetStatus(row.id, status) : row
         setSheet((current) => ({ ...current, ...fresh, id: row.id }))
         setSaved(true)
@@ -785,7 +853,7 @@ export default function MatchSheet() {
         setSaving(false)
       }
     },
-    [sheet, eventId, event, fields, score, slots, cardRows],
+    [sheet, eventId, event, fields, score, slots, cardRows, scoreRows],
   )
 
   /**
@@ -1214,6 +1282,11 @@ export default function MatchSheet() {
           onCard={setCard}
           fields={fields}
           onField={setField}
+          showScorers={showScorers}
+          scoreRows={scoreRows}
+          onScorer={setScorer}
+          scoreKinds={kinds}
+          scorerGaps={scorerGaps}
         />
       </div>
 
