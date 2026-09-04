@@ -60,10 +60,10 @@ purpose:
 |---|---|---|
 | `id` | uuid pk | |
 | `match_sheet_id` | uuid not null → `match_sheets` on delete cascade | |
-| `kind` | text not null, check in (`try`, `conversion`, `penalty`, `drop`) | The four RCM score components, same words as the `events` columns. |
+| `kind` | text not null, check in (`tries`, `conversions`, `penalties`, `drops`) | The four RCM score components, the SAME plural words as the `events` columns and `SCORE_KINDS`, so the soft note compares by name. |
 | `slot` | smallint, check 1–22 or null | The sheet's own numbered row. **The player is resolved through the slot at count time**, exactly as `cardDisplayName` does for cards — a filed sheet must survive a rename, a move or a leaver. |
 | `full_name` | text | The name as filed, beside the slot, for the same reason. |
-| `count` | smallint not null default 1, check > 0 | |
+| `qty` | smallint not null default 1, check > 0 | `qty`, not `count`: legal, but `sum(count)` reads as a bug to everyone who sees it. |
 | `created_at` | timestamptz | |
 
 RLS: one policy, `FOR ALL USING/WITH CHECK private.can_edit_match_sheet(match_sheet_id)`,
@@ -114,7 +114,7 @@ One function, `public.senior_season_stats(_team uuid, _season text)`,
 | `games` | Sheets the player is on. |
 | `starts` | Slots 1–15. |
 | `bench` | Slots 16–22. **Labelled "Bench" on screen, never "sub appearances"** — the sheet records selection, not whether they came on. |
-| `tries`, `conversions`, `penalties`, `drops` | Sum of `count` by kind. |
+| `tries`, `conversions`, `penalties`, `drops` | Sum of `qty` by kind. |
 | `yellows`, `reds` | Cards by colour, resolved through the slot. |
 
 A second function, `public.senior_season_stats_gaps(_team, _season)`,
