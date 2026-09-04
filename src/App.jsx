@@ -43,6 +43,7 @@ import YouthDashboard from './screens/YouthDashboard.jsx'
 import AdminCompetitions from './screens/AdminCompetitions.jsx'
 import Standings from './screens/Standings.jsx'
 import SeniorSection from './screens/SeniorSection.jsx'
+import Callups from './screens/Callups.jsx'
 import MatchSheet from './screens/MatchSheet.jsx'
 import Lineup from './screens/Lineup.jsx'
 import GameTime from './screens/GameTime.jsx'
@@ -290,6 +291,9 @@ export default function App() {
               What it shows is decided by RLS; the screen only chooses which
               section pills to draw. */}
           <Route path="/seniors" element={<AppShell><SeniorSection /></AppShell>} />
+          {/* U18 call-ups: the family answers, the senior staff ask and end, the
+              home staff are told. claude/plans/2026-09-02-senior-squads.md Part 3. */}
+          <Route path="/callups" element={<AppShell><Callups /></AppShell>} />
           <Route path="/admin" element={<AppShell><AdminDashboard /></AppShell>}>
             {/* ⚠️ /admin IS THE CHOOSER, and until 12 Aug 2026 it redirected
                 straight to Accounts. Every URL below is unchanged — only bare

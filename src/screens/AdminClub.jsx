@@ -28,6 +28,7 @@ import { formatLeftDate, isLeaver } from '../lib/leavers.js'
 import { FORMATS, formatLabel } from '../lib/fixtureFormat.js'
 import { isMinisTeam } from '../lib/minis.js'
 import { SECTIONS } from '../lib/section.js'
+import CallupAgeSetting from '../components/CallupAgeSetting.jsx'
 import InviteForm from './InviteForm.jsx'
 import Sheet from '../components/Sheet.jsx'
 import StorageCard from '../components/StorageCard.jsx'
@@ -607,6 +608,9 @@ export default function AdminClub() {
   return (
     <div>
       <SectionTitle>Manage</SectionTitle>
+      {/* The senior call-up floor (4 Sep 2026) — a club setting, admin-edited,
+          checked inside the database on both the list and the ask. */}
+      <CallupAgeSetting clubId={teams?.[0]?.club_id ?? null} />
       <Card className="p-[14px]">
         <div className="flex flex-col gap-2.5 desktop:flex-row">
           {/* `as={Link}` rather than a hand-rolled class string: these sit in a
