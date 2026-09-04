@@ -1104,3 +1104,26 @@ GRANT SELECT ON public.document_squads TO authenticated;
 -- that had to be corrected by a second migration the same day
 -- (public.document_push_subscriptions was born anon-executable; see
 -- db/migrations/20260831_documents_push_acl.sql).
+
+
+-- ---------------------------------------------------------------------
+-- Nine public functions from 3–4 Sep 2026 — anon EXECUTE revoked BY NAME
+--   (captured 4 Sep 2026, db/migrations/20260906_revoke_anon_execute_round_2.sql)
+--
+-- Found by db/tests/grants.sql the first time every harness was run one by
+-- one. Each creating migration did `REVOKE … FROM PUBLIC; GRANT … TO
+-- authenticated` and left Supabase's by-name grant to `anon` in place — the
+-- mechanism 20260813_revoke_anon_execute.sql describes. Measured after the
+-- fix: anon false and authenticated true on all nine; the two deliberate
+-- anon entries (calendar_events_for_token, list_signup_squads) untouched.
+-- Schema `private` is out of scope: anon has no USAGE on it (measured).
+-- ---------------------------------------------------------------------
+REVOKE EXECUTE ON FUNCTION public.answer_callup(uuid, boolean)              FROM anon;
+REVOKE EXECUTE ON FUNCTION public.callup_candidates(uuid)                   FROM anon;
+REVOKE EXECUTE ON FUNCTION public.competition_standings(uuid)               FROM anon;
+REVOKE EXECUTE ON FUNCTION public.end_callup(uuid)                          FROM anon;
+REVOKE EXECUTE ON FUNCTION public.event_clashes(uuid)                       FROM anon;
+REVOKE EXECUTE ON FUNCTION public.import_season(uuid, jsonb, jsonb)         FROM anon;
+REVOKE EXECUTE ON FUNCTION public.profiles_push_subscriptions(uuid[], text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.request_callup(uuid, uuid)                FROM anon;
+REVOKE EXECUTE ON FUNCTION public.results_push_subscriptions(uuid)          FROM anon;
