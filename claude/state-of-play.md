@@ -37,7 +37,7 @@ sheet; `claude/plans/2026-09-04-senior-season-stats.md`. The migration is
 APPLIED to live. **The `seniors` right is built (#706)** — an admin row
 carrying it (the club captain, "but might be others") reads both senior
 sections' rosters, availability, fixtures and stats, and no junior squad;
-⚠️ check `claude/changelog.md` for whether `20260911_seniors_right` is APPLIED.
+migration APPLIED and live.
 Still unbuilt from the senior work, in order: standings
 routes 2 and 3 (⚠️ DEFERRED by Jay, 4 Sep 2026 — no AI reader for now and no paste-and-parse either; route 1 stands), the club-wide cross-section switch (the fallback) and the all-seniors channel,
 union registration numbers. ✅ **The whole database suite is green on live
