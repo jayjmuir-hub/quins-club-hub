@@ -35,8 +35,15 @@ const SELECT = `
   mentions, edited_at, deleted_at, created_at, quoted_id, forwarded, attachment_path, attachments,
   author:profiles!messages_author_id_fkey(full_name),
   quoted:quoted_id(id, body, deleted_at, attachment_path, author_id, author:profiles!messages_author_id_fkey(full_name)),
-  event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, ends_at, time_tbd, venue, pitch, team_id)
+  event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, ends_at, time_tbd, venue, pitch, team_id),
+  parent:parent_id(id, body, deleted_at, attachment_path, author_id, event_id, author:profiles!messages_author_id_fkey(full_name), event:events!messages_event_id_fkey(id, type, title, opponent, home, starts_at, time_tbd))
 `
+// `parent` (4 Sep 2026): the post a channel reply answers, embedded so the
+// reply can draw its quote — the same shape `quoted` gives a DM reply. A
+// channel stream is FLAT since 4 Sep 2026 (claude/decisions/2026-09-04-channel-
+// threads-flat-stream.md): a reply is a message at its own time with a quote,
+// not a row folded under its parent. `parent.event` is what lets the quote say
+// the fixture's name instead of repeating the fixture post's empty body.
 
 // ══ THE ONE PLACE A CLIENT DECIDES WHAT TO WRITE FOR AN ATTACHMENT ════════
 //
@@ -79,40 +86,40 @@ function carriesAttachment(opts) {
  * round-trip beats rendering the last 50 rows and losing the post they
  * answer.
  */
-export async function listMessages(teamId, { limit = 50 } = {}) {
-  let posts = supabase
+// ⚠️ TOMBSTONE, 4 Sep 2026. Until today each of the three channel loaders below
+// fetched the newest top-level posts, then a second query for their replies,
+// and nested them as `replies: [...]` under each post — the thread model from
+// the first squad-chat build (#326). The screen folded those replies behind an
+// 11px "N replies" toggle, and on 4 Sep a manager's reply to the second-to-last
+// post in a role channel was promised by the chat list's preview and invisible
+// in the chat. Jay's ruling: a reply lands at the bottom as a new message, like
+// WhatsApp, with a quote of what it answers. So the stream is one query, every
+// message in time order, replies included, each carrying `parent` for its
+// quote. Nothing here nests any more. Do not bring `replies` back.
+async function flatStream(query) {
+  const { data, error } = await query
+  if (error) throw error
+  // Newest-first from the database (so the LIMIT keeps the recent end), oldest-
+  // first for the screen, which reads downwards.
+  return (data ?? []).slice().reverse()
+}
+
+export async function listMessages(teamId, { limit = 80 } = {}) {
+  let q = supabase
     .from('messages')
     .select(SELECT)
-    .is('parent_id', null)
     // ⚠️ THE CHANNEL FILTER IS LOAD-BEARING — 23 Aug 2026. Without it the club
     // channel (team_id null) also matched every DM (team_id null, channel dm),
     // so a member's own private messages appeared in Whole-club chat with no
     // recipient shown. Jay saw it on the live site the evening DMs shipped.
+    // A reply carries its parent's channel and team_id (the insert trigger
+    // copies them — measured live 4 Sep 2026, zero mismatches), so this
+    // filter is right for replies too.
     .eq('channel', 'squad')
     .order('created_at', { ascending: false })
     .limit(limit)
-  posts = teamId ? posts.eq('team_id', teamId) : posts.is('team_id', null)
-
-  const { data: heads, error } = await posts
-  if (error) throw error
-  if (!heads?.length) return []
-
-  const { data: replies, error: replyError } = await supabase
-    .from('messages')
-    .select(SELECT)
-    .in('parent_id', heads.map((m) => m.id))
-    .order('created_at', { ascending: true })
-  if (replyError) throw replyError
-
-  const byParent = new Map()
-  for (const r of replies ?? []) {
-    if (!byParent.has(r.parent_id)) byParent.set(r.parent_id, [])
-    byParent.get(r.parent_id).push(r)
-  }
-  return heads
-    .slice()
-    .reverse()
-    .map((m) => ({ ...m, replies: byParent.get(m.id) ?? [] }))
+  q = teamId ? q.eq('team_id', teamId) : q.is('team_id', null)
+  return flatStream(q)
 }
 
 /**
@@ -145,12 +152,14 @@ export async function postMessage(teamId, body, { eventId = null, mentions = [],
  * Replies to a post. Allowed for anybody who can see the post.
  * `mentions` is profile ids; the trigger drops any not in the squad.
  */
-export async function replyToMessage(parentId, body, { mentions = [] } = {}) {
-  const text = body?.trim()
-  if (!text) throw new Error('Write something first.')
+export async function replyToMessage(parentId, body, { mentions = [], attachmentPath = null, attachments = [] } = {}) {
+  const text = body?.trim() ?? ''
+  // 4 Sep 2026: a reply is sent from the foot composer now, so it may carry
+  // the tray's photos like any other post. Same rule as postMessage.
+  if (!text && !carriesAttachment({ attachments, attachmentPath })) throw new Error('Write something first.')
   const { data, error } = await supabase
     .from('messages')
-    .insert({ parent_id: parentId, body: text, mentions })
+    .insert({ parent_id: parentId, body: text, mentions, ...attachmentColumns({ attachments, attachmentPath }) })
     .select(SELECT)
     .single()
   if (error) throw error
@@ -493,30 +502,17 @@ export function subscribeMessages(callback, { debounceMs = REALTIME_DEBOUNCE_MS 
  * The squad's STAFF channel stream. Same shape as listMessages; the policy
  * decides who may read it (coach / manager / medic of the squad, or admin).
  */
-export async function listStaffMessages(teamId, { limit = 50 } = {}) {
+export async function listStaffMessages(teamId, { limit = 80 } = {}) {
   if (!teamId) return []
-  const { data: heads, error } = await supabase
-    .from('messages')
-    .select(SELECT)
-    .eq('team_id', teamId)
-    .eq('channel', 'staff')
-    .is('parent_id', null)
-    .order('created_at', { ascending: false })
-    .limit(limit)
-  if (error) throw error
-  if (!heads?.length) return []
-  const { data: replies, error: replyError } = await supabase
-    .from('messages')
-    .select(SELECT)
-    .in('parent_id', heads.map((m) => m.id))
-    .order('created_at', { ascending: true })
-  if (replyError) throw replyError
-  const byParent = new Map()
-  for (const r of replies ?? []) {
-    if (!byParent.has(r.parent_id)) byParent.set(r.parent_id, [])
-    byParent.get(r.parent_id).push(r)
-  }
-  return heads.slice().reverse().map((m) => ({ ...m, replies: byParent.get(m.id) ?? [] }))
+  return flatStream(
+    supabase
+      .from('messages')
+      .select(SELECT)
+      .eq('team_id', teamId)
+      .eq('channel', 'staff')
+      .order('created_at', { ascending: false })
+      .limit(limit),
+  )
 }
 
 // ── Role channels (db/migrations/20260830_role_channels.sql) ────────────────
@@ -525,28 +521,10 @@ export async function listStaffMessages(teamId, { limit = 50 } = {}) {
 // entirely the policy's decision; these are plain reads/inserts.
 
 /** The stream for one role channel, same thread shape as listMessages. */
-export async function listRoleMessages(channelKey, { limit = 50 } = {}) {
-  const { data: heads, error } = await supabase
-    .from('messages')
-    .select(SELECT)
-    .is('parent_id', null)
-    .eq('channel', channelKey)
-    .order('created_at', { ascending: false })
-    .limit(limit)
-  if (error) throw error
-  if (!heads?.length) return []
-  const { data: replies, error: replyError } = await supabase
-    .from('messages')
-    .select(SELECT)
-    .in('parent_id', heads.map((m) => m.id))
-    .order('created_at', { ascending: true })
-  if (replyError) throw replyError
-  const byParent = new Map()
-  for (const r of replies ?? []) {
-    if (!byParent.has(r.parent_id)) byParent.set(r.parent_id, [])
-    byParent.get(r.parent_id).push(r)
-  }
-  return heads.slice().reverse().map((m) => ({ ...m, replies: byParent.get(m.id) ?? [] }))
+export async function listRoleMessages(channelKey, { limit = 80 } = {}) {
+  return flatStream(
+    supabase.from('messages').select(SELECT).eq('channel', channelKey).order('created_at', { ascending: false }).limit(limit),
+  )
 }
 
 /** Posts to a role channel. Members only — the policy decides. */
