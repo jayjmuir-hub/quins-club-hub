@@ -9,8 +9,12 @@
 -- qualifies them for it: an admin who also manages U11 posts to Age Group
 -- Managers as "U11 · Team Manager", not "Admin". Everywhere else, unchanged.
 --
---  0. BASELINE: before the migration the admin-manager's managers-channel
---     post is stamped 'admin' with no squad (the bug, reproduced)
+--  0. CONTROL: 20260910 is already live on production, so a fresh
+--     managers-channel post from the admin-manager already reads
+--     'manager'/squad — this proves the probe can see the row and the
+--     stamping trigger runs, without pretending to reproduce a pre-migration
+--     world that no longer exists (repointed 6 Sep 2026; see the note below
+--     the migration-under-test block)
 --  1. after it, a NEW managers-channel post is 'manager' with the squad
 --  2. the pre-migration post was backfilled the same way
 --  3. CONTROL: her post in the SQUAD chat is still 'admin' — the order is
@@ -63,21 +67,54 @@ create function pg_temp.pill(_body text) returns text language sql as $$
     from public.messages where body = _body;
 $$;
 
--- ── 0: BASELINE — the bug, reproduced ────────────────────────────────────────
+-- ── 0: CONTROL — 20260910's rule is already live on production ──────────────
+-- ⚠️ REPOINTED 6 Sep 2026. This used to insert via the trigger and assert the
+-- PRE-migration shape ('admin/Club Secretary/-'). That was true only until
+-- 20260910 shipped; once it is live (it is — this harness guards a migration
+-- already on production, per its own header) a fresh insert through the live
+-- trigger produces the POST-migration shape instead, and the old assertion
+-- fails every run from here on. It was never a fixture bug — the database
+-- moved out from under a baseline that described a moment, not a fact.
+-- Repointed to assert the thing that is now true and still worth proving:
+-- the probe can see a freshly-inserted row, and the live trigger is running
+-- 20260910's rule (not some older or newer one). The CREATE OR REPLACE a few
+-- lines below then re-applies the identical body — a no-op re-migration,
+-- proving the inlined copy still matches production — and step 1 repeats
+-- this same assertion afterward so a drift between the two would show.
+-- Note: this control uses its own body ('zz chanpill control'), distinct
+-- from 'zz chanpill before' below — pg_temp.pill() has no ORDER BY / LIMIT
+-- and two rows sharing a body would make it silently pick whichever the
+-- planner returns first, which defeats the point of a control.
 select pg_temp.as_user('f0000000-0000-4000-8000-000000000510');
-insert into messages (club_id, channel, body) values ('f0000000-0000-4000-8000-000000000500','managers','zz chanpill before');
+insert into messages (club_id, channel, body) values ('f0000000-0000-4000-8000-000000000500','managers','zz chanpill control');
 reset role;
 do $a$
 begin
-  if pg_temp.pill('zz chanpill before') <> 'admin/Club Secretary/-' then
-    raise exception 'BASELINE FAILED: expected the admin-manager stamped admin with no squad before the migration, got %', pg_temp.pill('zz chanpill before');
+  if pg_temp.pill('zz chanpill control') <> 'manager/Team Manager/f0000000-0000-4000-8000-000000000501' then
+    raise exception 'CONTROL FAILED: expected 20260910''s rule already live (manager/Team Manager/squad), got %', pg_temp.pill('zz chanpill control');
   end if;
-  insert into _log(line) values ('0 baseline: before the migration the admin-manager''s managers post reads admin/Club Secretary/no squad');
+  insert into _log(line) values ('0 control: 20260910 is already live — a fresh managers post already reads manager/Team Manager/U11, proving the probe sees the row and the trigger runs');
 end $a$;
--- the officer's pre-migration post, for step 7
-select pg_temp.as_user('f0000000-0000-4000-8000-000000000512');
-insert into messages (club_id, channel, body) values ('f0000000-0000-4000-8000-000000000500','managers','zz chanpill officer before');
-reset role;
+
+-- Fixture for the BACKFILL assertions (2, 7): the backfill in the migration
+-- below only touches rows already stamped author_role = 'admin' with no
+-- squad — the shape the OLD (pre-20260910) trigger used to leave in a role
+-- channel. The live trigger no longer produces that shape (see the control
+-- above), so it is written directly with BOTH message triggers off —
+-- `messages_touch` (as the migration's own backfill does) AND
+-- `messages_provenance`, the BEFORE INSERT trigger that runs
+-- set_message_provenance and stamps `author_id := auth.uid()` regardless of
+-- what the INSERT names. Measured 6 Sep 2026: leaving it enabled silently
+-- overwrote the second fixture row's author_id with the leftover
+-- request.jwt.claims from the control above (u_510) instead of u_512,
+-- because `reset role;` clears the ROLE, not that session-config claim.
+alter table public.messages disable trigger messages_touch;
+alter table public.messages disable trigger messages_provenance;
+insert into public.messages (club_id, channel, author_id, author_role, author_title, author_team_id, body) values
+ ('f0000000-0000-4000-8000-000000000500','managers','f0000000-0000-4000-8000-000000000510','admin','Club Secretary',null,'zz chanpill before'),
+ ('f0000000-0000-4000-8000-000000000500','managers','f0000000-0000-4000-8000-000000000512','admin','Rugby Junior Manager',null,'zz chanpill officer before');
+alter table public.messages enable trigger messages_provenance;
+alter table public.messages enable trigger messages_touch;
 
 -- ── migration under test: db/migrations/20260910_role_channel_pill.sql,
 --    verbatim (begin/commit stripped) ────────────────────────────────────────
