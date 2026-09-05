@@ -27,6 +27,7 @@ import {
 import { shareElementAsImage } from '../lib/shareImage.js'
 import { shareOutcomeNote } from '../lib/shareOutcome.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { playupBlocksLineup } from '../lib/playupConsent.js'
 import { useToast } from '../components/Toast.jsx'
 
 // Picking a team, and sharing it — three VIEWS over one lineup since 25 Aug
@@ -476,6 +477,8 @@ export default function Lineup() {
   }
 
   function add(playerId, role, slotIndex = null) {
+    const player = playersById.get(playerId)
+    if (playupBlocksLineup(player)) return
     markEdited()
     if (role === ROLE_REPLACEMENT) {
       setReps((current) => [...current, playerId])
@@ -495,6 +498,7 @@ export default function Lineup() {
   }
 
   function toggleRole(playerId) {
+    if (playupBlocksLineup(playersById.get(playerId))) return
     markEdited()
     if (reps.includes(playerId)) {
       setReps((current) => current.filter((id) => id !== playerId))
@@ -601,6 +605,7 @@ export default function Lineup() {
       const rows = []
       slotted.forEach((playerId, index) => {
         if (!playerId) return
+        if (playupBlocksLineup(playersById.get(playerId))) return
         rows.push({
           player_id: playerId,
           role: ROLE_STARTER,
@@ -609,6 +614,7 @@ export default function Lineup() {
         })
       })
       reps.forEach((playerId, index) => {
+        if (playupBlocksLineup(playersById.get(playerId))) return
         rows.push({
           player_id: playerId,
           role: ROLE_REPLACEMENT,
@@ -729,13 +735,19 @@ export default function Lineup() {
                 {group.label} — {list.length}
               </p>
               <ul>
-                {list.map((player) => (
+                {list.map((player) => {
+                  const blocked = playupBlocksLineup(player)
+                  return (
                   <li key={player.id} className="border-b border-line py-2 last:border-b-0">
                     <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-[14.5px] text-ink">
                         {player.full_name}
                       </span>
-                      {pendingSlot != null ? (
+                      {blocked ? (
+                        <span className="shrink-0 text-[12px] font-bold uppercase tracking-[.4px] text-warn-ink">
+                          Consent pending
+                        </span>
+                      ) : pendingSlot != null ? (
                         <button
                           type="button"
                           onClick={() => add(player.id, ROLE_STARTER, pendingSlot)}
@@ -753,6 +765,7 @@ export default function Lineup() {
                           Start
                         </button>
                       )}
+                      {!blocked && (
                       <button
                         type="button"
                         onClick={() => add(player.id, ROLE_REPLACEMENT)}
@@ -760,6 +773,7 @@ export default function Lineup() {
                       >
                         Bench
                       </button>
+                      )}
                     </div>
                     {/* ⚠️ THE WARNING IS HERE AS WELL AS ON THE PICKED ROWS, for the
                         reason StatusChip already gives above: the pool is where the
@@ -773,7 +787,8 @@ export default function Lineup() {
                       grade={grades.get(player.id)?.tier}
                     />
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             </div>
           )

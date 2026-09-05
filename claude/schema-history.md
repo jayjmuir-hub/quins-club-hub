@@ -20,6 +20,27 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### Junior play-up parent consent — `20260914_junior_playup_consent`
+
+**STATUS: IN REPO, NOT APPLIED from the cloud agent.** Slice 1 of
+`claude/plans/2026-09-05-playup-consent-and-ops.md`. Ruling:
+`claude/decisions/2026-09-05-playup-parent-consent.md`.
+
+`memberships.playup_consent` is `pending` | `approved` on **guest** twins only.
+It is not `memberships.status`: that column is registration, and
+`can_see_team` requires `active`, so a pending *status* would hide the guest
+from roster and chat.
+
+`squad_guest_flags` exists because `"memb read"` is own-row or admin — a coach
+cannot list other families' memberships, and `listPlayers` used to try.
+`answer_junior_playup` is `is_own_player` only. `lineup_players` trigger
+`refuse_pending_playup_lineup` is the root-cause block; the Lineup screen is
+the courtesy.
+
+`private.notify_junior_playup` no-ops when `app.harness = on`.
+
+---
+
 ### Club Diary phase 2 — four migrations, and the reasoning the SQL cannot carry
 
 **STATUS: ALL FOUR APPLIED to production 1 Sep 2026**, in this order, which was

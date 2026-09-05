@@ -69,6 +69,13 @@ vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
 }))
 
+// Play-up consent Home card. Empty here so this file stays network-free;
+// the card itself is tests/playup-consent-banner.test.jsx.
+vi.mock('../src/data/playups.js', () => ({
+  listMyPendingPlayups: async () => [],
+  answerJuniorPlayup: async () => {},
+}))
+
 // The Squad contacts block (13 Aug 2026). Mocked here so this file stays
 // network-free; the block's own behaviour is covered by
 // tests/squad-staff-home.test.jsx. Defaults to an empty Map — every existing

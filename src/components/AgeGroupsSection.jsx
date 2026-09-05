@@ -5,7 +5,7 @@ import Chip from './Chip.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isSuperAdmin } from '../lib/scope.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
-import { addJuniorPlayup, listPlayerGuestTeamIds, removeJuniorPlayup } from '../data/playups.js'
+import { addJuniorPlayup, listPlayerGuestPlayups, removeJuniorPlayup } from '../data/playups.js'
 
 // Super-admin junior play-up on the player sheet. Home is players.team_id;
 // guests are active memberships on another junior squad. Ordinary coaches
@@ -17,7 +17,7 @@ export default function AgeGroupsSection({ player, team, onChanged }) {
   const homeIsJunior = team?.is_senior !== true && Boolean(player?.team_id)
   const visible = superAdmin && homeIsJunior && !player?.left_at
 
-  const [guestIds, setGuestIds] = useState([])
+  const [guestPlayups, setGuestPlayups] = useState([])
   const [reloadToken, setReloadToken] = useState(0)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickedId, setPickedId] = useState(null)
@@ -27,18 +27,23 @@ export default function AgeGroupsSection({ player, team, onChanged }) {
   useEffect(() => {
     if (!visible) return undefined
     let mounted = true
-    listPlayerGuestTeamIds(player.id, player.team_id)
-      .then((ids) => {
-        if (mounted) setGuestIds(ids)
+    listPlayerGuestPlayups(player.id, player.team_id)
+      .then((rows) => {
+        if (mounted) setGuestPlayups(rows)
       })
       .catch(() => {
-        if (mounted) setGuestIds([])
+        if (mounted) setGuestPlayups([])
       })
     return () => {
       mounted = false
     }
   }, [visible, player?.id, player?.team_id, reloadToken])
 
+  const guestIds = useMemo(() => guestPlayups.map((row) => row.team_id), [guestPlayups])
+  const consentByTeam = useMemo(
+    () => new Map(guestPlayups.map((row) => [row.team_id, row.playup_consent])),
+    [guestPlayups],
+  )
   const teamsById = useMemo(() => new Map((teams ?? []).map((row) => [row.id, row])), [teams])
   const guestTeams = guestIds.map((id) => teamsById.get(id)).filter(Boolean)
 
@@ -102,6 +107,9 @@ export default function AgeGroupsSection({ player, team, onChanged }) {
           <li key={guest.id} className="flex flex-wrap items-center gap-2">
             <Chip>{guest.name}</Chip>
             <span className="text-xs font-semibold text-ink-muted">Guest</span>
+            {consentByTeam.get(guest.id) === 'pending' && (
+              <span className="text-xs font-semibold text-warn-ink">Consent pending</span>
+            )}
             <Button
               size="sm"
               variant="dangerQuiet"
@@ -116,7 +124,8 @@ export default function AgeGroupsSection({ player, team, onChanged }) {
       </ul>
       <p className="mt-2 text-xs text-ink-faint">
         Home stays this squad. They appear as a guest on a play-up squad for roster,
-        availability, lineup and chat.
+        availability, chat and notices. A linked parent must agree before they can be
+        picked for a match.
       </p>
       <div className="mt-3">
         <Button
@@ -150,8 +159,7 @@ export default function AgeGroupsSection({ player, team, onChanged }) {
       >
         <p className="mb-3 text-sm text-ink-muted">
           They stay on {homeName}. The play-up squad sees them as a guest — roster,
-          availability, lineup and chat — the same way a senior guest membership already
-          works.
+          availability, chat and notices. Match lineup waits on a parent&apos;s yes.
         </p>
         {pickable.length === 0 ? (
           <p className="text-sm text-ink-muted">There is no other junior age group left to add.</p>

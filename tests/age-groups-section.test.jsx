@@ -9,6 +9,7 @@ import { MemoryRouter } from 'react-router-dom'
 
 const useMembershipsMock = vi.fn()
 const listGuestMock = vi.fn()
+const listGuestPlayupsMock = vi.fn()
 const addPlayupMock = vi.fn()
 const removePlayupMock = vi.fn()
 
@@ -18,6 +19,7 @@ vi.mock('../src/lib/memberships.jsx', () => ({
 
 vi.mock('../src/data/playups.js', () => ({
   listPlayerGuestTeamIds: (...a) => listGuestMock(...a),
+  listPlayerGuestPlayups: (...a) => listGuestPlayupsMock(...a),
   addJuniorPlayup: (...a) => addPlayupMock(...a),
   removeJuniorPlayup: (...a) => removePlayupMock(...a),
 }))
@@ -75,6 +77,7 @@ function mount({ memberships, teams = [U12, U14, U16, MEN1], player = PLAYER, te
 beforeEach(() => {
   vi.clearAllMocks()
   listGuestMock.mockResolvedValue([])
+  listGuestPlayupsMock.mockResolvedValue([])
   addPlayupMock.mockResolvedValue(null)
   removePlayupMock.mockResolvedValue(null)
 })
@@ -114,7 +117,7 @@ describe('Age groups — who sees Add', () => {
 
 describe('Age groups — add and remove', () => {
   it('the picker lists other junior squads, not home, not seniors, not already-guest', async () => {
-    listGuestMock.mockResolvedValue(['t-u12'])
+    listGuestPlayupsMock.mockResolvedValue([{ team_id: 't-u12', playup_consent: 'approved' }])
     const user = mount({ memberships: SUPER })
     const section = await screen.findByTestId('age-groups')
     expect(within(section).getByText('U12 Mixed')).toBeInTheDocument()
@@ -136,10 +139,17 @@ describe('Age groups — add and remove', () => {
   })
 
   it('Remove on a guest row calls removeJuniorPlayup', async () => {
-    listGuestMock.mockResolvedValue(['t-u16'])
+    listGuestPlayupsMock.mockResolvedValue([{ team_id: 't-u16', playup_consent: 'approved' }])
     const user = mount({ memberships: SUPER })
     const section = await screen.findByTestId('age-groups')
     await user.click(within(section).getByRole('button', { name: /remove from U16B Contact/i }))
     await waitFor(() => expect(removePlayupMock).toHaveBeenCalledWith('p-harness', 't-u16'))
+  })
+
+  it('a pending guest chip says Consent pending', async () => {
+    listGuestPlayupsMock.mockResolvedValue([{ team_id: 't-u16', playup_consent: 'pending' }])
+    mount({ memberships: SUPER })
+    const section = await screen.findByTestId('age-groups')
+    expect(within(section).getByText(/consent pending/i)).toBeInTheDocument()
   })
 })

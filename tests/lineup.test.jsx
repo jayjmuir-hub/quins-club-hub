@@ -57,10 +57,10 @@ const PLAYERS = [
   { id: 'p-out', full_name: 'Tomas Bergqvist', team_id: TEAM.id },
 ]
 
-function renderScreen({ memberships = COACH, lineups = [] } = {}) {
+function renderScreen({ memberships = COACH, lineups = [], players = PLAYERS } = {}) {
   useMembershipsMock.mockReturnValue({ memberships, teams: [TEAM], loading: false, error: null })
   getEventMock.mockResolvedValue(EVENT)
-  listPlayersMock.mockResolvedValue(PLAYERS)
+  listPlayersMock.mockResolvedValue(players)
   listAvailabilityMock.mockResolvedValue([
     { player_id: 'p-in', status: 'in' },
     { player_id: 'p-maybe', status: 'maybe' },
@@ -101,6 +101,47 @@ describe('the squad pool', () => {
     expect(screen.queryByText('Tomas Bergqvist')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Show 1 who said no/ }))
     expect(screen.getByText('Tomas Bergqvist')).toBeInTheDocument()
+  })
+})
+
+describe('junior play-up consent', () => {
+  it('a pending guest cannot be started or benched, and the row says Consent pending', async () => {
+    renderScreen({
+      players: [
+        ...PLAYERS,
+        {
+          id: 'p-playup',
+          full_name: 'Harness Playup Alderton',
+          team_id: 't-u14',
+          guest_of: TEAM.id,
+          playup_consent: 'pending',
+        },
+      ],
+    })
+    await waitFor(() => expect(screen.getByText('Harness Playup Alderton')).toBeInTheDocument())
+    const row = screen.getByText('Harness Playup Alderton').closest('li')
+    expect(within(row).queryByRole('button', { name: 'Start' })).not.toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: 'Bench' })).not.toBeInTheDocument()
+    expect(within(row).getByText(/consent pending/i)).toBeInTheDocument()
+  })
+
+  it('an approved guest can be started', async () => {
+    const user = renderScreen({
+      players: [
+        ...PLAYERS,
+        {
+          id: 'p-playup',
+          full_name: 'Harness Playup Alderton',
+          team_id: 't-u14',
+          guest_of: TEAM.id,
+          playup_consent: 'approved',
+        },
+      ],
+    })
+    await waitFor(() => expect(screen.getByText('Harness Playup Alderton')).toBeInTheDocument())
+    const row = screen.getByText('Harness Playup Alderton').closest('li')
+    await user.click(within(row).getByRole('button', { name: 'Start' }))
+    expect(screen.getByRole('button', { name: 'Remove Harness Playup Alderton' })).toBeInTheDocument()
   })
 })
 
