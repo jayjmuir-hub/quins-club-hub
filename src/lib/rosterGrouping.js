@@ -136,6 +136,43 @@ function single(players, keyOf, { order, label, byName }) {
  * make the table look broken at the exact moment a coach is wondering why it is
  * empty.
  */
+/**
+ * Junior play-ups (guest_of set, home team_id elsewhere) sit in a pinned
+ * footer on a junior roster, not mixed into Forwards/Backs/tier groups.
+ * Seniors keep their existing guest grouping — pin only when every squad
+ * currently on screen is junior (`is_senior !== true`).
+ */
+export function pinGuestsToFooter(shownTeams) {
+  return Array.isArray(shownTeams)
+    && shownTeams.length > 0
+    && shownTeams.every((team) => team.is_senior !== true)
+}
+
+/** Split already-filtered roster rows into home players vs guests. */
+export function partitionGuestPlayers(players) {
+  const home = []
+  const guests = []
+  for (const player of players ?? []) {
+    if (player.guest_of) guests.push(player)
+    else home.push(player)
+  }
+  return { home, guests }
+}
+
+export const OTHER_AGE_GROUPS_KEY = '__other_age_groups__'
+
+/** Footer group in the same shape `buildRosterGroups` returns. */
+export function otherAgeGroupsGroup(guests, { sortPlayers } = {}) {
+  const byName = sortPlayers ?? ((a, b) => a.full_name.localeCompare(b.full_name))
+  const list = [...(guests ?? [])].sort(byName)
+  return {
+    key: OTHER_AGE_GROUPS_KEY,
+    label: `From other age groups (${list.length})`,
+    count: list.length,
+    sections: [{ key: 'all', label: null, players: list }],
+  }
+}
+
 export function constantColumns(players, valueOf) {
   const hidden = new Set()
   if (!players || players.length === 0) return hidden
