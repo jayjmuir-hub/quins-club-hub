@@ -53,7 +53,7 @@ export const CLUB = 'club'
 // Re-exported from the hook so existing importers keep one home for it.
 export const tallyByEvent = tallyByEventImpl
 
-export default function Chat() {
+function ChatThread() {
   const { teamId: param } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const wantStaff = searchParams.get('channel') === 'staff'
@@ -238,4 +238,17 @@ export default function Chat() {
       <ChannelThread thread={thread} />
     </section>
   )
+}
+
+// ⚠️ KEYED BY THE ROUTE PARAM SO A SQUAD SWITCH REMOUNTS — 5 Sep 2026, the
+// same arrangement DirectMessages.jsx has had since its refs were found to
+// leak across conversations. Without it React reuses one instance across
+// /chat/:teamId changes: useChannelThread's "where New starts" and
+// "what was unread on arrival" refs are captured once and never reset, so
+// squad B's highlight was computed from squad A — and a slow response for A
+// could land under B's header (the hook's load ticket is the second half of
+// that fix, for the dock, which reuses the hook without a route).
+export default function Chat() {
+  const { teamId } = useParams()
+  return <ChatThread key={teamId ?? 'club'} />
 }

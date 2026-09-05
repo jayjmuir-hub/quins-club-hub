@@ -175,16 +175,26 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
     if (selfId) setChatPref(selfId, chatKey, { background: key }).catch(() => {})
   }
 
+  // ⚠️ A STALE LOAD MUST NOT LAND — 5 Sep 2026, the same guard as
+  // useDmThread. Chat.jsx keys the screen by `param` so a squad switch
+  // remounts (and resets the refs above); the dock reuses this hook, and a
+  // realtime reload racing a send needs the ticket just the same.
+  const loadTicket = useRef(0)
   const load = useCallback(async () => {
     if (!param || unknownTeam) return
+    const ticket = ++loadTicket.current
+    const stale = () => ticket !== loadTicket.current
     setError(null)
     try {
-      const [rows, mine, channel] = await Promise.all([
+      const [rows, channel] = await Promise.all([
         roleKey ? listRoleMessages(roleKey) : staffChannel ? listStaffMessages(teamId) : listMessages(teamId),
-        listMyMessageReads(),
         // A role channel has no settings row — open chat by construction.
         roleKey ? Promise.resolve(null) : getChannelSettings(teamId),
       ])
+      if (stale()) return
+      // My receipts for THESE rows only — see listMyMessageReads.
+      const mine = await listMyMessageReads(selfId, rows.map((m) => m.id))
+      if (stale()) return
       if (newFromRef.current === undefined) {
         openReadsRef.current = mine
         // Flat since 4 Sep 2026: every row is a message in its own right.
@@ -197,37 +207,44 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
       // Reactions are decoration: a stream without them is still a stream.
       try {
         const ids = rows.map((m) => m.id)
-        setReactions(await listReactions(ids))
+        const reactions = await listReactions(ids)
+        if (!stale()) setReactions(reactions)
       } catch {
-        setReactions(new Map())
+        if (!stale()) setReactions(new Map())
       }
+      if (stale()) return
       // Polls, the same way — a failure leaves the question text standing.
       try {
         const ids = rows.map((m) => m.id)
-        setPolls(await listPollsFor(ids))
+        const polls = await listPollsFor(ids)
+        if (!stale()) setPolls(polls)
       } catch {
-        setPolls(new Map())
+        if (!stale()) setPolls(new Map())
       }
+      if (stale()) return
       // RSVP chips for every fixture thread on screen. Allowed to fail —
       // a thread without chips is still a thread.
       const eventIds = rows.filter((m) => m.event_id && !m.deleted_at).map((m) => m.event_id)
       if (eventIds.length) {
         try {
-          setTallies(tallyByEvent(await listAvailabilityForEvents(eventIds)))
+          const tallies = tallyByEvent(await listAvailabilityForEvents(eventIds))
+          if (!stale()) setTallies(tallies)
         } catch {
-          setTallies(new Map())
+          if (!stale()) setTallies(new Map())
         }
       }
+      if (stale()) return
       // Staff-only, and allowed to fail without breaking the stream.
       if (canModerate && teamId && !staffChannel) {
         try {
-          setStats(await messageReadStats(teamId))
+          const stats = await messageReadStats(teamId)
+          if (!stale()) setStats(stats)
         } catch {
-          setStats(new Map())
+          if (!stale()) setStats(new Map())
         }
       }
     } catch (err) {
-      setError(friendlyMessage(err, 'We could not load the chat just now.'))
+      if (!stale()) setError(friendlyMessage(err, 'We could not load the chat just now.'))
     }
   }, [param, teamId, canModerate, staffChannel, roleKey, unknownTeam, selfId])
 
@@ -235,7 +252,21 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
     load()
   }, [load])
 
-  useEffect(() => (param ? subscribeMessages(load) : undefined), [param, load])
+  // Which rows on the shared `messages` channel are THIS thread's (5 Sep
+  // 2026): a role channel by its key; the club by "channel squad, no squad";
+  // a squad by id — its staff channel included, since both live under one
+  // team_id and a spare reload is cheaper than a missed one. A DELETE carries
+  // no row and always reloads — see messageMatcher.
+  const mine = useCallback(
+    (row) =>
+      roleKey
+        ? row.channel === roleKey
+        : isClub
+          ? row.team_id == null && row.channel === 'squad'
+          : row.team_id === teamId,
+    [roleKey, isClub, teamId],
+  )
+  useEffect(() => (param ? subscribeMessages(load, { where: mine }) : undefined), [param, load, mine])
   useEffect(() => (param ? subscribeReactions(load) : undefined), [param, load])
   useEffect(() => (param ? subscribePollVotes(load) : undefined), [param, load])
 

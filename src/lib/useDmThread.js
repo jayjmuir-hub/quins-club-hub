@@ -133,16 +133,31 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     [openDm, navigate],
   )
 
+  // ⚠️ A STALE LOAD MUST NOT LAND — 5 Sep 2026. `load` is rebuilt when the
+  // conversation changes, but a request already in flight for the previous
+  // one still resolves, and on a slow connection it resolves AFTER the new
+  // one: conversation A's rows under conversation B's header. The full screen
+  // keys the thread by id so it remounts (DirectMessages.jsx), which is what
+  // resets the refs above; the dock reuses this hook, and a realtime reload
+  // racing a send needs the guard just the same. Each load takes a ticket and
+  // every await below re-checks that it still holds the newest one.
+  const loadTicket = useRef(0)
   const load = useCallback(async () => {
+    const ticket = ++loadTicket.current
+    const stale = () => ticket !== loadTicket.current
     setError(null)
     try {
-      const [conv, rows, inbox, blocks, reads] = await Promise.all([
+      const [conv, rows, inbox, blocks] = await Promise.all([
         getConversation(conversationId),
         listDirectMessages(conversationId),
         listMyConversations(),
         listMyBlocks(),
-        listMyMessageReads(),
       ])
+      if (stale()) return
+      // My receipts for THESE rows only — see listMyMessageReads for why the
+      // unscoped read it replaced was heading for the 1000-row cap.
+      const reads = await listMyMessageReads(selfId, rows.map((m) => m.id))
+      if (stale()) return
       // Where "New" starts, captured ONCE per visit — the screen marks
       // everything read moments later, so a live value would vanish under
       // the reader (24 Aug feedback: "mark for new messages").
@@ -155,38 +170,49 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
       setMissing(!conv)
       // Reactions are decoration: a thread without them is still a thread.
       try {
-        setReactions(await listReactions(rows.map((m) => m.id)))
+        const reactions = await listReactions(rows.map((m) => m.id))
+        if (!stale()) setReactions(reactions)
       } catch {
-        setReactions(new Map())
+        if (!stale()) setReactions(new Map())
       }
+      if (stale()) return
       // Polls are decoration in the same sense: a failure leaves the question
       // text (the message body) standing, never an error.
       try {
-        setPolls(await listPollsFor(rows.map((m) => m.id)))
+        const polls = await listPollsFor(rows.map((m) => m.id))
+        if (!stale()) setPolls(polls)
       } catch {
-        setPolls(new Map())
+        if (!stale()) setPolls(new Map())
       }
+      if (stale()) return
       // So are nicknames — a failure renders real names, never an error.
       try {
-        setNicknames(await listMyNicknames())
+        const nicknames = await listMyNicknames()
+        if (!stale()) setNicknames(nicknames)
       } catch {
-        setNicknames(new Map())
+        if (!stale()) setNicknames(new Map())
       }
+      if (stale()) return
       // And stars.
       try {
-        setStars(await listMyStars())
+        const stars = await listMyStars()
+        if (!stale()) setStars(stars)
       } catch {
-        setStars(new Set())
+        if (!stale()) setStars(new Set())
       }
+      if (stale()) return
       // And the ticks — decoration with the same stance: a thread whose
       // receipts failed is still a thread, showing single ticks.
       try {
-        setReceipts(await listMessageReceipts(selfId, rows.filter((m) => m.author_id === selfId).map((m) => m.id)))
+        const receipts = await listMessageReceipts(selfId, rows.filter((m) => m.author_id === selfId).map((m) => m.id))
+        if (!stale()) setReceipts(receipts)
       } catch {
-        setReceipts(new Map())
+        if (!stale()) setReceipts(new Map())
       }
+      if (stale()) return
       const group = conv?.kind === 'group'
       const people = group ? await listGroupMembers(conversationId) : null
+      if (stale()) return
       setMembers(people)
       const mine = inbox.find((c) => c.conversation_id === conversationId)
       const otherId = conv && !group ? (conv.profile_a === selfId ? conv.profile_b : conv.profile_a) : null
@@ -206,7 +232,7 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
         logWelfareAccess(conversationId)
       }
     } catch (err) {
-      setError(friendlyMessage(err, 'We could not load this conversation.'))
+      if (!stale()) setError(friendlyMessage(err, 'We could not load this conversation.'))
     }
   }, [conversationId, selfId, admin])
 
@@ -226,7 +252,14 @@ export default function useDmThread(conversationId, { openDm, consumeReplyState 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  useEffect(() => subscribeMessages(load), [load])
+  // Only THIS conversation's rows wake the reload (5 Sep 2026): every
+  // subscriber shares one `messages` channel now, so without the filter a
+  // post in any squad would refetch every open DM. A DELETE carries no row
+  // and always reloads — see messageMatcher.
+  useEffect(
+    () => subscribeMessages(load, { where: (row) => row.conversation_id === conversationId }),
+    [load, conversationId],
+  )
   useEffect(() => subscribeReactions(load), [load])
   useEffect(() => subscribePollVotes(load), [load])
 

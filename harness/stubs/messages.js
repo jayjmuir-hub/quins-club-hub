@@ -281,7 +281,12 @@ export async function listMessageReceipts() {
     ['hz-dm-12', { delivered: new Set(['hz-sam']), read: new Set(['hz-sam']) }],
   ])
 }
-export async function markMessagesDelivered() {}
+export function markUnreadDelivered() {
+  return Promise.resolve()
+}
+export function messageMatcher() {
+  return () => true
+}
 export function receiptState(receipt, recipients) {
   const others = (recipients ?? []).filter(Boolean)
   if (others.length === 0) return 'sent'

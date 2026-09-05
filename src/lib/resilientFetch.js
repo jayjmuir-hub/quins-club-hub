@@ -73,6 +73,11 @@ export const READ_RPCS = new Set([
   'storage_usage',
   'welfare_overview',
   'conversation_involves_minor',
+  // 5 Sep 2026 — the two badge counts, moved server-side. Read-only by
+  // construction (STABLE, security invoker). ⚠️ NOT mark_unread_delivered,
+  // which writes.
+  'count_unread_messages',
+  'count_admin_waiting',
 ])
 
 export class RequestTimeoutError extends Error {
