@@ -201,7 +201,7 @@ export default function Sidebar({ showSquadHub = false, showSeniors = false, sho
     ...(showSeniors ? [{ to: '/seniors', label: 'Seniors', icon: SquadIcon }] : []),
     { to: '/notices', label: 'Notices', icon: NoticesIcon },
     { to: '/documents', label: 'Documents', icon: DocumentsIcon },
-    ...(showOps ? [{ to: '/ops', label: 'Ops', icon: OpsIcon }] : []),
+    ...(showOps ? [{ to: '/ops', label: 'Club Ops', icon: OpsIcon }] : []),
     ...(showAdmin ? [{ to: '/admin', label: 'Admin', icon: AdminIcon }] : []),
   ]
 

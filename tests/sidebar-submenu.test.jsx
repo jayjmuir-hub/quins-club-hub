@@ -269,11 +269,12 @@ describe('Admin sub-menu', () => {
 describe('Club Ops sidebar item', () => {
   it('is offered when showOps is set, and is not on the dock list', () => {
     renderAt('/', { showOps: true })
-    expect(screen.getByRole('link', { name: 'Ops' })).toHaveAttribute('href', '/ops')
+    expect(screen.getByRole('link', { name: 'Club Ops' })).toHaveAttribute('href', '/ops')
   })
 
   it('is absent unless showOps is set', () => {
     renderAt('/')
+    expect(screen.queryByRole('link', { name: 'Club Ops' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Ops' })).not.toBeInTheDocument()
   })
 })

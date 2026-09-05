@@ -300,6 +300,72 @@ describe('Nav — Admin pill', () => {
   })
 })
 
+// Phone-width five-tab geometry. jsdom has no layout, so the settled 360px
+// bar is computed from the classes the dock actually wears — same worst-case
+// glyph width as a missing `font-condensed` (system sans uppercase). Jay,
+// 5 Sep 2026: Schedule/Roster captions collided because the Squad Hub pill
+// was too wide; keep five tabs, shrink type + pill, leave a clear gap.
+function uppercaseWidth(text, fontPx, trackingEm) {
+  const n = text.length
+  const glyph = fontPx * 0.62
+  return n * glyph + Math.max(0, n - 1) * fontPx * trackingEm
+}
+
+function twTokenPx(className, kind) {
+  const match = className.match(new RegExp(`(?:^|\\s)${kind}-\\[(\\d+(?:\\.\\d+)?)px\\](?:\\s|$)`))
+  return match ? Number(match[1]) : null
+}
+
+function spaceX(className) {
+  if (/(?:^|\s)px-3(?:\s|$)/.test(className)) return 12
+  if (/(?:^|\s)px-2(?:\s|$)/.test(className)) return 8
+  return null
+}
+
+function rowGap(className) {
+  if (/(?:^|\s)gap-1\.5(?:\s|$)/.test(className)) return 6
+  if (/(?:^|\s)gap-1(?:\s|$)/.test(className)) return 4
+  return null
+}
+
+describe('phone five-tab dock — Schedule/Roster must not collide (5 Sep 2026)', () => {
+  it('keeps all five tabs, a tight active pill, and a clear caption gap at 360px', () => {
+    renderNav('/squad', { showSquadHub: true })
+
+    const captions = [...document.querySelectorAll('[data-testid="dock-caption"]')]
+    expect(captions.map((el) => el.textContent)).toEqual([
+      'Home',
+      'Schedule',
+      'Roster',
+      'Squad Hub',
+      'Chat',
+    ])
+    expect(document.querySelectorAll('nav a')).toHaveLength(5)
+
+    const captionPx = twTokenPx(captions[1].className, 'text')
+    expect(captionPx).toBeTruthy()
+
+    const active = screen.getByRole('link', { name: 'Squad Hub' })
+    const pad = spaceX(active.className)
+    const gap = rowGap(active.className)
+    const label = active.querySelector('[data-testid="dock-label"]')
+    const labelPx = twTokenPx(label.className, 'text')
+    expect(pad).toBeTruthy()
+    expect(gap).toBeTruthy()
+    expect(labelPx).toBeTruthy()
+
+    const pill = pad * 2 + gap + 22 + uppercaseWidth('SQUAD HUB', labelPx, 0.06)
+    const inner = 360 - 2 * 6 - 2 * 20
+    const space = (inner - (38 * 4 + pill)) / 4
+    const captionGap =
+      38 + space - uppercaseWidth('SCHEDULE', captionPx, 0.03) / 2 - uppercaseWidth('ROSTER', captionPx, 0.03) / 2
+
+    // Fat pill + 9px captions left ~6px — ScheduleRoster on Jay's phone.
+    expect(pill).toBeLessThanOrEqual(110)
+    expect(captionGap).toBeGreaterThanOrEqual(8)
+  })
+})
+
 describe('the dock never carries Squad Hub AND Seniors (3 Sep 2026)', () => {
   // Six tabs overlapped on a phone the day Seniors shipped. A person with a
   // Squad Hub reaches the section from the Squad Hub page instead.
