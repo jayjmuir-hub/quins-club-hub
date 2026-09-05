@@ -26,6 +26,12 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+vi.mock('../src/data/playups.js', () => ({
+  listPlayerGuestTeamIds: async () => [],
+  addJuniorPlayup: async () => null,
+  removeJuniorPlayup: async () => null,
+}))
+
 vi.mock('../src/data/photos.js', () => ({
   signPhotoUrl: vi.fn().mockResolvedValue(null),
   signPhotoUrls: vi.fn(async () => ({})),

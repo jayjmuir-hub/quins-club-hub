@@ -40,6 +40,12 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+vi.mock('../src/data/playups.js', () => ({
+  listPlayerGuestTeamIds: async () => [],
+  addJuniorPlayup: async () => null,
+  removeJuniorPlayup: async () => null,
+}))
+
 // The photo bucket is private, so a viewable URL has to be signed. Mocked
 // here because the table now renders faces: without it the photo test would
 // reach for the network. The no-photo tests never call it — Roster skips the

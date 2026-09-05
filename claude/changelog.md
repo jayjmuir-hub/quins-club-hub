@@ -8,6 +8,10 @@ changed, when".** Backfilled from `git log` on 7 Aug 2026 — the 5 to 7 Aug ent
 are one-liners taken from commit subjects, so they are accurate but thinner than the
 hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
+## 5 Sep 2026
+
+- 🏉 **Junior play-up (second age group) via guest membership.** Super admin only. Home stays `players.team_id`; `add_junior_playup` / `remove_junior_playup` twin or drop active home memberships on another junior squad. Age groups block on the player sheet. Migration `db/migrations/20260913_junior_playup.sql` not applied to live from this PR. Rot detectors: `tests/playups.test.js`, `tests/age-groups-section.test.jsx`, `tests/players-list-membership.test.js`, `db/tests/junior-playup.sql`.
+
 ## 4 Sep 2026
 
 - 💬 **Chat composer declutter.** One shared `ComposerBar` on DMs, groups, squad/club channels, and the floating dock: WhatsApp-style `+` attach menu (photo, file, poll), icon Send, `@` typeahead in groups only. Rot detectors: `tests/composer-bar.test.jsx`, `tests/mention-picker.test.js`, `tests/floating-dock.test.jsx`.

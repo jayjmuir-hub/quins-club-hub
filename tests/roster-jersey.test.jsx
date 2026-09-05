@@ -44,6 +44,12 @@ vi.mock('../src/data/players.js', () => ({
   setPlayerJerseyNumber: (...args) => setPlayerJerseyNumberMock(...args),
 }))
 
+vi.mock('../src/data/playups.js', () => ({
+  listPlayerGuestTeamIds: async () => [],
+  addJuniorPlayup: async () => null,
+  removeJuniorPlayup: async () => null,
+}))
+
 vi.mock('../src/data/playerTiers.js', () => ({
   listPlayerGrades: vi.fn(async () => new Map()),
   listPlayerUnits: vi.fn(async () => new Map()),

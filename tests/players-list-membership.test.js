@@ -122,6 +122,19 @@ describe('listPlayers({ teamIds }) — home or active membership', () => {
     expect(result).toEqual([])
     expect(fromMock).not.toHaveBeenCalled()
   })
+
+  it('a junior home player with an active guest membership on another junior squad is guest_of that squad', async () => {
+    playersRows = [
+      { id: 'p-home', full_name: 'Harness Home Alderton', team_id: 't-u16', left_at: null },
+      { id: 'p-playup', full_name: 'Harness Playup Brackwood', team_id: 't-u14', left_at: null },
+    ]
+    membershipsRows = [{ player_id: 'p-playup', team_id: 't-u16', status: 'active' }]
+
+    const result = await listPlayers({ teamIds: ['t-u16'] })
+
+    expect(result.find((row) => row.id === 'p-playup').guest_of).toBe('t-u16')
+    expect(result.find((row) => row.id === 'p-home').guest_of).toBeNull()
+  })
 })
 
 // ⚠️ listPlayerSquads' TESTS WERE HERE — deleted 2 Sep 2026, whole-branch

@@ -524,6 +524,12 @@ there is no photo, and sortable, searchable and staff-editable there. `claude/pl
 tombstone over the original ruling and `claude/plans/2026-09-02-senior-squads-2a-implementation.md`
 is what built the narrower one.
 
+**A junior on a second age group is a guest membership, not a second players row.** Super admins
+add that through `add_junior_playup` / `remove_junior_playup` (`db/migrations/20260913_junior_playup.sql`):
+home stays `players.team_id`; every active home membership for that `player_id` is twinned onto
+the guest junior squad (same pattern as U18 call-ups). `listPlayers({ teamIds })` already marks
+those rows `guest_of`. Staff see the mark; parents must not. Ordinary coaches never see Add.
+
 **A player who has quit is marked LEFT, never deleted.** `players.left_at` non-null is a
 leaver; `left_at IS NULL` means current. `mark_player_left`/`restore_player`
 (`db/migrations/20260902_player_leavers.sql`,
