@@ -196,6 +196,7 @@ function stubThread(overrides = {}) {
     docFileRef: { current: null },
     pendingFile: { file: null, error: null, pick: vi.fn(), clear: vi.fn() },
     pickFile: vi.fn(),
+    attachIncoming: vi.fn(),
     composerOpen: true,
     sending: false,
     progress: null,

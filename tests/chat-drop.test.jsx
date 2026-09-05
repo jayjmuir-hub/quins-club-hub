@@ -105,6 +105,30 @@ vi.mock('../src/data/chatMedia.js', () => ({
   chatFileAccept: () => 'application/pdf',
   uploadChatFile: vi.fn(),
   attachmentPreviewLabel: () => '📷 Photo',
+  CHAT_FILE_TYPES: {
+    'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'text/csv': 'csv',
+    'application/csv': 'csv',
+  },
+  validateChatFile: (file) => {
+    if (!file) return 'Choose a file first.'
+    const ok = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'application/csv',
+    ])
+    if (!ok.has(file.type)) return 'That file type is not supported. Use a PDF, Word, Excel or CSV file.'
+    if (file.size > 26214400) return 'That file is over the 25 MB limit.'
+    return null
+  },
 }))
 vi.mock('../src/screens/ChatList.jsx', () => ({
   RowAvatar: () => <span data-testid="row-avatar" />,
@@ -170,6 +194,9 @@ beforeEach(() => {
 })
 
 const img = (name) => new File(['x'], name, { type: 'image/jpeg' })
+const pdf = (name = 'notes.pdf') => new File(['x'], name, { type: 'application/pdf' })
+const xlsx = (name = 'fixture-list.xlsx') =>
+  new File(['x'], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
 
 /** A drag event as the DOM hands one over. jsdom has no DataTransfer. */
 function drag(kind, { files = [], types = files.length ? ['Files'] : ['text/plain'] } = {}) {
@@ -256,12 +283,38 @@ describe('the drop', () => {
     expect(screen.getByLabelText('Message')).toHaveValue('these are from Saturday')
   })
 
-  it('⚠️ refuses a dropped PDF and says so — `accept` never sees this door', async () => {
-    // accept on the <input> filters the PICKER only. A dropped file bypasses
-    // it entirely, so the tray's own gate is the only thing standing here.
+  it('routes a dropped PDF to the pending-file chip, not the photo tray', async () => {
+    // accept on the <input> filters the PICKER only. Drop bypasses it, so
+    // routing by MIME is what sends a document to pendingFile.pick instead
+    // of the tray's "not a photo" gate.
     await ready()
-    fireEvent(pane(), drag('drop', { files: [new File(['x'], 'notes.pdf', { type: 'application/pdf' })] }))
+    fireEvent(pane(), drag('drop', { files: [pdf()] }))
+    expect(await screen.findByTestId('pending-file')).toHaveTextContent('notes.pdf')
+    expect(screen.queryAllByTestId('tray-thumb')).toHaveLength(0)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('routes a dropped Excel workbook to the pending-file chip', async () => {
+    await ready()
+    fireEvent(pane(), drag('drop', { files: [xlsx()] }))
+    expect(await screen.findByTestId('pending-file')).toHaveTextContent('fixture-list.xlsx')
+    expect(screen.queryAllByTestId('tray-thumb')).toHaveLength(0)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('partitions a mixed drop: photos to the tray, first doc to pending file', async () => {
+    await ready()
+    fireEvent(pane(), drag('drop', { files: [img('a.jpg'), xlsx(), pdf('second.pdf')] }))
+    expect(await screen.findAllByTestId('tray-thumb')).toHaveLength(1)
+    expect(screen.getByTestId('pending-file')).toHaveTextContent('fixture-list.xlsx')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('⚠️ still refuses a dropped zip as not a photo', async () => {
+    await ready()
+    fireEvent(pane(), drag('drop', { files: [new File(['x'], 'bundle.zip', { type: 'application/zip' })] }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/not a photo/i)
     expect(screen.queryAllByTestId('tray-thumb')).toHaveLength(0)
+    expect(screen.queryByTestId('pending-file')).toBeNull()
   })
 })

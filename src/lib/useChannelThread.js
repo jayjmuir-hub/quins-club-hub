@@ -5,6 +5,7 @@ import { removeChatAttachments, uploadChatFile, uploadChatVoice } from '../data/
 import { listEvents } from '../data/events.js'
 import { useAttachmentTray } from './useAttachmentTray.js'
 import { usePendingChatFile } from './usePendingChatFile.js'
+import { routeChatAttachments } from './chatComposer.js'
 import { uploadAlbum } from './uploadAlbum.js'
 import {
   channelMembers,
@@ -317,7 +318,8 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
   /**
    * The picker door. ⚠️ `accept` on the input filters this door ONLY — the
    * paste and drop doors bypass it entirely — so the real type gate is
-   * isAcceptableImage inside the tray, which all three share.
+   * isAcceptableImage inside the tray (photos) and validateChatFile /
+   * routeChatAttachments (documents).
    */
   function pickPhoto(domEvent) {
     const files = Array.from(domEvent.target.files ?? [])
@@ -333,6 +335,10 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
     domEvent.target.value = ''
     tray.clear()
     pendingFile.pick(files)
+  }
+
+  function attachIncoming(files) {
+    routeChatAttachments(files, { addPhotos: tray.add, pickFile: pendingFile.pick })
   }
 
   async function send(domEvent) {
@@ -559,6 +565,7 @@ export default function useChannelThread({ param, wantStaff = false, threadParam
     progress,
     pickPhoto,
     pickFile,
+    attachIncoming,
     draftRef,
     fileRef,
     docFileRef,

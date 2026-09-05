@@ -97,6 +97,7 @@ function channelStub(overrides = {}) {
     setAttachEventId: vi.fn(),
     setSendError: vi.fn(),
     pickPhoto: vi.fn(),
+    attachIncoming: vi.fn(),
     md: false,
     onReact: vi.fn(),
     onReply: vi.fn(),
@@ -141,6 +142,7 @@ function dmStub(overrides = {}) {
     docFileRef: { current: null },
     pickPhoto: vi.fn(),
     pickFile: vi.fn(),
+    attachIncoming: vi.fn(),
     draft: '',
     setDraft: vi.fn(),
     setDraftMentions: vi.fn(),
@@ -234,7 +236,8 @@ describe('channel composer bar', () => {
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
 
     await user.click(screen.getByTestId('attach-menu'))
-    expect(screen.getByTestId('attach-menu-photo')).toHaveAccessibleName(/photo or file|attach a photo|photo/i)
+    expect(screen.getByTestId('attach-menu-photo')).toHaveAccessibleName('Photo')
+    expect(screen.getByTestId('attach-menu-photo')).toHaveTextContent(/^Photo$/)
     expect(screen.getByTestId('attach-menu-file')).toBeInTheDocument()
     expect(screen.getByTestId('attach-menu-poll')).toBeInTheDocument()
     const photo = screen.getByTestId('photo-input')
