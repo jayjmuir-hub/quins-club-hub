@@ -39,7 +39,7 @@ export default function AgeGroupsSection({ player, team, onChanged }) {
     }
   }, [visible, player?.id, player?.team_id, reloadToken])
 
-  const guestIds = guestPlayups.map((row) => row.team_id)
+  const guestIds = useMemo(() => guestPlayups.map((row) => row.team_id), [guestPlayups])
   const consentByTeam = useMemo(
     () => new Map(guestPlayups.map((row) => [row.team_id, row.playup_consent])),
     [guestPlayups],

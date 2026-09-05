@@ -158,6 +158,7 @@ function createChannel() {
 beforeEach(() => {
   supabase.from.mockReset()
   supabase.rpc.mockReset()
+  supabase.rpc.mockResolvedValue({ data: [], error: null })
   supabase.channel.mockReset()
   supabase.removeChannel.mockReset()
   // ⚠️ `mockClear`, NOT `mockReset` — reset would drop the resolved value set
@@ -777,16 +778,12 @@ describe('listPlayers', () => {
 
     await listPlayers({ teamIds: ['team-1'] })
 
-    // ⚠️ TWO CALLS SINCE senior-squads-2a, NOT ONE — a non-empty teamIds now
-    // also runs a `memberships` query (same shared mock builder here, since
-    // this file's createQueryBuilder returns one canned result regardless of
-    // table), scoped to the same requested teams. See
-    // tests/players-list-membership.test.js for the table-aware mock that
-    // exercises the "home OR active membership" behaviour this adds.
-    expect(calls.in).toEqual([
-      ['team_id', ['team-1']],
-      ['team_id', ['team-1']],
-    ])
+    // Home players still filter by team_id. Guests come from
+    // squad_guest_flags (not a memberships table read — "memb read" is
+    // own-row or admin). Empty flags here means no second players fetch.
+    // tests/players-list-membership.test.js is the table-aware mock.
+    expect(calls.in).toEqual([['team_id', ['team-1']]])
+    expect(supabase.rpc).toHaveBeenCalledWith('squad_guest_flags', { _teams: ['team-1'] })
   })
 
   it('does not query at all when teamIds is an empty array, and returns []', async () => {
