@@ -10,6 +10,8 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 5 Sep 2026
 
+- `ea60039` — docs: cite #723 squash and prior changelog SHA.
+- #724 — 🔔 **Home "Turn them on" lands on the Notifications toggle.** Root cause was `useScreenChrome` (UX review item 7): a pathname change to `/settings#notifications` focused `<main>` and `scrollTo(0, 0)`, which on a phone undid More's hash `scrollIntoView` so parents saw the top of Settings. Hash deep-links now skip that top-reset and focus the section (`#notifications`, `#your-calendar`, account menu included). Rot detectors: `tests/screen-chrome.test.jsx`, `tests/more.test.jsx`.
 - `26e5da8` — docs: changelog for Settings hash deep-link scroll fix.
 - `4c27e7b` — 🔔 **Home "Turn them on" lands on the Notifications toggle.** Root cause was `useScreenChrome` (UX review item 7): a pathname change to `/settings#notifications` focused `<main>` and `scrollTo(0, 0)`, which on a phone undid More's hash `scrollIntoView` so parents saw the top of Settings. Hash deep-links now skip that top-reset and focus the section (`#notifications`, `#your-calendar`, account menu included). Rot detectors: `tests/screen-chrome.test.jsx`, `tests/more.test.jsx`.
 - #723 — 📎 **Chat FileCard: hide signed URLs, type pill, Download button.**
