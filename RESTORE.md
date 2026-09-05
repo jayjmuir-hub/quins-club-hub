@@ -777,6 +777,13 @@ uses `#5c5854` (6.42:1).
 dialog blocks the event loop and hangs Playwright's browser check dead — established in
 Task 14, reused in Task 15's player delete.
 
+**`DiscardConfirm` is pinned over the open Sheet, not in the scrolled body.** The ask used
+to sit as the first child of the panel (`overflow-y-auto`); a dirty form scrolled to the
+bottom left Discard / Keep editing off-screen under the sticky title (Jay, 5 Sep 2026,
+profile Edit). The component portals a centered `fixed inset-0` overlay onto the dialog
+panel, so every `useDiscardGuard` sheet inherits it with no call-site CSS. EventForm uses
+the same component (it still owns its own dirty flag).
+
 **Squad reassignment on edit must fall back to the entity's own team, not the first editable
 one.** `editableTeams[0]` as a fallback silently reassigns whoever is being edited to a coach's
 first squad the moment the form opens. Reconcile against the entity's actual `team_id` instead.

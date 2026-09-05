@@ -16,7 +16,8 @@ import useUnsavedChanges from './useUnsavedChanges.js'
  * back:
  *   - `requestClose` — wire it to the Sheet's onClose. Clean closes at once;
  *     dirty arms the question instead.
- *   - `confirming` — render <DiscardConfirm> when true.
+ *   - `confirming` — render <DiscardConfirm> when true. That component pins
+ *     itself over the open Sheet; it is not in the scrolled body.
  *   - `discard` / `keep` — the two answers.
  *
  * The reload / tab-close guard (useUnsavedChanges) rides along, so a form

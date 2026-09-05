@@ -62,6 +62,7 @@ describe('EventForm — unsaved changes', () => {
     expect(onClose).not.toHaveBeenCalled()
 
     const ask = await screen.findByRole('alertdialog', { name: /discard your changes/i })
+    expect(ask).toHaveAttribute('data-testid', 'discard-confirm')
     await user.click(within(ask).getByRole('button', { name: /keep editing/i }))
     expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(screen.getByLabelText(/opponent/i)).toHaveValue('Dubai Exiles')
