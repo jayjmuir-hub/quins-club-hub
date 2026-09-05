@@ -7,8 +7,24 @@ const MIGRATION = readFileSync(
   join(process.cwd(), 'db', 'migrations', '20260914_junior_playup_consent.sql'),
   'utf8',
 )
+const FIX = readFileSync(
+  join(process.cwd(), 'db', 'migrations', '20260915_playup_staff_fix.sql'),
+  'utf8',
+)
 const HARNESS = readFileSync(join(process.cwd(), 'db', 'tests', 'junior-playup-consent.sql'), 'utf8')
 const ADD = readFileSync(join(process.cwd(), 'db', 'migrations', '20260913_junior_playup.sql'), 'utf8')
+
+const PLAYUP_STAFF_UUID_AGG = [
+  "select coalesce(array_agg(distinct uid), '{}'::uuid[])",
+  'select a as uid from private.approval_audience(_club, _home, _except) as a',
+  'select a as uid from private.approval_audience(_club, _guest, _except) as a',
+]
+
+function playupStaffDef(src) {
+  const m = src.match(/create or replace function private\.playup_staff[\s\S]*?\$\$;/)
+  expect(m, 'playup_staff definition').toBeTruthy()
+  return m[0]
+}
 
 describe('junior play-up consent (rot detector)', () => {
   it('consent is pending|approved on the guest membership, not a boolean and not memberships.status', () => {
@@ -37,5 +53,18 @@ describe('junior play-up consent (rot detector)', () => {
   it('anon execute is revoked by name', () => {
     expect(MIGRATION).toMatch(/revoke execute on function public\.answer_junior_playup/i)
     expect(MIGRATION).toMatch(/from anon/i)
+  })
+
+  it('playup_staff aggregates uuid, not record, from SETOF approval_audience', () => {
+    for (const sql of [MIGRATION, FIX]) {
+      const def = playupStaffDef(sql)
+      expect(def).not.toMatch(/select \* from private\.approval_audience/)
+      for (const needle of PLAYUP_STAFF_UUID_AGG) {
+        expect(def).toContain(needle)
+      }
+    }
+    expect(FIX).toMatch(/create or replace function private\.playup_staff/i)
+    expect(HARNESS).toContain("pg_get_functiondef('private.playup_staff(uuid, uuid, uuid, uuid)'::regprocedure)")
+    expect(HARNESS).toContain('%select * from private.approval_audience%')
   })
 })

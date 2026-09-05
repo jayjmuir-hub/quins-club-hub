@@ -15,6 +15,11 @@
 -- senior call-up twins).
 --
 -- Direct super-admin add still starts pending. No auto-timeout.
+--
+-- ⚠️ playup_staff must alias SETOF uuid as a column (`select a as uid … as a`).
+-- Star-selecting approval_audience inside array_agg is record[], and apply
+-- fails: COALESCE types record[] and uuid[] cannot be matched.
+-- 20260915_playup_staff_fix.sql is the same CREATE OR REPLACE, already live.
 
 alter table public.memberships
   add column if not exists playup_consent text;
@@ -89,12 +94,12 @@ stable
 security definer
 set search_path = public
 as $$
-  select coalesce(array_agg(distinct a), '{}'::uuid[])
+  select coalesce(array_agg(distinct uid), '{}'::uuid[])
     from (
-      select * from private.approval_audience(_club, _home, _except)
+      select a as uid from private.approval_audience(_club, _home, _except) as a
       union
-      select * from private.approval_audience(_club, _guest, _except)
-    ) as a;
+      select a as uid from private.approval_audience(_club, _guest, _except) as a
+    ) s;
 $$;
 revoke execute on function private.playup_staff(uuid, uuid, uuid, uuid) from public;
 

@@ -39,6 +39,13 @@ the courtesy.
 
 `private.notify_junior_playup` no-ops when `app.harness = on`.
 
+⚠️ **`private.playup_staff` must not `select *` from `approval_audience`.** That
+helper is `SETOF uuid`; `array_agg` of the subquery then is `record[]`, and
+apply fails with `COALESCE types record[] and uuid[] cannot be matched`. Alias
+the set as a column (`select a as uid … as a`). Live was patched 5 Sep 2026;
+`db/migrations/20260915_playup_staff_fix.sql` is the same idempotent replace,
+and `20260914` in-repo now carries the same body.
+
 ---
 
 ### Club Diary phase 2 — four migrations, and the reasoning the SQL cannot carry

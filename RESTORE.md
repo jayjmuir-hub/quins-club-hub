@@ -527,7 +527,9 @@ is what built the narrower one.
 **A junior on a second age group is a guest membership, not a second players row.** Super admins
 add that through `add_junior_playup` / `remove_junior_playup`
 (`db/migrations/20260913_junior_playup.sql` and consent in
-`db/migrations/20260914_junior_playup_consent.sql`):
+`db/migrations/20260914_junior_playup_consent.sql`;
+`db/migrations/20260915_playup_staff_fix.sql` replaces `playup_staff` so
+`array_agg` is over uuid, not record):
 home stays `players.team_id`; every active home membership for that `player_id` is twinned onto
 the guest junior squad (same pattern as U18 call-ups) with `status = 'active'` and
 `playup_consent` `pending` until a linked parent approves. `listPlayers({ teamIds })` marks

@@ -28,6 +28,13 @@ begin
      or to_regprocedure('public.squad_guest_flags(uuid[])') is null then
     raise exception 'play-up consent RPCs are not on this database — apply db/migrations/20260914_junior_playup_consent.sql';
   end if;
+  if to_regprocedure('private.playup_staff(uuid, uuid, uuid, uuid)') is null then
+    raise exception 'playup_staff is not on this database';
+  end if;
+  if pg_get_functiondef('private.playup_staff(uuid, uuid, uuid, uuid)'::regprocedure)
+     like '%select * from private.approval_audience%' then
+    raise exception 'playup_staff still aggregates SETOF uuid as record — apply db/migrations/20260915_playup_staff_fix.sql';
+  end if;
 
   select id into t_home from public.teams where club_id = club and is_senior is not true and name like 'U14B%' order by name limit 1;
   select id into t_guest from public.teams where club_id = club and is_senior is not true and name like 'U16B%' order by name limit 1;
