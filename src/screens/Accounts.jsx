@@ -206,6 +206,11 @@ const NO_CLUB_KNOWN =
 const PENDING_APPROVAL_NOTE =
   'Parents add their own player and land here. Until you approve them they can see their own child and the squad’s fixtures — enough to set availability — and nothing else: not the squad roster, not other families’ contact details. Approving gives them the same view as everyone else in that age group.'
 
+// Single note under "Waiting for access". Dismiss / revoke / login-survives
+// live here once — not a second footer under the list.
+const WAITING_FOR_ACCESS_NOTE =
+  "Anyone can create a login, but they see nothing until you grant access. Finished asks sit at the top; bare logins below — dismiss ones you don't recognise (clears this list only, not the login; undo below). Revoking is the same: the login stays, so they can still sign in to an empty app and can't register again."
+
 const SHEET_LABEL = 'mb-1.5 block text-[12.5px] font-bold uppercase tracking-[.4px] text-ink-muted'
 const SHEET_INPUT =
   'w-full rounded-[11px] border-[1.5px] border-line bg-surface-card px-3 py-[11px] text-[16px] text-ink outline-none transition focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
@@ -2026,24 +2031,7 @@ export default function Accounts() {
             Waiting for access
           </h3>
           <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
-            Anyone can create a login with their email address, but they see nothing at all in
-            the app until an admin gives them access. People who finished saying who they are sit at the top.
-            People who only created a login sit below — dismiss those if you do not recognise them. Anyone you don&apos;t recognise can
-            be dismissed — that only clears them off this list, it doesn&apos;t delete their
-            login, and you can undo it below.
-          </p>
-          {/* Added 8 Aug 2026. The sentence above already said dismissing does
-              not delete a login, and it still was not enough — the count at the
-              top of the screen said "2 people" and that is what got believed.
-              This spells out the consequence rather than the mechanism, because
-              the consequence is the bit that bites: a surviving login cannot
-              sign up again, so the person gets no email and no error. */}
-          <p className={`mt-1 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
-            <strong className="font-bold">Revoking access doesn&apos;t delete a login
-            either</strong>, and nothing in this app can — only the Supabase dashboard.
-            Someone whose access you revoked can still sign in; they just see nothing.
-            If they try to register again they get no email and no error, because the
-            login already exists.
+            {WAITING_FOR_ACCESS_NOTE}
           </p>
 
           {waiting.length === 0 ? (
@@ -2051,8 +2039,7 @@ export default function Accounts() {
               <Empty message="Nobody is waiting for access. Anyone who signs up without an invite will appear here." />
             </Card>
           ) : (
-            <>
-              <div className="mt-2.5 flex flex-col gap-3">
+            <div className="mt-2.5 flex flex-col gap-3">
                 {waiting.map((profile, index) => {
                   const state = grantState[profile.id] ?? {}
                   const triage = triageState[profile.id] ?? {}
@@ -2302,13 +2289,6 @@ export default function Accounts() {
                   )
                 })}
               </div>
-
-              <p className={`mt-2 text-[12.5px] leading-relaxed ${MUTED_ON_PAPER}`}>
-                Dismissing someone is safe and reversible: with no access they could already see
-                nothing, and dismissing only takes them off this list. It does not delete their
-                login — closing an account itself isn&apos;t something this screen can do.
-              </p>
-            </>
           )}
         </section>
       )}
