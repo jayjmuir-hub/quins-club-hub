@@ -422,7 +422,7 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
               {showOps && (
                 <Link to="/ops" role="menuitem" data-testid="account-ops" onClick={() => close({ refocus: false })} className={ITEM}>
                   <OpsIcon className={ICON} />
-                  Ops
+                  Club Ops
                 </Link>
               )}
 

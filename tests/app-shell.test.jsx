@@ -169,7 +169,7 @@ describe('AppShell', () => {
     expect(screen.getAllByRole('link', { name: 'Notices' })).toHaveLength(1)
   })
 
-  it('offers Ops in the sidebar for a super admin, not on the phone dock', () => {
+  it('offers Club Ops in the sidebar for a super admin, not on the phone dock', () => {
     useMembershipsMock.mockReturnValue(
       loaded({
         memberships: [
@@ -178,8 +178,9 @@ describe('AppShell', () => {
       }),
     )
     renderShell()
-    expect(screen.getAllByRole('link', { name: 'Ops' })).toHaveLength(1)
-    expect(screen.getByRole('link', { name: 'Ops' })).toHaveAttribute('href', '/ops')
+    expect(screen.getAllByRole('link', { name: 'Club Ops' })).toHaveLength(1)
+    expect(screen.getByRole('link', { name: 'Club Ops' })).toHaveAttribute('href', '/ops')
+    expect(screen.queryByRole('link', { name: /^Ops$/ })).not.toBeInTheDocument()
   })
 
   it('renders the crest with a meaningful alt and without a cropping object-fit class', () => {

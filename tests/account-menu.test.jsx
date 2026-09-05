@@ -255,13 +255,17 @@ describe('AccountMenu — the management doors', () => {
     expect(screen.queryByTestId('account-ops')).not.toBeInTheDocument()
   })
 
-  it('gives a super admin the Ops door', async () => {
+  it('gives a super admin the Club Ops door', async () => {
     await open([{ id: 'm-sa', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: 'c1', is_super: true }])
-    expect(screen.getByTestId('account-ops')).toHaveAttribute('href', '/ops')
+    const ops = screen.getByTestId('account-ops')
+    expect(ops).toHaveAttribute('href', '/ops')
+    expect(ops).toHaveTextContent('Club Ops')
+    expect(ops).not.toHaveTextContent(/^Ops$/)
   })
 
-  it('gives a head coach the Ops door, not an assistant', async () => {
+  it('gives a head coach the Club Ops door, not an assistant', async () => {
     await open([{ id: 'm-hc', role: 'coach', team_id: 'team-u10', club_id: 'c1', status: 'active', is_head_coach: true }])
+    expect(screen.getByTestId('account-ops')).toHaveTextContent('Club Ops')
     expect(screen.getByTestId('account-ops')).toHaveAttribute('href', '/ops')
   })
 })

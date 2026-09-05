@@ -105,7 +105,7 @@ function linkClassName({ isActive }) {
     // label) and colour. Labels exist for every item in the DOM and in the
     // accessible name; only the active one is VISIBLE, which is what makes
     // six tabs fit on a 360px phone without a single abbreviation.
-    'group relative z-[1] flex h-[46px] items-center justify-center gap-1.5 rounded-pill outline-none',
+    'group relative z-[1] flex h-[46px] items-center justify-center gap-1 rounded-pill outline-none',
     'transition-[padding,color,transform] duration-300 ease-out motion-reduce:transition-none',
     // Press squash — the iOS tab feel. 90% on the way down, and the spring
     // curve on the transition above gives it the bounce back.
@@ -125,7 +125,10 @@ function linkClassName({ isActive }) {
     // (24 Aug, above) and full-strength ink (28 Aug) both retire with it.
     // min-w-[44px] on the idle tab: 22px icon + px-2 measured 38px wide
     // (2 Sep 2026 UX review, item 5). The active pill is wider by its label.
-    isActive ? 'px-3 text-white' : 'min-w-[44px] px-2 text-white/90',
+    // ⚠️ px-2 on the ACTIVE pill too (5 Sep 2026). px-3 made "Squad Hub"
+    // so wide that Schedule/Roster captions ran together on a 360px five-tab
+    // bar. Keep five tabs; tighten the pill, do not drop Roster.
+    isActive ? 'px-2 text-white' : 'min-w-[44px] px-2 text-white/90',
   ].join(' ')
 }
 
@@ -138,7 +141,7 @@ function labelClassName({ isActive }) {
     // HUB" open. Idle items are 38px (22px icon + px-2), the open pill ~108,
     // and the bar has 336px inside its insets — 5×38 + 108 + padding fits;
     // at 12px/px-3.5 it did not, and More fell off the right edge.
-    'overflow-hidden whitespace-nowrap font-condensed text-[11px] font-bold uppercase tracking-[0.06em]',
+    'overflow-hidden whitespace-nowrap font-condensed text-[10px] font-bold uppercase tracking-[0.06em]',
     'transition-[max-width,opacity,margin] duration-300 ease-out motion-reduce:transition-none',
     isActive ? 'max-w-[96px] opacity-100' : 'max-w-0 opacity-0 -ml-1.5',
   ].join(' ')
@@ -149,7 +152,7 @@ function labelClassName({ isActive }) {
 // add to the item's width, because the Glider measures idle items as icon-width
 // and predicts the settled layout from it (see measure() below). Centred under
 // the icon and allowed to overflow into the gap `justify-between` already leaves
-// between icons; kept tiny (9px condensed) so even "Squad Hub" clears its
+// between icons; kept tiny (8px condensed, 5 Sep 2026) so even "Squad Hub" clears its
 // neighbours. Hidden on the ACTIVE tab, whose label rides beside its icon in the
 // pill instead — so no tab shows the word twice.
 // Every caption is dead-centred under its icon — including the END tabs.
@@ -161,7 +164,7 @@ function labelClassName({ isActive }) {
 function captionClassName({ isActive }) {
   return [
     'pointer-events-none absolute bottom-[3px] left-1/2 -translate-x-1/2 whitespace-nowrap',
-    'font-condensed text-[9px] font-bold uppercase leading-none tracking-[0.03em]',
+    'font-condensed text-[8px] font-bold uppercase leading-none tracking-[0.03em]',
     'transition-opacity duration-200 ease-out motion-reduce:transition-none',
     isActive ? 'opacity-0' : 'opacity-100',
   ].join(' ')
@@ -324,7 +327,7 @@ export default function Nav({ showSquadHub = false, showSeniors = false, badges 
       const active = links[activeIndex]
       const label = active.querySelector('span')
       const hidden = label ? Math.max(0, label.scrollWidth - label.clientWidth) : 0
-      const gap = label && label.clientWidth === 0 ? 6 : 0
+      const gap = label && label.clientWidth === 0 ? 4 : 0
       const activeWidth = Math.max(active.offsetWidth, idle) + hidden + gap
       const total = idle * (links.length - 1) + activeWidth
       const space = links.length > 1 ? (inner - total) / (links.length - 1) : 0
