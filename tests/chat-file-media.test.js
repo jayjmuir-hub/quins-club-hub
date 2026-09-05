@@ -16,6 +16,7 @@ import {
   attachmentPreviewLabel,
   uploadChatFile,
 } from '../src/data/chatMedia.js'
+import { fileKindLabel } from '../src/lib/fileKind.js'
 
 beforeEach(() => supabase.storage.from.mockReset())
 
@@ -77,6 +78,24 @@ describe('attachmentPreviewLabel — files win before the photo default', () => 
 
   it('a file is never called a photo even when count is 1', () => {
     expect(attachmentPreviewLabel('p1/uuid.pdf', 1)).toBe('📄 File')
+  })
+})
+
+describe('fileKindLabel — type pill from MIME or extension', () => {
+  it('uppercases the allowlisted kind from MIME, filename, or path', () => {
+    expect(fileKindLabel({ type: 'application/pdf' })).toBe('PDF')
+    expect(fileKindLabel({ type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })).toBe('XLSX')
+    expect(fileKindLabel({ type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })).toBe('DOCX')
+    expect(fileKindLabel({ type: 'text/csv' })).toBe('CSV')
+    expect(fileKindLabel({ name: 'grid.csv' })).toBe('CSV')
+    expect(fileKindLabel({ path: 'p1/uuid.docx' })).toBe('DOCX')
+    expect(fileKindLabel({ type: 'application/msword', name: 'old.doc' })).toBe('DOC')
+  })
+
+  it('stays in lockstep with CHAT_FILE_TYPES', () => {
+    for (const [mime, ext] of Object.entries(CHAT_FILE_TYPES)) {
+      expect(fileKindLabel({ type: mime })).toBe(ext.toUpperCase())
+    }
   })
 })
 

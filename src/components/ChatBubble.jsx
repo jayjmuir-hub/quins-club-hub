@@ -225,6 +225,7 @@ export default function ChatBubble({
                 path={photoPath}
                 name={album[0]?.name}
                 size={album[0]?.size}
+                type={album[0]?.type}
                 compact={photoCompact}
               />
             ) : (

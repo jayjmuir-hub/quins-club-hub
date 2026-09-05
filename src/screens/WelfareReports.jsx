@@ -101,6 +101,7 @@ function Queue() {
                     path={r.message.attachment_path}
                     name={r.message.attachments?.[0]?.name}
                     size={r.message.attachments?.[0]?.size}
+                    type={r.message.attachments?.[0]?.type}
                   />
                 )}
               </>

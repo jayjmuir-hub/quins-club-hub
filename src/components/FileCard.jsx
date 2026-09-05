@@ -1,37 +1,57 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { fileKindLabel } from '../lib/fileKind.js'
 import { signChatPhotoUrl } from '../data/chatMedia.js'
 import { formatBytes } from '../data/storage.js'
+import { saveBlobAsFile } from '../lib/downloadBlob.js'
 
 // A document in a chat bubble — claude/plans/2026-09-04-chat-file-attachments.md.
-// Icon + original filename + human size; tap opens a signed URL. No in-bubble
-// Office preview (Jay, 4 Sep 2026). Caption is deferred.
+// Icon + original filename + type pill + human size. Download is a BUTTON that
+// fetch→blob→object URL, never <a href={signedUrl}> — parents must not see a
+// long signed storage URL in the status bar or on long-press (Jay, 5 Sep 2026).
+// No in-bubble Office preview. Caption is deferred.
 
-export default function FileCard({ path, name, size, compact = false }) {
-  const [url, setUrl] = useState(null)
+function FileTypePill({ type, name, path, className }) {
+  return (
+    <span
+      data-testid="file-type-pill"
+      className={`inline-flex shrink-0 rounded-[6px] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[.4px] ${className}`}
+    >
+      {fileKindLabel({ type, name, path })}
+    </span>
+  )
+}
 
-  useEffect(() => {
-    let live = true
-    setUrl(null)
-    if (path) signChatPhotoUrl(path).then((signed) => live && setUrl(signed))
-    return () => {
-      live = false
-    }
-  }, [path])
+export default function FileCard({ path, name, size, type, compact = false }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
 
   if (!path) return null
   const label = name || 'File'
-  const href = url || undefined
+
+  async function download() {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const signed = await signChatPhotoUrl(path)
+      if (!signed) throw new Error('missing')
+      const res = await fetch(signed)
+      if (!res.ok) throw new Error('http')
+      const blob = await res.blob()
+      await saveBlobAsFile(blob, label)
+    } catch {
+      setError('Could not download that file.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
       data-testid="chat-file"
-      aria-label={`Open ${label}`}
-      className={`mt-1 flex max-w-[280px] items-center gap-2.5 rounded-[10px] bg-black/10 px-2.5 py-2 no-underline ${
+      className={`mt-1 flex max-w-[min(100%,22rem)] items-center gap-2.5 rounded-[10px] bg-black/10 px-2.5 py-2 ${
         compact ? 'py-1.5' : ''
-      } ${href ? 'hover:bg-black/15' : 'pointer-events-none'}`}
+      }`}
     >
       <span
         aria-hidden="true"
@@ -40,12 +60,31 @@ export default function FileCard({ path, name, size, compact = false }) {
         📄
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-bold leading-tight">{label}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <FileTypePill type={type} name={name} path={path} className="bg-white/25" />
+          <span data-testid="file-name" className="min-w-0 truncate text-[13px] font-bold leading-tight">
+            {label}
+          </span>
+        </span>
         {size != null && (
-          <span className="block text-[11px] font-semibold opacity-70">{formatBytes(size)}</span>
+          <span className="mt-0.5 block text-[11px] font-semibold opacity-70">{formatBytes(size)}</span>
+        )}
+        {error && (
+          <span role="alert" className="mt-0.5 block text-[11px] font-semibold text-danger-ink">
+            {error}
+          </span>
         )}
       </span>
-    </a>
+      <button
+        type="button"
+        onClick={download}
+        disabled={busy}
+        aria-label={`Download ${label}`}
+        className="shrink-0 rounded-[8px] bg-white/25 px-2 py-1 text-[11px] font-extrabold leading-none hover:bg-white/35 disabled:opacity-60"
+      >
+        {busy ? '…' : 'Download'}
+      </button>
+    </div>
   )
 }
 
@@ -65,6 +104,7 @@ export function PendingFileChip({ file, error, onRemove }) {
           className="flex items-center gap-2 rounded-[10px] bg-surface-mute px-2.5 py-2"
         >
           <span aria-hidden="true">📄</span>
+          <FileTypePill type={file.type} name={file.name} className="bg-surface-sunk text-ink" />
           <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-ink">{file.name}</span>
           <span className="shrink-0 text-[11px] font-semibold text-ink-muted">{formatBytes(file.size)}</span>
           <button
