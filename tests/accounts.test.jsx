@@ -1029,7 +1029,17 @@ describe('Accounts — waiting for access', () => {
     const section = waitingSection()
 
     expect(within(section).getByRole('heading', { name: /waiting for access/i })).toBeInTheDocument()
-    expect(within(section).getByText(/see nothing at all in the app/i)).toBeInTheDocument()
+    expect(
+      within(section).getByText(/anyone can create a login, but they see nothing until you grant access/i),
+    ).toBeInTheDocument()
+    expect(within(section).getByText(/finished asks sit at the top/i)).toBeInTheDocument()
+    expect(within(section).getByText(/clears this list only, not the login/i)).toBeInTheDocument()
+    expect(within(section).getByText(/revoking is the same/i)).toBeInTheDocument()
+    expect(within(section).getByText(/can.t register again/i)).toBeInTheDocument()
+    // The old two-paragraph intro and the footer that repeated dismiss/login.
+    expect(within(section).queryByText(/see nothing at all in the app/i)).not.toBeInTheDocument()
+    expect(within(section).queryByText(/dismissing someone is safe and reversible/i)).not.toBeInTheDocument()
+    expect(within(section).queryByText(/only the supabase dashboard/i)).not.toBeInTheDocument()
     // Not "requests" — nobody asked for anything.
     expect(within(section).queryByText(/request/i)).not.toBeInTheDocument()
 
@@ -1058,7 +1068,9 @@ describe('Accounts — waiting for access', () => {
     expect(within(section).getAllByRole('button', { name: /^dismiss$/i })).toHaveLength(
       within(section).getAllByTestId('waiting-person').length,
     )
-    expect(within(section).getByText(/does not delete their login/i)).toBeInTheDocument()
+    // Reversible is in the intro note once — not a second footer under the list.
+    expect(within(section).getByText(/not the login; undo below/i)).toBeInTheDocument()
+    expect(within(section).queryByText(/does not delete their login/i)).not.toBeInTheDocument()
   })
 
   it('dismisses a person, passing the acting admin, and drops them off the list', async () => {
