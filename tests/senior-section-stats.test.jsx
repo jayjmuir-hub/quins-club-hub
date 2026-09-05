@@ -47,7 +47,8 @@ describe('the seniors overview — season stats', () => {
         <SeniorSection />
       </MemoryRouter>,
     )
-    const section = await screen.findByTestId('season-stats')
+    // Since 4 Sep 2026 the stats sit inside each squad's Season card.
+    const section = await screen.findByTestId('season')
     const blocks = within(section).getAllByTestId('season-stats-squad')
     expect(blocks).toHaveLength(2)
     expect(seasonStatsMock).toHaveBeenCalledWith('men1', expect.any(String))

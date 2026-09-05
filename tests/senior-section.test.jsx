@@ -109,21 +109,28 @@ describe('the senior section — a 2nd XV player', () => {
     expect(listEventsMock.mock.calls[0][0].from).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
 
-  it('this weekend: each squad’s match with in, out and not-answered counts', async () => {
+  it('this weekend: one card per match, answered-of-squad first, in and out after', async () => {
     renderAs(MEN2_PLAYER)
     const rows = await screen.findAllByTestId('weekend-row')
     expect(rows).toHaveLength(2)
-    expect(rows[0]).toHaveTextContent('1st XV · Quins vs Tusskers')
-    expect(rows[0]).toHaveTextContent('ADH · Premiership · Round 2 · Home · Time TBD')
-    // 1st XV has two players: one in, one out, nobody unanswered.
-    expect(rows[0]).toHaveTextContent('1 in')
-    expect(rows[0]).toHaveTextContent('1 out')
-    expect(rows[0]).toHaveTextContent('0 not answered')
-    // 2nd XV has two on its list (one a guest): one in, one unanswered.
-    expect(rows[1]).toHaveTextContent('1 in')
-    expect(rows[1]).toHaveTextContent('1 not answered')
+    expect(rows[0]).toHaveTextContent('1st XV')
+    expect(rows[0]).toHaveTextContent('Quins vs Tusskers')
+    expect(rows[0]).toHaveTextContent('ADH · Premiership · Round 2 · Home')
+    // Every weekend match is TBD, so it is said once in the heading, not per row.
+    expect(rows[0]).not.toHaveTextContent('Time TBD')
+    expect(screen.getByTestId('this-weekend')).toHaveTextContent(/times TBD/)
+    // 1st XV has two players: both answered, one in, one out.
+    expect(within(rows[0]).getByTestId('weekend-availability')).toHaveTextContent('2 of 2 answered · 1 in · 1 out')
+    // 2nd XV has two on its list (one a guest): one answered, in.
+    expect(within(rows[1]).getByTestId('weekend-availability')).toHaveTextContent('1 of 2 answered · 1 in · 0 out')
     // Training is not a match and is not on the weekend card.
     expect(screen.queryByText(/training/i)).not.toBeInTheDocument()
+    // The weekend's matches are NOT repeated in the fixtures list below.
+    const fixtures = within(screen.getByTestId('fixtures')).getAllByTestId('fixture-row')
+    expect(fixtures).toHaveLength(1)
+    expect(fixtures[0]).toHaveTextContent('Quins vs Shaheen')
+    // "Full schedule" carries the section so the Schedule opens on it.
+    expect(screen.getByRole('link', { name: 'Full schedule' })).toHaveAttribute('href', '/schedule?team=section:senior_men')
   })
 
   it('the pool: grouped by home squad, numbers first, a second squad tagged', async () => {
@@ -134,20 +141,24 @@ describe('the senior section — a 2nd XV player', () => {
     expect(within(squads[0]).getAllByRole('listitem')[0]).toHaveTextContent('9Tariq Benali')
     expect(squads[1]).toHaveTextContent('2nd XV · 2')
     expect(within(squads[1]).getByText('home 1st XV')).toBeInTheDocument()
-    expect(screen.getByText('The pool · 4 players')).toBeInTheDocument()
+    expect(screen.getByTestId('pool')).toHaveTextContent('The pool4 players')
   })
 
-  it('the season record reads our row off the league table, and says so when there is none', async () => {
+  it('the season card reads our league row off the table, and says so when there is none', async () => {
     renderAs(MEN2_PLAYER)
-    const cards = await screen.findAllByTestId('record-card')
-    expect(cards[0]).toHaveTextContent('2-1-1')
-    expect(cards[0]).toHaveTextContent('Premiership · 3rd · 11 pts')
-    expect(within(cards[0]).getByRole('link', { name: 'Table' })).toHaveAttribute('href', '/standings/c-wap')
-    expect(cards[1]).toHaveTextContent('No league table yet.')
+    const cards = await screen.findAllByTestId('season-card')
+    expect(cards).toHaveLength(2)
+    const league = within(cards[0]).getByTestId('record-card')
+    expect(league).toHaveTextContent('League: 2-1-1 · 3rd · 11 pts')
+    expect(cards[0]).toHaveTextContent('Premiership')
+    expect(within(league).getByRole('link', { name: 'Table' })).toHaveAttribute('href', '/standings/c-wap')
+    expect(within(cards[1]).getByTestId('record-card')).toHaveTextContent('No league table yet.')
+    // No scored match yet, so the all-matches line says so instead of 0–0–0.
+    expect(within(cards[0]).getByTestId('all-matches-record')).toHaveTextContent('No scored matches yet.')
     expect(standingsMock).toHaveBeenCalledTimes(1)
   })
 
-  it('puts an All matches W–D–L row above the league table cards', async () => {
+  it('the all-matches W–D–L sits on the squad’s Season card, above its league line', async () => {
     const at = Date.parse('2026-10-15T08:00:00Z')
     const spy = vi.spyOn(Date, 'now').mockReturnValue(at)
     listEventsMock.mockResolvedValue([
@@ -175,24 +186,22 @@ describe('the senior section — a 2nd XV player', () => {
     ])
     try {
       renderAs(MEN2_PLAYER)
-      const all = await screen.findByTestId('all-matches-record')
-      const league = screen.getByTestId('season-record')
+      const cards = await screen.findAllByTestId('season-card')
+      const season = screen.getByTestId('season')
+      expect(season).toHaveTextContent(/league · tournaments · friendlies/)
+      expect(screen.getByRole('heading', { name: /^Season 20/ })).toBeInTheDocument()
+      const all = within(cards[0]).getByTestId('all-matches-record')
+      const league = within(cards[0]).getByTestId('record-card')
       expect(all.compareDocumentPosition(league) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-      expect(all).toHaveTextContent(/all matches/i)
-      expect(all).toHaveTextContent(/league · tournaments · friendlies/)
-      const cards = within(all).getAllByTestId('season-record-card')
       expect(cards[0]).toHaveTextContent('1st XV')
-      expect(within(cards[0]).getByTestId('stat-won')).toHaveTextContent('1')
-      expect(within(cards[0]).getByTestId('stat-drawn')).toHaveTextContent('1')
-      expect(within(cards[0]).getByTestId('stat-lost')).toHaveTextContent('0')
-      expect(within(cards[0]).getByTestId('season-record-wdl')).toHaveTextContent('1–1–0')
-      expect(cards[0]).toHaveTextContent('from scores on Hub · 2026-27')
-      expect(within(league).getAllByTestId('record-card')[0]).toHaveTextContent('2-1-1')
-      expect(within(league).getAllByTestId('record-card')[0]).toHaveTextContent('Premiership · 3rd · 11 pts')
+      expect(within(all).getByTestId('stat-won')).toHaveTextContent('1')
+      expect(within(all).getByTestId('stat-drawn')).toHaveTextContent('1')
+      expect(within(all).getByTestId('stat-lost')).toHaveTextContent('0')
+      expect(within(all).getByTestId('season-record-wdl')).toHaveTextContent('1–1–0')
+      expect(all).toHaveTextContent(/all matches/i)
+      expect(league).toHaveTextContent('League: 2-1-1 · 3rd · 11 pts')
       expect(within(league).getByRole('link', { name: 'Table' })).toHaveAttribute('href', '/standings/c-wap')
-      expect(within(league).getByRole('heading', { name: 'Season record' })).toBeInTheDocument()
-      expect(screen.getByTestId('season-stats')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: /Season stats/ })).toBeInTheDocument()
+      expect(within(cards[0]).getByTestId('season-stats-squad')).toBeInTheDocument()
     } finally {
       spy.mockRestore()
     }
@@ -202,7 +211,7 @@ describe('the senior section — a 2nd XV player', () => {
     const spy = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-15T08:00:00Z'))
     try {
       renderAs(MEN2_PLAYER)
-      await screen.findByTestId('season-record')
+      await screen.findByTestId('season')
       const { from } = listEventsMock.mock.calls[0][0]
       expect(Date.parse(from)).toBeLessThanOrEqual(Date.parse('2026-08-31T20:00:00.000Z'))
     } finally {

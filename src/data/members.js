@@ -189,15 +189,35 @@ export async function listClubMembers() {
  * a coach sees their squads' pending rows, a parent sees nothing and the
  * badge is not rendered anyway.
  */
+export function countReportsWaiting(reports, messages) {
+  const lastAuthor = new Map()
+  for (const m of messages) lastAuthor.set(m.feedback_id, m.author_id)
+  return reports.filter(
+    (r) => r.status === 'new' || (r.status === 'in-progress' && lastAuthor.get(r.id) === r.submitted_by),
+  ).length
+}
+
 export async function countAdminWaiting(userId) {
-  const [profiles, memberships, dismissed] = await Promise.all([
+  const [profiles, memberships, dismissed, reports, messages] = await Promise.all([
     supabase.from('profiles').select('id'),
     supabase.from('memberships').select('profile_id, status'),
     supabase.from('access_requests').select('profile_id').eq('status', 'dismissed'),
+    // Open reports and suggestions (Jay, 4 Sep 2026: "no notification number
+    // appeared on the icon so i had not known it was submitted"). `new` only:
+    // an in-progress report has been seen, and the badge is for what has not.
+    supabase.from('feedback').select('id, status, submitted_by').in('status', ['new', 'in-progress']),
+    supabase.from('feedback_messages').select('feedback_id, author_id, created_at').order('created_at', { ascending: true }),
   ])
   if (profiles.error) throw profiles.error
   if (memberships.error) throw memberships.error
   if (dismissed.error) throw dismissed.error
+  // A report count that cannot be read costs the reports and nothing else —
+  // an admin without the feedback grant still gets approvals on the badge.
+  // A report is waiting when it is `new`, or when it is in progress and the
+  // LAST message on its thread is the reporter's — they answered, and nobody
+  // has answered back (4 Sep 2026, the thread). A thread that cannot be
+  // read counts only the `new` ones.
+  const openReports = reports.error ? 0 : countReportsWaiting(reports.data ?? [], messages.error ? [] : (messages.data ?? []))
 
   const memberRows = memberships.data ?? []
   const withMembership = new Set(memberRows.map((row) => row.profile_id).filter(Boolean))
@@ -207,7 +227,7 @@ export async function countAdminWaiting(userId) {
       profile.id !== userId && !withMembership.has(profile.id) && !dismissedIds.has(profile.id),
   ).length
   const pending = memberRows.filter((row) => row.status === 'pending').length
-  return waiting + pending
+  return waiting + pending + openReports
 }
 
 export async function listPendingProfiles() {

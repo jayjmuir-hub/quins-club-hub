@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 
 // /my-reports — the screen a "somebody replied to your report" notification
@@ -24,10 +25,13 @@ vi.mock('../src/data/feedback.js', async () => {
     ...actual,
     listFeedback: vi.fn(),
     subscribeFeedback: vi.fn(() => () => {}),
+    listFeedbackMessages: vi.fn(async () => []),
+    sendFeedbackMessage: vi.fn(),
+    subscribeFeedbackMessages: vi.fn(() => () => {}),
   }
 })
 
-import { listFeedback, subscribeFeedback } from '../src/data/feedback.js'
+import { listFeedback, subscribeFeedback, listFeedbackMessages, sendFeedbackMessage } from '../src/data/feedback.js'
 import MyReports from '../src/screens/MyReports.jsx'
 import { useNotificationRouting } from '../src/lib/notificationRouting.js'
 
@@ -135,5 +139,54 @@ describe('the notification routing fallback', () => {
     renderProbe()
     listeners.message({ data: { type: 'workbox-something', url: `${window.location.origin}/my-reports` } })
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/more'))
+  })
+})
+
+// The reporter's side of the thread (4 Sep 2026): the club's messages and
+// their own, and a box to answer. The admin_note line is the fallback for
+// when the thread cannot be read.
+describe('the thread, from the reporter’s side', () => {
+  it('renders the messages in order and sends a reply as the reporter', async () => {
+    listFeedback.mockResolvedValue([
+      { id: 'f1', ref: 41, status: 'in-progress', body: 'The roster is blank on my phone', admin_note: 'Looking now.', submitted_by: 'me', club_id: 'club-1' },
+    ])
+    listFeedbackMessages.mockResolvedValue([
+      { id: 'm1', feedback_id: 'f1', author_id: 'admin-9', body: 'Looking now.', created_at: '2026-09-04T15:00:00Z' },
+    ])
+    sendFeedbackMessage.mockResolvedValue({ id: 'm2', feedback_id: 'f1', author_id: 'me', body: 'Still blank today.', created_at: '2026-09-04T16:00:00Z' })
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <MyReports />
+      </MemoryRouter>,
+    )
+    const thread = await screen.findByTestId('feedback-thread')
+    const lines = within(thread).getAllByTestId('feedback-message')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toHaveAttribute('data-from', 'club')
+    expect(lines[0]).toHaveTextContent(/The club · Fri 4 Sept, 19:00/)
+    // The old single-reply line is not drawn twice.
+    expect(screen.queryByText(/From the club:/)).not.toBeInTheDocument()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/message on report 41/i), 'Still blank today.')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(sendFeedbackMessage).toHaveBeenCalledWith('f1', 'Still blank today.', { authorId: 'me', clubId: 'club-1' }))
+    expect(within(thread).getAllByTestId('feedback-message')).toHaveLength(2)
+    expect(within(thread).getAllByTestId('feedback-message')[1]).toHaveAttribute('data-from', 'reporter')
+    expect(within(thread).getAllByTestId('feedback-message')[1]).toHaveTextContent(/You · Fri 4 Sept, 20:00/)
+  })
+
+  it('falls back to the admin_note line when the thread cannot be read', async () => {
+    listFeedback.mockResolvedValue([
+      { id: 'f1', ref: 41, status: 'done', body: 'The roster is blank on my phone', admin_note: 'Fixed on Tuesday.', submitted_by: 'me' },
+    ])
+    listFeedbackMessages.mockRejectedValue(new Error('refused'))
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <MyReports />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(/Fixed on Tuesday\./)).toBeInTheDocument()
+    expect(screen.queryByTestId('feedback-thread')).not.toBeInTheDocument()
   })
 })
