@@ -40,6 +40,7 @@ vi.mock('../src/data/photos.js', () => ({
 }))
 
 import { supabase } from '../src/lib/supabase.js'
+import { resetSharedChannelsForTests } from '../src/data/subscribeToTable.js'
 import { MAX_ROWS, MAX_TOTAL_ROWS } from '../src/data/limits.js'
 import { createAccessRequest } from '../src/data/accessRequests.js'
 import {
@@ -156,6 +157,7 @@ function createChannel() {
 }
 
 beforeEach(() => {
+  resetSharedChannelsForTests()
   supabase.from.mockReset()
   supabase.rpc.mockReset()
   supabase.rpc.mockResolvedValue({ data: [], error: null })
@@ -459,17 +461,23 @@ describe('subscribeEvents', () => {
     expect(supabase.removeChannel).toHaveBeenCalledWith(channel)
   })
 
-  it('uses a distinct channel per call so two concurrent subscribers do not collide', () => {
-    const channelA = createChannel()
-    const channelB = createChannel()
-    supabase.channel.mockReturnValueOnce(channelA).mockReturnValueOnce(channelB)
+  // ⚠️ SHARED SINCE 5 Sep 2026: two concurrent subscribers to `events` ride
+  // ONE channel (src/data/subscribeToTable.js), and both still hear every
+  // change. The contract in full is tests/subscribe-to-table-shared.test.js.
+  it('two concurrent subscribers share one channel and both hear the change', () => {
+    const channel = createChannel()
+    supabase.channel.mockReturnValue(channel)
+    const a = vi.fn()
+    const b = vi.fn()
 
-    subscribeEvents(vi.fn())
-    subscribeEvents(vi.fn())
+    subscribeEvents(a, { debounceMs: 0 })
+    subscribeEvents(b, { debounceMs: 0 })
 
-    const [nameA] = supabase.channel.mock.calls[0]
-    const [nameB] = supabase.channel.mock.calls[1]
-    expect(nameA).not.toEqual(nameB)
+    expect(supabase.channel).toHaveBeenCalledTimes(1)
+    const [, , onChange] = channel.on.mock.calls[0]
+    onChange({})
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -1386,10 +1394,16 @@ describe('subscribeAvailability', () => {
         table: 'availability',
         filter: 'event_id=eq.e-1',
       }),
-      callback,
+      expect.any(Function),
     )
     expect(channel.subscribe).toHaveBeenCalled()
     expect(typeof unsubscribe).toBe('function')
+    // The channel is handed the shared fan-out (5 Sep 2026), not the callback
+    // itself — so prove the callback is still what a change reaches. No
+    // debounce here: an RSVP is one row, and the caller re-reads on each.
+    const [, , onChange] = channel.on.mock.calls[0]
+    onChange({ eventType: 'INSERT', new: { event_id: 'e-1' }, old: {} })
+    expect(callback).toHaveBeenCalledTimes(1)
   })
 
   it('the returned unsubscribe function is idempotent (safe to call twice)', () => {
@@ -1412,6 +1426,9 @@ describe('subscribeAvailability', () => {
     subscribeAvailability('e-1', vi.fn())
     subscribeAvailability('e-2', vi.fn())
 
+    // Two events, two server-side filters, two channels — sharing (5 Sep
+    // 2026) is per table AND filter, so these must not be merged.
+    expect(supabase.channel).toHaveBeenCalledTimes(2)
     const [nameA] = supabase.channel.mock.calls[0]
     const [nameB] = supabase.channel.mock.calls[1]
     expect(nameA).not.toEqual(nameB)

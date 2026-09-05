@@ -362,52 +362,53 @@ export async function markMessagesRead(profileId, messageIds) {
  * list's badge (my_chats) has counted them since 24 Aug — a dot that stayed
  * dark while the list said "1 unread" was the last trace of the fold.
  *
- * ⚠️ BOUNDED ON PURPOSE. At a full club this is fifteen squads' worth of
- * posts, and "everything you have ever not read" is both unbounded and
+ * ⚠️ COUNTED IN THE DATABASE SINCE 5 Sep 2026 (`count_unread_messages`,
+ * db/migrations/20260917_chat_and_admin_counts.sql). This used to fetch EVERY
+ * `message_reads` row the caller could see — with no filter and no limit —
+ * and subtract in JavaScript. PostgREST caps a response at 1000 rows, and the
+ * author arm of the reads policy hands a coach 300 rows for one post 300
+ * parents read, so the set would have been silently truncated within a
+ * season: messages already read would look unread, and because the mark-read
+ * write ignores duplicates nothing could ever clear them. Measured on
+ * production the day it was found: one person already at 300 rows off 197
+ * messages. One RPC, one integer, no ceiling.
+ *
+ * The 14-day window is still the rule: "everything you have ever not read" is
  * meaningless as a dot — a parent who joined today has not read any of it.
- * Two weeks is the window a dot can honestly mean "new". Ids only; RLS
- * scopes which squads' posts come back, exactly as it does for the screen.
  */
 export async function countUnreadMessages(profileId) {
   if (!profileId) return 0
-  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-  const [posts, reads] = await Promise.all([
-    supabase
-      .from('messages')
-      .select('id')
-      .is('deleted_at', null)
-      .neq('author_id', profileId)
-      .gte('created_at', since),
-    supabase.from('message_reads').select('message_id'),
-  ])
-  if (posts.error) throw posts.error
-  if (reads.error) throw reads.error
-  const read = new Set((reads.data ?? []).map((r) => r.message_id))
-  const unread = (posts.data ?? []).filter((m) => !read.has(m.id))
-  // ⚠️ THE SECOND TICK RIDES ON THIS FETCH (26 Aug 2026). This function runs
-  // in every signed-in tab on mount and on every realtime message event —
-  // which is exactly what "delivered to their device" means, as opposed to
-  // "they opened the thread" (that is message_reads). Fire-and-forget: the
-  // badge count must not wait on, or fail with, the receipt write.
-  markMessagesDelivered(profileId, unread.map((m) => m.id))
-  return unread.length
+  const { data, error } = await supabase.rpc('count_unread_messages')
+  if (error) throw error
+  const n = Number(data ?? 0)
+  // The second tick rides on this recount, as it always has — but as ONE
+  // statement that inserts only what is missing (see markUnreadDelivered),
+  // not an upsert of every unread id on every recount in every open tab.
+  if (n > 0) markUnreadDelivered()
+  return n
 }
 
 /**
- * Records that this device has RECEIVED these messages — WhatsApp's second
- * tick (26 Aug 2026). Same never-throw upsert stance as markMessagesRead:
- * a receipt must never break the screen. Callers pass only ids AUTHORED BY
- * OTHERS; delivering your own message to yourself is meaningless and the
- * receipts query filters self out anyway.
+ * Records this device as having RECEIVED every recent unread message it has
+ * not yet been recorded for — WhatsApp's second tick (26 Aug 2026) — in one
+ * server-side statement (`mark_unread_delivered`, 5 Sep 2026). Fire-and-forget
+ * and never throws: a receipt must never break the screen.
+ *
+ * ⚠️ WHY NOT THE OLD UPSERT. `markMessagesDelivered` (removed) sent one row
+ * per unread id on EVERY recount, and a recount happens on every message posted
+ * anywhere, in every open tab. A parent with 200 unread generated 200 writes
+ * per message posted club-wide. The database ignored the duplicates but still
+ * had to receive and check them all.
  */
-export async function markMessagesDelivered(profileId, messageIds) {
-  if (!profileId || !messageIds?.length) return
-  const rows = messageIds.map((id) => ({ message_id: id, profile_id: profileId }))
-  const { error } = await supabase
-    .from('message_deliveries')
-    .upsert(rows, { onConflict: 'message_id,profile_id', ignoreDuplicates: true })
-  if (error) console.warn('Could not record messages as delivered:', error.message)
+export function markUnreadDelivered() {
+  return supabase
+    .rpc('mark_unread_delivered')
+    .then(({ error }) => {
+      if (error) console.warn('Could not record messages as delivered:', error.message)
+    })
+    .catch(() => {})
 }
+
 
 /**
  * Delivery and read receipts for MESSAGES I AUTHORED — the ticks' data
@@ -460,8 +461,20 @@ export function receiptState(receipt, recipients) {
 }
 
 /** Which posts this person has read. RLS returns only their own rows. */
-export async function listMyMessageReads() {
-  const { data, error } = await supabase.from('message_reads').select('message_id')
+export async function listMyMessageReads(selfId, messageIds) {
+  // ⚠️ SCOPED TO MY OWN RECEIPTS FOR THE MESSAGES ON SCREEN — 5 Sep 2026. This
+  // was an unfiltered select of every message_reads row the caller could see,
+  // which includes other people's reads of the caller's own posts (the author
+  // arm, 20260826) and is capped at 1000 rows by PostgREST. Past the cap the
+  // "New" marker in a thread landed on the wrong message and every visit
+  // re-sent read receipts the database already held. The thread only ever
+  // needs "which of THESE ids have I read", so that is all it asks for now.
+  if (!selfId || !messageIds?.length) return new Set()
+  const { data, error } = await supabase
+    .from('message_reads')
+    .select('message_id')
+    .eq('profile_id', selfId)
+    .in('message_id', messageIds)
   if (error) throw error
   return new Set((data ?? []).map((r) => r.message_id))
 }
@@ -488,8 +501,25 @@ export async function messageReadStats(teamId) {
  * full-refetch at scale stands — one squad's stream is one bounded query,
  * and the pilot will measure it before this widens.
  */
-export function subscribeMessages(callback, { debounceMs = REALTIME_DEBOUNCE_MS } = {}) {
-  return subscribeToTable('messages', callback, { debounceMs })
+export function subscribeMessages(callback, { debounceMs = REALTIME_DEBOUNCE_MS, where } = {}) {
+  return subscribeToTable('messages', callback, { debounceMs, match: where ? messageMatcher(where) : undefined })
+}
+
+/**
+ * Turns a row predicate into a payload matcher for subscribeToTable, failing
+ * OPEN. `where(row)` is asked only when the payload carries the row: an
+ * INSERT or UPDATE does; a DELETE carries only the primary key (REPLICA
+ * IDENTITY DEFAULT), so it cannot be judged and must trigger a re-read —
+ * missing a delete would leave a removed message on screen. Since 5 Sep 2026
+ * every subscriber shares one `messages` channel (subscribeToTable), so this
+ * is how a thread hears its own conversation and not every squad's.
+ */
+export function messageMatcher(where) {
+  return (payload) => {
+    const row = payload?.new
+    if (!row || typeof row !== 'object' || !('id' in row)) return true
+    return where(row)
+  }
 }
 
 // ── Phase 3: the staff channel, direct messages, reports ───────────────────

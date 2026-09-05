@@ -10,6 +10,7 @@ vi.mock('../src/lib/supabase.js', () => ({
 }))
 
 import { supabase } from '../src/lib/supabase.js'
+import { resetSharedChannelsForTests } from '../src/data/subscribeToTable.js'
 import {
   countUnreadMessages,
   deleteConversation,
@@ -17,6 +18,7 @@ import {
   getEventThread,
   listMentionables,
   listMessages,
+  listMyMessageReads,
   markMessagesRead,
   messageReadStats,
   postMessage,
@@ -41,6 +43,7 @@ function builder(result) {
 }
 
 beforeEach(() => {
+  resetSharedChannelsForTests()
   supabase.from.mockReset()
   supabase.rpc.mockReset()
   supabase.channel.mockReset()
@@ -274,41 +277,71 @@ describe('read receipts', () => {
 })
 
 describe('countUnreadMessages', () => {
-  // The dock's Chat dot: recent messages by OTHER people, minus my reads —
-  // replies included since 4 Sep 2026 (the flat stream; the list's badge
-  // already counted them).
-  it('counts recent messages, replies included, not by me that I have not read', async () => {
-    const posts = builder({ data: [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }], error: null })
-    const reads = builder({ data: [{ message_id: 'p2' }], error: null })
-    const deliveries = builder({ data: null, error: null })
-    supabase.from.mockImplementation((table) =>
-      table === 'messages' ? posts.b : table === 'message_deliveries' ? deliveries.b : reads.b)
+  // The dock's Chat dot: one RPC since 5 Sep 2026 (count_unread_messages),
+  // because the client-side version fetched every read receipt the caller
+  // could see and PostgREST caps that at 1000 rows — see the function's note
+  // and db/tests/chat-and-admin-counts.sql for the rule itself.
+  it('asks the database for the count and returns it as a number', async () => {
+    supabase.rpc.mockImplementation((name) =>
+      Promise.resolve(name === 'count_unread_messages' ? { data: 2, error: null } : { data: 0, error: null }))
 
     expect(await countUnreadMessages('me')).toBe(2)
 
-    expect(posts.calls.is).toEqual([['deleted_at', null]])
-    expect(posts.calls.neq[0]).toEqual(['author_id', 'me'])
-    // Bounded to a recent window, on purpose — see the function's note.
-    expect(posts.calls.gte[0][0]).toBe('created_at')
-    // ⚠️ THE SECOND TICK RIDES ON THIS FETCH (26 Aug 2026): every unread id
-    // is recorded as delivered to this device, fire-and-forget.
-    expect(deliveries.calls.upsert[0][0]).toEqual([
-      { message_id: 'p1', profile_id: 'me' },
-      { message_id: 'p3', profile_id: 'me' },
-    ])
-    expect(deliveries.calls.upsert[0][1]).toMatchObject({ ignoreDuplicates: true })
+    expect(supabase.rpc).toHaveBeenCalledWith('count_unread_messages')
+    // ⚠️ THE SECOND TICK RIDES ON THIS RECOUNT (26 Aug 2026) — as ONE
+    // server-side statement now, not an upsert of every unread id.
+    expect(supabase.rpc).toHaveBeenCalledWith('mark_unread_delivered')
+  })
+
+  it('does not bother the delivery statement when nothing is unread', async () => {
+    supabase.rpc.mockResolvedValue({ data: 0, error: null })
+    expect(await countUnreadMessages('me')).toBe(0)
+    expect(supabase.rpc).toHaveBeenCalledTimes(1)
+    expect(supabase.rpc).toHaveBeenCalledWith('count_unread_messages')
   })
 
   it('returns 0 without a query when there is no signed-in profile', async () => {
     expect(await countUnreadMessages(null)).toBe(0)
-    expect(supabase.from).not.toHaveBeenCalled()
+    expect(supabase.rpc).not.toHaveBeenCalled()
   })
 
-  it('throws when a read fails, rather than inventing a number', async () => {
-    const posts = builder({ data: null, error: new Error('nope') })
-    const reads = builder({ data: [], error: null })
-    supabase.from.mockImplementation((table) => (table === 'messages' ? posts.b : reads.b))
+  it('throws when the read fails, rather than inventing a number', async () => {
+    supabase.rpc.mockResolvedValue({ data: null, error: new Error('nope') })
     await expect(countUnreadMessages('me')).rejects.toThrow('nope')
+  })
+
+  it('a failed delivery mark never breaks the count', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      supabase.rpc.mockImplementation((name) =>
+        Promise.resolve(name === 'count_unread_messages' ? { data: 3, error: null } : { data: null, error: new Error('tick') }))
+      expect(await countUnreadMessages('me')).toBe(3)
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(warn).toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+})
+
+describe('listMyMessageReads', () => {
+  // Scoped to MY receipts for the ids on screen (5 Sep 2026): the unscoped
+  // read it replaced also returned other people's reads of my own posts and
+  // was heading for the 1000-row cap.
+  it('asks only for my own receipts on the given ids', async () => {
+    const reads = builder({ data: [{ message_id: 'p2' }], error: null })
+    supabase.from.mockReturnValue(reads.b)
+    const set = await listMyMessageReads('me', ['p1', 'p2'])
+    expect([...set]).toEqual(['p2'])
+    expect(reads.calls.eq[0]).toEqual(['profile_id', 'me'])
+    expect(reads.calls.in[0]).toEqual(['message_id', ['p1', 'p2']])
+  })
+
+  it('returns an empty set without a query when there is nothing to ask about', async () => {
+    expect((await listMyMessageReads('me', [])).size).toBe(0)
+    expect((await listMyMessageReads(null, ['p1'])).size).toBe(0)
+    expect(supabase.from).not.toHaveBeenCalled()
   })
 })
 

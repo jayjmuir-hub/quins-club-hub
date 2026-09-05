@@ -189,45 +189,20 @@ export async function listClubMembers() {
  * a coach sees their squads' pending rows, a parent sees nothing and the
  * badge is not rendered anyway.
  */
-export function countReportsWaiting(reports, messages) {
-  const lastAuthor = new Map()
-  for (const m of messages) lastAuthor.set(m.feedback_id, m.author_id)
-  return reports.filter(
-    (r) => r.status === 'new' || (r.status === 'in-progress' && lastAuthor.get(r.id) === r.submitted_by),
-  ).length
-}
-
 export async function countAdminWaiting(userId) {
-  const [profiles, memberships, dismissed, reports, messages] = await Promise.all([
-    supabase.from('profiles').select('id'),
-    supabase.from('memberships').select('profile_id, status'),
-    supabase.from('access_requests').select('profile_id').eq('status', 'dismissed'),
-    // Open reports and suggestions (Jay, 4 Sep 2026: "no notification number
-    // appeared on the icon so i had not known it was submitted"). `new` only:
-    // an in-progress report has been seen, and the badge is for what has not.
-    supabase.from('feedback').select('id, status, submitted_by').in('status', ['new', 'in-progress']),
-    supabase.from('feedback_messages').select('feedback_id, author_id, created_at').order('created_at', { ascending: true }),
-  ])
-  if (profiles.error) throw profiles.error
-  if (memberships.error) throw memberships.error
-  if (dismissed.error) throw dismissed.error
-  // A report count that cannot be read costs the reports and nothing else —
-  // an admin without the feedback grant still gets approvals on the badge.
-  // A report is waiting when it is `new`, or when it is in progress and the
-  // LAST message on its thread is the reporter's — they answered, and nobody
-  // has answered back (4 Sep 2026, the thread). A thread that cannot be
-  // read counts only the `new` ones.
-  const openReports = reports.error ? 0 : countReportsWaiting(reports.data ?? [], messages.error ? [] : (messages.data ?? []))
-
-  const memberRows = memberships.data ?? []
-  const withMembership = new Set(memberRows.map((row) => row.profile_id).filter(Boolean))
-  const dismissedIds = new Set((dismissed.data ?? []).map((row) => row.profile_id))
-  const waiting = (profiles.data ?? []).filter(
-    (profile) =>
-      profile.id !== userId && !withMembership.has(profile.id) && !dismissedIds.has(profile.id),
-  ).length
-  const pending = memberRows.filter((row) => row.status === 'pending').length
-  return waiting + pending + openReports
+  // ⚠️ ONE RPC SINCE 5 Sep 2026 (`count_admin_waiting`,
+  // db/migrations/20260917_chat_and_admin_counts.sql). This used to download
+  // every profile, every membership, every dismissed request and every
+  // feedback message — five queries and a client-side join — on every change
+  // to four tables and on every window focus, for every admin. The SQL is the
+  // three rules above plus the report rule from 20260915_feedback_thread
+  // (new, or in-progress with the reporter's message last), unchanged, run as
+  // the caller under the same RLS. `userId` is no longer sent: the function
+  // reads auth.uid(), which is the only id it could ever have been.
+  if (!userId) return 0
+  const { data, error } = await supabase.rpc('count_admin_waiting')
+  if (error) throw error
+  return Number(data ?? 0)
 }
 
 export async function listPendingProfiles() {

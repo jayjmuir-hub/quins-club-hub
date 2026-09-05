@@ -10,6 +10,7 @@ vi.mock('../src/lib/supabase.js', () => ({
 
 import { supabase } from '../src/lib/supabase.js'
 import { createPoll, listPollsFor, setPollVote, subscribePollVotes } from '../src/data/polls.js'
+import { resetSharedChannelsForTests } from '../src/data/subscribeToTable.js'
 
 function builder(result) {
   const calls = {}
@@ -25,6 +26,7 @@ function builder(result) {
 }
 
 beforeEach(() => {
+  resetSharedChannelsForTests()
   supabase.from.mockReset()
   supabase.rpc.mockReset()
   supabase.channel.mockReset()
