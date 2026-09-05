@@ -31,10 +31,10 @@ import { friendlyMessage } from '../lib/friendlyError.js'
  * one that was actually asked for, because that is the squad the caller is
  * rendering.
  *
- * ⚠️ TWO QUERIES, NOT A VIEW — RLS on both tables already decides what comes
- * back (`private.can_see_player` is what makes the guest row readable at
- * all); a view would need its own policy, and this module has no route to
- * add one.
+ * ⚠️ TWO QUERIES, NOT A VIEW — RLS on `players` (`private.can_see_player`)
+ * plus `squad_guest_flags` (security definer) decide which guests come back.
+ * A view would need its own policy, and "memb read" is own-row or admin, so
+ * a coach cannot list other families' memberships directly.
  */
 export async function listPlayers({ teamIds, includeLeft = false } = {}) {
   if (Array.isArray(teamIds) && teamIds.length === 0) return []
@@ -84,30 +84,27 @@ export async function listPlayers({ teamIds, includeLeft = false } = {}) {
   // membership query, no `guest_of`.
   if (!Array.isArray(teamIds) || teamIds.length === 0) return homeRows
 
-  const homeWithFlag = homeRows.map((row) => ({ ...row, guest_of: null }))
+  const homeWithFlag = homeRows.map((row) => ({ ...row, guest_of: null, playup_consent: null }))
   const homeIds = new Set(homeWithFlag.map((row) => row.id))
 
-  // ⚠️ ACTIVE ONLY, AND player_id NOT NULL. A membership row can carry a
-  // parent-only role with no player_id yet (the invite exists before the
-  // child does), and a 'left' status is exactly the case the CONTROL in
-  // tests/players-list-membership.test.js proves stays invisible — dropping
-  // this .eq is the fault that test is built to catch.
-  const { data: memberships, error: membershipError } = await supabase
-    .from('memberships')
-    .select('player_id, team_id')
-    .in('team_id', teamIds)
-    .eq('status', 'active')
-  if (membershipError) throw membershipError
+  // ⚠️ GUEST FLAGS VIA SECURITY DEFINER, NOT a memberships table read.
+  // "memb read" is own-row or admin, so a coach querying memberships for
+  // their squad would never see another family's guest twins — and the
+  // play-up would vanish from the host roster. squad_guest_flags returns
+  // only player_id, team_id, playup_consent for teams the caller can_see
+  // (active guests only).
+  const { data: flags, error: flagError } = await supabase.rpc('squad_guest_flags', {
+    _teams: teamIds,
+  })
+  if (flagError) throw flagError
 
-  // playerId -> Set of requested team ids they hold an active membership in.
-  // Home players are skipped here on purpose: their `guest_of` is already
-  // decided (null), and a redundant membership row in their own home squad
-  // must never turn them into a guest of themselves.
   const membershipMap = new Map()
-  for (const row of memberships ?? []) {
+  const consentByGuest = new Map()
+  for (const row of flags ?? []) {
     if (!row.player_id || homeIds.has(row.player_id)) continue
     if (!membershipMap.has(row.player_id)) membershipMap.set(row.player_id, new Set())
     membershipMap.get(row.player_id).add(row.team_id)
+    consentByGuest.set(`${row.player_id}:${row.team_id}`, row.playup_consent ?? null)
   }
 
   const guestIds = [...membershipMap.keys()]
@@ -129,7 +126,11 @@ export async function listPlayers({ teamIds, includeLeft = false } = {}) {
     // The FIRST requested team, in `teamIds` order, that this player is
     // actually a guest of — not just any of them.
     const guestOf = teamIds.find((teamId) => heldTeams?.has(teamId)) ?? null
-    return { ...row, guest_of: guestOf }
+    return {
+      ...row,
+      guest_of: guestOf,
+      playup_consent: guestOf ? (consentByGuest.get(`${row.id}:${guestOf}`) ?? null) : null,
+    }
   })
 
   // Merge and re-sort in JS with the same comparator the database used, so

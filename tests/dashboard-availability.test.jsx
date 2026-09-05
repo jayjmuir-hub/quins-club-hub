@@ -62,6 +62,11 @@ vi.mock('../src/data/players.js', () => ({
   listPlayers: (...args) => listPlayersMock(...args),
 }))
 
+vi.mock('../src/data/playups.js', () => ({
+  listMyPendingPlayups: async () => [],
+  answerJuniorPlayup: async () => {},
+}))
+
 vi.mock('../src/data/availability.js', () => ({
   listAvailability: async () => [],
   listAvailabilityForEvents: async () => [],

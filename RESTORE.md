@@ -525,15 +525,21 @@ tombstone over the original ruling and `claude/plans/2026-09-02-senior-squads-2a
 is what built the narrower one.
 
 **A junior on a second age group is a guest membership, not a second players row.** Super admins
-add that through `add_junior_playup` / `remove_junior_playup` (`db/migrations/20260913_junior_playup.sql`):
+add that through `add_junior_playup` / `remove_junior_playup`
+(`db/migrations/20260913_junior_playup.sql` and consent in
+`db/migrations/20260914_junior_playup_consent.sql`):
 home stays `players.team_id`; every active home membership for that `player_id` is twinned onto
-the guest junior squad (same pattern as U18 call-ups). `listPlayers({ teamIds })` already marks
-those rows `guest_of`. Staff see the mark; parents must not. Ordinary coaches never see Add.
+the guest junior squad (same pattern as U18 call-ups) with `status = 'active'` and
+`playup_consent` `pending` until a linked parent approves. `listPlayers({ teamIds })` marks
+those rows `guest_of` via `squad_guest_flags` (not a raw `memberships` read — `"memb read"` is
+own-row or admin). Staff see Play-up and, while pending, Consent pending; other parents must not.
+Match lineup is refused until `approved`. Ordinary coaches never see Add.
 On a junior roster the guest's **home** squad name is the age-group label (looked up on the
 full `teams` list from memberships, not `visibleTeams` — a U14B-only coach preview still
 has U13 Mixed in `teams`), with a Play-up badge for staff, and the row lives only under
 **From other age groups**, not mixed into Forwards/Backs/tier groups. Senior guest grouping
 is unchanged. Never print "No age group" for a guest whose `team_id` resolves.
+Ruling: `claude/decisions/2026-09-05-playup-parent-consent.md`.
 
 **A player who has quit is marked LEFT, never deleted.** `players.left_at` non-null is a
 leaver; `left_at IS NULL` means current. `mark_player_left`/`restore_player`

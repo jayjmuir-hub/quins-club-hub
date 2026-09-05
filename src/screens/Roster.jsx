@@ -223,6 +223,9 @@ function PlayerRow({
           {showGuestMark && player.guest_of && (
             <Badge data-testid="play-up-badge">Play-up</Badge>
           )}
+          {showGuestMark && player.guest_of && player.playup_consent === 'pending' && (
+            <Badge data-testid="consent-pending-badge" tone="parent">Consent pending</Badge>
+          )}
         </span>
       </span>
 

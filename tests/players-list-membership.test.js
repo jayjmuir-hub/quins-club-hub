@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // are mostly children (CLAUDE.md rule 9).
 
 let playersRows = []
-let membershipsRows = []
+let guestFlags = []
 
 function fakeTable(rows) {
   let filtered = [...rows]
@@ -43,13 +43,18 @@ function fakeTable(rows) {
 
 const fromMock = vi.fn((table) => {
   if (table === 'players') return fakeTable(playersRows)
-  if (table === 'memberships') return fakeTable(membershipsRows)
   throw new Error(`players-list-membership.test.js: unexpected supabase.from('${table}')`)
+})
+
+const rpcMock = vi.fn(async (name) => {
+  if (name === 'squad_guest_flags') return { data: guestFlags, error: null }
+  throw new Error(`players-list-membership.test.js: unexpected rpc('${name}')`)
 })
 
 vi.mock('../src/lib/supabase', () => ({
   supabase: {
     from: (table) => fromMock(table),
+    rpc: (...args) => rpcMock(...args),
   },
 }))
 
@@ -57,8 +62,9 @@ import { listPlayers } from '../src/data/players.js'
 
 beforeEach(() => {
   fromMock.mockClear()
+  rpcMock.mockClear()
   playersRows = []
-  membershipsRows = []
+  guestFlags = []
 })
 
 describe('listPlayers({ teamIds }) — home or active membership', () => {
@@ -70,27 +76,24 @@ describe('listPlayers({ teamIds }) — home or active membership', () => {
       // Home squad A, holds only a 'left' membership in B — the CONTROL.
       { id: 'guest-2', full_name: 'Harness Guest Cravenmoor', team_id: 'A', left_at: null },
     ]
-    membershipsRows = [
-      { player_id: 'guest-1', team_id: 'B', status: 'active' },
-      { player_id: 'guest-2', team_id: 'B', status: 'left' },
-    ]
+    // squad_guest_flags returns only ACTIVE guests. guest-2 (left) is the
+    // CONTROL: absent from the RPC result, so they must not appear.
+    guestFlags = [{ player_id: 'guest-1', team_id: 'B', playup_consent: null }]
 
     const result = await listPlayers({ teamIds: ['B'] })
 
     expect(result.map((row) => row.id)).toEqual(['guest-1', 'home-1'])
     expect(result.find((row) => row.id === 'home-1').guest_of).toBeNull()
     expect(result.find((row) => row.id === 'guest-1').guest_of).toBe('B')
-    // CONTROL: a player whose only membership in B is 'left' is absent —
-    // this is the assertion the fault injection below (dropping
-    // .eq('status','active')) is proven to break.
     expect(result.find((row) => row.id === 'guest-2')).toBeUndefined()
+    expect(rpcMock).toHaveBeenCalledWith('squad_guest_flags', { _teams: ['B'] })
   })
 
   it('names the FIRST requested team a player is a guest of, in teamIds order', async () => {
     playersRows = [{ id: 'guest-3', full_name: 'Harness Guest Dunwoody', team_id: 'A', left_at: null }]
-    membershipsRows = [
-      { player_id: 'guest-3', team_id: 'C', status: 'active' },
-      { player_id: 'guest-3', team_id: 'B', status: 'active' },
+    guestFlags = [
+      { player_id: 'guest-3', team_id: 'C', playup_consent: null },
+      { player_id: 'guest-3', team_id: 'B', playup_consent: null },
     ]
 
     const result = await listPlayers({ teamIds: ['B', 'C'] })
@@ -100,7 +103,7 @@ describe('listPlayers({ teamIds }) — home or active membership', () => {
 
   it('hides a guest who has left, same left_at rule as the home fetch', async () => {
     playersRows = [{ id: 'guest-4', full_name: 'Harness Guest Elmswood', team_id: 'A', left_at: '2026-01-01' }]
-    membershipsRows = [{ player_id: 'guest-4', team_id: 'B', status: 'active' }]
+    guestFlags = [{ player_id: 'guest-4', team_id: 'B', playup_consent: null }]
 
     const result = await listPlayers({ teamIds: ['B'] })
 
@@ -113,7 +116,7 @@ describe('listPlayers({ teamIds }) — home or active membership', () => {
     const result = await listPlayers()
 
     expect(result).toEqual([{ id: 'p-1', full_name: 'Harness Player Foxglen', team_id: 'A', left_at: null }])
-    expect(fromMock).not.toHaveBeenCalledWith('memberships')
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('returns [] without querying when teamIds is an empty array', async () => {
@@ -128,12 +131,26 @@ describe('listPlayers({ teamIds }) — home or active membership', () => {
       { id: 'p-home', full_name: 'Harness Home Alderton', team_id: 't-u16', left_at: null },
       { id: 'p-playup', full_name: 'Harness Playup Brackwood', team_id: 't-u14', left_at: null },
     ]
-    membershipsRows = [{ player_id: 'p-playup', team_id: 't-u16', status: 'active' }]
+    guestFlags = [{ player_id: 'p-playup', team_id: 't-u16', playup_consent: 'approved' }]
 
     const result = await listPlayers({ teamIds: ['t-u16'] })
 
     expect(result.find((row) => row.id === 'p-playup').guest_of).toBe('t-u16')
     expect(result.find((row) => row.id === 'p-home').guest_of).toBeNull()
+  })
+
+  it('stamps playup_consent from squad_guest_flags onto the guest row', async () => {
+    playersRows = [
+      { id: 'p-home', full_name: 'Harness Home Alderton', team_id: 't-u16', left_at: null },
+      { id: 'p-playup', full_name: 'Harness Playup Brackwood', team_id: 't-u14', left_at: null },
+    ]
+    guestFlags = [{ player_id: 'p-playup', team_id: 't-u16', playup_consent: 'pending' }]
+
+    const result = await listPlayers({ teamIds: ['t-u16'] })
+
+    expect(result.find((row) => row.id === 'p-playup').guest_of).toBe('t-u16')
+    expect(result.find((row) => row.id === 'p-playup').playup_consent).toBe('pending')
+    expect(result.find((row) => row.id === 'p-home').playup_consent).toBeNull()
   })
 })
 

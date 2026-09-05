@@ -46,6 +46,7 @@ vi.mock('../src/data/players.js', () => ({
 
 vi.mock('../src/data/playups.js', () => ({
   listPlayerGuestTeamIds: async () => [],
+  listPlayerGuestPlayups: async () => [],
   addJuniorPlayup: async () => null,
   removeJuniorPlayup: async () => null,
 }))

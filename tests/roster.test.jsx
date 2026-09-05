@@ -38,6 +38,8 @@ vi.mock('../src/data/photos.js', () => ({
 
 vi.mock('../src/data/playups.js', () => ({
   listPlayerGuestTeamIds: async () => [],
+  listPlayerGuestPlayups: async () => [],
+  listPlayerGuestPlayups: async () => [],
   addJuniorPlayup: async () => null,
   removeJuniorPlayup: async () => null,
 }))
@@ -1050,6 +1052,31 @@ describe('Roster — junior play-up guests', () => {
     const forwardBlock = forwardHeading.closest('div')
     expect(forwardBlock).not.toContainElement(guestRow)
     expect(within(forwardBlock).getByText('Ade Kwarteng')).toBeInTheDocument()
+  })
+
+  it('staff see Consent pending on a pending guest, with Play-up', async () => {
+    listPlayersMock.mockResolvedValue([
+      U14_HOME,
+      { ...U13_GUEST, playup_consent: 'pending' },
+    ])
+    setup()
+    const row = (await screen.findByText('Nico Vellani')).closest('[data-testid="player-row"]')
+    expect(within(row).getByText('Play-up')).toBeInTheDocument()
+    expect(within(row).getByText(/consent pending/i)).toBeInTheDocument()
+  })
+
+  it('CONTROL: a parent never sees Play-up, Consent pending, or the from-squad mark', async () => {
+    listPlayersMock.mockResolvedValue([
+      U14_HOME,
+      { ...U13_GUEST, playup_consent: 'pending' },
+    ])
+    useMembershipsMock.mockReturnValue(memberships(PARENT_U14B, [TEAM_U14B, TEAM_U13_MIXED]))
+    setup()
+    const row = (await screen.findByText('Nico Vellani')).closest('[data-testid="player-row"]')
+    expect(within(row).queryByText('Play-up')).not.toBeInTheDocument()
+    expect(within(row).queryByText(/consent pending/i)).not.toBeInTheDocument()
+    expect(within(row).queryByText(/from U13 Mixed/)).not.toBeInTheDocument()
+    expect(within(row).getByTestId('home-squad-name')).toHaveTextContent('U13 Mixed')
   })
 
   it('CONTROL: a parent never sees Play-up or the from-squad mark', async () => {
