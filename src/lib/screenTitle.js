@@ -30,6 +30,7 @@ const TITLES = [
   ['/admin/club', 'Club settings'],
   ['/admin/icons', 'Profile icons'],
   ['/admin/needs-attention', 'Needs attention'],
+  ['/admin/playups', 'Play-up requests'],
   ['/admin/officers', 'Club officers'],
   ['/admin/pitches', 'Pitches'],
   ['/admin/rights-log', 'Rights log'],

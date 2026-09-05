@@ -7,10 +7,13 @@ import {
   PLAY_UP,
   ageAt,
   ageGradeCheck,
+  canPlayUpInto,
   cutoffAgesForTeam,
   cutoffFor,
   ownBandForAge,
   ownSquadLabel,
+  playupSourceTeams,
+  playupTargetTeams,
 } from '../src/lib/ageGrade.js'
 
 // src/lib/ageGrade.js — UAERF age-grade eligibility, ported from the tournament
@@ -358,5 +361,35 @@ describe('a real mismatch', () => {
     expect(ageGradeCheck('U12 Mixed', '2010-03-04', IN_SEASON).message).toMatch(
       /you can still save/i,
     )
+  })
+})
+
+describe('play-up source and target squads (request/nominate picker)', () => {
+  const U13 = { id: 't-u13', name: 'U13 Mixed', sort_order: 8, is_senior: false }
+  const U14B = { id: 't-u14b', name: 'U14B', sort_order: 9, is_senior: false }
+  const U16B = { id: 't-u16b', name: 'U16B Contact', sort_order: 11, is_senior: false }
+  const U12G = { id: 't-u12g', name: 'U12G QR', sort_order: 7, is_senior: false }
+  const U14G = { id: 't-u14g', name: 'U14G', sort_order: 9, is_senior: false }
+  const U6 = { id: 't-u6', name: 'U6', sort_order: 1, is_senior: false }
+  const SENIOR = { id: 't-1xv', name: 'Senior Men 1st XV', sort_order: 20, is_senior: true }
+  const ALL = [U6, U13, U14B, U16B, U12G, U14G, SENIOR]
+
+  it('U14B may take a play-up from U13 Mixed, not from U6 or a senior side', () => {
+    const sources = playupSourceTeams(U14B, ALL, IN_SEASON)
+    expect(sources.map((t) => t.id)).toEqual([U13.id])
+    expect(canPlayUpInto(U13, U14B, IN_SEASON)).toBe(true)
+    expect(canPlayUpInto(U6, U14B, IN_SEASON)).toBe(false)
+    expect(canPlayUpInto(SENIOR, U14B, IN_SEASON)).toBe(false)
+  })
+
+  it('U13 Mixed may be nominated into U14B, not into U16B (two hops) or seniors', () => {
+    const targets = playupTargetTeams(U13, ALL, IN_SEASON)
+    expect(targets.map((t) => t.id)).toEqual([U14B.id])
+    expect(canPlayUpInto(U13, U16B, IN_SEASON)).toBe(false)
+  })
+
+  it('⚠️ girls may play up two groups: U12G into U14G', () => {
+    expect(canPlayUpInto(U12G, U14G, IN_SEASON)).toBe(true)
+    expect(playupSourceTeams(U14G, ALL, IN_SEASON).map((t) => t.id)).toEqual([U12G.id])
   })
 })

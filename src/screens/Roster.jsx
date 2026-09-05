@@ -20,9 +20,9 @@ import { listPlayers, listPlayerPrivate } from '../data/players.js'
 import { isLeaver } from '../lib/leavers.js'
 // The club's own age function, so a number on the roster cannot drift from the
 // one that decides which squad a child belongs in.
-import { ageAt } from '../lib/ageGrade.js'
+import { ageAt, playupSourceTeams, playupTargetTeams } from '../lib/ageGrade.js'
 import { useMemberships } from '../lib/memberships.jsx'
-import { adminTeamReach, canWriteChild, canWritePlayer, isActiveMembership, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
+import { adminTeamReach, canRequestPlayup, canWriteChild, canWritePlayer, isActiveMembership, isAdmin, isOwnPlayer, isSquadStaffRole, visibleTeams } from '../lib/scope.js'
 import { GENDERS, genderLabel } from '../lib/gender.js'
 import PlayerAvatar from '../components/PlayerAvatar.jsx'
 import { signPhotoUrls } from '../data/photos.js'
@@ -31,6 +31,7 @@ import { sortByJersey } from '../lib/jersey.js'
 import { ListSkeleton } from '../components/Skeleton.jsx'
 import { friendlyMessage } from '../lib/friendlyError.js'
 import { useToast } from '../components/Toast.jsx'
+import PlayupRequestSheet from '../components/PlayupRequestSheet.jsx'
 
 // The team filter survives a reload. Without this, choosing club-wide as the
 // desktop default (desktop-spec.md §10 decision 2) would make a coach who
@@ -322,6 +323,7 @@ export default function Roster() {
   // an existing player and opening it empty are the same state transition.
   const [formState, setFormState] = useState(null)
   const [importing, setImporting] = useState(false)
+  const [playupMode, setPlayupMode] = useState(null)
 
   const [players, setPlayers] = useState([])
   // Staff-only: departed squad members, held apart from `players` so they
@@ -382,6 +384,27 @@ export default function Roster() {
   const canEditAnything =
     adminTeamReach(memberships, 'edit') ||
     memberships.some((membership) => isActiveMembership(membership) && isSquadStaffRole(membership.role))
+
+  const focusTeamId =
+    teamFilter && teamFilter !== ALL_TEAMS_ID
+      ? teamFilter
+      : scopedTeams.length === 1
+        ? scopedTeams[0].id
+        : null
+  const focusTeam = focusTeamId ? teamsById.get(focusTeamId) ?? null : null
+  const mayPlayupRequest = canRequestPlayup(memberships, focusTeamId)
+  const playupSources = useMemo(
+    () => (focusTeam ? playupSourceTeams(focusTeam, teams ?? []) : []),
+    [focusTeam, teams],
+  )
+  const playupTargets = useMemo(
+    () => (focusTeam ? playupTargetTeams(focusTeam, teams ?? []) : []),
+    [focusTeam, teams],
+  )
+  const playupHomePlayers = useMemo(
+    () => (players ?? []).filter((p) => !p.guest_of && p.team_id === focusTeamId),
+    [players, focusTeamId],
+  )
 
   useEffect(() => {
     let mounted = true
@@ -933,18 +956,30 @@ export default function Roster() {
             {players.length} {players.length === 1 ? 'player' : 'players'} · {scopeSummary}
           </p>
         </div>
-        {canEditAnything && (
+        {(canEditAnything || mayPlayupRequest) && (
           <div className="flex shrink-0 items-center gap-2">
+            {mayPlayupRequest && playupSources.length > 0 && (
+              <Button variant="secondary" onClick={() => setPlayupMode('request')}>
+                Request play-up
+              </Button>
+            )}
+            {mayPlayupRequest && playupTargets.length > 0 && (
+              <Button variant="secondary" onClick={() => setPlayupMode('nominate')}>
+                Nominate for play-up
+              </Button>
+            )}
             {/* Import is desktop-only and unapologetically so: it is a paste
                 target, and pasting a spreadsheet into a phone is not a thing
                 anyone does. Hidden rather than disabled on mobile — an
                 always-greyed button just asks a question it can't answer. */}
-            {isDesktop && (
+            {canEditAnything && isDesktop && (
               <Button variant="secondary" onClick={() => setImporting(true)}>
                 Import
               </Button>
             )}
-            <Button onClick={() => setFormState({ player: null })}>Add player</Button>
+            {canEditAnything && (
+              <Button onClick={() => setFormState({ player: null })}>Add player</Button>
+            )}
           </div>
         )}
       </div>
@@ -1234,6 +1269,16 @@ export default function Roster() {
           </div>
         </details>
       )}
+
+      <PlayupRequestSheet
+        open={playupMode != null}
+        onClose={() => setPlayupMode(null)}
+        mode={playupMode ?? 'request'}
+        hostTeam={focusTeam}
+        otherTeams={playupMode === 'nominate' ? playupTargets : playupSources}
+        homePlayers={playupHomePlayers}
+        onSubmitted={() => toast('Request sent. A super admin will decide.')}
+      />
 
       {selectedPlayer && !formState && (
         <PlayerDetail

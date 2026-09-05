@@ -32,6 +32,7 @@ import AdminIcons from './screens/AdminIcons.jsx'
 import AdminRightsLog from './screens/AdminRightsLog.jsx'
 import AdminOfficers from './screens/AdminOfficers.jsx'
 import AdminStaff from './screens/AdminStaff.jsx'
+import AdminPlayupRequests from './screens/AdminPlayupRequests.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
 import Allocation from './screens/Allocation.jsx'
@@ -314,6 +315,7 @@ export default function App() {
                 every admin is a registrar, and the screen carries no contact
                 detail and no dates. */}
             <Route path="needs-attention" element={<AdminNeedsAttention />} />
+            <Route path="playups" element={<AdminPlayupRequests />} />
             {/* Who gave whom access, and when. ⚠️ THE ONLY ADMIN ROUTE WHOSE
                 AUDIENCE IS NARROWER THAN AdminDashboard's isAdmin() GATE — it
                 records what admins do, so an ordinary admin must not be its

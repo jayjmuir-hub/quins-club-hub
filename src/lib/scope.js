@@ -121,6 +121,24 @@ export function isActiveMembership(membership) {
 }
 
 /**
+ * Who may Request play-up (host) or Nominate (home) for a squad.
+ *
+ * Head coach of THAT squad (`is_head_coach`) or its age-group manager.
+ * Not an assistant coach, not a medic, not an admin hat by itself.
+ * Mirrors `private.can_request_playup` (db/migrations/20260916_playup_requests.sql).
+ * The SQL is the write gate; this only decides whether the roster offers the button.
+ */
+export function canRequestPlayup(memberships, teamId) {
+  if (!memberships || teamId == null) return false
+  return memberships.some(
+    (m) =>
+      isActiveMembership(m) &&
+      m.team_id === teamId &&
+      ((canHoldHeadCoachFlag(m.role) && m.is_head_coach === true) || m.role === SQUAD_STAFF_ROLES[1]),
+  )
+}
+
+/**
  * Whether this person may approve registrations for at least one squad, and is
  * therefore worth showing an approvals screen to at all.
  *

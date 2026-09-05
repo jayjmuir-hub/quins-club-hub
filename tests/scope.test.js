@@ -20,6 +20,7 @@ import {
   adminRights,
   adminTeamReach,
   ADMIN_TEAM_REACH,
+  canRequestPlayup,
 } from '../src/lib/scope.js'
 
 // Unit tests for src/lib/scope.js (Task 7: pure membership/scope helpers) and
@@ -1046,5 +1047,61 @@ describe('adminTeamReach — the admin split', () => {
 
   it('a pending admin row reaches nothing even with rights', () => {
     expect(adminTeamReach(admin(['clubadmin'], { status: 'pending' }), 'see')).toBe(false)
+  })
+})
+
+// Slice 2 play-up request/nominate. Mirrors private.can_request_playup:
+// head coach of THAT squad, or its age-group manager. Not a plain coach,
+// not a medic, not a super admin by admin hat alone.
+describe('canRequestPlayup', () => {
+  it('lets the squad head coach request on that squad', () => {
+    expect(
+      canRequestPlayup(
+        [membership({ role: 'coach', team_id: U12.id, is_head_coach: true })],
+        U12.id,
+      ),
+    ).toBe(true)
+  })
+
+  it('lets the age-group manager request on that squad', () => {
+    expect(
+      canRequestPlayup([membership({ role: 'manager', team_id: U12.id })], U12.id),
+    ).toBe(true)
+  })
+
+  it('refuses an assistant coach (coach without the head-coach flag)', () => {
+    expect(
+      canRequestPlayup([membership({ role: 'coach', team_id: U12.id })], U12.id),
+    ).toBe(false)
+  })
+
+  it('refuses a medic of that squad', () => {
+    expect(
+      canRequestPlayup([membership({ role: 'medic', team_id: U12.id })], U12.id),
+    ).toBe(false)
+  })
+
+  it('refuses a manager of a different squad', () => {
+    expect(
+      canRequestPlayup([membership({ role: 'manager', team_id: U8.id })], U12.id),
+    ).toBe(false)
+  })
+
+  it('refuses a pending head-coach row', () => {
+    expect(
+      canRequestPlayup(
+        [membership({ role: 'coach', team_id: U12.id, is_head_coach: true, status: 'pending' })],
+        U12.id,
+      ),
+    ).toBe(false)
+  })
+
+  it('does not treat super admin as enough on its own', () => {
+    expect(
+      canRequestPlayup(
+        [membership({ role: 'admin', team_id: null, is_super: true })],
+        U12.id,
+      ),
+    ).toBe(false)
   })
 })

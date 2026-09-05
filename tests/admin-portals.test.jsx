@@ -420,6 +420,7 @@ describe('AdminDashboard — inside a portal', () => {
       'Squads & league teams',
       'Staff',
       'Needs attention',
+      'Play-ups',
       'Rights log',
       // Club officers joined the super-only pair on 26 Aug 2026 —
       // claude/plans/2026-08-26-club-officers.md.
@@ -445,6 +446,7 @@ describe('AdminDashboard — inside a portal', () => {
   //    refusal that matters is membership_audit's read policy, not this row.
   it('⚠️ still maps /admin/rights-log to Club Hub Admin for an ordinary admin', () => {
     expect(portalForPath('/admin/rights-log')?.key).toBe('club')
+    expect(portalForPath('/admin/playups')?.key).toBe('club')
   })
 
   // ⚠️ NOT TIDINESS. A bare `flex` row does not clip when it overruns — the

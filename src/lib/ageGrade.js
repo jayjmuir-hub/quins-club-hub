@@ -398,3 +398,41 @@ export function ageGradeCheck(teamName, dateOfBirth, today = new Date(), { squad
       'can still save if it is right.',
   }
 }
+
+/**
+ * Whether a typical player of `sourceTeam` is an allowed play-up into `hostTeam`.
+ * Uses the same UAERF hop as ageGradeCheck (one boys/mixed rung; girls one or two years).
+ * Mixed and girls streams stay apart — U13 Mixed is not a U14G source.
+ */
+export function canPlayUpInto(sourceTeam, hostTeam, today = new Date()) {
+  if (!sourceTeam?.name || !hostTeam?.name) return false
+  if (sourceTeam.id && hostTeam.id && sourceTeam.id === hostTeam.id) return false
+  if (sourceTeam.is_senior === true || hostTeam.is_senior === true) return false
+  if (ageBandFromTeamName(sourceTeam.name) == null) return false
+  if (ageBandFromTeamName(hostTeam.name) == null) return false
+  if (girlsGroup(sourceTeam.name) !== girlsGroup(hostTeam.name)) return false
+  const ages = cutoffAgesForTeam(sourceTeam.name)
+  if (!ages) return false
+  const cutoff = cutoffFor(today)
+  return ages.some((age) => {
+    const bornYear = cutoff.getUTCFullYear() - age
+    const dob = `${bornYear}-${String(CUTOFF_MONTH).padStart(2, '0')}-${String(CUTOFF_DAY).padStart(2, '0')}`
+    return ageGradeCheck(hostTeam.name, dob, today).status === PLAY_UP
+  })
+}
+
+function bySortThenName(a, b) {
+  const so = (a.sort_order ?? 0) - (b.sort_order ?? 0)
+  if (so !== 0) return so
+  return String(a.name ?? '').localeCompare(String(b.name ?? ''))
+}
+
+/** Younger junior squads a host may Request players from. */
+export function playupSourceTeams(hostTeam, allTeams, today = new Date()) {
+  return (allTeams ?? []).filter((t) => canPlayUpInto(t, hostTeam, today)).sort(bySortThenName)
+}
+
+/** Older junior squads a home squad may Nominate players into. */
+export function playupTargetTeams(homeTeam, allTeams, today = new Date()) {
+  return (allTeams ?? []).filter((t) => canPlayUpInto(homeTeam, t, today)).sort(bySortThenName)
+}

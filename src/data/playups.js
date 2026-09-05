@@ -86,3 +86,52 @@ export async function listPlayerGuestTeamIds(playerId, homeTeamId) {
   return rows.map((row) => row.team_id)
 }
 
+export async function requestJuniorPlayups({ playerIds, guestTeamId, note }) {
+  const { error } = await supabase.rpc('request_junior_playups', {
+    _players: playerIds,
+    _guest_team: guestTeamId,
+    _note: note || null,
+  })
+  if (error) throw refused(error, 'The play-up request could not be sent.')
+}
+
+export async function nominateJuniorPlayups({ playerIds, guestTeamId, note }) {
+  const { error } = await supabase.rpc('nominate_junior_playups', {
+    _players: playerIds,
+    _guest_team: guestTeamId,
+    _note: note || null,
+  })
+  if (error) throw refused(error, 'The play-up nomination could not be sent.')
+}
+
+export async function playupSourcePlayers(sourceTeamId, hostTeamId) {
+  const { data, error } = await supabase.rpc('playup_source_players', {
+    _source_team: sourceTeamId,
+    _host_team: hostTeamId,
+  })
+  if (error) throw refused(error, 'Those players could not be listed.')
+  return data ?? []
+}
+
+export async function listPlayupRequests() {
+  const { data, error } = await supabase
+    .from('playup_requests')
+    .select(
+      'id, status, kind, note, player_id, home_team_id, guest_team_id, requested_by, decision_note, created_at, ' +
+        'players(full_name), home:teams!playup_requests_home_team_id_fkey(name), guest:teams!playup_requests_guest_team_id_fkey(name)',
+    )
+    .eq('status', 'requested')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function decidePlayupRequest(requestId, yes, note) {
+  const { error } = await supabase.rpc('decide_playup_request', {
+    _id: requestId,
+    _yes: yes === true,
+    _note: note || null,
+  })
+  if (error) throw refused(error, 'That request could not be updated.')
+}
+

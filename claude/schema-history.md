@@ -20,6 +20,25 @@ repo; `src/screens/EventForm.jsx` writes the column it adds.
 
 ---
 
+### Junior play-up request/nominate — `20260916_playup_requests`
+
+**STATUS: IN REPO, NOT APPLIED from the cloud agent.** Slice 2 of
+`claude/plans/2026-09-05-playup-consent-and-ops.md`. Apply after 20260913–20260915.
+Do not reuse the `20260915` stamp.
+
+`playup_requests` is a queue (`requested` | `approved` | `declined`), kind
+`host_request` | `home_nominate`. No write policy: RPCs only. SELECT is super
+admin, the requester, or `private.can_request_playup` on home or host.
+
+`private.can_request_playup` is **head coach of that squad or its manager**. It
+is not `is_team_staff`. Assistant coach and medic are 42501. Super admin is
+not enough to file; they Approve via `decide_playup_request`, which calls
+`add_junior_playup` (parent consent still starts pending).
+
+`notify_junior_playup` still no-ops when `app.harness = on`.
+
+---
+
 ### Junior play-up parent consent — `20260914_junior_playup_consent`
 
 **STATUS: IN REPO, NOT APPLIED from the cloud agent.** Slice 1 of
