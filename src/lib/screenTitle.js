@@ -78,6 +78,8 @@ const SQUAD_SUB = [
   [/^\/squad\/[^/]+\/chat$/, 'Squad chat'],
   [/^\/squad\/[^/]+\/match-roster$/, 'Match roster'],
   [/^\/squad\/[^/]+\/training$/, 'Training'],
+  [/^\/squad\/[^/]+\/callups$/, 'Call-ups'],
+  [/^\/squad\/[^/]+\/playups$/, 'Play-ups'],
 ]
 
 /** The screen's own name for a path, or null for a path nobody listed. */

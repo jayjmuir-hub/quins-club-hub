@@ -10,6 +10,8 @@ import {
   squadExpects,
   squadMismatch,
   squadRequiresGender,
+  callupHomeLabel,
+  isCallupHomeForSenior,
 } from '../src/lib/gender.js'
 
 // src/lib/gender.js is pure, so it is tested with plain strings — no render,
@@ -130,6 +132,22 @@ describe('squadExpects', () => {
   // first in the function.
   it('does not read "Women\'s XV" as a men\'s squad', () => {
     expect(squadExpects("Women's XV")).not.toBe('male')
+  })
+})
+
+describe('call-up gender pool', () => {
+  it('Senior Men only see U18B, Senior Women only U18G', () => {
+    expect(callupHomeLabel('Senior Men - 2nd XV')).toBe('U18B')
+    expect(callupHomeLabel("Women's XV")).toBe('U18G')
+    expect(isCallupHomeForSenior('U18B', 'Senior Men - 1st XV')).toBe(true)
+    expect(isCallupHomeForSenior('U18G', 'Senior Men - 1st XV')).toBe(false)
+    expect(isCallupHomeForSenior('U18G', 'Senior Women - 1st XV')).toBe(true)
+    expect(isCallupHomeForSenior('U18B', 'Senior Women - 1st XV')).toBe(false)
+  })
+
+  it('does not invent a pool when the senior squad is unclassifiable', () => {
+    expect(callupHomeLabel('Touch')).toBeNull()
+    expect(isCallupHomeForSenior('U18B', 'Touch')).toBe(false)
   })
 })
 

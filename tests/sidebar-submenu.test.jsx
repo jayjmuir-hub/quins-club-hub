@@ -44,15 +44,15 @@ function renderAt(path, props = {}) {
 }
 
 describe('Squad Hub sub-menu', () => {
-  it('expands with Overview and Build a Match Roster inside a squad, carrying the teamId', () => {
+  it('expands with Overview and Match roster inside a squad, carrying the teamId', () => {
     renderAt('/squad/t-u12')
     const submenu = screen.getByTestId('submenu-squad')
     expect(within(submenu).getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '/squad/t-u12')
-    expect(within(submenu).getByRole('link', { name: 'Build a Match Roster' })).toHaveAttribute(
+    expect(within(submenu).getByRole('link', { name: 'Match roster' })).toHaveAttribute(
       'href',
       '/squad/t-u12/match-roster',
     )
-    expect(within(submenu).getByRole('link', { name: 'Training Plans' })).toHaveAttribute(
+    expect(within(submenu).getByRole('link', { name: 'Training' })).toHaveAttribute(
       'href',
       '/squad/t-u12/training',
     )
@@ -72,6 +72,43 @@ describe('Squad Hub sub-menu', () => {
     renderAt('/roster')
     expect(screen.queryByTestId('submenu-squad')).not.toBeInTheDocument()
     expect(screen.queryByTestId('submenu-schedule')).not.toBeInTheDocument()
+  })
+
+  it('adds a Call-ups pill on a senior squad, not the U18 pool on Overview', () => {
+    useMembershipsMock.mockReturnValue({
+      memberships: [{ id: 'm2', role: 'coach', status: 'active', team_id: 't-men', is_head_coach: true }],
+      teams: [{ id: 't-men', name: 'Senior Men - 2nd XV', is_senior: true, sort_order: 20 }],
+    })
+    renderAt('/squad/t-men')
+    const submenu = screen.getByTestId('submenu-squad')
+    expect(within(submenu).getByRole('link', { name: 'Call-ups' })).toHaveAttribute('href', '/squad/t-men/callups')
+    expect(within(submenu).queryByRole('link', { name: 'Play-ups' })).not.toBeInTheDocument()
+  })
+
+  it('adds a Play-ups pill for a junior head coach and hides it from an assistant', () => {
+    useMembershipsMock.mockReturnValue({
+      memberships: [{ id: 'm3', role: 'coach', status: 'active', team_id: 't-u14', is_head_coach: true }],
+      teams: [
+        { id: 't-u13', name: 'U13 Mixed', is_senior: false, sort_order: 8 },
+        { id: 't-u14', name: 'U14B', is_senior: false, sort_order: 9 },
+      ],
+    })
+    renderAt('/squad/t-u14')
+    expect(within(screen.getByTestId('submenu-squad')).getByRole('link', { name: 'Play-ups' })).toHaveAttribute(
+      'href',
+      '/squad/t-u14/playups',
+    )
+
+    useMembershipsMock.mockReturnValue({
+      memberships: [{ id: 'm4', role: 'coach', status: 'active', team_id: 't-u14', is_head_coach: false }],
+      teams: [
+        { id: 't-u13', name: 'U13 Mixed', is_senior: false, sort_order: 8 },
+        { id: 't-u14', name: 'U14B', is_senior: false, sort_order: 9 },
+      ],
+    })
+    renderAt('/squad/t-u14')
+    const menus = screen.getAllByTestId('submenu-squad')
+    expect(within(menus[menus.length - 1]).queryByRole('link', { name: 'Play-ups' })).not.toBeInTheDocument()
   })
 })
 

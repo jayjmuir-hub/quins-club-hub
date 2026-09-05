@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth.jsx'
 import { useMemberships } from '../lib/memberships.jsx'
 import { isPortalOpen, portalHome, portalLabel, PORTALS } from '../lib/portals.js'
 import { NAV_ITEMS, SquadIcon } from './Nav.jsx'
+import { squadHubNavItems } from '../lib/squadHub.js'
 import crest from '../assets/crest.png'
 
 // The desktop sidebar — phase 2 of the 2.0 retheme
@@ -86,7 +87,7 @@ const ACCOUNTS_PATHS = ['/admin/accounts', '/approvals']
 // while on /chat, where the list is clearing itself. Jay's ruling over the
 // 23 Aug dot-not-a-number stance, recorded in src/lib/useDockBadges.js.
 export default function Sidebar({ showSquadHub = false, showSeniors = false, showAdmin = false, chatUnread = 0 }) {
-  const { memberships } = useMemberships()
+  const { memberships, teams } = useMemberships()
   const location = useLocation()
   const { user } = useAuth()
 
@@ -122,12 +123,9 @@ export default function Sidebar({ showSquadHub = false, showSeniors = false, sho
   const squadMatch = location.pathname.match(/^\/squad\/([^/]+)/)
   const childrenFor = (to) => {
     if (to === '/squad' && squadMatch) {
-      return [
-        { to: `/squad/${squadMatch[1]}`, label: 'Overview', end: true },
-        { to: `/squad/${squadMatch[1]}/match-roster`, label: 'Build a Match Roster' },
-        { to: `/squad/${squadMatch[1]}/training`, label: 'Training Plans' },
-        { to: `/squad/${squadMatch[1]}/chat`, label: 'Chat' },
-      ]
+      const teamId = squadMatch[1]
+      const team = (teams ?? []).find((candidate) => candidate.id === teamId)
+      return squadHubNavItems({ teamId, team, memberships, teams })
     }
     // /game-time keeps the Roster section open: it is this section's only
     // routed child, and collapsing the menu the moment somebody enters it

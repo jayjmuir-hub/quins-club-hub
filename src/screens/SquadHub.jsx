@@ -8,15 +8,15 @@ import { Sheet } from '../components/Sheet.jsx'
 import { SquadHubPickerSkeleton, SquadHubSkeleton } from '../components/Skeleton.jsx'
 import Spinner from '../components/Spinner.jsx'
 import SquadDocumentsCard from '../components/SquadDocumentsCard.jsx'
+import SquadHubNav from '../components/SquadHubNav.jsx'
 import { TeamFilter } from '../components/TeamFilter.jsx'
+import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
+import SeasonStatsTable from '../components/SeasonStatsTable.jsx'
 import { listAttendanceForEvents } from '../data/attendance.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
 import { listMatchSheetsFor } from '../data/matchSheets.js'
 import { listLeagueTeams } from '../data/leagueTeams.js'
-import CallupCard from '../components/CallupCard.jsx'
-import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
-import SeasonStatsTable from '../components/SeasonStatsTable.jsx'
 import { listPlayers } from '../data/players.js'
 import { seasonStats, seasonStatsGaps } from '../data/seasonStats.js'
 import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
@@ -511,9 +511,7 @@ export default function SquadHub() {
               by side, the tracking grid takes the full width beneath them.
               Grid PLACEMENT classes, not DOM order, so the phone keeps
               tracking directly under the calendar — its headline position. */}
-          {/* U18 players this senior squad may call up — renders nothing for a
-              junior squad or for anyone the database refuses. */}
-          <CallupCard team={team} />
+          <SquadHubNav teamId={teamId} />
           {recordsScores(team?.name) && (
             <div className="mb-3">
               <SeasonRecordBand

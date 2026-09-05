@@ -5,9 +5,11 @@ import Card from './Card.jsx'
 import { BlockTitle } from './Editorial.jsx'
 import { listCallupCandidates, requestCallup } from '../data/callups.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import { isCallupHomeForSenior } from '../lib/gender.js'
 
-// "U18 players you can call up" — on a SENIOR squad's Squad Hub, for its
-// staff. claude/plans/2026-09-02-senior-squads.md Part 3, built 4 Sep 2026.
+// "U18 players you can call up" — on a SENIOR squad's Call-ups Hub pill.
+// claude/plans/2026-09-02-senior-squads.md Part 3, built 4 Sep 2026.
+// Gender-matched in the UI: Senior Men see U18B, Senior Women see U18G.
 //
 // ⚠️ THE LIST COMES FROM callup_candidates AND SHOWS ONLY WHAT IT RETURNS:
 // name, home squad, state. No birthday, no contact, nobody under the floor
@@ -16,7 +18,7 @@ import { friendlyMessage } from '../lib/friendlyError.js'
 // other people can open.
 
 const STATE = {
-  consent_needed: { label: 'Consent needed', action: 'Ask the family' },
+  consent_needed: { label: 'Not asked yet', action: 'Ask the family' },
   consent_given: { label: 'Consent given', action: 'Add to squad' },
   requested: { label: 'Asked — waiting', action: null },
   refused: { label: 'Declined recently', action: null },
@@ -42,6 +44,8 @@ export default function CallupCard({ team }) {
 
   if (!team?.is_senior || rows == null) return null
 
+  const visible = rows.filter((row) => isCallupHomeForSenior(row.home_team, team.name))
+
   async function ask(playerId) {
     setBusy(playerId)
     setError(null)
@@ -64,11 +68,11 @@ export default function CallupCard({ team }) {
         </Link>
       </div>
       <Card className="p-0">
-        {rows.length === 0 ? (
+        {visible.length === 0 ? (
           <p className="px-4 py-3 text-sm text-ink-muted">Nobody in the U18s is old enough yet.</p>
         ) : (
           <ul className="divide-y divide-line">
-            {rows.map((row) => {
+            {visible.map((row) => {
               const s = STATE[row.state] ?? { label: row.state, action: null }
               return (
                 <li key={row.player_id} data-testid="callup-candidate" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
