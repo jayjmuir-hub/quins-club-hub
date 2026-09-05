@@ -10,6 +10,9 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 5 Sep 2026
 
+- #714 — 🏉 **Junior roster play-up display.** Guest home squad name from the full `teams` list (not `visibleTeams`), Play-up badge for staff, pinned **From other age groups** footer on junior rosters. Rot detectors: `tests/roster.test.jsx`, `tests/roster-grouping.test.js`.
+- `96462d2` — Junior roster: home squad + Play-up footer for guests.
+- `cc0679a` — Record junior roster play-up display in RESTORE.md.
 - #713 — 🏉 **Junior play-up (second age group) via guest membership.** Super admin only. Home stays `players.team_id`; `add_junior_playup` / `remove_junior_playup` twin or drop active home memberships on another junior squad. Age groups block on the player sheet. Migration `db/migrations/20260913_junior_playup.sql` not applied to live from this PR. Rot detectors: `tests/playups.test.js`, `tests/age-groups-section.test.jsx`, `tests/players-list-membership.test.js`, `db/tests/junior-playup.sql`.
 - #712 — 💬 **Chat composer declutter.** One shared `ComposerBar` on DMs, groups, squad/club channels, and the floating dock: WhatsApp-style `+` attach menu (photo, file, poll), icon Send, `@` typeahead in groups only. Rot detectors: `tests/composer-bar.test.jsx`, `tests/mention-picker.test.js`, `tests/floating-dock.test.jsx`.
 - `0c8ddc9` — Chat composer declutter: + attach menu, icon Send, @ typeahead.
