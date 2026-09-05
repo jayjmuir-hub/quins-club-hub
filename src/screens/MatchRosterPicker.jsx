@@ -4,6 +4,7 @@ import Card from '../components/Card.jsx'
 import { AccentTitle, Kicker } from '../components/Editorial.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
+import SquadHubNav from '../components/SquadHubNav.jsx'
 import { listAvailabilityForEvents } from '../data/availability.js'
 import { listEvents } from '../data/events.js'
 import { listLineupCounts } from '../data/lineups.js'
@@ -114,6 +115,7 @@ export default function MatchRosterPicker() {
           </Link>
         </p>
       </div>
+      <SquadHubNav teamId={teamId} />
 
       {error && (
         <p role="alert" className="mb-3 flex flex-wrap items-center gap-2 text-[13px] font-semibold text-danger-ink">

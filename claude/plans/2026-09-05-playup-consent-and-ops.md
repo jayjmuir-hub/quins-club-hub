@@ -1,6 +1,7 @@
 # Junior play-up — parent consent, request/nominate, Club Ops (hybrid C)
 
-**STATUS: SLICES 1–2 BUILT.** Slice 3 (Club Ops hybrid C) is specified here
+**STATUS: SLICES 1–2 BUILT.** Slice 2 roster doors plus the Squad Hub Play-ups
+pill (frontend) are in the code. Slice 3 (Club Ops hybrid C) is specified here
 and not built. Dated 2026-09-05. Jay approved the full design the same day
 (“go for everything”). Ruling:
 `claude/decisions/2026-09-05-playup-parent-consent.md`.

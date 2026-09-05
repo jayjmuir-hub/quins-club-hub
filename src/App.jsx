@@ -39,6 +39,8 @@ import Allocation from './screens/Allocation.jsx'
 import SquadHub from './screens/SquadHub.jsx'
 import MatchRosterPicker from './screens/MatchRosterPicker.jsx'
 import SquadTraining from './screens/SquadTraining.jsx'
+import SquadCallups from './screens/SquadCallups.jsx'
+import SquadPlayups from './screens/SquadPlayups.jsx'
 import PitchGlance from './screens/PitchGlance.jsx'
 import YouthDashboard from './screens/YouthDashboard.jsx'
 import AdminCompetitions from './screens/AdminCompetitions.jsx'
@@ -273,6 +275,8 @@ export default function App() {
               performance director published. The per-event view stays inside
               EventDetail; this is the season-at-a-glance list (22 Aug 2026). */}
           <Route path="/squad/:teamId/training" element={<AppShell><SquadTraining /></AppShell>} />
+          <Route path="/squad/:teamId/callups" element={<AppShell><SquadCallups /></AppShell>} />
+          <Route path="/squad/:teamId/playups" element={<AppShell><SquadPlayups /></AppShell>} />
           {/* The read-only pitch calendar for squad staff — outside /admin
               for the same reason /lineup and /game-time are: its audience is
               coaches and team managers, and AdminDashboard's isAdmin() gate

@@ -8,6 +8,7 @@ import TrainingDateStrip from '../components/TrainingDateStrip.jsx'
 import TrainingShelf from '../components/TrainingShelf.jsx'
 import { Sheet } from '../components/Sheet.jsx'
 import Spinner from '../components/Spinner.jsx'
+import SquadHubNav from '../components/SquadHubNav.jsx'
 import { listEvents } from '../data/events.js'
 import { listSessionsForEvents } from '../data/trainingPlans.js'
 import { CLUB_TIME_ZONE, clubToday, eventDate, eventTimeLabel, eventTitle } from '../lib/eventFormat.js'
@@ -110,6 +111,7 @@ export default function SquadTraining() {
           </Link>
         </p>
       </div>
+      <SquadHubNav teamId={teamId} />
 
       {error && (
         <p role="alert" className="mb-3 flex flex-wrap items-center gap-2 text-[13px] font-semibold text-danger-ink">

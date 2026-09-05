@@ -39,6 +39,8 @@ describe('screenName', () => {
     expect(screenName('/squad/team-abc/chat')).toBe('Squad chat')
     expect(screenName('/squad/team-abc/match-roster')).toBe('Match roster')
     expect(screenName('/squad/team-abc/training')).toBe('Training')
+    expect(screenName('/squad/team-abc/callups')).toBe('Call-ups')
+    expect(screenName('/squad/team-abc/playups')).toBe('Play-ups')
   })
 
   it('a prefix only matches at a path boundary', () => {

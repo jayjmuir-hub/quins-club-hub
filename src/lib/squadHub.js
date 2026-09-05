@@ -1,6 +1,8 @@
+import { playupSourceTeams, playupTargetTeams } from './ageGrade.js'
 import { squadFormat } from './minis.js'
 import {
   canEditTeam,
+  canRequestPlayup,
   highestRole,
   labelForRole,
 } from './scope.js'
@@ -74,4 +76,29 @@ export function squadMark(name) {
     .map((word) => word[0] ?? '')
     .join('')
     .toUpperCase()
+}
+
+/**
+ * Squad Hub subnav: Overview / Match roster / Training, plus Call-ups on a
+ * senior squad and Play-ups for a junior head coach or age-group manager.
+ * Sidebar and the phone pill row both read this so the two cannot drift.
+ */
+export function squadHubNavItems({ teamId, team, memberships, teams } = {}) {
+  if (!teamId) return []
+  const items = [
+    { to: `/squad/${teamId}`, label: 'Overview', end: true },
+    { to: `/squad/${teamId}/match-roster`, label: 'Match roster' },
+    { to: `/squad/${teamId}/training`, label: 'Training' },
+  ]
+  if (team?.is_senior) {
+    items.push({ to: `/squad/${teamId}/callups`, label: 'Call-ups' })
+  } else if (team && canRequestPlayup(memberships, teamId)) {
+    const sources = playupSourceTeams(team, teams)
+    const targets = playupTargetTeams(team, teams)
+    if (sources.length > 0 || targets.length > 0) {
+      items.push({ to: `/squad/${teamId}/playups`, label: 'Play-ups' })
+    }
+  }
+  items.push({ to: `/squad/${teamId}/chat`, label: 'Chat' })
+  return items
 }

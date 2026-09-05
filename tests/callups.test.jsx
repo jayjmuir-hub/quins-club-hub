@@ -100,7 +100,7 @@ describe('the Squad Hub card', () => {
     const user = wrap(<CallupCard team={{ id: 't-men2', name: 'Senior Men - 2nd XV', is_senior: true }} />, SENIOR_COACH)
     const rows = await screen.findAllByTestId('callup-candidate')
     expect(rows).toHaveLength(3)
-    expect(rows[0]).toHaveTextContent('U18B · Consent needed')
+    expect(rows[0]).toHaveTextContent('U18B · Not asked yet')
     expect(rows[1]).toHaveTextContent('Asked — waiting')
     expect(within(rows[1]).queryByRole('button')).not.toBeInTheDocument()
     expect(rows[2]).toHaveTextContent('In this squad')
@@ -115,6 +115,33 @@ describe('the Squad Hub card', () => {
     wrap(<CallupCard team={{ id: 't-u18', name: 'U18B', is_senior: false }} />, U18_COACH)
     expect(screen.queryByTestId('callup-card')).not.toBeInTheDocument()
     expect(listCandidatesMock).not.toHaveBeenCalled()
+  })
+
+  it('Senior Men never see the U18G list, even if the RPC returns both', async () => {
+    listCandidatesMock.mockResolvedValue([
+      { player_id: 'p-boy', full_name: 'Idris Vantongeren', home_team_id: 't-u18b', home_team: 'U18B', state: 'consent_needed', request_id: null },
+      { player_id: 'p-girl', full_name: 'Niamh Colter', home_team_id: 't-u18g', home_team: 'U18G', state: 'consent_needed', request_id: null },
+    ])
+    wrap(<CallupCard team={{ id: 't-men2', name: 'Senior Men - 2nd XV', is_senior: true }} />, SENIOR_COACH)
+    const rows = await screen.findAllByTestId('callup-candidate')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveTextContent('Idris Vantongeren')
+    expect(screen.queryByText('Niamh Colter')).not.toBeInTheDocument()
+  })
+
+  it('Senior Women never see the U18B list', async () => {
+    listCandidatesMock.mockResolvedValue([
+      { player_id: 'p-boy', full_name: 'Idris Vantongeren', home_team_id: 't-u18b', home_team: 'U18B', state: 'consent_needed', request_id: null },
+      { player_id: 'p-girl', full_name: 'Niamh Colter', home_team_id: 't-u18g', home_team: 'U18G', state: 'consent_needed', request_id: null },
+    ])
+    wrap(
+      <CallupCard team={{ id: 't-women', name: 'Senior Women - 1st XV', is_senior: true }} />,
+      [{ id: 'm-w', role: 'coach', status: 'active', team_id: 't-women', club_id: CLUB }],
+    )
+    const rows = await screen.findAllByTestId('callup-candidate')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveTextContent('Niamh Colter')
+    expect(screen.queryByText('Idris Vantongeren')).not.toBeInTheDocument()
   })
 })
 

@@ -178,3 +178,21 @@ export function squadMismatch(gender, teamName) {
 
   return `${genderLabel(gender)} player in ${teamName}. That's allowed — just check it's right.`
 }
+
+/**
+ * The U18 home squad a senior side may call from, or null when the senior
+ * name does not imply a gender. Senior Men → U18B; Senior Women → U18G.
+ */
+export function callupHomeLabel(seniorTeamName) {
+  const expected = squadExpects(seniorTeamName)
+  if (expected === 'male') return 'U18B'
+  if (expected === 'female') return 'U18G'
+  return null
+}
+
+/** True when this U18 home squad matches the senior side's gender. */
+export function isCallupHomeForSenior(homeTeamName, seniorTeamName) {
+  const expected = squadExpects(seniorTeamName)
+  if (!expected) return false
+  return squadExpects(homeTeamName) === expected
+}
