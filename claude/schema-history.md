@@ -1412,6 +1412,8 @@ written under another name; anon holds nothing.
 
 ## 20260917_chat_and_admin_counts — three badge counts move into the database (5 Sep 2026)
 
+✅ **APPLIED to live 5 Sep 2026**, before PR #726 was merged (squash `b259ae1`).
+
 **Why.** A performance review of the live app. `countUnreadMessages` fetched
 every `message_reads` row the caller could see — no filter, no limit — and
 subtracted in the browser. PostgREST caps a response at `db-max-rows` (1000
