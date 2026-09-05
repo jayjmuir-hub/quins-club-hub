@@ -22,13 +22,14 @@ import NoticeComposer from '../src/components/NoticeComposer.jsx'
 
 vi.mock('../src/data/announcements.js', () => ({ createNotice: vi.fn(async () => ({ id: 'n1' })) }))
 
-function Harness({ onClose, saving = false }) {
+function Harness({ onClose, saving = false, children }) {
   const [text, setText] = useState('')
   const guard = useDiscardGuard({ dirty: text !== '', saving, onClose })
   return (
     <Sheet open onClose={guard.requestClose} title="Harness">
       {guard.confirming && <DiscardConfirm id="h" onDiscard={guard.discard} onKeep={guard.keep} />}
       <input aria-label="Text" value={text} onChange={(e) => setText(e.target.value)} />
+      {children}
       <button type="button" onClick={guard.requestClose}>Cancel</button>
     </Sheet>
   )
@@ -64,6 +65,46 @@ describe('useDiscardGuard + DiscardConfirm', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await user.click(screen.getByRole('button', { name: 'Discard' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps Discard and Keep editing in the sheet viewport when the body is scrolled', async () => {
+    // Jay, 5 Sep 2026: dirty profile Edit, scroll to the bottom, tap outside
+    // — the ask sat at the top of the sheet body, off-screen. The confirm is
+    // pinned over the panel, so it must not live in the scrolled flow, and
+    // arming it must not yank scrollTop back to the title.
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(
+      <Harness onClose={onClose}>
+        <div data-testid="long-tail" style={{ height: 2400 }}>
+          padding so the sheet scrolls
+        </div>
+      </Harness>,
+    )
+    await user.type(screen.getByLabelText('Text'), 'half a thought')
+    const panel = screen.getByRole('dialog')
+    panel.scrollTop = 1800
+    const at = panel.scrollTop
+    expect(at).toBeGreaterThan(0)
+
+    await user.keyboard('{Escape}')
+    expect(onClose).not.toHaveBeenCalled()
+    const ask = screen.getByRole('alertdialog')
+    expect(ask).toHaveTextContent('Discard your changes?')
+    expect(panel.contains(ask)).toBe(true)
+    expect(ask.className).toMatch(/\bfixed\b/)
+    expect(ask.className).toMatch(/\binset-0\b/)
+    expect(panel.scrollTop).toBe(at)
+    expect(screen.getByRole('button', { name: 'Keep editing' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument()
+  })
+
+  it('focuses the ask when it appears', async () => {
+    const user = userEvent.setup()
+    render(<Harness onClose={vi.fn()} />)
+    await user.type(screen.getByLabelText('Text'), 'x')
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('alertdialog')).toHaveFocus()
   })
 
   it('never arms while a save is in flight', async () => {

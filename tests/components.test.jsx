@@ -360,6 +360,7 @@ describe('Sheet', () => {
     expect(hasClassToken(dialog, 'rounded-t-[22px]')).toBe(true)
     expect(hasClassToken(dialog, 'desktop:rounded-[20px]')).toBe(true)
     expect(hasClassToken(dialog, 'desktop:w-[min(520px,94vw)]')).toBe(true)
+    expect(hasClassToken(dialog, 'relative')).toBe(true)
   })
 
   it('respects prefers-reduced-motion by disabling its entrance animation under motion-reduce', () => {

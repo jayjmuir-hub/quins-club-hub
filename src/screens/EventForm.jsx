@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Sheet from '../components/Sheet.jsx'
 import Button from '../components/Button.jsx'
+import DiscardConfirm from '../components/DiscardConfirm.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import TimePicker from '../components/TimePicker.jsx'
 import RepeatUntilField from '../components/RepeatUntilField.jsx'
@@ -1582,30 +1583,11 @@ export default function EventForm({
           check. */}
       <form onSubmit={handleSubmit} noValidate ref={formRef}>
         {confirmingDiscard && (
-          <div
-            role="alertdialog"
-            aria-labelledby="event-discard-title"
-            aria-describedby="event-discard-body"
-            className="mb-3.5 rounded-[11px] border border-line bg-surface-mute px-3 py-2.5"
-          >
-            <p id="event-discard-title" className="text-sm font-bold text-ink">
-              Discard your changes?
-            </p>
-            <p id="event-discard-body" className="mt-0.5 text-[12.5px] text-ink-muted">
-              Nothing has been saved yet.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {/* `danger` is the CONFIRM of the pair; the arming tap was the
-                  close itself. Button defaults type="button", so neither of
-                  these submits the form they sit inside. */}
-              <Button variant="danger" onClick={() => onClose?.()}>
-                Discard
-              </Button>
-              <Button variant="ghost" onClick={() => setConfirmingDiscard(false)}>
-                Keep editing
-              </Button>
-            </div>
-          </div>
+          <DiscardConfirm
+            id="event-discard"
+            onDiscard={() => onClose?.()}
+            onKeep={() => setConfirmingDiscard(false)}
+          />
         )}
         {/* ⚠️ IN TOURNAMENT MODE THE NAME IS THE IDENTITY, so it takes the top
             slot the Type control has for every other kind. The kind was already

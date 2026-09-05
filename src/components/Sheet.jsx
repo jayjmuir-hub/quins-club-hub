@@ -233,8 +233,12 @@ export function Sheet({ open, onClose, title, children, dismissible = true, size
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
         data-size={size}
-        className={`glass-panel max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] shadow-card animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] ${size === 'wide' ? 'desktop:w-[min(760px,94vw)]' : 'desktop:w-[min(520px,94vw)]'} desktop:animate-sheet-scale-in desktop:rounded-[20px]`}
+        className={`glass-panel relative max-h-[92vh] w-full overflow-y-auto rounded-t-[22px] shadow-card animate-sheet-slide-up motion-reduce:animate-none desktop:max-h-[88vh] ${size === 'wide' ? 'desktop:w-[min(760px,94vw)]' : 'desktop:w-[min(520px,94vw)]'} desktop:animate-sheet-scale-in desktop:rounded-[20px]`}
       >
+        {/* `relative` + `glass-panel`: DiscardConfirm portals a `fixed
+            inset-0` overlay onto this panel. backdrop-filter makes that
+            `fixed` cover THIS box (not the viewport); `relative` is the
+            fallback containing block if the filter is absent. */}
         {/* Drag-handle bar (design-system.md §4.16 .sheet-grip): mobile
             only, visual affordance only — there is no swipe-to-dismiss
             gesture wired up, matching the prototype (dismissal is tap-scrim
