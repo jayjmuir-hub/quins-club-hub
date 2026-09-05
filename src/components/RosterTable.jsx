@@ -487,9 +487,9 @@ export default function RosterTable({
                         it here just keeps the table free of a label that is
                         only useful to staff. `player.team_id` is still the
                         HOME squad on a guest row (src/data/players.js). */}
-                    {showGuestMark && player.guest_of && (
+                    {showGuestMark && player.guest_of && teamsById.get(player.team_id)?.name && (
                       <span className="mt-0.5 block text-[12px] font-semibold text-ink-faint">
-                        from {teamsById.get(player.team_id)?.name ?? 'another squad'}
+                        from {teamsById.get(player.team_id).name}
                       </span>
                     )}
                     {/* The refusal lands in the row that caused it, not in a
@@ -698,8 +698,13 @@ export default function RosterTable({
                         ))}
                       </select>
                     ) : (
-                      <span className="px-2 text-ink-muted">
-                        {teamsById.get(player.team_id)?.name ?? 'No age group'}
+                      <span className="flex flex-wrap items-center gap-1.5 px-2 text-ink-muted">
+                        <span data-testid="home-squad-name">
+                          {teamsById.get(player.team_id)?.name ?? (player.guest_of ? '' : 'No age group')}
+                        </span>
+                        {showGuestMark && player.guest_of && (
+                          <Badge data-testid="play-up-badge">Play-up</Badge>
+                        )}
                       </span>
                     )}
                   </td>

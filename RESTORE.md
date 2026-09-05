@@ -529,6 +529,11 @@ add that through `add_junior_playup` / `remove_junior_playup` (`db/migrations/20
 home stays `players.team_id`; every active home membership for that `player_id` is twinned onto
 the guest junior squad (same pattern as U18 call-ups). `listPlayers({ teamIds })` already marks
 those rows `guest_of`. Staff see the mark; parents must not. Ordinary coaches never see Add.
+On a junior roster the guest's **home** squad name is the age-group label (looked up on the
+full `teams` list from memberships, not `visibleTeams` — a U14B-only coach preview still
+has U13 Mixed in `teams`), with a Play-up badge for staff, and the row lives only under
+**From other age groups**, not mixed into Forwards/Backs/tier groups. Senior guest grouping
+is unchanged. Never print "No age group" for a guest whose `team_id` resolves.
 
 **A player who has quit is marked LEFT, never deleted.** `players.left_at` non-null is a
 leaver; `left_at IS NULL` means current. `mark_player_left`/`restore_player`

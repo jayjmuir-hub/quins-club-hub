@@ -76,6 +76,8 @@ vi.mock('../src/data/playerTiers.js', () => ({
     ['p-hooker', ['Hooker']],
     ['p-lock', ['Lock']],
     ['p-fullback', ['Fullback']],
+    ['p-u14-home', ['Prop']],
+    ['p-u13-guest', ['Wing']],
   ])),
 }))
 
@@ -91,7 +93,7 @@ import Roster from '../src/screens/Roster.jsx'
 // that satisfies both. The minis behaviour has its own file: tests/minis.test.js
 // and tests/minis-screens.test.jsx.
 const TEAM_U12 = { id: 'team-u12', name: 'U12', sort_order: 5 }
-const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13 }
+const TEAM_FIRST_XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 13, is_senior: true }
 const TEAMS = [TEAM_FIRST_XV, TEAM_U12] // deliberately unsorted; visibleTeams sorts
 
 const ADMIN = [{ id: 'm1', role: 'admin', status: 'active', admin_rights: ['clubadmin'], team_id: null }]
@@ -976,5 +978,109 @@ describe('the ?open= player deep link', () => {
     setupAt('/roster?open=p-not-real')
     await screen.findAllByTestId('player-row')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+// ── Junior play-up guests (Jay, 5 Sep 2026) ─────────────────────────────────
+// A U14B coach's `visibleTeams` is only U14B, but memberships.teams still
+// holds every squad `loadTeams` returned (team read is any signed-in user).
+// Building teamsById from the scoped list is what printed "No age group"
+// for a U13 Mixed guest. Names invented. CLAUDE.md rule 9.
+const TEAM_U14B = { id: 'team-u14b', name: 'U14B', sort_order: 9, is_senior: false }
+const TEAM_U13_MIXED = { id: 'team-u13m', name: 'U13 Mixed', sort_order: 8, is_senior: false }
+const COACH_U14B = [{ id: 'm-u14b', role: 'coach', status: 'active', team_id: 'team-u14b' }]
+const PARENT_U14B = [{ id: 'm-parent-u14b', role: 'parent', team_id: 'team-u14b', player_id: 'p-u14-home' }]
+const U14_HOME = {
+  id: 'p-u14-home',
+  team_id: 'team-u14b',
+  full_name: 'Ade Kwarteng',
+  position: 'Prop',
+  is_captain: false,
+  guest_of: null,
+}
+const U13_GUEST = {
+  id: 'p-u13-guest',
+  team_id: 'team-u13m',
+  full_name: 'Nico Vellani',
+  position: 'Wing',
+  is_captain: false,
+  guest_of: 'team-u14b',
+}
+
+function setDesktop(isDesktop = true) {
+  window.matchMedia = vi.fn().mockImplementation((query) => ({
+    matches: isDesktop,
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+  }))
+}
+
+describe('Roster — junior play-up guests', () => {
+  beforeEach(() => {
+    setDesktop(false)
+    useMembershipsMock.mockReturnValue(memberships(COACH_U14B, [TEAM_U14B, TEAM_U13_MIXED]))
+    listPlayersMock.mockResolvedValue([U14_HOME, U13_GUEST])
+  })
+
+  it('shows the home squad name and a Play-up badge, never No age group', async () => {
+    setup()
+    const row = (await screen.findByText('Nico Vellani')).closest('[data-testid="player-row"]')
+    expect(within(row).getByTestId('home-squad-name')).toHaveTextContent('U13 Mixed')
+    expect(within(row).getByText('Play-up')).toBeInTheDocument()
+    expect(within(row).getByText(/from U13 Mixed/)).toBeInTheDocument()
+    expect(within(row).queryByText('No age group')).not.toBeInTheDocument()
+    expect(screen.queryByText('No age group')).not.toBeInTheDocument()
+  })
+
+  it('pins the guest under From other age groups, not Forwards or Backs', async () => {
+    setup()
+    await screen.findByText('Nico Vellani')
+
+    expect(groupLabels()).toContain('Forwards')
+    expect(groupLabels().some((label) => label.startsWith('From other age groups'))).toBe(true)
+
+    const guestRow = screen.getByText('Nico Vellani').closest('[data-testid="player-row"]')
+    const footer = screen.getByText(/From other age groups/).closest('div')
+    expect(footer).toContainElement(guestRow)
+
+    const forwardHeading = screen.getByText('Forwards')
+    const forwardBlock = forwardHeading.closest('div')
+    expect(forwardBlock).not.toContainElement(guestRow)
+    expect(within(forwardBlock).getByText('Ade Kwarteng')).toBeInTheDocument()
+  })
+
+  it('CONTROL: a parent never sees Play-up or the from-squad mark', async () => {
+    useMembershipsMock.mockReturnValue(memberships(PARENT_U14B, [TEAM_U14B, TEAM_U13_MIXED]))
+    setup()
+    const row = (await screen.findByText('Nico Vellani')).closest('[data-testid="player-row"]')
+    expect(within(row).queryByText('Play-up')).not.toBeInTheDocument()
+    expect(within(row).queryByText(/from U13 Mixed/)).not.toBeInTheDocument()
+    expect(within(row).getByTestId('home-squad-name')).toHaveTextContent('U13 Mixed')
+  })
+
+  it('keeps a matching guest in the footer after search', async () => {
+    const { user } = setup()
+    await screen.findByText('Nico Vellani')
+    await user.type(screen.getByRole('searchbox'), 'Nico')
+    expect(screen.getByText('Nico Vellani')).toBeInTheDocument()
+    expect(screen.queryByText('Ade Kwarteng')).not.toBeInTheDocument()
+    expect(screen.getByText(/From other age groups/)).toBeInTheDocument()
+  })
+
+  it('shows home name and Play-up on the desktop age-group cell, guest under the footer', async () => {
+    setDesktop(true)
+    setup()
+    await screen.findByTestId('roster-table')
+    const row = screen.getAllByTestId('roster-table-row').find((r) =>
+      within(r).queryByText('Nico Vellani'))
+    expect(within(row).getByTestId('home-squad-name')).toHaveTextContent('U13 Mixed')
+    expect(within(row).getByText('Play-up')).toBeInTheDocument()
+    expect(within(row).getByText(/from U13 Mixed/)).toBeInTheDocument()
+    expect(within(row).queryByText('No age group')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Age group for Nico Vellani')).not.toBeInTheDocument()
+    expect(screen.getByText(/From other age groups/)).toBeInTheDocument()
   })
 })

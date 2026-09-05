@@ -61,7 +61,7 @@ import Roster from '../src/screens/Roster.jsx'
 
 // The senior squad USES jersey numbers; U18B does not. Both carry
 // sort_order so visibleTeams' ordering is stable and unrelated to this test.
-const TEAM_1XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 1, uses_jersey_numbers: true }
+const TEAM_1XV = { id: 'team-1xv', name: 'Senior Men 1st XV', sort_order: 1, uses_jersey_numbers: true, is_senior: true }
 const TEAM_U18B = { id: 'team-u18b', name: 'U18B', sort_order: 2, uses_jersey_numbers: false }
 
 const COACH_1XV = [{ id: 'm1', role: 'coach', status: 'active', team_id: 'team-1xv' }]

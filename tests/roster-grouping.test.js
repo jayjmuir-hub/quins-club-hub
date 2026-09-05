@@ -4,6 +4,9 @@ import {
   constantColumns,
   GROUP_BY,
   UNGRADED,
+  pinGuestsToFooter,
+  partitionGuestPlayers,
+  otherAgeGroupsGroup,
 } from '../src/lib/rosterGrouping.js'
 
 // Jay, 14 Aug 2026, from the U16B coach view: "it would also help to be able to
@@ -122,5 +125,35 @@ describe('constantColumns', () => {
     // ⚠️ Hiding every column on an empty list would make the table look broken
     // at the exact moment somebody is wondering why it is empty.
     expect(constantColumns([], readers).size).toBe(0)
+  })
+})
+
+describe('junior guest footer partition', () => {
+  const home = { id: 'p-home', full_name: 'Ade Kwarteng', guest_of: null, unit: 'forward' }
+  const guest = { id: 'p-guest', full_name: 'Nico Vellani', guest_of: 'team-u14b', unit: 'back' }
+
+  it('pins guests to a footer only when every squad on screen is junior', () => {
+    expect(pinGuestsToFooter([{ id: 'u14b', is_senior: false }])).toBe(true)
+    expect(pinGuestsToFooter([{ id: '1xv', is_senior: true }])).toBe(false)
+    expect(pinGuestsToFooter([
+      { id: 'u14b', is_senior: false },
+      { id: '1xv', is_senior: true },
+    ])).toBe(false)
+    expect(pinGuestsToFooter([])).toBe(false)
+  })
+
+  it('keeps home players out of the guest list and guests out of home', () => {
+    const { home: homes, guests } = partitionGuestPlayers([guest, home])
+    expect(homes.map((p) => p.id)).toEqual(['p-home'])
+    expect(guests.map((p) => p.id)).toEqual(['p-guest'])
+  })
+
+  it('titles the footer exactly From other age groups, with a count', () => {
+    const group = otherAgeGroupsGroup([guest, home])
+    expect(group.label).toBe('From other age groups (2)')
+    expect(group.sections[0].players.map((p) => p.full_name)).toEqual([
+      'Ade Kwarteng',
+      'Nico Vellani',
+    ])
   })
 })

@@ -9,7 +9,7 @@ import RosterTable from '../components/RosterTable.jsx'
 import TeamFilter, { ALL_TEAMS_ID } from '../components/TeamFilter.jsx'
 import { sectionGroups, teamIdsForFilter } from '../lib/section.js'
 import { positionGroup, POSITION_GROUP_ORDER } from '../lib/rosterUnit.js'
-import { buildRosterGroups, constantColumns, GROUP_BY } from '../lib/rosterGrouping.js'
+import { buildRosterGroups, constantColumns, GROUP_BY, pinGuestsToFooter, partitionGuestPlayers, otherAgeGroupsGroup } from '../lib/rosterGrouping.js'
 import { isMinisTeam } from '../lib/minis.js'
 import { listPlayerGrades, listPlayerPositions, listPlayerUnits, savePlayerPositions, setPlayerUnit } from '../data/playerTiers.js'
 import PlayerDetail from './PlayerDetail.jsx'
@@ -76,6 +76,13 @@ function readStoredFilter() {
 // value), so it introduces no new colour. --muted inside a card is untouched:
 // the player row's "Flanker · U10" meta line still uses it.
 const MUTED_ON_PAPER = 'text-ink-muted'
+
+/** Home squad name. Guests keep `player.team_id` as home; never "No age group". */
+function homeTeamName(player, teamsById) {
+  const name = teamsById.get(player.team_id)?.name
+  if (name) return name
+  return player.guest_of ? '' : 'No age group'
+}
 
 // Every group is ordered by name. The prototype sorted position groups by
 // jersey number, but the club does not use numbers (see playerFormat.js), so
@@ -188,7 +195,7 @@ function PlayerRow({
               (src/data/players.js) — the name printed is the HOME squad's,
               from `teamsById`, via `player.team_id` which stays the home
               team even on a guest row. */}
-          {showGuestMark && player.guest_of && (
+          {showGuestMark && player.guest_of && teamName && (
             <span className="text-[12px] font-semibold text-ink-faint">from {teamName}</span>
           )}
         </span>
@@ -207,10 +214,15 @@ function PlayerRow({
             is always absent, and printing "Position not set" for them would
             state a gap they are not allowed to see filled. Staff still get
             "Position not set", which for them is an honest to-do. */}
-        <span className="mt-0.5 block text-[12.5px] text-ink-faint">
-          {showPosition ? `${player.position || 'Position not set'} · ` : ''}{teamName}
-          {genderLabel(player.gender) ? ` · ${genderLabel(player.gender)}` : ''}
-          {Number.isFinite(age) ? ` · ${age}` : ''}
+        <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[12.5px] text-ink-faint">
+          <span data-testid="home-squad-name">
+            {showPosition ? `${player.position || 'Position not set'} · ` : ''}{teamName}
+            {genderLabel(player.gender) ? ` · ${genderLabel(player.gender)}` : ''}
+            {Number.isFinite(age) ? ` · ${age}` : ''}
+          </span>
+          {showGuestMark && player.guest_of && (
+            <Badge data-testid="play-up-badge">Play-up</Badge>
+          )}
         </span>
       </span>
 
@@ -247,7 +259,7 @@ function RosterGroup({
           <PlayerRow
             key={player.id}
             player={player}
-            teamName={teamsById.get(player.team_id)?.name ?? 'No age group'}
+            teamName={homeTeamName(player, teamsById)}
             photoUrl={player.photo_path ? photoUrls?.[player.photo_path] : undefined}
             age={ageByPlayer?.get(player.id) ?? null}
             showPosition={showPosition}
@@ -270,7 +282,13 @@ export default function Roster() {
 
   const scopedTeams = useMemo(() => visibleTeams(memberships, teams), [memberships, teams])
   const teamIds = useMemo(() => scopedTeams.map((team) => team.id), [scopedTeams])
-  const teamsById = useMemo(() => new Map(scopedTeams.map((team) => [team.id, team])), [scopedTeams])
+  // ⚠️ THE FULL CLUB LIST, NOT `scopedTeams`. `loadTeams` already returns every
+  // squad a signed-in user may read (`team read` is `auth.uid() IS NOT NULL`).
+  // `visibleTeams` then narrows the pills and the `listPlayers` query. Guest
+  // rows keep `player.team_id` as the HOME squad, which is often outside that
+  // scope (a U14B coach previewing a U13 Mixed play-up). Looking up names in
+  // the scoped map printed "No age group" / "from another squad".
+  const teamsById = useMemo(() => new Map((teams ?? []).map((team) => [team.id, team])), [teams])
 
   const isDesktop = useMediaQuery(DESKTOP_QUERY)
 
@@ -615,7 +633,11 @@ export default function Roster() {
   const visible =
     filterTeamIds == null
       ? matchingSearch
-      : matchingSearch.filter((player) => filterTeamIds.includes(player.team_id))
+      : matchingSearch.filter(
+          (player) =>
+            filterTeamIds.includes(player.team_id)
+            || (player.guest_of && filterTeamIds.includes(player.guest_of)),
+        )
 
   const pillCounts = new Map(scopedTeams.map((team) => [team.id, 0]))
   pillCounts.set(ALL_TEAMS_ID, matchingSearch.length)
@@ -625,6 +647,9 @@ export default function Roster() {
   matchingSearch.forEach((player) => {
     if (pillCounts.has(player.team_id)) {
       pillCounts.set(player.team_id, pillCounts.get(player.team_id) + 1)
+    }
+    if (player.guest_of && player.guest_of !== player.team_id && pillCounts.has(player.guest_of)) {
+      pillCounts.set(player.guest_of, pillCounts.get(player.guest_of) + 1)
     }
   })
 
@@ -673,12 +698,17 @@ export default function Roster() {
   const groupByPosition =
     canEditAnything && !minisOnly && (activeFilter !== ALL_TEAMS_ID || scopedTeams.length === 1)
 
+  const pinGuests = pinGuestsToFooter(shownTeams)
+  const { home: homeVisible, guests: guestVisible } = pinGuests
+    ? partitionGuestPlayers(visible)
+    : { home: visible, guests: [] }
+
   // Not memoised: `visible` is rebuilt on every render anyway (it depends on
   // the search box), so a useMemo here would never hit its cache and would
   // only advertise a saving it doesn't make. The whole scope is at most a few
   // hundred players.
   const bucket = new Map()
-  visible.forEach((player) => {
+  homeVisible.forEach((player) => {
     const key = groupByPosition ? positionGroup(player) : player.team_id
     if (!bucket.has(key)) bucket.set(key, [])
     bucket.get(key).push(player)
@@ -691,6 +721,14 @@ export default function Roster() {
       label: groupByPosition ? key : (teamsById.get(key)?.name ?? 'No age group'),
       players: [...bucket.get(key)].sort(byName),
     }))
+  if (guestVisible.length > 0) {
+    const footer = otherAgeGroupsGroup(guestVisible)
+    groups.push({
+      key: footer.key,
+      label: footer.label,
+      players: footer.sections[0].players,
+    })
+  }
 
   // ⚠️ THE DESKTOP TABLE'S COLUMNS AND GROUPING, which are NOT the mobile
   // `groups` above. The mobile list has always grouped; the table has not, and
@@ -743,10 +781,10 @@ export default function Roster() {
   // harmless. Same reconciliation-against-live-scope rule the team pill itself
   // follows — a stored choice can outlive what produced it.
   const tableGroupBy = minisOnly && groupBy !== GROUP_BY.TEAM ? 'none' : groupBy
-  const tableGroups =
+  const tableGroupsBase =
     !canEditAnything || tableGroupBy === 'none'
       ? null
-      : buildRosterGroups(visible, {
+      : buildRosterGroups(homeVisible, {
           groupBy: tableGroupBy,
           tierByPlayer,
           teamsById,
@@ -754,6 +792,12 @@ export default function Roster() {
           // where the squad in view uses numbers at all.
           sortPlayers: jerseySort ? sortByJersey : undefined,
         })
+  const tableGroups =
+    tableGroupsBase && guestVisible.length > 0
+      ? [...tableGroupsBase, otherAgeGroupsGroup(guestVisible, {
+          sortPlayers: jerseySort ? sortByJersey : undefined,
+        })]
+      : tableGroupsBase
 
   // How many of the players on screen have no gender recorded. Distinct from
   // hiddenUnrecorded above, which counts the ones a gender FILTER is hiding;
