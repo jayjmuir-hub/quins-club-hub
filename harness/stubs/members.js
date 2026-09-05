@@ -652,3 +652,12 @@ export async function requestStaffRole(teamId, role) {
     player_id: null,
   }
 }
+
+// Mirrors src/data/members.js countReportsWaiting (4 Sep 2026): pure, no client.
+export function countReportsWaiting(reports, messages) {
+  const lastAuthor = new Map()
+  for (const m of messages) lastAuthor.set(m.feedback_id, m.author_id)
+  return reports.filter(
+    (r) => r.status === 'new' || (r.status === 'in-progress' && lastAuthor.get(r.id) === r.submitted_by),
+  ).length
+}

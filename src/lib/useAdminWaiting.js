@@ -76,6 +76,9 @@ export default function useAdminWaiting({ userId, enabled, tick = 0 }) {
     const unsubscribeFeedback = subscribeToTable('feedback', recount, {
       debounceMs: ADMIN_WAITING_DEBOUNCE_MS,
     })
+    const unsubscribeThread = subscribeToTable('feedback_messages', recount, {
+      debounceMs: ADMIN_WAITING_DEBOUNCE_MS,
+    })
 
     const onReturn = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
@@ -90,6 +93,7 @@ export default function useAdminWaiting({ userId, enabled, tick = 0 }) {
       unsubscribeMemberships?.()
       unsubscribeRequests?.()
       unsubscribeFeedback?.()
+      unsubscribeThread?.()
       document.removeEventListener('visibilitychange', onReturn)
       window.removeEventListener('focus', onReturn)
     }

@@ -12,7 +12,7 @@ import { subscribeToTable } from './subscribeToTable.js'
 
 const SELECT = `
   id, ref, kind, body, route, context, status, admin_note,
-  handled_by, handled_at, created_at,
+  handled_by, handled_at, created_at, submitted_by, club_id,
   profiles!feedback_submitted_by_fkey(full_name)
 `
 
@@ -215,4 +215,50 @@ export async function deleteFeedback(id) {
     throw new Error('That report was not deleted — you may not have admin rights on it.')
   }
   return data[0]
+}
+
+// ══ THE THREAD (4 Sep 2026) ═══════════════════════════════════════════════
+//
+// Jay: "there is no way to send a follow-up message with the done, there is
+// no thread of messages." `feedback_messages` holds every message on a
+// report, from the reporter or an admin, in order
+// (db/migrations/20260915_feedback_thread.sql). RLS decides who reads and who
+// writes — the reporter and the club's admins, the same two as `feedback read`.
+//
+// ⚠️ AN ADMIN'S MESSAGE ALSO BECOMES `admin_note`, BY TRIGGER, and THAT is
+// what pushes the reporter — nothing here sends a push. A reporter's message
+// leaves the feedback row alone, so nobody is pushed about their own words.
+
+const MESSAGE_SELECT = 'id, feedback_id, author_id, body, created_at, profiles!feedback_messages_author_id_fkey(full_name)'
+
+/** Every message on the given reports, oldest first. Empty list for no ids. */
+export async function listFeedbackMessages(feedbackIds) {
+  const ids = (feedbackIds ?? []).filter(Boolean)
+  if (ids.length === 0) return []
+  const { data, error } = await supabase
+    .from('feedback_messages')
+    .select(MESSAGE_SELECT)
+    .in('feedback_id', ids)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+/** Adds a message to a report's thread, as the signed-in person. */
+export async function sendFeedbackMessage(feedbackId, body, { authorId, clubId } = {}) {
+  if (!feedbackId) throw new Error('sendFeedbackMessage needs a feedback id.')
+  const text = (body ?? '').trim()
+  if (!text) throw new Error('Write something first.')
+  const { data, error } = await supabase
+    .from('feedback_messages')
+    .insert({ feedback_id: feedbackId, club_id: clubId, author_id: authorId, body: text })
+    .select(MESSAGE_SELECT)
+    .single()
+  if (error) throw error
+  return data
+}
+
+/** Subscribes to the thread table; RLS decides who is told. Returns unsubscribe. */
+export function subscribeFeedbackMessages(onChange) {
+  return subscribeToTable('feedback_messages', onChange)
 }

@@ -62,10 +62,10 @@ describe('useAdminWaiting', () => {
     const { unmount } = render(<Probe userId="me" enabled />)
     await waitFor(() => expect(countAdminWaitingMock).toHaveBeenCalled())
     // `feedback` since 4 Sep 2026: an open report lands on the Admin badge.
-    expect(subscriptions.map((s) => s.table).sort()).toEqual(['access_requests', 'feedback', 'memberships'])
+    expect(subscriptions.map((s) => s.table).sort()).toEqual(['access_requests', 'feedback', 'feedback_messages', 'memberships'])
     for (const s of subscriptions) expect(s.options.debounceMs).toBe(ADMIN_WAITING_DEBOUNCE_MS)
     unmount()
-    expect(unsubscribeMock).toHaveBeenCalledTimes(3)
+    expect(unsubscribeMock).toHaveBeenCalledTimes(4)
   })
 
   it('⚠️ recounts when a membership change arrives — the number moves without a refresh', async () => {

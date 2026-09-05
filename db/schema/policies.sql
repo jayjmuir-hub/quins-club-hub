@@ -2108,3 +2108,17 @@ CREATE POLICY "competition result confirm" ON public.competition_results
     AND created_by = (SELECT auth.uid())
     AND confirmed_at IS NOT NULL
     AND source = ANY (ARRAY['typed'::text, 'read'::text, 'fetched'::text]));
+
+-- ── public.feedback_messages ── ADDED 2026-09-15 (feedback_thread) ─────────
+-- The same two people as "feedback read": the reporter, or a club admin.
+CREATE POLICY "feedback message read" ON public.feedback_messages
+  FOR SELECT TO authenticated
+  USING (private.is_admin(club_id) OR EXISTS (SELECT 1 FROM feedback f WHERE f.id = feedback_id AND f.submitted_by = (SELECT auth.uid())));
+
+CREATE POLICY "feedback message write" ON public.feedback_messages
+  FOR INSERT TO authenticated
+  WITH CHECK (author_id = (SELECT auth.uid())
+    AND club_id = (SELECT f.club_id FROM feedback f WHERE f.id = feedback_id)
+    AND (private.is_admin(club_id) OR EXISTS (SELECT 1 FROM feedback f WHERE f.id = feedback_id AND f.submitted_by = (SELECT auth.uid()))));
+-- No UPDATE and no DELETE policy, on purpose: a thread is a record. The
+-- report's own delete cascades it away.

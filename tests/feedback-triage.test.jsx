@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Unit tests for src/components/FeedbackTriage.jsx — the admin surface that
@@ -11,12 +11,18 @@ const setFeedbackStatusMock = vi.fn()
 const deleteFeedbackMock = vi.fn()
 const unsubscribeSpy = vi.fn()
 const subscribeFeedbackMock = vi.fn(() => unsubscribeSpy)
+const listFeedbackMessagesMock = vi.fn()
+const sendFeedbackMessageMock = vi.fn()
+const subscribeFeedbackMessagesMock = vi.fn(() => () => {})
 
 vi.mock('../src/data/feedback.js', () => ({
   listFeedback: (...args) => listFeedbackMock(...args),
   setFeedbackStatus: (...args) => setFeedbackStatusMock(...args),
   deleteFeedback: (...args) => deleteFeedbackMock(...args),
   subscribeFeedback: (...args) => subscribeFeedbackMock(...args),
+  listFeedbackMessages: (...args) => listFeedbackMessagesMock(...args),
+  sendFeedbackMessage: (...args) => sendFeedbackMessageMock(...args),
+  subscribeFeedbackMessages: (...args) => subscribeFeedbackMessagesMock(...args),
   feedbackRef: (ref) => (ref == null ? null : `QCH-${String(ref).padStart(4, '0')}`),
   FEEDBACK_STATUSES: ['new', 'in-progress', 'done', 'wontfix'],
   OPEN_STATUSES: ['new', 'in-progress'],
@@ -46,6 +52,8 @@ const rows = [
     route: '/roster',
     status: 'new',
     created_at: '2026-09-04T14:42:00Z',
+    submitted_by: 'member-1',
+    club_id: 'club-1',
     profiles: { full_name: 'Priya Vanterpool' },
   },
   {
@@ -68,6 +76,16 @@ beforeEach(() => {
   setFeedbackStatusMock.mockResolvedValue({})
   deleteFeedbackMock.mockReset()
   deleteFeedbackMock.mockResolvedValue({ id: 'f2' })
+  listFeedbackMessagesMock.mockReset()
+  listFeedbackMessagesMock.mockResolvedValue([
+    { id: 'm1', feedback_id: 'f1', author_id: 'admin-1', body: 'Looking into it now.', created_at: '2026-09-04T15:00:00Z' },
+    { id: 'm2', feedback_id: 'f1', author_id: 'member-1', body: 'Thanks, it is the U12 roster.', created_at: '2026-09-04T15:10:00Z', profiles: { full_name: 'Priya Vanterpool' } },
+  ])
+  sendFeedbackMessageMock.mockReset()
+  sendFeedbackMessageMock.mockImplementation(async (id, body) => ({
+    id: 'm-new', feedback_id: id, author_id: 'admin-1', body, created_at: '2026-09-04T16:00:00Z',
+  }))
+  subscribeFeedbackMessagesMock.mockClear()
 })
 
 describe('the triage list', () => {
@@ -141,30 +159,53 @@ describe('openCount', () => {
   })
 })
 
-describe('replying to a report', () => {
-  it('saves the reply against the row, keeping the status unchanged', async () => {
-    const user = userEvent.setup()
+// The THREAD (4 Sep 2026): every message from either side, in order, and a
+// box to add one. Jay: "there is no way to send a follow-up message with the
+// done, there is no thread of messages."
+describe('the thread on a report', () => {
+  it('shows both sides in order, each line saying who and when', async () => {
     render(<FeedbackTriage />)
-    const box = await screen.findByLabelText(/reply to Priya/i)
-    await user.type(box, 'Fixed it, thanks for telling us')
-    await user.click(screen.getAllByRole('button', { name: /save reply/i })[0])
-
-    await waitFor(() => expect(setFeedbackStatusMock).toHaveBeenCalledTimes(1))
-    // ⚠️ The status argument must be the row's CURRENT status. Passing a
-    // literal here would silently reopen a finished report every time somebody
-    // typed a reply into it.
-    expect(setFeedbackStatusMock.mock.calls[0][1]).toBe('new')
-    expect(setFeedbackStatusMock.mock.calls[0][2]).toMatchObject({
-      adminNote: 'Fixed it, thanks for telling us',
-    })
+    const thread = await screen.findByTestId('feedback-thread')
+    const lines = within(thread).getAllByTestId('feedback-message')
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toHaveAttribute('data-from', 'club')
+    expect(lines[0]).toHaveTextContent('Looking into it now.')
+    expect(lines[0]).toHaveTextContent(/You · Fri 4 Sept, 19:00/)
+    expect(lines[1]).toHaveAttribute('data-from', 'reporter')
+    expect(lines[1]).toHaveTextContent('Thanks, it is the U12 roster.')
+    expect(lines[1]).toHaveTextContent(/Priya Vanterpool · Fri 4 Sept, 19:10/)
+    // The thread was asked for once, for the reports on the list.
+    expect(listFeedbackMessagesMock).toHaveBeenCalledWith(['f1', 'f2'])
+    expect(subscribeFeedbackMessagesMock).toHaveBeenCalledTimes(1)
   })
 
-  it('will not save until something has actually changed', async () => {
+  it('sends a reply into the thread as the admin, and the status is not touched', async () => {
+    const user = userEvent.setup()
     render(<FeedbackTriage />)
-    await screen.findByLabelText(/reply to Priya/i)
-    // Nothing typed, so there is nothing to write — an enabled button here
-    // would stamp handled_by/handled_at for a non-event.
-    expect(screen.getAllByRole('button', { name: /save reply/i })[0]).toBeDisabled()
+    const box = await screen.findByLabelText(/message on report 41/i)
+    await user.type(box, 'Fixed it, thanks for telling us')
+    await user.click(screen.getAllByRole('button', { name: /send reply/i })[0])
+
+    await waitFor(() => expect(sendFeedbackMessageMock).toHaveBeenCalledTimes(1))
+    expect(sendFeedbackMessageMock.mock.calls[0][0]).toBe('f1')
+    expect(sendFeedbackMessageMock.mock.calls[0][1]).toBe('Fixed it, thanks for telling us')
+    expect(sendFeedbackMessageMock.mock.calls[0][2]).toMatchObject({ authorId: 'admin-1', clubId: 'club-1' })
+    // A message is not a status change: the trigger makes it admin_note and
+    // pushes the reporter; nothing here calls setFeedbackStatus.
+    expect(setFeedbackStatusMock).not.toHaveBeenCalled()
+    // It appears in the thread, and the box empties.
+    const thread = screen.getByTestId('feedback-thread')
+    expect(within(thread).getAllByTestId('feedback-message')).toHaveLength(3)
+    expect(box).toHaveValue('')
+  })
+
+  it('refuses an empty send with an inline error, not a request', async () => {
+    const user = userEvent.setup()
+    render(<FeedbackTriage />)
+    await screen.findByLabelText(/message on report 41/i)
+    await user.click(screen.getAllByRole('button', { name: /send reply/i })[0])
+    expect(await screen.findByRole('alert')).toHaveTextContent(/write something first/i)
+    expect(sendFeedbackMessageMock).not.toHaveBeenCalled()
   })
 
   it('tells the admin the reply is what the reporter reads', async () => {
