@@ -4,7 +4,6 @@ import Card from '../components/Card.jsx'
 import Empty from '../components/Empty.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { BlockTitle } from '../components/Editorial.jsx'
-import { SeasonRecordBand } from '../components/SeasonRecordCard.jsx'
 import SeasonStatsTable from '../components/SeasonStatsTable.jsx'
 import { listEvents } from '../data/events.js'
 import { listAvailabilityForEvents } from '../data/availability.js'
@@ -197,9 +196,22 @@ export default function SeniorSection() {
     return <Empty message="No senior section is set up yet. An admin sets a squad's section on the Club tab." />
   }
 
+  // The weekend's matches leave the fixtures list, so nothing is drawn twice
+  // (Jay, 4 Sep 2026: "things don't line up … other issues"). Six is the cap;
+  // "Full schedule" carries the section so the Schedule opens on it.
+  const weekendIds = new Set(weekend.map((e) => e.id))
+  const upcoming = matches.filter((e) => !weekendIds.has(e.id))
+  const allTimesTbd = weekend.length > 0 && weekend.every((e) => e.time_tbd)
+  // A squad with no scored match yet says so, rather than wearing 0–0–0.
+  const allMatchByTeam = new Map(
+    allMatchRows
+      .filter(({ record }) => record.wins + record.draws + record.losses > 0)
+      .map((row) => [row.team.id, row.record]),
+  )
+
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="text-[22px] font-extrabold tracking-tight text-ink">{sectionLong(section)}</h1>
         {all.length > 1 && (
           <div className="flex gap-1.5" role="group" aria-label="Section">
@@ -235,146 +247,169 @@ export default function SeniorSection() {
           <Spinner label="Loading the section…" />
         </div>
       ) : (
-        <div className="desktop:grid desktop:grid-cols-2 desktop:gap-x-4">
-          <section className="mb-5" data-testid="this-weekend">
-            <BlockTitle>{weekend.length ? `This weekend · ${fmtDay(dayKey(weekend[0]))}` : 'This weekend'}</BlockTitle>
-            <Card className="p-0">
-              {weekend.length === 0 ? (
-                <Empty message="No matches coming up." />
-              ) : (
-                <ul className="divide-y divide-line">
-                  {weekend.map((event) => {
-                    const team = teamsById.get(event.team_id)
-                    const counts = availByEvent.get(event.id)
-                    const size = squadSize.get(event.team_id) ?? 0
-                    const answered = counts ? counts.in + counts.out + counts.maybe : 0
-                    const unanswered = Math.max(0, size - answered)
-                    const short = counts && counts.in < 15
-                    return (
-                      <li key={event.id} data-testid="weekend-row" className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 ${short && !foreign ? 'bg-warn-bg' : ''}`}>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-ink">
-                            {shortSquadName(team?.name)} · {eventTitle(event)}
-                          </p>
-                          <p className="text-xs text-ink-muted">
-                            {fixtureLabel(event, leagueTeamsById.get(event.league_team_id), '')}
-                            {event.home === true ? ' · Home' : event.home === false ? ' · Away' : ''}
-                            {event.time_tbd ? ' · Time TBD' : ''}
-                            {dayKey(event) !== dayKey(weekend[0]) ? ` · ${fmtDay(dayKey(event))}` : ''}
-                          </p>
-                        </div>
-                        {!foreign && (
-                          <p className="text-right text-xs tabular-nums">
-                            <span className="font-bold text-accent-ink">{counts?.in ?? 0} in</span>
-                            {' · '}
-                            <span className="text-danger-ink">{counts?.out ?? 0} out</span>
-                            <br />
-                            <span className="text-ink-faint">{unanswered} not answered</span>
-                          </p>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </Card>
-          </section>
-
-          <section className="mb-5" data-testid="fixtures">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <BlockTitle>Fixtures</BlockTitle>
-              <Link to="/schedule" className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">Full schedule</Link>
-            </div>
-            <Card className="p-0">
-              {matches.length === 0 ? (
-                <Empty message="No fixtures in the window." />
-              ) : (
-                <ul className="divide-y divide-line">
-                  {matches.slice(0, 12).map((event) => (
-                    <li key={event.id} data-testid="fixture-row" className="flex items-center gap-3 px-3 py-2 text-sm">
-                      <span className="w-20 shrink-0 text-xs text-ink-muted">{fmtDay(dayKey(event))}</span>
-                      <span className="rounded-[7px] bg-surface-mute px-1.5 py-0.5 text-[11px] font-bold text-ink-muted">{shortSquadName(teamsById.get(event.team_id)?.name)}</span>
-                      <span className="min-w-0 flex-1 truncate font-bold text-ink">{eventTitle(event)}</span>
-                      <span className="text-xs text-ink-faint">{event.home === true ? 'H' : event.home === false ? 'A' : ''}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {matches.length > 12 && <p className="px-3 py-2 text-xs text-ink-faint">{matches.length - 12} more on the schedule.</p>}
-            </Card>
+        <>
+          {/* ⚠️ ONE COLUMN, FOUR ROWS, ONE CARD PER SQUAD IN EACH. The page was
+              two columns with different rhythms, so nothing lined up with
+              anything (Jay, 4 Sep 2026). Every row below is the same grid, so
+              squads line up vertically down the page, and an empty squad
+              still gets its card. */}
+          <section className="mb-6" data-testid="this-weekend">
+            <SectionHead
+              title="This weekend"
+              meta={weekend.length ? `${fmtDay(dayKey(weekend[0]))}${allTimesTbd ? ' · times TBD' : ''}` : ''}
+            />
+            {weekend.length === 0 ? (
+              <Card><Empty message="No matches coming up." /></Card>
+            ) : (
+              <div className={GRID}>
+                {weekend.map((event) => {
+                  const team = teamsById.get(event.team_id)
+                  const counts = availByEvent.get(event.id)
+                  const size = squadSize.get(event.team_id) ?? 0
+                  const answered = counts ? counts.in + counts.out + counts.maybe : 0
+                  const short = counts && counts.in < 15
+                  return (
+                    <Card key={event.id} data-testid="weekend-row" className={`p-3 ${short && !foreign ? 'bg-warn-bg' : ''}`}>
+                      <SquadTag name={team?.name} />
+                      <p className="mt-1.5 text-sm font-bold text-ink">{eventTitle(event)}</p>
+                      <p className="text-xs text-ink-muted">
+                        {fixtureLabel(event, leagueTeamsById.get(event.league_team_id), '')}
+                        {event.home === true ? ' · Home' : event.home === false ? ' · Away' : ''}
+                        {event.time_tbd && !allTimesTbd ? ' · Time TBD' : ''}
+                        {dayKey(event) !== dayKey(weekend[0]) ? ` · ${fmtDay(dayKey(event))}` : ''}
+                      </p>
+                      {!foreign && (
+                        <p className="mt-2 text-xs tabular-nums text-ink-muted" data-testid="weekend-availability">
+                          {size === 0 ? (
+                            <span className="text-ink-faint">No players yet</span>
+                          ) : (
+                            <>
+                              <span className={answered < size ? 'font-bold text-warn-ink' : 'font-bold text-accent-ink'}>
+                                {answered} of {size}
+                              </span>{' '}
+                              answered
+                              {answered > 0 && (
+                                <>
+                                  {' · '}
+                                  <span className="text-accent-ink">{counts.in} in</span>
+                                  {' · '}
+                                  <span className="text-danger-ink">{counts.out} out</span>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </p>
+                      )}
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
           </section>
 
           {!foreign && (
-            <section className="mb-5" data-testid="pool">
-              <BlockTitle>The pool · {players.length} players</BlockTitle>
-              <Card className="p-0">
+            <section className="mb-6" data-testid="pool">
+              <SectionHead title="The pool" meta={`${players.length} player${players.length === 1 ? '' : 's'}`} />
+              <div className={GRID}>
                 {sectionTeams.map((team) => {
                   const list = pool.get(team.id) ?? []
                   const open = openSquads[team.id] === true
-                  const shown = open ? list : list.slice(0, 5)
+                  const shown = open ? list : list.slice(0, 8)
                   return (
-                    <div key={team.id} data-testid="pool-squad" className="border-b border-line last:border-b-0">
-                      <p className="px-3 pt-2.5 text-xs font-bold uppercase tracking-[.4px] text-ink-muted">
+                    <Card key={team.id} data-testid="pool-squad" className="p-3">
+                      <p className="text-xs font-bold uppercase tracking-[.4px] text-ink-muted">
                         {shortSquadName(team.name)} · {list.length}
                       </p>
-                      <ul>
-                        {shown.map((p) => (
-                          <li key={p.id} className="flex items-center gap-3 px-3 py-1.5 text-sm">
-                            <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-sunk text-[11px] font-extrabold text-ink-muted">
-                              {p.jersey_num ?? '·'}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate font-bold text-ink">{p.full_name}</span>
-                            {p.guest_of && (
-                              <span className="rounded-[7px] bg-surface-mute px-1.5 py-0.5 text-[11px] font-bold text-ink-muted">
-                                home {shortSquadName(teamsById.get(p.guest_of)?.name ?? teams?.find((t) => t.id === p.guest_of)?.name)}
+                      {list.length === 0 ? (
+                        <p className="mt-2 text-xs text-ink-faint">Nobody assigned yet.</p>
+                      ) : (
+                        <ul className="mt-1.5 divide-y divide-line">
+                          {shown.map((p) => (
+                            <li key={p.id} className="flex items-center gap-2.5 py-1.5 text-sm">
+                              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-sunk text-[11px] font-extrabold text-ink-muted">
+                                {p.jersey_num ?? '·'}
                               </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      {list.length > 5 && (
+                              <span className="min-w-0 flex-1 truncate font-bold text-ink">{p.full_name}</span>
+                              {p.guest_of && (
+                                <span className="rounded-[7px] bg-surface-mute px-1.5 py-0.5 text-[11px] font-bold text-ink-muted">
+                                  home {shortSquadName(teamsById.get(p.guest_of)?.name ?? teams?.find((t) => t.id === p.guest_of)?.name)}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {list.length > 8 && (
                         <button
                           type="button"
                           onClick={() => setOpenSquads((c) => ({ ...c, [team.id]: !open }))}
-                          className="px-3 pb-2.5 text-[12.5px] font-bold text-brand-ink underline-offset-2 hover:underline"
+                          className="mt-1.5 text-[12.5px] font-bold text-brand-ink underline-offset-2 hover:underline"
                         >
                           {open ? 'Show fewer' : `Show all ${list.length}`}
                         </button>
                       )}
-                    </div>
+                    </Card>
                   )
                 })}
-              </Card>
+              </div>
             </section>
           )}
 
-          {allMatchRows.length > 0 && (
-            <section className="mb-5" data-testid="all-matches-record">
-              <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-muted">All matches</p>
-              <p className="mb-2.5 text-xs text-ink-muted">league · tournaments · friendlies</p>
-              <SeasonRecordBand rows={allMatchRows} layout="row" />
-            </section>
-          )}
-
-          <section className="mb-5" data-testid="season-record">
-            <BlockTitle>Season record</BlockTitle>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {/* One season card per squad: the all-matches record, the league
+              line with its table, and the scorers. Three blocks of the same
+              three squads became one. */}
+          <section className="mb-6" data-testid="season">
+            <SectionHead title={`Season ${season}`} meta="league · tournaments · friendlies" />
+            <div className={GRID}>
               {sectionTeams.map((team) => {
                 const lt = leagueTeams.find((row) => row.team_id === team.id && row.competition_id)
                 const row = lt ? (records.get(lt.competition_id) ?? []).find((r) => r.is_ours) : null
+                const record = allMatchByTeam.get(team.id)
+                const rows = stats.get(team.id) ?? []
+                const open = Boolean(openStats[team.id])
                 return (
-                  <Card key={team.id} className="p-3" data-testid="record-card">
-                    <p className="text-xs text-ink-muted">{shortSquadName(team.name)}</p>
-                    {row ? (
-                      <>
-                        <p className="text-[20px] font-extrabold tabular-nums text-ink">{row.won}-{row.drawn}-{row.lost}</p>
-                        <p className="text-xs text-ink-muted">
-                          {lt.division ? divisionShort(lt.division) : ''} · {row.pos}{['st', 'nd', 'rd'][row.pos - 1] ?? 'th'} · {row.points} pts
-                        </p>
-                        <Link to={`/standings/${lt.competition_id}`} className="text-[12.5px] font-bold text-brand-ink underline-offset-2 hover:underline">Table</Link>
-                      </>
-                    ) : (
-                      <p className="text-xs text-ink-faint">No league table yet.</p>
+                  <Card key={team.id} data-testid="season-card" className="p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-xs font-bold uppercase tracking-[.4px] text-ink-muted">{shortSquadName(team.name)}</p>
+                      {lt?.division && <p className="text-xs text-ink-muted">{divisionShort(lt.division)}</p>}
+                    </div>
+                    <div data-testid="all-matches-record" className="mt-1.5">
+                      {record ? (
+                        <>
+                          <p className="text-[22px] font-extrabold tabular-nums leading-tight text-ink" data-testid="season-record-wdl">
+                            <span data-testid="stat-won">{record.wins}</span>–<span data-testid="stat-drawn">{record.draws}</span>–<span data-testid="stat-lost">{record.losses}</span>
+                          </p>
+                          <p className="text-[11px] text-ink-muted">W · D · L, all matches</p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-ink-faint">No scored matches yet.</p>
+                      )}
+                    </div>
+                    <div data-testid="record-card" className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-xs">
+                      {row ? (
+                        <>
+                          <span className="text-ink-muted">
+                            League: {row.won}-{row.drawn}-{row.lost} · {row.pos}{['st', 'nd', 'rd'][row.pos - 1] ?? 'th'} · {row.points} pts
+                          </span>
+                          <Link to={`/standings/${lt.competition_id}`} className="shrink-0 font-bold text-brand-ink underline-offset-2 hover:underline">Table</Link>
+                        </>
+                      ) : (
+                        <span className="text-ink-faint">No league table yet.</span>
+                      )}
+                    </div>
+                    {!foreign && (
+                      <div data-testid="season-stats-squad" className="mt-2 border-t border-line pt-2">
+                        <SeasonStatsTable rows={rows} limit={open ? undefined : 5} />
+                        {rows.length > 5 && (
+                          <button
+                            type="button"
+                            onClick={() => setOpenStats((c) => ({ ...c, [team.id]: !open }))}
+                            className="mt-1.5 text-[12.5px] font-bold text-brand-ink underline-offset-2 hover:underline"
+                          >
+                            {open ? 'Show fewer' : `Show all ${rows.length}`}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </Card>
                 )
@@ -382,32 +417,63 @@ export default function SeniorSection() {
             </div>
           </section>
 
-          {!foreign && (
-            <section className="mb-5" data-testid="season-stats">
-              <BlockTitle>Season stats · {season}</BlockTitle>
-              {sectionTeams.map((team) => {
-                const rows = stats.get(team.id) ?? []
-                const open = Boolean(openStats[team.id])
-                return (
-                  <Card key={team.id} className="mb-3 p-3" data-testid="season-stats-squad">
-                    <p className="mb-1.5 text-xs font-bold text-ink-muted">{shortSquadName(team.name)}</p>
-                    <SeasonStatsTable rows={rows} limit={open ? undefined : 5} />
-                    {rows.length > 5 && (
-                      <button
-                        type="button"
-                        onClick={() => setOpenStats((c) => ({ ...c, [team.id]: !open }))}
-                        className="mt-2 text-[12.5px] font-bold text-brand-ink underline-offset-2 hover:underline"
-                      >
-                        {open ? 'Show fewer' : `Show all ${rows.length}`}
-                      </button>
-                    )}
-                  </Card>
-                )
-              })}
-            </section>
-          )}
-        </div>
+          <section className="mb-6" data-testid="fixtures">
+            <SectionHead
+              title="Upcoming fixtures"
+              meta={upcoming.length > FIXTURE_CAP ? `next ${FIXTURE_CAP}` : ''}
+              action={
+                <Link to={`/schedule?team=section:${section}`} className="text-[13px] font-bold text-brand-ink underline-offset-2 hover:underline">
+                  Full schedule
+                </Link>
+              }
+            />
+            <Card className="p-0">
+              {upcoming.length === 0 ? (
+                <Empty message="No more fixtures in the window." />
+              ) : (
+                <ul className="divide-y divide-line">
+                  {/* ⚠️ A GRID WITH FIXED COLUMNS, NOT FLEX. "1st", "2nd" and
+                      "3rd" are different widths, so a tag sized to its text
+                      shifted the match name a few pixels per row. */}
+                  {upcoming.slice(0, FIXTURE_CAP).map((event) => (
+                    <li key={event.id} data-testid="fixture-row" className="grid grid-cols-[84px_64px_minmax(0,1fr)_20px] items-center gap-2.5 px-3 py-2 text-sm">
+                      <span className="text-xs text-ink-muted">{fmtDay(dayKey(event))}</span>
+                      <SquadTag name={teamsById.get(event.team_id)?.name} block />
+                      <span className="min-w-0 truncate font-bold text-ink">{eventTitle(event)}</span>
+                      <span className="text-right text-xs text-ink-faint">{event.home === true ? 'H' : event.home === false ? 'A' : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {upcoming.length > FIXTURE_CAP && (
+                <p className="border-t border-line px-3 py-2 text-center text-xs text-ink-faint">{upcoming.length - FIXTURE_CAP} more on the schedule.</p>
+              )}
+            </Card>
+          </section>
+        </>
       )}
     </div>
+  )
+}
+
+const GRID = 'grid grid-cols-1 gap-3 sm:grid-cols-3'
+const FIXTURE_CAP = 6
+
+function SectionHead({ title, meta, action }) {
+  return (
+    <div className="mb-2 flex items-baseline gap-2">
+      <BlockTitle>{title}</BlockTitle>
+      {meta && <span className="text-xs text-ink-muted">{meta}</span>}
+      {action && <span className="ml-auto">{action}</span>}
+    </div>
+  )
+}
+
+/** The squad's short name in a tag; `block` fills a grid column so tags line up. */
+function SquadTag({ name, block = false }) {
+  return (
+    <span className={`rounded-[7px] bg-surface-mute px-1.5 py-0.5 text-[11px] font-bold text-ink-muted ${block ? 'block text-center' : 'inline-block'}`}>
+      {shortSquadName(name)}
+    </span>
   )
 }

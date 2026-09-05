@@ -1127,3 +1127,11 @@ REVOKE EXECUTE ON FUNCTION public.import_season(uuid, jsonb, jsonb)         FROM
 REVOKE EXECUTE ON FUNCTION public.profiles_push_subscriptions(uuid[], text) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.request_callup(uuid, uuid)                FROM anon;
 REVOKE EXECUTE ON FUNCTION public.results_push_subscriptions(uuid)          FROM anon;
+
+-- public.feedback_messages — TABLE grants  (20260915_feedback_thread)
+-- Read and insert only; no update, no delete; anon nothing. Unlike `feedback`
+-- the Supabase default DELETE grant was REVOKED here, so a future delete
+-- policy would not open anything by itself.
+REVOKE ALL ON public.feedback_messages FROM anon;
+REVOKE ALL ON public.feedback_messages FROM authenticated;
+GRANT SELECT, INSERT ON public.feedback_messages TO authenticated;

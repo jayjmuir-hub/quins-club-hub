@@ -8551,3 +8551,32 @@ $function$;
 
 revoke execute on function private.seniors_right_reach(uuid) from public, anon;
 grant execute on function private.seniors_right_reach(uuid) to authenticated;
+
+-- Added 2026-09-15 (feedback_thread). An ADMIN's message on a report's thread
+-- becomes feedback.admin_note (+ handled_by/handled_at), which fires the
+-- reporter's push through notify_feedback_reply_push. A reporter's message
+-- leaves the feedback row alone. Not callable directly; anon and public
+-- revoked.
+CREATE OR REPLACE FUNCTION private.feedback_message_after_insert()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if exists (
+    select 1 from public.memberships m
+     where m.profile_id = new.author_id
+       and m.club_id = new.club_id
+       and m.role = 'admin'
+       and m.status = 'active'
+  ) then
+    update public.feedback
+       set admin_note = new.body,
+           handled_by = new.author_id,
+           handled_at = new.created_at
+     where id = new.feedback_id;
+  end if;
+  return new;
+end;
+$function$;

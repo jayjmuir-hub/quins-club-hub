@@ -1376,3 +1376,36 @@ migration is applied). Client: `tests/playups.test.js`,
 `tests/age-groups-section.test.jsx`,
 `tests/players-list-membership.test.js`, `tests/roster-jersey.test.jsx`
 (parent guest-mark CONTROL).
+
+## 20260915_feedback_thread — a thread of messages on a report (4 Sep 2026)
+
+**Why.** Jay, handling a real report: *"if i mark it that i'm working on it
+and reply, once i'm done i click done but there is no way to send a follow-up
+message with the done, there is no thread of messages."* A report carried ONE
+reply, `admin_note`, overwritten on every save, and the reporter could not
+answer it.
+
+**What it changes.** `feedback_messages` — any number of messages on a
+report, from the reporter or an admin, in order. Two policies, the same two
+people as `feedback read`: read is the reporter or a club admin; insert is the
+same two, as themselves (`author_id = auth.uid()`). No update, no delete; the
+report's delete cascades. Realtime publication, so a reply appears without a
+reload.
+
+**`admin_note` stays, kept as the latest ADMIN message by trigger.** The
+reporter's push fires on `admin_note` changing and push-send renders it, so an
+admin's message inserts a row AND writes itself into `admin_note` — that is
+what makes the phone buzz. A reporter's message never touches the feedback
+row: nobody is pushed about their own words. Existing notes are backfilled as
+the first message on their report (one on live at the time).
+
+**The Admin badge.** `countAdminWaiting` now counts a report that is `new`, or
+in progress with the reporter's message last on its thread — they answered
+and nobody answered back. The badge subscribes to `feedback` and
+`feedback_messages`.
+
+**Proof.** `db/tests/feedback-thread.sql`, eleven steps, green on the
+rolled-back live run before this file was committed: both sides read and
+write; the trigger sets `admin_note` for the admin and leaves it for the
+reporter; another member reads none and cannot write; a message cannot be
+written under another name; anon holds nothing.

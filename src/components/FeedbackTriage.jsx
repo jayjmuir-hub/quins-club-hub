@@ -6,6 +6,9 @@ import Button from './Button.jsx'
 import { useAuth } from '../lib/auth.jsx'
 import {
   listFeedback,
+  listFeedbackMessages,
+  sendFeedbackMessage,
+  subscribeFeedbackMessages,
   setFeedbackStatus,
   deleteFeedback,
   subscribeFeedback,
@@ -15,6 +18,7 @@ import {
   OPEN_STATUSES,
 } from '../data/feedback.js'
 import { friendlyMessage } from '../lib/friendlyError.js'
+import FeedbackThread from './FeedbackThread.jsx'
 
 // What members have reported, and what has been done about it.
 // Design: claude/plans/2026-08-18-help-and-feedback.md.
@@ -67,14 +71,23 @@ export function visibleReports(rows, showResolved) {
   return (rows ?? []).filter((row) => OPEN_STATUSES.includes(row.status))
 }
 
-function ReportRow({ row, onStatus, onNote, onDelete, busy }) {
+/** "Fri 4 Sep, 18:42" in the club's time zone. */
+export function submittedLabel(iso) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('en-GB', {
+    timeZone: 'Asia/Dubai',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function ReportRow({ row, messages, viewerId, onStatus, onSend, onDelete, busy }) {
   const who = row.profiles?.full_name ?? 'A member'
-  // Local while typing; committed on Save. A controlled field writing straight
-  // through would fire an update on every keystroke.
-  const [note, setNote] = useState(row.admin_note ?? '')
-  const [noteSaved, setNoteSaved] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const dirty = note !== (row.admin_note ?? '')
 
   return (
     <div className="border-b border-line p-3 last:border-b-0">
@@ -84,6 +97,13 @@ function ReportRow({ row, onStatus, onNote, onDelete, busy }) {
         </span>
         <span className="text-[13px] text-ink-faint">{feedbackRef(row.ref)}</span>
         {row.route && <span className="text-[13px] text-ink-faint">· {row.route}</span>}
+        {/* When it came in — Jay, 4 Sep 2026: "there is no date time stamp on
+            that so i can see when it was submitted". Club time, to the minute. */}
+        {row.created_at && (
+          <time dateTime={row.created_at} className="ml-auto text-[12px] text-ink-faint" data-testid="feedback-when">
+            {submittedLabel(row.created_at)}
+          </time>
+        )}
       </div>
 
       {/* The member's own words, unedited. The column grants stop an admin
@@ -111,48 +131,22 @@ function ReportRow({ row, onStatus, onNote, onDelete, busy }) {
         ))}
       </select>
 
-      {/* ⚠️ THIS IS THE REPLY, AND IT IS THE ONLY ONE. Jay, 18 Aug 2026, chose
-          in-app over a second e-mail: "in app only". So whatever is typed here
-          is what the reporter reads, on their own report, behind the same `?`
-          they used to send it. Nothing else tells them anything. */}
+      {/* ⚠️ THE THREAD. Until 4 Sep 2026 this was ONE textarea, `admin_note`,
+          overwritten on every save, and the reporter could not answer. Now
+          every message from either side is here in order, and an admin's
+          message still becomes `admin_note` (by trigger), which is what pushes
+          the reporter. In-app only, as Jay ruled on 18 Aug. */}
       <div className="mt-2">
-        <label
-          htmlFor={`feedback-note-${row.id}`}
-          className="mb-1 block text-[13px] font-semibold text-ink-muted"
-        >
-          Reply to {who.split(' ')[0]}
-        </label>
-        <textarea
-          id={`feedback-note-${row.id}`}
-          value={note}
-          disabled={busy}
-          onChange={(e) => {
-            setNote(e.target.value)
-            setNoteSaved(false)
-          }}
-          rows={2}
+        <p className="mb-1 text-[13px] font-semibold text-ink-muted">Messages with {who.split(' ')[0]}</p>
+        <FeedbackThread
+          report={row}
+          messages={messages}
+          viewerId={viewerId}
+          busy={busy}
           placeholder="They see this on their own report in the app."
-          className="w-full rounded-[11px] border-[1.5px] border-line px-3 py-2 text-[15px] text-ink focus:border-brand focus:outline-none"
+          sendLabel="Send reply"
+          onSend={(text) => onSend(row, text)}
         />
-        <div className="mt-1 flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={busy || !dirty}
-            onClick={async () => {
-              await onNote(row, note)
-              setNoteSaved(true)
-            }}
-          >
-            Save reply
-          </Button>
-          {noteSaved && !dirty && (
-            <span role="status" className="text-[13px] font-semibold text-accent-ink">
-              Saved
-            </span>
-          )}
-        </div>
       </div>
 
       {/* ⚠️ TWO STEPS, AND `dangerQuiet` ARMS BEFORE `danger` CONFIRMS. The
@@ -212,6 +206,7 @@ function ReportRow({ row, onStatus, onNote, onDelete, busy }) {
 export default function FeedbackTriage() {
   const { user } = useAuth()
   const [rows, setRows] = useState(null)
+  const [messages, setMessages] = useState([])
   const [error, setError] = useState(null)
   const [busyId, setBusyId] = useState(null)
   const [showResolved, setShowResolved] = useState(false)
@@ -219,7 +214,15 @@ export default function FeedbackTriage() {
   const load = useCallback(async () => {
     setError(null)
     try {
-      setRows(await listFeedback())
+      const list = await listFeedback()
+      setRows(list)
+      // The threads, in one call for every report on the list (4 Sep 2026).
+      // A thread that cannot be read costs the thread and not the list.
+      try {
+        setMessages(await listFeedbackMessages(list.map((r) => r.id)))
+      } catch {
+        setMessages([])
+      }
     } catch (err) {
       setError(friendlyMessage(err, 'Could not load reports.'))
     }
@@ -241,21 +244,26 @@ export default function FeedbackTriage() {
   // reporter's name on whichever row just changed. The re-read is RLS-scoped
   // and cheap at this volume.
   useEffect(() => subscribeFeedback(() => load()), [load])
+  useEffect(() => {
+    try {
+      return subscribeFeedbackMessages(() => load())
+    } catch {
+      return undefined
+    }
+  }, [load])
 
-  async function saveNote(row, adminNote) {
+  async function sendMessage(row, text) {
     setBusyId(row.id)
     setError(null)
     try {
-      // ⚠️ THE STATUS GOES WITH IT UNCHANGED. setFeedbackStatus is the only
-      // write path, and it always stamps handled_by/handled_at — which is
-      // correct here too: writing a reply IS handling it.
-      await setFeedbackStatus(row.id, row.status, { adminNote, actorId: user?.id })
-      setRows((current) =>
-        (current ?? []).map((r) => (r.id === row.id ? { ...r, admin_note: adminNote } : r)),
-      )
+      const saved = await sendFeedbackMessage(row.id, text, { authorId: user?.id, clubId: row.club_id })
+      setMessages((current) => [...current, saved])
+      // The trigger made this message the report's admin_note; mirror it so
+      // the row does not lag the realtime re-read.
+      setRows((current) => (current ?? []).map((r) => (r.id === row.id ? { ...r, admin_note: text } : r)))
     } catch (err) {
-      await load()
-      setError(friendlyMessage(err, 'That reply did not save.'))
+      setError(friendlyMessage(err, 'That reply did not send.'))
+      throw err
     } finally {
       setBusyId(null)
     }
@@ -371,7 +379,9 @@ export default function FeedbackTriage() {
               key={row.id}
               row={row}
               onStatus={changeStatus}
-              onNote={saveNote}
+              onSend={sendMessage}
+              messages={messages.filter((msg) => msg.feedback_id === row.id)}
+              viewerId={user?.id ?? null}
               onDelete={removeReport}
               busy={busyId === row.id}
             />

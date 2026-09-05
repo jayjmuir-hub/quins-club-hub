@@ -13,9 +13,11 @@ import { countAdminWaiting } from '../src/data/members.js'
 // existence of a memberships row, not a status on the request.
 function tables({ profiles, memberships, dismissed }) {
   supabase.from.mockImplementation((table) => {
-    const data = { profiles, memberships, access_requests: dismissed }[table]
+    // feedback / feedback_messages (4 Sep 2026) read empty here; the report
+    // half has its own test, tests/reports-waiting.test.js.
+    const data = { profiles, memberships, access_requests: dismissed, feedback: [], feedback_messages: [] }[table]
     const result = Promise.resolve({ data, error: null })
-    return { select: () => Object.assign(result, { eq: () => result }) }
+    return { select: () => Object.assign(result, { eq: () => result, in: () => result, order: () => result }) }
   })
 }
 
@@ -55,7 +57,7 @@ describe('countAdminWaiting', () => {
   it('throws when a read fails rather than inventing a number', async () => {
     supabase.from.mockImplementation(() => {
       const result = Promise.resolve({ data: null, error: new Error('nope') })
-      return { select: () => Object.assign(result, { eq: () => result }) }
+      return { select: () => Object.assign(result, { eq: () => result, in: () => result, order: () => result }) }
     })
     await expect(countAdminWaiting('me')).rejects.toThrow('nope')
   })

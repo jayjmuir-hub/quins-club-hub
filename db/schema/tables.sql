@@ -2824,3 +2824,23 @@ ALTER TABLE public.training_suggestions ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE public.training_suggestions IS
   'The director''s suggested session for one training event. One row per event; a re-publish with a different template resets it to pending. Never written by the app directly — suggest_training and decide_training_suggestion are the only writers. Blocks are not copied here: accept copies them from the template into training_sessions.';
+
+-- ── public.feedback_messages ── ADDED 2026-09-15 (feedback_thread) ─────────
+-- The thread on a report. An admin's message also becomes feedback.admin_note
+-- by trigger (private.feedback_message_after_insert), which is what pushes
+-- the reporter. Spec: claude/schema-history.md, 20260915_feedback_thread.
+CREATE TABLE public.feedback_messages (
+  id          uuid        NOT NULL DEFAULT gen_random_uuid(),
+  feedback_id uuid        NOT NULL,
+  club_id     uuid        NOT NULL,
+  author_id   uuid        NOT NULL,
+  body        text        NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT feedback_messages_pkey             PRIMARY KEY (id),
+  CONSTRAINT feedback_messages_feedback_id_fkey FOREIGN KEY (feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+  CONSTRAINT feedback_messages_club_id_fkey     FOREIGN KEY (club_id)     REFERENCES clubs(id)    ON DELETE CASCADE,
+  CONSTRAINT feedback_messages_author_id_fkey   FOREIGN KEY (author_id)   REFERENCES profiles(id) ON DELETE CASCADE,
+  CONSTRAINT feedback_messages_body_check       CHECK ((length(btrim(body)) > 0))
+);
+CREATE INDEX feedback_messages_feedback_idx ON public.feedback_messages (feedback_id, created_at);
+ALTER TABLE public.feedback_messages ENABLE ROW LEVEL SECURITY;
