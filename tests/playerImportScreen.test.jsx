@@ -21,6 +21,12 @@ vi.mock('../src/lib/memberships.jsx', () => ({
   useMemberships: () => useMembershipsMock(),
 }))
 
+vi.mock('../src/data/playups.js', () => ({
+  listPlayerGuestTeamIds: async () => [],
+  addJuniorPlayup: async () => null,
+  removeJuniorPlayup: async () => null,
+}))
+
 // The importer writes positions to staff-only player_positions AFTER the
 // insert (25 Aug 2026) — the players payload carries no position key.
 vi.mock('../src/data/playerTiers.js', () => ({

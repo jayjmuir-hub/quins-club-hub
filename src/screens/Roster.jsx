@@ -1210,6 +1210,7 @@ export default function Roster() {
             setSelectedPlayerId(null)
             refresh()
           }}
+          onPlayupChanged={refresh}
         />
       )}
 

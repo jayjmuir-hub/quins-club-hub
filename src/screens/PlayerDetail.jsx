@@ -16,6 +16,7 @@ import PersonName from '../components/PersonName.jsx'
 import { friendlyMessage } from '../lib/friendlyError.js'
 import { seasonStats } from '../data/seasonStats.js'
 import { seasonLabelFor } from '../lib/season.js'
+import AgeGroupsSection from '../components/AgeGroupsSection.jsx'
 
 // The player detail sheet (design-system.md §5.7): a branded hero carrying
 // the player's initials, a set of key/value rows, and — only when the database
@@ -585,6 +586,7 @@ export default function PlayerDetail({
   onDeleted,
   onLeft,
   onRestored,
+  onPlayupChanged,
 }) {
   const teamName = team?.name ?? 'Not set'
   // Every position as an equal chip, the main one starred (2 Sep 2026 —
@@ -683,6 +685,8 @@ export default function PlayerDetail({
           looking at a team-mate gets null from RLS. An empty "Date of birth"
           row would tell them there is one and they may not see it. */}
       <BirthdayBlock playerId={player.id} />
+
+      <AgeGroupsSection player={player} team={team} onChanged={onPlayupChanged} />
 
       <ParentsBlock playerId={player.id} />
 

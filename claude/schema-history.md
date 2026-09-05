@@ -1270,6 +1270,7 @@ backfilled, and the officer title in her squad chat too.
 
 ## 20260911_seniors_right — a named person reads both senior sections (4 Sep 2026)
 
+
 **Why.** 20260905 opened a senior section to its own adults and kept men's
 and women's rosters apart, with "a club setting can open them" as the only
 route written down. Jay, the same evening: *"the option to give certain
@@ -1299,3 +1300,32 @@ rolled-back run of 4 Sep 2026 before the file was committed.
 
 **Not built.** The club-wide switch stays as the coarser fallback in the
 plan, unasked-for.
+
+## 20260913_junior_playup — super-admin second junior age group (5 Sep 2026)
+
+**Why.** Super admins need to put a junior on a second junior age group for
+occasional play-ups. A second `players` row was refused: home is
+`players.team_id`, and `listPlayers` already understands a guest as an
+active membership on a requested squad that is not home (`guest_of`).
+Senior call-ups already twin family memberships that way; this is the same
+write, without a consent request. The super admin is the gate.
+
+**What it changes.** Two SECURITY DEFINER functions,
+`add_junior_playup(player, guest_team)` and `remove_junior_playup`. Both
+demand `private.is_super_admin()` first. Add asserts the player exists, has
+not left, home is junior, guest is junior, guest ≠ home, same club; then
+inserts a twin of every active home membership onto the guest team where
+that twin does not already exist (idempotent, and it completes a half-twin).
+Remove deletes memberships for that `player_id` on the guest team only —
+never home, never the players row, and it refuses if the "guest" id is
+actually home or a senior squad so a mis-aimed call cannot wipe the home
+rows. Anon EXECUTE revoked by name on both.
+
+**Not built.** Parent self-serve play-up, senior call-up redesign, DOB /
+age-grade changes.
+
+**Proof.** `db/tests/junior-playup.sql` (rolled-back; run after the
+migration is applied). Client: `tests/playups.test.js`,
+`tests/age-groups-section.test.jsx`,
+`tests/players-list-membership.test.js`, `tests/roster-jersey.test.jsx`
+(parent guest-mark CONTROL).

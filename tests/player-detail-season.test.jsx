@@ -32,6 +32,16 @@ vi.mock('../src/lib/useOwnContactGate.js', () => ({
   default: () => ({ allowed: false, settled: true }),
 }))
 
+vi.mock('../src/lib/memberships.jsx', () => ({
+  useMemberships: () => ({ memberships: [], teams: [], loading: false, error: null, reload: () => {} }),
+}))
+
+vi.mock('../src/data/playups.js', () => ({
+  listPlayerGuestTeamIds: async () => [],
+  addJuniorPlayup: async () => null,
+  removeJuniorPlayup: async () => null,
+}))
+
 import PlayerDetail from '../src/screens/PlayerDetail.jsx'
 
 const MEN1 = { id: 't-men1', name: 'Senior Men - 1st XV', section: 'senior_men' }
