@@ -10,12 +10,11 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 5 Sep 2026
 
-- 🏉 **Junior play-up (second age group) via guest membership.** Super admin only. Home stays `players.team_id`; `add_junior_playup` / `remove_junior_playup` twin or drop active home memberships on another junior squad. Age groups block on the player sheet. Migration `db/migrations/20260913_junior_playup.sql` not applied to live from this PR. Rot detectors: `tests/playups.test.js`, `tests/age-groups-section.test.jsx`, `tests/players-list-membership.test.js`, `db/tests/junior-playup.sql`.
+- #713 — 🏉 **Junior play-up (second age group) via guest membership.** Super admin only. Home stays `players.team_id`; `add_junior_playup` / `remove_junior_playup` twin or drop active home memberships on another junior squad. Age groups block on the player sheet. Migration `db/migrations/20260913_junior_playup.sql` not applied to live from this PR. Rot detectors: `tests/playups.test.js`, `tests/age-groups-section.test.jsx`, `tests/players-list-membership.test.js`, `db/tests/junior-playup.sql`.
+- #712 — 💬 **Chat composer declutter.** One shared `ComposerBar` on DMs, groups, squad/club channels, and the floating dock: WhatsApp-style `+` attach menu (photo, file, poll), icon Send, `@` typeahead in groups only. Rot detectors: `tests/composer-bar.test.jsx`, `tests/mention-picker.test.js`, `tests/floating-dock.test.jsx`.
+- `0c8ddc9` — Chat composer declutter: + attach menu, icon Send, @ typeahead.
 
-## 4 Sep 2026
-
-- 💬 **Chat composer declutter.** One shared `ComposerBar` on DMs, groups, squad/club channels, and the floating dock: WhatsApp-style `+` attach menu (photo, file, poll), icon Send, `@` typeahead in groups only. Rot detectors: `tests/composer-bar.test.jsx`, `tests/mention-picker.test.js`, `tests/floating-dock.test.jsx`.
-- #711 — 🏠 **Home Club seniors W–D–L rollup.** When Home shows more than one senior scoring squad, one thin StatBand labelled `Club seniors` sums all-matches wins, draws and losses. A lone senior keeps its own name; Club juniors is unchanged and can sit beside it; Squad Hub and `/seniors` stay per-squad. A Vets side with no age band is a senior scoring row (`recordsScores` fails open) and joins the sum. Rot detectors: `tests/match-record.test.js`, `tests/dashboard.test.jsx`.
+## 4 Sep 2026- #711 — 🏠 **Home Club seniors W–D–L rollup.** When Home shows more than one senior scoring squad, one thin StatBand labelled `Club seniors` sums all-matches wins, draws and losses. A lone senior keeps its own name; Club juniors is unchanged and can sit beside it; Squad Hub and `/seniors` stay per-squad. A Vets side with no age band is a senior scoring row (`recordsScores` fails open) and joins the sum. Rot detectors: `tests/match-record.test.js`, `tests/dashboard.test.jsx`.
 - `66d6fdc` — Home: combine senior W–D–L into one Club seniors band.
 - #710 — 🏠 **Home Club juniors W–D–L rollup.** When Home shows more than one junior scoring squad, one thin StatBand labelled `Club juniors` sums all-matches wins, draws and losses. A lone junior and every senior stay per-squad; Squad Hub and `/seniors` are unchanged; U6–U7 still skip the record row. Rot detectors: `tests/match-record.test.js`, `tests/dashboard.test.jsx`.
 - `3ad52b0` — Home: combine junior W–D–L into one Club juniors band.
