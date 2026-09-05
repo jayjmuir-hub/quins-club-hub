@@ -103,6 +103,30 @@ vi.mock('../src/data/chatMedia.js', () => ({
   chatFileAccept: () => 'application/pdf',
   uploadChatFile: vi.fn(),
   attachmentPreviewLabel: () => '📷 Photo',
+  CHAT_FILE_TYPES: {
+    'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'text/csv': 'csv',
+    'application/csv': 'csv',
+  },
+  validateChatFile: (file) => {
+    if (!file) return 'Choose a file first.'
+    const ok = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'application/csv',
+    ])
+    if (!ok.has(file.type)) return 'That file type is not supported. Use a PDF, Word, Excel or CSV file.'
+    if (file.size > 26214400) return 'That file is over the 25 MB limit.'
+    return null
+  },
 }))
 vi.mock('../src/screens/ChatList.jsx', () => ({
   RowAvatar: () => <span data-testid="row-avatar" />,
@@ -192,21 +216,48 @@ describe('pasteImages — the gate itself', () => {
 
   it('takes over only when the clipboard carries image FILES', () => {
     const add = vi.fn()
+    const pick = vi.fn()
     const ev = clipboard({ files: [img('image.png', 'image/png')] })
-    expect(pasteImages(ev, add)).toBe(true)
+    expect(pasteImages(ev, add, pick)).toBe(true)
     expect(ev.defaultPrevented).toBe(true)
     expect(add).toHaveBeenCalledWith([expect.any(File)])
+    expect(pick).not.toHaveBeenCalled()
   })
 
-  it('⚠️ a pasted PDF is left to the browser, not swallowed silently', () => {
+  it('routes a pasted PDF to pickFile, not the photo tray', () => {
+    const add = vi.fn()
+    const pick = vi.fn()
+    const pdf = new File(['x'], 'notes.pdf', { type: 'application/pdf' })
+    const ev = clipboard({ files: [pdf] })
+    expect(pasteImages(ev, add, pick)).toBe(true)
+    expect(ev.defaultPrevented).toBe(true)
+    expect(add).not.toHaveBeenCalled()
+    expect(pick).toHaveBeenCalledWith([pdf])
+  })
+
+  it('routes a pasted Excel workbook to pickFile', () => {
+    const add = vi.fn()
+    const pick = vi.fn()
+    const xlsx = new File(['x'], 'fixture-list.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    const ev = clipboard({ files: [xlsx] })
+    expect(pasteImages(ev, add, pick)).toBe(true)
+    expect(pick).toHaveBeenCalledWith([xlsx])
+    expect(add).not.toHaveBeenCalled()
+  })
+
+  it('⚠️ a pasted zip is left to the browser, not swallowed silently', () => {
     // Copying a file in Explorer puts it on the clipboard as a File. If the
-    // handler claimed every paste with files in it, a pasted PDF would
+    // handler claimed every paste with files in it, a pasted zip would
     // vanish: preventDefault fires, nothing is added, nothing is said.
     const add = vi.fn()
-    const ev = clipboard({ files: [new File(['x'], 'notes.pdf', { type: 'application/pdf' })] })
-    expect(pasteImages(ev, add)).toBe(false)
+    const pick = vi.fn()
+    const ev = clipboard({ files: [new File(['x'], 'bundle.zip', { type: 'application/zip' })] })
+    expect(pasteImages(ev, add, pick)).toBe(false)
     expect(ev.defaultPrevented).toBe(false)
     expect(add).not.toHaveBeenCalled()
+    expect(pick).not.toHaveBeenCalled()
   })
 
   it('survives a clipboard with no clipboardData at all', () => {
@@ -232,6 +283,24 @@ describe('paste is actually WIRED to the DM composer', () => {
     const box = screen.getByLabelText('Message')
     fireEvent(box, clipboard({ files: [img('image.png', 'image/png')] }))
     expect(await screen.findAllByTestId('tray-thumb')).toHaveLength(1)
+  })
+
+  it('a pasted Excel workbook lands on the pending-file chip', async () => {
+    renderThread()
+    await screen.findAllByTestId('dm-bubble')
+    const box = screen.getByLabelText('Message')
+    fireEvent(
+      box,
+      clipboard({
+        files: [
+          new File(['x'], 'fixture-list.xlsx', {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          }),
+        ],
+      }),
+    )
+    expect(await screen.findByTestId('pending-file')).toHaveTextContent('fixture-list.xlsx')
+    expect(screen.queryAllByTestId('tray-thumb')).toHaveLength(0)
   })
 
   it('⚠️ typing-paste still works: nothing prevented, nothing attached', async () => {

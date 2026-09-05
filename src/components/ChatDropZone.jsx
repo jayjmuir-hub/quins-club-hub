@@ -67,9 +67,10 @@ export default function ChatDropZone({ onFiles, children }) {
         e.preventDefault()
         depth.current = 0
         setDragging(false)
-        // ⚠️ EVERY dropped file goes to the tray, including the ones that are
-        // not images: the tray's gate is what refuses them, WITH A MESSAGE.
-        // Filtering here instead would make a dropped PDF vanish in silence.
+        // Hand every dropped file to the caller. Partitioning (images →
+        // tray, allowlisted docs → pendingFile.pick) lives in
+        // routeChatAttachments so a PDF cannot vanish in silence and cannot
+        // hit the tray's "not a photo" gate either.
         onFiles(Array.from(e.dataTransfer.files ?? []))
       }}
     >

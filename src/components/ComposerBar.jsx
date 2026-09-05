@@ -60,12 +60,12 @@ function AttachMenu({ allowPolls, onPhoto, onFile, onPoll }) {
           <button
             type="button"
             role="menuitem"
-            aria-label="Photo or file"
+            aria-label="Photo"
             data-testid="attach-menu-photo"
             onClick={() => pick(onPhoto)}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13.5px] font-semibold text-ink hover:bg-surface-mute"
           >
-            Photo or file
+            Photo
           </button>
           <button
             type="button"
@@ -128,6 +128,7 @@ export default function ComposerBar({
   onVoiceError,
   onSubmit,
   onPasteFiles,
+  onPasteFile,
 }) {
   const [caret, setCaret] = useState(() => draft?.length ?? 0)
   const token = mentionables.length ? mentionQueryAt(draft, caret) : null
@@ -184,7 +185,7 @@ export default function ComposerBar({
         onSelect={(e) => rememberCaret(e.currentTarget)}
         onInput={(e) => autoGrow(e.currentTarget)}
         onKeyDown={composerKeyDown}
-        onPaste={(e) => pasteImages(e, onPasteFiles)}
+        onPaste={(e) => pasteImages(e, onPasteFiles, onPasteFile)}
         rows={1}
         maxLength={2000}
         placeholder={placeholder}

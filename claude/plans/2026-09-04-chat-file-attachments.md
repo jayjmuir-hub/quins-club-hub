@@ -32,5 +32,6 @@ Allowlisted MIME → ext: pdf, doc, docx, xls, xlsx, csv (`text/csv` and
 
 - Not the Documents repo.
 - Not an album of files.
-- Not a drop-zone for PDFs (drop still hits the photo tray and is refused as
-  not a photo). The file door is a separate control beside that tray.
+- Drop and paste of allowlisted docs (pdf/doc/xlsx/csv) go to the pending-file
+  slot via `routeChatAttachments`; leftover types still hit the photo tray's
+  "not a photo" gate. Docs are not mixed into photo albums.

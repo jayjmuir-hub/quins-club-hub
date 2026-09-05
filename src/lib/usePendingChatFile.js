@@ -3,8 +3,9 @@ import { validateChatFile } from '../data/chatMedia.js'
 
 // The composer's document slot — one file, never mixed into the photo tray
 // (claude/plans/2026-09-04-chat-file-attachments.md). useAttachmentTray stays
-// image-only: a PDF dropped on the conversation is still "not a photo". This
-// hook is the file-control door beside that tray.
+// image-only. Drop and paste partition by type (routeChatAttachments):
+// allowlisted docs land here; images go to the tray; leftover types still
+// hit the tray's "not a photo" gate. This hook is also the File-menu door.
 
 export function usePendingChatFile() {
   const [file, setFile] = useState(null)

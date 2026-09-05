@@ -1,4 +1,23 @@
+import { CHAT_FILE_TYPES } from '../data/chatMedia.js'
 import { isAcceptableImage } from './imageResize.js'
+
+function isChatDocument(file) {
+  return Boolean(file?.type && CHAT_FILE_TYPES?.[file.type])
+}
+
+/**
+ * Partition drop/paste files: images → photo tray, allowlisted docs → the
+ * one-file pending slot. Leftovers (zip, ppt) still go to the tray so its
+ * "not a photo" message fires instead of vanishing. Never tray.add a PDF.
+ */
+export function routeChatAttachments(files, { addPhotos, pickFile } = {}) {
+  const incoming = Array.from(files ?? [])
+  if (incoming.length === 0) return
+  const docs = incoming.filter(isChatDocument)
+  const forTray = incoming.filter((file) => !isChatDocument(file))
+  if (forTray.length) addPhotos?.(forTray)
+  if (docs.length) pickFile?.(docs)
+}
 
 // Composer behaviour shared by the channel screen and the DM/group thread
 // (24 Aug 2026 feedback round: "message typing area should expand" and
@@ -73,25 +92,28 @@ export function composerKeyDown(domEvent) {
 }
 
 /**
- * The PASTE door: Ctrl+V a screenshot into a chat and it joins the tray.
+ * The PASTE door: Ctrl+V a screenshot into a chat and it joins the tray;
+ * an allowlisted document (pdf/doc/xlsx/…) joins the pending-file slot.
  *
  * ⚠️ PASTING TEXT IS A HUNDRED TIMES COMMONER THAN PASTING A PHOTO, so this
- * does nothing at all unless the clipboard actually carries image files.
- * Calling preventDefault on an ordinary text paste would break typing into
- * the message box — a far worse bug than the one this fixes — which is why
- * the early return comes BEFORE preventDefault and not after it.
+ * does nothing at all unless the clipboard actually carries image files or
+ * an allowlisted chat document. Calling preventDefault on an ordinary text
+ * paste would break typing into the message box — a far worse bug than the
+ * one this fixes — which is why the early return comes BEFORE preventDefault
+ * and not after it.
  *
- * ⚠️ AND IT ONLY CLAIMS IMAGES. Copying a file in Explorer puts it on the
- * clipboard as a File too, so "the clipboard has files" is not enough: a
- * pasted PDF must be left to the browser rather than silently swallowed by
- * a handler that prevents the default and then adds nothing.
+ * ⚠️ IT DOES NOT CLAIM EVERY FILE. Copying a file in Explorer puts it on the
+ * clipboard as a File too. A pasted zip must be left to the browser rather
+ * than silently swallowed by a handler that prevents the default and then
+ * adds nothing.
  *
  * Returns true when it took over, for tests and for callers that care.
  */
-export function pasteImages(domEvent, add) {
-  const files = Array.from(domEvent.clipboardData?.files ?? []).filter(isAcceptableImage)
-  if (files.length === 0) return false
+export function pasteImages(domEvent, addPhotos, pickFile) {
+  const files = Array.from(domEvent.clipboardData?.files ?? [])
+  const claimed = files.some((file) => isAcceptableImage(file) || isChatDocument(file))
+  if (!claimed) return false
   domEvent.preventDefault()
-  add(files)
+  routeChatAttachments(files, { addPhotos, pickFile })
   return true
 }

@@ -59,7 +59,7 @@ export default function DmThread({ thread, compact = false }) {
   const [editingId, setEditingId] = useState(null)
 
   return (
-    <ChatDropZone onFiles={thread.tray.add}>
+    <ChatDropZone onFiles={thread.attachIncoming}>
       {/* ── The notice is REVIEWING-ONLY since 26 Aug 2026 — Jay: "remove
              the club admins can review notice", pointing at the dock, which
              never showed it. The member-facing "admins can review" line was
@@ -400,7 +400,8 @@ export default function DmThread({ thread, compact = false }) {
                 onSendVoice={thread.sendVoice}
                 onVoiceError={thread.setError}
                 onSubmit={thread.send}
-                onPasteFiles={thread.tray.add}
+                  onPasteFiles={thread.tray.add}
+                onPasteFile={thread.pendingFile.pick}
               />
             </>
           )}

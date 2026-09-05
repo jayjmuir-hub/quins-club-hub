@@ -81,7 +81,7 @@ export default function ChannelThread({ thread, compact = false }) {
   const [votesFor, setVotesFor] = useState(null)
 
   return (
-    <ChatDropZone onFiles={thread.tray.add}>
+    <ChatDropZone onFiles={thread.attachIncoming}>
       {error && (
         <Card className="mb-3 px-4 py-3">
           <p role="alert" className="text-[13px] font-semibold text-danger-ink">
@@ -306,6 +306,7 @@ export default function ChannelThread({ thread, compact = false }) {
               onVoiceError={thread.setSendError}
               onSubmit={thread.send}
               onPasteFiles={thread.tray.add}
+              onPasteFile={thread.pendingFile.pick}
             />
           </>
         ) : (

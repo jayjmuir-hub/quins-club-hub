@@ -10,6 +10,7 @@ hand-written 4 Aug ones. **Add the entry in the same breath as the commit.**
 
 ## 5 Sep 2026
 
+- #716 — 📎 **Chat drop/paste of Excel, Word, PDF** onto the pending-file chip (not the photo tray). Attach menu **Photo or file** is now **Photo**; **File** stays the document door. Mixed drop: images → tray, first allowlisted doc → pending file. Zip/ppt still "not a photo". Rot detectors: `tests/chat-drop.test.jsx`, `tests/chat-paste.test.jsx`, `tests/composer-bar.test.jsx`.
 - #715 — **fix(forms): Discard / Keep editing stay in the open sheet.** Dirty long sheets (profile Edit and every other `useDiscardGuard` form) left the ask in the scrolled body under the sticky title. `DiscardConfirm` now portals a centered overlay onto the Sheet panel; EventForm uses the shared component. Rot detectors: `tests/discard-guard.test.jsx`, `tests/event-form-unsaved.test.jsx`.
 - #714 — 🏉 **Junior roster play-up display.** Guest home squad name from the full `teams` list (not `visibleTeams`), Play-up badge for staff, pinned **From other age groups** footer on junior rosters. Rot detectors: `tests/roster.test.jsx`, `tests/roster-grouping.test.js`.
 - `78c97bb` — Junior roster: home squad + Play-up footer for guests.
