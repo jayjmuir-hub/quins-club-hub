@@ -33,7 +33,7 @@ vi.mock('../src/lib/auth.jsx', () => ({
 }))
 
 // Imported after vi.mock so this binds to the mocked modules.
-import FeedbackTriage, { openCount, visibleReports } from '../src/components/FeedbackTriage.jsx'
+import FeedbackTriage, { openCount, submittedLabel, visibleReports } from '../src/components/FeedbackTriage.jsx'
 
 // ⚠️ INVENTED NAMES. The repo is public and its members are mostly children —
 // CLAUDE.md rule 9. The shape is real; the people are not.
@@ -45,6 +45,7 @@ const rows = [
     body: 'The age group is wrong for my son',
     route: '/roster',
     status: 'new',
+    created_at: '2026-09-04T14:42:00Z',
     profiles: { full_name: 'Priya Vanterpool' },
   },
   {
@@ -317,5 +318,21 @@ describe('deleting a report', () => {
     // the error and leave the screen silently unchanged.
     expect(await screen.findByRole('alert')).toHaveTextContent(/admin rights/i)
     expect(screen.getByText(/the age group is wrong for my son/i)).toBeTruthy()
+  })
+})
+
+// Jay, 4 Sep 2026: "there is no date time stamp on that so i can see when it
+// was submitted". Club time, to the minute, on the report's header line.
+describe('when a report came in', () => {
+  it('shows the submitted time in club time on the header line', async () => {
+    render(<FeedbackTriage />)
+    const when = await screen.findByTestId('feedback-when')
+    expect(when).toHaveAttribute('datetime', '2026-09-04T14:42:00Z')
+    expect(when).toHaveTextContent('Fri 4 Sept, 18:42')
+  })
+
+  it('submittedLabel renders in Asia/Dubai and swallows a bad date', () => {
+    expect(submittedLabel('2026-09-04T20:30:00Z')).toBe('Sat 5 Sept, 00:30')
+    expect(submittedLabel('nonsense')).toBe('')
   })
 })

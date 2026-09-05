@@ -190,14 +190,21 @@ export async function listClubMembers() {
  * badge is not rendered anyway.
  */
 export async function countAdminWaiting(userId) {
-  const [profiles, memberships, dismissed] = await Promise.all([
+  const [profiles, memberships, dismissed, reports] = await Promise.all([
     supabase.from('profiles').select('id'),
     supabase.from('memberships').select('profile_id, status'),
     supabase.from('access_requests').select('profile_id').eq('status', 'dismissed'),
+    // Open reports and suggestions (Jay, 4 Sep 2026: "no notification number
+    // appeared on the icon so i had not known it was submitted"). `new` only:
+    // an in-progress report has been seen, and the badge is for what has not.
+    supabase.from('feedback').select('id').eq('status', 'new'),
   ])
   if (profiles.error) throw profiles.error
   if (memberships.error) throw memberships.error
   if (dismissed.error) throw dismissed.error
+  // A report count that cannot be read costs the reports and nothing else —
+  // an admin without the feedback grant still gets approvals on the badge.
+  const openReports = reports.error ? 0 : (reports.data ?? []).length
 
   const memberRows = memberships.data ?? []
   const withMembership = new Set(memberRows.map((row) => row.profile_id).filter(Boolean))
@@ -207,7 +214,7 @@ export async function countAdminWaiting(userId) {
       profile.id !== userId && !withMembership.has(profile.id) && !dismissedIds.has(profile.id),
   ).length
   const pending = memberRows.filter((row) => row.status === 'pending').length
-  return waiting + pending
+  return waiting + pending + openReports
 }
 
 export async function listPendingProfiles() {

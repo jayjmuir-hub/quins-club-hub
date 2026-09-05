@@ -719,6 +719,22 @@ export default function Schedule() {
     }
   }
 
+  // /schedule?team=<squad id | section:senior_men> selects that filter as if
+  // it had been tapped — the Seniors screen's "Full schedule" link (Jay,
+  // 4 Sep 2026: "that should only open up the senior schedule"). Persisted
+  // like a tap, so it survives the reload; consumed and cleared like ?open=.
+  // A value that is not in scope is dropped, and the stored filter stands.
+  const teamParam = searchParams.get('team')
+  useEffect(() => {
+    if (!teamParam) return
+    if (membershipsLoading) return
+    const scoped = visibleTeams(memberships, teams)
+    const valid =
+      scoped.some((team) => team.id === teamParam) || sectionGroups(scoped).some((group) => group.id === teamParam)
+    if (valid) persistFilter(teamParam)
+    setSearchParams({}, { replace: true })
+  }, [teamParam, membershipsLoading, memberships, teams, setSearchParams])
+
   const persistTypeFilter = (next) => {
     setTypeFilter(next)
     try {

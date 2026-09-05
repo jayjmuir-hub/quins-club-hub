@@ -67,6 +67,20 @@ export function visibleReports(rows, showResolved) {
   return (rows ?? []).filter((row) => OPEN_STATUSES.includes(row.status))
 }
 
+/** "Fri 4 Sep, 18:42" in the club's time zone. */
+export function submittedLabel(iso) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('en-GB', {
+    timeZone: 'Asia/Dubai',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function ReportRow({ row, onStatus, onNote, onDelete, busy }) {
   const who = row.profiles?.full_name ?? 'A member'
   // Local while typing; committed on Save. A controlled field writing straight
@@ -84,6 +98,13 @@ function ReportRow({ row, onStatus, onNote, onDelete, busy }) {
         </span>
         <span className="text-[13px] text-ink-faint">{feedbackRef(row.ref)}</span>
         {row.route && <span className="text-[13px] text-ink-faint">· {row.route}</span>}
+        {/* When it came in — Jay, 4 Sep 2026: "there is no date time stamp on
+            that so i can see when it was submitted". Club time, to the minute. */}
+        {row.created_at && (
+          <time dateTime={row.created_at} className="ml-auto text-[12px] text-ink-faint" data-testid="feedback-when">
+            {submittedLabel(row.created_at)}
+          </time>
+        )}
       </div>
 
       {/* The member's own words, unedited. The column grants stop an admin

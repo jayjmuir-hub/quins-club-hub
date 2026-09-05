@@ -393,6 +393,35 @@ describe('Schedule — team filter', () => {
     expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
   })
 
+  // The Seniors screen's "Full schedule" link (4 Sep 2026): /schedule?team=
+  // section:senior_men opens the Schedule filtered to that section, as if the
+  // pill had been tapped — persisted, and the param cleared.
+  it('opens filtered to the section named in ?team=, and remembers it', async () => {
+    const senior = { ...TEAM_FIRST_XV, section: 'senior_men' }
+    useMembershipsMock.mockReturnValue(memberships(ADMIN, [senior, TEAM_U10]))
+    render(
+      <MemoryRouter initialEntries={['/schedule?team=section:senior_men']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Schedule />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Senior squad training')).toBeInTheDocument()
+    expect(screen.queryByText('Quins vs Dubai Exiles')).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: /age group/i })).toHaveTextContent('Senior men')
+    expect(window.localStorage.getItem('quins.schedule.teamFilter')).toBe('section:senior_men')
+  })
+
+  it('ignores a ?team= that is not in scope and keeps the stored filter', async () => {
+    window.localStorage.setItem('quins.schedule.teamFilter', 'team-u10')
+    render(
+      <MemoryRouter initialEntries={['/schedule?team=section:senior_women']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Schedule />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Quins vs Dubai Exiles')).toBeInTheDocument()
+    expect(screen.queryByText('Senior squad training')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('quins.schedule.teamFilter')).toBe('team-u10')
+  })
+
   it('hides the team filter when the user can only see one team', async () => {
     useMembershipsMock.mockReturnValue(memberships(COACH_ONE_TEAM))
 

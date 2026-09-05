@@ -72,6 +72,10 @@ export default function useAdminWaiting({ userId, enabled, tick = 0 }) {
     const unsubscribeRequests = subscribeToTable('access_requests', recount, {
       debounceMs: ADMIN_WAITING_DEBOUNCE_MS,
     })
+    // A new report lands on the badge as it is submitted (4 Sep 2026).
+    const unsubscribeFeedback = subscribeToTable('feedback', recount, {
+      debounceMs: ADMIN_WAITING_DEBOUNCE_MS,
+    })
 
     const onReturn = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
@@ -85,6 +89,7 @@ export default function useAdminWaiting({ userId, enabled, tick = 0 }) {
       mounted = false
       unsubscribeMemberships?.()
       unsubscribeRequests?.()
+      unsubscribeFeedback?.()
       document.removeEventListener('visibilitychange', onReturn)
       window.removeEventListener('focus', onReturn)
     }
