@@ -152,8 +152,9 @@ function pinnedToBottom(pathname) {
 }
 
 // UX review item 7 (2 Sep 2026): tab title, focus and scroll on every
-// navigation — src/lib/useScreenChrome.js. Renders nothing; inside
-// BrowserRouter because it reads useLocation.
+// navigation — src/lib/useScreenChrome.js. Hash deep-links skip the
+// scroll-to-top (Settings #notifications / #your-calendar). Renders
+// nothing; inside BrowserRouter because it reads useLocation.
 function ScreenChrome() {
   useScreenChrome({ pinnedToBottom })
   return null

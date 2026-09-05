@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { pickDate } from './helpers/pickDate.js'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import useScreenChrome from '../src/lib/useScreenChrome.js'
 
 // Unit tests for src/screens/More.jsx (admin-dashboard plan, 2026-08-05).
 // useMemberships is mocked so this exercises only the screen's own
@@ -1232,5 +1233,67 @@ describe('More — the #notifications hash scrolls to the section', () => {
     // Give the (absent) effect the same two frames the real one uses.
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(scrollSpy).not.toHaveBeenCalled()
+  })
+
+  // ⚠️ THE RACE THE ISOLATED TESTS ABOVE CANNOT SEE. More's hash effect
+  // calling scrollIntoView is necessary and not sufficient: App mounts
+  // useScreenChrome above the routes, and on a pathname change it focuses
+  // <main> and scrollTo(0, 0). That is the reset Jay hit on the phone —
+  // isolated More tests stayed green. The last thing this navigation may
+  // do to the viewport is land on #notifications, not the top of Settings.
+  it('wins against the App-level scroll-to-top on the same navigation', async () => {
+    const u = userEvent.setup()
+    const order = []
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation((...args) => {
+      order.push({ type: 'scrollTo', args })
+    })
+    scrollSpy.mockImplementation(function record() {
+      order.push({ type: 'scrollIntoView', id: this.id })
+    })
+
+    function Chrome() {
+      useScreenChrome()
+      return null
+    }
+    function FromHome() {
+      const navigate = useNavigate()
+      return (
+        <button type="button" onClick={() => navigate('/settings#notifications')}>
+          turn them on
+        </button>
+      )
+    }
+
+    render(
+      <MemoryRouter
+        initialEntries={['/']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Chrome />
+        <main id="main-content" tabIndex={-1}>
+          <Routes>
+            <Route path="/" element={<FromHome />} />
+            <Route path="/settings" element={<More />} />
+          </Routes>
+        </main>
+      </MemoryRouter>,
+    )
+
+    await u.click(screen.getByRole('button', { name: /turn them on/i }))
+
+    await waitFor(() => {
+      expect(document.getElementById('notifications')).toBeTruthy()
+    })
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalled())
+
+    try {
+      expect(scrollTo).not.toHaveBeenCalled()
+      const last = order[order.length - 1]
+      expect(last).toEqual({ type: 'scrollIntoView', id: 'notifications' })
+      expect(document.activeElement).not.toBe(document.getElementById('main-content'))
+      expect(document.activeElement?.id).toBe('notifications')
+    } finally {
+      scrollTo.mockRestore()
+    }
   })
 })
