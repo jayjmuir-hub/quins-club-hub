@@ -1,8 +1,7 @@
 # Junior play-up — parent consent, request/nominate, Club Ops (hybrid C)
 
-**STATUS: SLICES 1–2 BUILT.** Slice 2 roster doors plus the Squad Hub Play-ups
-pill (frontend) are in the code. Slice 3 (Club Ops hybrid C) is specified here
-and not built. Dated 2026-09-05. Jay approved the full design the same day
+**STATUS: SLICES 1–3 BUILT.** Slice 3 is Club Ops hybrid C (`/ops` + Home
+peek + nav). Dated 2026-09-05. Jay approved the full design the same day
 (“go for everything”). Ruling:
 `claude/decisions/2026-09-05-playup-parent-consent.md`.
 
@@ -53,12 +52,19 @@ RPCs (security definer, `search_path = public`, anon EXECUTE revoked by name):
 
 A request does **not** create a guest. Status `requested` until Approve
 (`approved` + guest twins pending consent) or Decline (`declined` + notify
-requester). Thin inbox: `/admin/playups` + Home peek for super admins. Club Ops
-hybrid C remains slice 3.
+requester). Slice 2 shipped a thin `/admin/playups` inbox. Slice 3 replaces
+that page with Club Ops.
 
-### Slice 3 (later) — Club Ops hybrid C
+### Slice 3 — Club Ops hybrid C
 
-Club Ops page / Home band for outstanding play-up consents. Not in this PR.
+**Built (frontend-only; reuses slice 2 RPCs).** `/ops` outside `/admin` so a
+head coach or age-group manager is not turned away by `isAdmin()`. Super admin
+sees the club play-up queue and may Approve / Decline (`decide_playup_request`).
+Head coach / manager sees play-up rows for **their** squads (request status) and
+View, not Approve. Home band: “Club Ops · N open” + See all. Desktop sidebar
+**Ops**; phone account-menu **Ops** (not a sixth dock tab). `/admin/playups`
+redirects to `/ops`. Access / pitch queues are later empty copy only.
+Rot detectors: `tests/club-ops-page.test.jsx`, `tests/club-ops.test.js`.
 
 Out of scope for the whole programme here: auto-timeout, senior call-ups
 (already their own consent), demo videos.

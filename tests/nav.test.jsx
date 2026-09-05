@@ -32,6 +32,10 @@ describe('NAV_ITEMS', () => {
   it('has no More tab', () => {
     expect(NAV_ITEMS.map((item) => item.to)).not.toContain('/more')
   })
+
+  it('has no Ops tab — six dock items overlap on a phone', () => {
+    expect(NAV_ITEMS.map((item) => item.to)).not.toContain('/ops')
+  })
 })
 
 describe('Nav', () => {

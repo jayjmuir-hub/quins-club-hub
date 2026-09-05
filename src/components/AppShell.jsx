@@ -11,7 +11,7 @@ import useClearNotificationTray from '../lib/useClearNotificationTray.js'
 import { useMemberships } from '../lib/memberships.jsx'
 import useAutoHideOnScroll from '../lib/useAutoHideOnScroll.js'
 import useSlowLoad from '../lib/useSlowLoad.js'
-import { highestRole, isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
+import { canSeeClubOps, highestRole, isAdmin, isPendingOnly, isSquadStaffRole, roleLabel } from '../lib/scope.js'
 import { sectionsFor } from '../lib/section.js'
 import { isLeftOnly } from '../lib/leavers.js'
 import Nav from './Nav.jsx'
@@ -360,7 +360,13 @@ export default function AppShell({ children }) {
           focusable element on every screen (the a11y test enforces it), and
           the sidebar is a fixed element whose DOM position does not affect
           its paint. */}
-      <Sidebar showSquadHub={showSquadHub} showSeniors={showSeniors} showAdmin={isAdmin(memberships)} chatUnread={dockBadges.chatCount} />
+      <Sidebar
+        showSquadHub={showSquadHub}
+        showSeniors={showSeniors}
+        showAdmin={isAdmin(memberships)}
+        showOps={canSeeClubOps(memberships)}
+        chatUnread={dockBadges.chatCount}
+      />
       {/* Diagnostic overlay, flag-gated — see its header. Mounted in the
           shell so it renders on EVERY screen once armed. */}
       <PaintDebug />

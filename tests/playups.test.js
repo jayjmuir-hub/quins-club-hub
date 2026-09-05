@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const rpcMock = vi.fn()
 let membershipsRows = []
+let playupRequestRows = []
 
 function fakeTable(rows) {
   let filtered = [...rows]
@@ -24,6 +25,12 @@ function fakeTable(rows) {
     filtered = filtered.filter((row) => row[col] !== val)
     return builder
   })
+  builder.in = vi.fn((col, vals) => {
+    const set = new Set(vals)
+    filtered = filtered.filter((row) => set.has(row[col]))
+    return builder
+  })
+  builder.order = vi.fn(() => builder)
   builder.then = (resolve, reject) => Promise.resolve({ data: filtered, error: null }).then(resolve, reject)
   return builder
 }
@@ -33,16 +40,18 @@ vi.mock('../src/lib/supabase', () => ({
     rpc: (...args) => rpcMock(...args),
     from: (table) => {
       if (table === 'memberships') return fakeTable(membershipsRows)
+      if (table === 'playup_requests') return fakeTable(playupRequestRows)
       throw new Error(`playups.test.js: unexpected supabase.from('${table}')`)
     },
   },
 }))
 
-import { addJuniorPlayup, removeJuniorPlayup, listPlayerGuestTeamIds, requestJuniorPlayups, nominateJuniorPlayups, decidePlayupRequest } from '../src/data/playups.js'
+import { addJuniorPlayup, removeJuniorPlayup, listPlayerGuestTeamIds, requestJuniorPlayups, nominateJuniorPlayups, decidePlayupRequest, listPlayupRequests } from '../src/data/playups.js'
 
 beforeEach(() => {
   rpcMock.mockReset()
   membershipsRows = []
+  playupRequestRows = []
 })
 
 describe('addJuniorPlayup / removeJuniorPlayup', () => {
@@ -142,5 +151,16 @@ describe('request / nominate / decide wrappers', () => {
       _yes: true,
       _note: null,
     })
+  })
+
+  it('lists requested rows by default, or the statuses asked for', async () => {
+    playupRequestRows = [
+      { id: 'a', status: 'requested' },
+      { id: 'b', status: 'declined' },
+    ]
+    expect((await listPlayupRequests()).map((row) => row.id)).toEqual(['a'])
+    expect(
+      (await listPlayupRequests({ statuses: ['requested', 'declined'] })).map((row) => row.id),
+    ).toEqual(['a', 'b'])
   })
 })

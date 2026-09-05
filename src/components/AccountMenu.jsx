@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useMemberships } from '../lib/memberships.jsx'
-import { canApproveAnything, isAdmin, parentPreviewTeamIds } from '../lib/scope.js'
+import { canApproveAnything, canSeeClubOps, isAdmin, parentPreviewTeamIds } from '../lib/scope.js'
 import { enterSends, setEnterSends } from '../lib/chatComposer.js'
 import { effectiveTheme, toggleTheme, watchSystemTheme } from '../lib/theme.js'
 import { ViewAsOptions } from './ViewAsSwitcher.jsx'
@@ -149,6 +149,16 @@ function ApprovalsIcon(props) {
   )
 }
 
+function OpsIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+      <path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M8 12h8M8 16h5" />
+    </svg>
+  )
+}
+
 function BellIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
@@ -229,6 +239,7 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
   // admin gets the approvals queue only — same split, and the same
   // realMemberships gate as View-as, so a preview never hides your own door.
   const canApprove = !admin && canApproveAnything(realMemberships)
+  const showOps = canSeeClubOps(realMemberships)
 
   // The chat Enter-sends toggle, lifted off the More tab. Device-level
   // (localStorage via chatComposer.js), so it is read once and flipped in place
@@ -405,6 +416,13 @@ export default function AccountMenu({ firstName, email, roleLabel, signOut, onRe
                 <Link to="/approvals" role="menuitem" data-testid="account-approvals" onClick={() => close({ refocus: false })} className={ITEM}>
                   <ApprovalsIcon className={ICON} />
                   Approvals
+                </Link>
+              )}
+
+              {showOps && (
+                <Link to="/ops" role="menuitem" data-testid="account-ops" onClick={() => close({ refocus: false })} className={ITEM}>
+                  <OpsIcon className={ICON} />
+                  Ops
                 </Link>
               )}
 

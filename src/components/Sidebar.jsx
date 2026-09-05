@@ -45,6 +45,16 @@ function DocumentsIcon(props) {
   )
 }
 
+function OpsIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M8 12h8M8 16h5" />
+    </svg>
+  )
+}
+
 function AdminIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -86,7 +96,7 @@ const ACCOUNTS_PATHS = ['/admin/accounts', '/approvals']
 // pill — the same number the installed icon wears, from useDockBadges. Zero
 // while on /chat, where the list is clearing itself. Jay's ruling over the
 // 23 Aug dot-not-a-number stance, recorded in src/lib/useDockBadges.js.
-export default function Sidebar({ showSquadHub = false, showSeniors = false, showAdmin = false, chatUnread = 0 }) {
+export default function Sidebar({ showSquadHub = false, showSeniors = false, showAdmin = false, showOps = false, chatUnread = 0 }) {
   const { memberships, teams } = useMemberships()
   const location = useLocation()
   const { user } = useAuth()
@@ -191,6 +201,7 @@ export default function Sidebar({ showSquadHub = false, showSeniors = false, sho
     ...(showSeniors ? [{ to: '/seniors', label: 'Seniors', icon: SquadIcon }] : []),
     { to: '/notices', label: 'Notices', icon: NoticesIcon },
     { to: '/documents', label: 'Documents', icon: DocumentsIcon },
+    ...(showOps ? [{ to: '/ops', label: 'Ops', icon: OpsIcon }] : []),
     ...(showAdmin ? [{ to: '/admin', label: 'Admin', icon: AdminIcon }] : []),
   ]
 

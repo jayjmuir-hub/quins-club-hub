@@ -13,7 +13,8 @@ says yes. There is no auto-timeout. Decline (or staff remove) drops the guest
 place and tells staff.
 
 Direct super-admin add still starts as pending parent consent. Coach
-request/nominate and Club Ops are later slices; they do not change this gate.
+request/nominate (slice 2) and Club Ops hybrid C (slice 3, `/ops`) do not
+change this gate.
 
 ## Why this is not `memberships.status`
 

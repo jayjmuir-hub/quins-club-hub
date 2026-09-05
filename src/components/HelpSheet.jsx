@@ -55,6 +55,7 @@ const ROUTE_LABELS = {
   '/chat/dm': 'Messages',
   '/settings': 'Settings',
   '/approvals': 'Approvals',
+  '/ops': 'Club Ops',
   '/game-time': 'Game time',
 }
 

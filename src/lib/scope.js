@@ -139,6 +139,29 @@ export function canRequestPlayup(memberships, teamId) {
 }
 
 /**
+ * Squads whose play-up queue this person may read in Club Ops.
+ * Super admin: every junior squad in `teams`. Head coach / age-group manager:
+ * only the squads `canRequestPlayup` is true for. Assistant/medic: none.
+ */
+export function clubOpsTeamIds(memberships, teams) {
+  if (isSuperAdmin(memberships)) {
+    return (teams ?? []).filter((t) => t.is_senior !== true).map((t) => t.id)
+  }
+  const ids = []
+  for (const row of memberships ?? []) {
+    if (row.team_id && canRequestPlayup(memberships, row.team_id) && !ids.includes(row.team_id)) {
+      ids.push(row.team_id)
+    }
+  }
+  return ids
+}
+
+/** Super admin (club-wide) or head coach / manager of at least one squad. */
+export function canSeeClubOps(memberships) {
+  return isSuperAdmin(memberships) || clubOpsTeamIds(memberships).length > 0
+}
+
+/**
  * Whether this person may approve registrations for at least one squad, and is
  * therefore worth showing an approvals screen to at all.
  *
