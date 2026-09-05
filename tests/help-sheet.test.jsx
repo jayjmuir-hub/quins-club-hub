@@ -207,6 +207,7 @@ describe('routeLabel', () => {
   it('names the screens a member recognises', () => {
     expect(routeLabel('/roster')).toBe('Roster')
     expect(routeLabel('/')).toBe('Home')
+    expect(routeLabel('/ops')).toBe('Club Ops')
   })
 
   it('names the section for a nested route rather than echoing an id', () => {

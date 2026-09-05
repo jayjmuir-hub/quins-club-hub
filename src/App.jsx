@@ -32,7 +32,7 @@ import AdminIcons from './screens/AdminIcons.jsx'
 import AdminRightsLog from './screens/AdminRightsLog.jsx'
 import AdminOfficers from './screens/AdminOfficers.jsx'
 import AdminStaff from './screens/AdminStaff.jsx'
-import AdminPlayupRequests from './screens/AdminPlayupRequests.jsx'
+import ClubOps from './screens/ClubOps.jsx'
 import Accounts from './screens/Accounts.jsx'
 import Pitches from './screens/Pitches.jsx'
 import Allocation from './screens/Allocation.jsx'
@@ -285,6 +285,14 @@ export default function App() {
               read (pitch_occupancy); allocation stays /admin/allocation. */}
           <Route path="/pitch-calendar" element={<AppShell><PitchGlance /></AppShell>} />
 
+          {/* Club Ops hybrid C — outside /admin so a head coach or age-group
+              manager is not turned away by AdminDashboard's isAdmin() gate.
+              Super admin sees the club queue; those hats see their squads.
+              `/admin/playups` (slice 2 inbox) redirects here so old pushes
+              still land. */}
+          <Route path="/ops" element={<AppShell><ClubOps /></AppShell>} />
+          <Route path="/admin/playups" element={<Navigate to="/ops" replace />} />
+
           {/* Admin-only, desktop-only. AdminDashboard gates on isAdmin()
               against the EFFECTIVE membership set and renders <Outlet/>,
               so both tabs below inherit the gate — typing
@@ -320,7 +328,6 @@ export default function App() {
                 every admin is a registrar, and the screen carries no contact
                 detail and no dates. */}
             <Route path="needs-attention" element={<AdminNeedsAttention />} />
-            <Route path="playups" element={<AdminPlayupRequests />} />
             {/* Who gave whom access, and when. ⚠️ THE ONLY ADMIN ROUTE WHOSE
                 AUDIENCE IS NARROWER THAN AdminDashboard's isAdmin() GATE — it
                 records what admins do, so an ordinary admin must not be its

@@ -113,15 +113,16 @@ export async function playupSourcePlayers(sourceTeamId, hostTeamId) {
   return data ?? []
 }
 
-export async function listPlayupRequests() {
-  const { data, error } = await supabase
+export async function listPlayupRequests({ statuses = ['requested'] } = {}) {
+  let query = supabase
     .from('playup_requests')
     .select(
-      'id, status, kind, note, player_id, home_team_id, guest_team_id, requested_by, decision_note, created_at, ' +
+      'id, status, kind, note, player_id, home_team_id, guest_team_id, requested_by, decision_note, created_at, decided_at, ' +
         'players(full_name), home:teams!playup_requests_home_team_id_fkey(name), guest:teams!playup_requests_guest_team_id_fkey(name)',
     )
-    .eq('status', 'requested')
-    .order('created_at', { ascending: true })
+  if (statuses.length === 1) query = query.eq('status', statuses[0])
+  else if (statuses.length > 1) query = query.in('status', statuses)
+  const { data, error } = await query.order('created_at', { ascending: true })
   if (error) throw error
   return data ?? []
 }

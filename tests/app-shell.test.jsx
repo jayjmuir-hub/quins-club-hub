@@ -169,6 +169,19 @@ describe('AppShell', () => {
     expect(screen.getAllByRole('link', { name: 'Notices' })).toHaveLength(1)
   })
 
+  it('offers Ops in the sidebar for a super admin, not on the phone dock', () => {
+    useMembershipsMock.mockReturnValue(
+      loaded({
+        memberships: [
+          { role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, is_super: true },
+        ],
+      }),
+    )
+    renderShell()
+    expect(screen.getAllByRole('link', { name: 'Ops' })).toHaveLength(1)
+    expect(screen.getByRole('link', { name: 'Ops' })).toHaveAttribute('href', '/ops')
+  })
+
   it('renders the crest with a meaningful alt and without a cropping object-fit class', () => {
     // Regression: crest.png is 369x400 (portrait) inside a square badge box.
     // object-cover (or the unstyled default object-fit:fill) either crops or

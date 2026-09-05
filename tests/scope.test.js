@@ -21,6 +21,8 @@ import {
   adminTeamReach,
   ADMIN_TEAM_REACH,
   canRequestPlayup,
+  canSeeClubOps,
+  clubOpsTeamIds,
 } from '../src/lib/scope.js'
 
 // Unit tests for src/lib/scope.js (Task 7: pure membership/scope helpers) and
@@ -1103,5 +1105,29 @@ describe('canRequestPlayup', () => {
         U12.id,
       ),
     ).toBe(false)
+  })
+})
+
+describe('canSeeClubOps / clubOpsTeamIds', () => {
+  it('lets a super admin into Club Ops with every junior squad', () => {
+    const rows = [membership({ role: 'admin', team_id: null, is_super: true })]
+    const teams = [U8, U12, { id: 't-men', name: 'Senior Men', is_senior: true }]
+    expect(canSeeClubOps(rows)).toBe(true)
+    expect(clubOpsTeamIds(rows, teams)).toEqual([U8.id, U12.id])
+  })
+
+  it('lets a head coach and an age-group manager in for their squad only', () => {
+    const hc = [membership({ role: 'coach', team_id: U12.id, is_head_coach: true })]
+    expect(canSeeClubOps(hc)).toBe(true)
+    expect(clubOpsTeamIds(hc, [U8, U12])).toEqual([U12.id])
+    const mgr = [membership({ role: 'manager', team_id: U8.id })]
+    expect(canSeeClubOps(mgr)).toBe(true)
+    expect(clubOpsTeamIds(mgr, [U8, U12])).toEqual([U8.id])
+  })
+
+  it('refuses an assistant coach, a medic, and a parent', () => {
+    expect(canSeeClubOps([membership({ role: 'coach', team_id: U12.id })])).toBe(false)
+    expect(canSeeClubOps([membership({ role: 'medic', team_id: U12.id })])).toBe(false)
+    expect(canSeeClubOps([membership({ role: 'parent', team_id: U12.id, player_id: 'p1' })])).toBe(false)
   })
 })

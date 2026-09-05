@@ -77,7 +77,10 @@ export const NAV_ITEMS = [
   // phone's only entry point is the thing you cannot delete (the 22 Aug
   // handoff's lesson), and a chat nobody can find is a chat nobody uses.
   { to: '/chat', label: 'Chat', icon: ChatIcon },
-  // ⚠️ NO "More" TAB SINCE 29 Aug 2026 (Jay). It was a grab-bag — the You
+  // ⚠️ NO "Ops" TAB ON THIS BAR. Club Ops is a sidebar item (desktop) and an
+  // account-menu row (phone). A sixth dock tab overlaps on a phone — measured
+  // when Squad Hub and Seniors were both spliced in. Eligible people reach
+  // /ops from Home (Club Ops peek) and from the account menu.
   // editor, photo, players, notices, calendar, notification/chat toggles,
   // privacy/delete, sign-out and the admin/approvals doors — and its home is
   // the masthead account menu (AccountMenu.jsx), which already links to /more

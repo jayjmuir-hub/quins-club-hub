@@ -550,6 +550,9 @@ medic and untagged staff are refused by `private.can_request_playup` (42501), no
 in the UI. Super admin `decide_playup_request` yes calls `add_junior_playup`; no closes the
 row and notifies the requester. Migration `db/migrations/20260916_playup_requests.sql`.
 Ordinary coaches never see Request / Nominate. Direct super-admin add (Age groups) still exists.
+Club Ops hybrid C (`/ops`, Home “Club Ops · N open” peek, sidebar/account-menu Ops) is the
+decision inbox: super admin Approve/Decline via `decide_playup_request`; head coach or
+age-group manager sees their squads’ request status. `/admin/playups` redirects to `/ops`.
 
 **A player who has quit is marked LEFT, never deleted.** `players.left_at` non-null is a
 leaver; `left_at IS NULL` means current. `mark_player_left`/`restore_player`

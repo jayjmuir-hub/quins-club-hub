@@ -236,6 +236,7 @@ describe('AccountMenu — the management doors', () => {
     await open(MEDIC_U10)
     expect(screen.queryByTestId('account-approvals')).not.toBeInTheDocument()
     expect(screen.queryByTestId('account-admin')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('account-ops')).not.toBeInTheDocument()
   })
 
   // ⚠️ THE SAFEGUARDING CASE. A pending coach request has the same role and team
@@ -251,5 +252,16 @@ describe('AccountMenu — the management doors', () => {
     await open(PARENT)
     expect(screen.queryByTestId('account-approvals')).not.toBeInTheDocument()
     expect(screen.queryByTestId('account-admin')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('account-ops')).not.toBeInTheDocument()
+  })
+
+  it('gives a super admin the Ops door', async () => {
+    await open([{ id: 'm-sa', role: 'admin', admin_rights: ['clubadmin'], status: 'active', team_id: null, club_id: 'c1', is_super: true }])
+    expect(screen.getByTestId('account-ops')).toHaveAttribute('href', '/ops')
+  })
+
+  it('gives a head coach the Ops door, not an assistant', async () => {
+    await open([{ id: 'm-hc', role: 'coach', team_id: 'team-u10', club_id: 'c1', status: 'active', is_head_coach: true }])
+    expect(screen.getByTestId('account-ops')).toHaveAttribute('href', '/ops')
   })
 })

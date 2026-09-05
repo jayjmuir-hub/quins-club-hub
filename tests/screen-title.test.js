@@ -17,6 +17,8 @@ describe('screenName', () => {
     expect(screenName('/documents')).toBe('Documents')
     expect(screenName('/notices')).toBe('Notices')
     expect(screenName('/admin')).toBe('Admin')
+    expect(screenName('/ops')).toBe('Club Ops')
+    expect(screenName('/admin/playups')).toBe('Club Ops')
   })
 
   it('⚠️ a longer prefix wins — /chat never swallows /chat/starred', () => {

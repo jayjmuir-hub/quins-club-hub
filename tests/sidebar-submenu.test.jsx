@@ -266,6 +266,18 @@ describe('Admin sub-menu', () => {
   })
 })
 
+describe('Club Ops sidebar item', () => {
+  it('is offered when showOps is set, and is not on the dock list', () => {
+    renderAt('/', { showOps: true })
+    expect(screen.getByRole('link', { name: 'Ops' })).toHaveAttribute('href', '/ops')
+  })
+
+  it('is absent unless showOps is set', () => {
+    renderAt('/')
+    expect(screen.queryByRole('link', { name: 'Ops' })).not.toBeInTheDocument()
+  })
+})
+
 describe('the Chat unread count (4 Sep 2026)', () => {
   // Jay, asked "dot or number" against the 23 Aug dot-only ruling: number.
   // The sidebar wears the same count the installed icon does; the phone dock
