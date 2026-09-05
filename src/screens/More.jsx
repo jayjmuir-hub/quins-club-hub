@@ -363,6 +363,13 @@ export default function More() {
   // snap, and once it has landed they are no-ops. The `typeof` guard keeps a
   // late timer harmless if the element or its scrollIntoView has gone (unmount,
   // or a test that stubs it).
+  //
+  // ⚠️ AND THE APP-LEVEL CHROME MUST NOT UNDO THIS. useScreenChrome scrolls
+  // to 0 on every pathname change (UX review item 7). That is the right
+  // default for a new screen and the wrong default for a fragment: on a
+  // phone it focuses <main> and iOS jumps there after this effect has
+  // already scrolled. The chrome skips the top-reset when a hash is
+  // present; this effect still owns the settle-window corrections.
   const { hash } = useLocation()
   useEffect(() => {
     if (!hash) return undefined
@@ -515,7 +522,7 @@ export default function More() {
           the component is shared, not copied. */}
       {/* `id`/`scroll-mt` so the account menu's "Add to your calendar" row can
           land here, the same hash-scroll the Notifications section uses. */}
-      <div id="your-calendar" className="scroll-mt-24">
+      <div id="your-calendar" className="scroll-mt-24" tabIndex={-1}>
         <SectionTitle>Your calendar</SectionTitle>
         <Card className="p-[14px]">
           <CalendarSubscribe />
@@ -532,7 +539,7 @@ export default function More() {
           claude/plans/2026-08-18-push-notifications.md. */}
       {/* `scroll-mt` keeps the title clear of the sticky masthead when the
           #notifications hash scroll (above) lands here. */}
-      <div id="notifications" className="scroll-mt-24">
+      <div id="notifications" className="scroll-mt-24" tabIndex={-1}>
         <SectionTitle>Notifications</SectionTitle>
         <Card className="p-4">
           <PushNotificationsToggle />
