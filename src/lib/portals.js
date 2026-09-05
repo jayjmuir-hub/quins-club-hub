@@ -64,6 +64,7 @@ export const PORTALS = [
       // birth (see the screen's header), so it hands nobody anything they could
       // not already read on the Accounts screen.
       { to: '/admin/needs-attention', label: 'Needs attention' },
+      { to: '/admin/playups', label: 'Play-ups', superOnly: true },
       // ⚠️ SUPER ADMINS ONLY, AND THIS IS THE FIRST TAB IN THE FILE THAT IS NOT
       // VISIBLE TO EVERY HOLDER OF ITS PORTAL. The portal gate is `right`, and
       // Club Hub Admin has none — every admin holds it. This log records what

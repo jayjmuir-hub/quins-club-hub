@@ -543,6 +543,14 @@ has U13 Mixed in `teams`), with a Play-up badge for staff, and the row lives onl
 is unchanged. Never print "No age group" for a guest whose `team_id` resolves.
 Ruling: `claude/decisions/2026-09-05-playup-parent-consent.md`.
 
+**A play-up request does not create the guest.** Head coach (`is_head_coach`) or age-group
+manager of the host files `request_junior_playups`; the same hats on the home squad file
+`nominate_junior_playups`. Both insert `playup_requests` at `requested`. Assistant coach,
+medic and untagged staff are refused by `private.can_request_playup` (42501), not only hidden
+in the UI. Super admin `decide_playup_request` yes calls `add_junior_playup`; no closes the
+row and notifies the requester. Migration `db/migrations/20260916_playup_requests.sql`.
+Ordinary coaches never see Request / Nominate. Direct super-admin add (Age groups) still exists.
+
 **A player who has quit is marked LEFT, never deleted.** `players.left_at` non-null is a
 leaver; `left_at IS NULL` means current. `mark_player_left`/`restore_player`
 (`db/migrations/20260902_player_leavers.sql`,

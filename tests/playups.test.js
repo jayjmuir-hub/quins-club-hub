@@ -38,7 +38,7 @@ vi.mock('../src/lib/supabase', () => ({
   },
 }))
 
-import { addJuniorPlayup, removeJuniorPlayup, listPlayerGuestTeamIds } from '../src/data/playups.js'
+import { addJuniorPlayup, removeJuniorPlayup, listPlayerGuestTeamIds, requestJuniorPlayups, nominateJuniorPlayups, decidePlayupRequest } from '../src/data/playups.js'
 
 beforeEach(() => {
   rpcMock.mockReset()
@@ -105,5 +105,42 @@ describe('listPlayerGuestTeamIds', () => {
       { player_id: 'p-other', team_id: 't-u16', status: 'active' },
     ]
     await expect(listPlayerGuestTeamIds('p-u14', 't-u14')).resolves.toEqual(['t-u16'])
+  })
+})
+
+describe('request / nominate / decide wrappers', () => {
+  it('calls request_junior_playups with the player ids and host squad', async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null })
+    await requestJuniorPlayups({ playerIds: ['p-u13'], guestTeamId: 't-u14b', note: 'cover' })
+    expect(rpcMock).toHaveBeenCalledWith('request_junior_playups', {
+      _players: ['p-u13'],
+      _guest_team: 't-u14b',
+      _note: 'cover',
+    })
+  })
+
+  it('calls nominate_junior_playups', async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null })
+    await nominateJuniorPlayups({ playerIds: ['p-u13'], guestTeamId: 't-u14b', note: '' })
+    expect(rpcMock).toHaveBeenCalledWith('nominate_junior_playups', {
+      _players: ['p-u13'],
+      _guest_team: 't-u14b',
+      _note: null,
+    })
+  })
+
+  it('calls decide_playup_request and surfaces a super-admin refusal', async () => {
+    rpcMock.mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'Only a super admin can approve or decline a play-up request.' },
+    })
+    await expect(decidePlayupRequest('req-1', true, '')).rejects.toThrow(
+      'Only a super admin can approve or decline a play-up request.',
+    )
+    expect(rpcMock).toHaveBeenCalledWith('decide_playup_request', {
+      _id: 'req-1',
+      _yes: true,
+      _note: null,
+    })
   })
 })

@@ -74,6 +74,7 @@ vi.mock('../src/data/players.js', () => ({
 vi.mock('../src/data/playups.js', () => ({
   listMyPendingPlayups: async () => [],
   answerJuniorPlayup: async () => {},
+  listPlayupRequests: async () => [],
 }))
 
 // The Squad contacts block (13 Aug 2026). Mocked here so this file stays

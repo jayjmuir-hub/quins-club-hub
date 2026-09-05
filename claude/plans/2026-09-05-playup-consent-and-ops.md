@@ -1,6 +1,6 @@
 # Junior play-up — parent consent, request/nominate, Club Ops (hybrid C)
 
-**STATUS: SLICE 1 BUILT in this pull request.** Slices 2–3 are specified here
+**STATUS: SLICES 1–2 BUILT.** Slice 3 (Club Ops hybrid C) is specified here
 and not built. Dated 2026-09-05. Jay approved the full design the same day
 (“go for everything”). Ruling:
 `claude/decisions/2026-09-05-playup-parent-consent.md`.
@@ -30,10 +30,30 @@ After a super-admin adds a junior play-up guest (existing Age groups UI /
   screen, every add-to-lineup path, and a `lineup_players` trigger).
 - Direct super-admin add (no coach request yet) still starts **pending**.
 
-### Slice 2 (later) — Request play-up / Nominate + head-coach flag
+### Slice 2 — Request play-up / Nominate + head-coach flag
 
-Host or home coaches request/nominate; head-coach flag as specified when
-that slice is picked up. Not in this PR.
+Host or home **head coach** (`memberships.is_head_coach`) or **age-group manager**
+(`role = manager` on that squad) may file. Not assistant Coach, Medic, or
+untagged staff. Super admin Approve/Decline is the second gate; parent consent
+is still slice 1.
+
+Migration `db/migrations/20260916_playup_requests.sql` is **not applied to live
+from this PR** — Jay/Grok apply it after 20260913–20260915. Harness
+`db/tests/junior-playup-request.sql`.
+
+RPCs (security definer, `search_path = public`, anon EXECUTE revoked by name):
+
+| RPC | Who |
+|---|---|
+| `request_junior_playups(_players, _guest_team, _note)` | head coach or manager of the **host** |
+| `nominate_junior_playups(_players, _guest_team, _note)` | head coach or manager of the player's **home** |
+| `playup_source_players(_source_team, _host_team)` | same host gate; names only |
+| `decide_playup_request(_id, _yes, _note)` | super admin; yes calls `add_junior_playup` |
+
+A request does **not** create a guest. Status `requested` until Approve
+(`approved` + guest twins pending consent) or Decline (`declined` + notify
+requester). Thin inbox: `/admin/playups` + Home peek for super admins. Club Ops
+hybrid C remains slice 3.
 
 ### Slice 3 (later) — Club Ops hybrid C
 
@@ -85,5 +105,9 @@ which no-ops when `app.harness = on`.
 1. Apply `db/migrations/20260913_junior_playup.sql` if it is not already on
    live (order first).
 2. Apply `db/migrations/20260914_junior_playup_consent.sql`.
-3. `npm run db:check -- junior-playup` and `npm run db:check -- junior-playup-consent`.
-4. Bare `npm run db:check` before treating production as done.
+3. Apply `db/migrations/20260915_playup_staff_fix.sql` if live still has the
+   record[] `playup_staff` body.
+4. Apply `db/migrations/20260916_playup_requests.sql` (slice 2).
+5. `npm run db:check -- junior-playup`, `junior-playup-consent`, and
+   `junior-playup-request`.
+6. Bare `npm run db:check` before treating production as done.
