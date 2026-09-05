@@ -1409,3 +1409,48 @@ rolled-back live run before this file was committed: both sides read and
 write; the trigger sets `admin_note` for the admin and leaves it for the
 reporter; another member reads none and cannot write; a message cannot be
 written under another name; anon holds nothing.
+
+## 20260917_chat_and_admin_counts — three badge counts move into the database (5 Sep 2026)
+
+**Why.** A performance review of the live app. `countUnreadMessages` fetched
+every `message_reads` row the caller could see — no filter, no limit — and
+subtracted in the browser. PostgREST caps a response at `db-max-rows` (1000
+here), and the author arm added by `20260826_chat_delivery_receipts` returns
+other people's reads of the caller's own posts, so a coach whose post 300
+parents read gets 300 rows for one message. Measured on production the day it
+was found: 197 messages ever posted, one person already receiving 300 rows.
+Past the cap the recent receipts are the ones dropped, messages already read
+look unread, and the duplicate-ignoring mark-read upsert can never clear them.
+Not slow — wrong, and within a season.
+
+**What it adds.** Three `SECURITY INVOKER` functions, each the client's own
+query moved server-side so it sees exactly the caller's rows under the
+caller's policies:
+
+- `count_unread_messages()` — last 14 days, not deleted, not mine, no receipt
+  of mine. One integer. In `READ_RPCS` so a stall times out and retries.
+- `mark_unread_delivered()` — inserts the missing `message_deliveries` rows
+  in one statement and returns how many. Replaces an upsert of every unread
+  id on every recount in every open tab (a parent with 200 unread wrote 200
+  rows per message posted club-wide). A write: NOT in `READ_RPCS`.
+- `count_admin_waiting()` — waiting (no membership, not dismissed) + pending
+  rows + reports that are new or in progress with the reporter's word last.
+  Replaces five table reads and a client-side join on every change to four
+  tables, per admin. In `READ_RPCS`.
+
+**Client half, same PR.** `listMyMessageReads(selfId, messageIds)` asks only
+for my receipts on the ids on screen. Every realtime subscriber now shares one
+channel per table (`src/data/subscribeToTable.js`), and a thread filters the
+shared `messages` stream to its own rows, failing open on a DELETE.
+
+**Proof.** `db/tests/chat-and-admin-counts.sql`, eleven steps, green on the
+rolled-back live run before this file was committed; the author control went
+red under an injected fault (the `author_id` test removed), and a control
+query afterwards found none of the three functions, no fixture rows, and the
+`messages_touch` trigger still enabled. Two fixture traps the file records:
+`messages_touch` freezes every column but `body`, so the age/delete steps
+disable it for the transaction; and a profile created with no name is
+auto-dismissed by `hold_bare_signup`, so the "waiting" stranger carries a
+name. Client: `tests/subscribe-to-table-shared.test.js`,
+`tests/messages-data.test.js`, `tests/count-admin-waiting.test.js`,
+`tests/data.test.js`.
